@@ -1,6 +1,9 @@
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Describes your infrastructure at a high level. After editing, run:
+# Copy this file to infra.yml and customize it:
+#   cp infra.yml.example infra.yml
+#
+# Then run:
 #   make sync        # Generate/update Ansible files
 #   make apply       # Apply to Incus
 #
@@ -8,13 +11,30 @@
 #
 # The generated Ansible files (inventory/, group_vars/, host_vars/) are
 # the Secondary Source of Truth. You can freely edit them outside the
-# === MANAGED === sections. Both this file and the generated files
-# should be committed to git.
+# === MANAGED === sections.
+
+# ── Subnet selection ─────────────────────────────────────────
+#
+# base_subnet defines the first two octets of all your domain networks.
+# Each domain gets: <base_subnet>.<subnet_id>.0/24
+#
+# Choose a range that does NOT conflict with your existing LAN:
+#   - 192.168.x.x — common home/office LANs (may conflict!)
+#   - 10.x.x.x    — large private range, less likely to conflict
+#   - 172.16-31.x.x — another private range option
+#
+# If your home network is 10.10.0.0/24 or 10.10.1.0/24,
+# consider using 10.10 or 172.16 as base_subnet to avoid conflicts.
+#
+# RFC 1918 private address ranges:
+#   10.0.0.0/8       (10.0.0.0 – 10.255.255.255)
+#   172.16.0.0/12    (172.16.0.0 – 172.31.255.255)
+#   10.10.0.0/16   (10.10.0.0 – 10.10.255.255)
 
 project_name: my-infra
 
 global:
-  base_subnet: "192.168"              # Domains use <base_subnet>.<subnet_id>.0/24
+  base_subnet: "10.10"               # Domains use <base_subnet>.<subnet_id>.0/24
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
@@ -24,12 +44,12 @@ domains: {}
   #
   # admin:
   #   description: "Administration and orchestration"
-  #   subnet_id: 0                     # → 192.168.0.0/24 (unique, 0-254)
+  #   subnet_id: 0                     # → 10.10.0.0/24 (unique, 0-254)
   #   machines:
   #     admin-ansible:
   #       description: "Ansible controller — drives the whole infra"
   #       type: lxc                    # "lxc" or "vm"
-  #       ip: "192.168.0.10"           # Static IP (omit for DHCP)
+  #       ip: "10.10.0.10"           # Static IP (omit for DHCP)
   #       config:
   #         security.nesting: "true"
   #       roles:
@@ -42,7 +62,7 @@ domains: {}
   #     dev-workspace:
   #       description: "Main development workspace"
   #       type: lxc
-  #       ip: "192.168.1.10"
+  #       ip: "10.10.1.10"
   #       config:
   #         limits.cpu: "4"
   #         limits.memory: "8GiB"
@@ -65,7 +85,7 @@ domains: {}
   #     llm-server:
   #       description: "Local LLM inference server"
   #       type: lxc
-  #       ip: "192.168.2.10"
+  #       ip: "10.10.2.10"
   #       gpu: true
   #       profiles:
   #         - default
