@@ -129,6 +129,8 @@ phase N is complete and validated.
 - `docs/quickstart.md`
 - `docs/lab-teaching.md`
 - `docs/gpu-llm.md`
+- `docs/host-setup-debian.md` — Debian 13 host installation guide (Incus, backports, GPU)
+- `docs/host-setup-archlinux.md` — Arch Linux host installation guide (based on existing bootstrap)
 - `CONTRIBUTING.md`
 
 ---

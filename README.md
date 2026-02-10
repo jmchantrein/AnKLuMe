@@ -54,14 +54,32 @@ infra.yml          →    make sync    →    Ansible files    →    make apply
 3. **Enrich** the generated files with your custom variables (Secondary Source of Truth)
 4. **Apply**: `make apply` — networks, projects, profiles, instances, provisioning
 
+## Prerequisites
+
+Before using AnKLuMe, you need:
+
+1. **A Linux host** with [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
+   installed and initialized
+2. **An admin instance** (LXC container or VM) named `admin-ansible`, with:
+   - The Incus socket mounted (`/var/run/incus/unix.socket`)
+   - Ansible, Python 3.11+, git installed
+3. **This repository** cloned inside the admin instance
+
+AnKLuMe runs entirely from inside the admin instance. It never modifies
+the host directly — everything goes through the Incus socket.
+
+> Host installation guides for Debian and Arch Linux: see [ROADMAP](docs/ROADMAP.md).
+
 ## Quick start
+
+Inside the `admin-ansible` instance:
 
 ```bash
 # Clone
 git clone https://github.com/<user>/anklume.git
 cd anklume
 
-# Install dependencies
+# Install Ansible dependencies
 make init
 
 # Create your infrastructure descriptor
