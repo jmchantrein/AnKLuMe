@@ -21,8 +21,8 @@ lint-ansible: ## Validate Ansible roles and playbooks
 	ansible-lint
 
 lint-shell: ## Validate shell scripts
-	@if compgen -G "scripts/*.sh" > /dev/null; then \
-		shellcheck scripts/*.sh; \
+	@if compgen -G "scripts/*.sh" > /dev/null || compgen -G "scripts/hooks/*" > /dev/null; then \
+		shellcheck scripts/*.sh scripts/hooks/*; \
 	else \
 		echo "No shell scripts found, skipping shellcheck"; \
 	fi
@@ -79,13 +79,19 @@ test-roles: ## Run Molecule tests for all roles
 	done
 
 # ── Setup ─────────────────────────────────────────────────
-init: ## Initial setup: install all dependencies
+init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
 	pip install --user pyyaml pytest molecule ruff
 	@echo "---"
 	@echo "Also install system packages: ansible-lint yamllint shellcheck"
 	@echo "  Arch:   pacman -S ansible-lint yamllint shellcheck"
 	@echo "  Debian: apt install ansible-lint yamllint shellcheck"
+
+install-hooks: ## Install git pre-commit hooks
+	@mkdir -p .git/hooks
+	@cp scripts/hooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Git hooks installed. Use --no-verify to bypass."
 
 # ── Help ──────────────────────────────────────────────────
 help: ## Show this help
@@ -95,4 +101,4 @@ help: ## Show this help
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-limit snap snap-restore snap-list snap-delete \
-        test test-generator test-roles init help
+        test test-generator test-roles init install-hooks help
