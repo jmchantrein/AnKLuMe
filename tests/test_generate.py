@@ -11,7 +11,7 @@ def sample_infra():
     return {
         "project_name": "test-infra",
         "global": {
-            "base_subnet": "192.168",
+            "base_subnet": "10.100",
             "default_os_image": "images:debian/13",
             "default_connection": "community.general.incus",
             "default_user": "root",
@@ -24,7 +24,7 @@ def sample_infra():
                     "admin-ctrl": {
                         "description": "Controller",
                         "type": "lxc",
-                        "ip": "192.168.0.10",
+                        "ip": "10.100.0.10",
                         "config": {"security.nesting": "true"},
                         "roles": ["base_system"],
                     },
@@ -37,7 +37,7 @@ def sample_infra():
                     "dev-ws": {
                         "description": "Dev workspace",
                         "type": "lxc",
-                        "ip": "192.168.1.10",
+                        "ip": "10.100.1.10",
                     },
                 },
             },
@@ -53,7 +53,7 @@ def infra_file(tmp_path, sample_infra):
     return p
 
 
-# ── load_infra ───────────────────────────────────────────────
+# -- load_infra ---------------------------------------------------------------
 
 
 class TestLoadInfra:
@@ -63,7 +63,7 @@ class TestLoadInfra:
         assert "admin" in data["domains"]
 
 
-# ── validate ─────────────────────────────────────────────────
+# -- validate ------------------------------------------------------------------
 
 
 class TestValidate:
@@ -83,11 +83,11 @@ class TestValidate:
         assert any("duplicate" in e for e in validate(sample_infra))
 
     def test_duplicate_ip(self, sample_infra):
-        sample_infra["domains"]["work"]["machines"]["dev-ws"]["ip"] = "192.168.0.10"
-        assert any("IP 192.168.0.10 already used" in e for e in validate(sample_infra))
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["ip"] = "10.100.0.10"
+        assert any("IP 10.100.0.10 already used" in e for e in validate(sample_infra))
 
     def test_ip_wrong_subnet(self, sample_infra):
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "192.168.1.10"
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.1.10"
         assert any("not in subnet" in e for e in validate(sample_infra))
 
     def test_invalid_domain_name(self, sample_infra):
@@ -110,8 +110,18 @@ class TestValidate:
         sample_infra["domains"] = {}
         assert validate(sample_infra) == []
 
+    def test_ephemeral_validation_error(self, sample_infra):
+        sample_infra["domains"]["admin"]["ephemeral"] = "yes"
+        errors = validate(sample_infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
 
-# ── generate ─────────────────────────────────────────────────
+    def test_ephemeral_machine_validation_error(self, sample_infra):
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ephemeral"] = "yes"
+        errors = validate(sample_infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+
+# -- generate ------------------------------------------------------------------
 
 
 class TestGenerate:
@@ -128,7 +138,7 @@ class TestGenerate:
         generate(sample_infra, tmp_path)
         content = (tmp_path / "inventory" / "admin.yml").read_text()
         assert "admin-ctrl" in content
-        assert "192.168.0.10" in content
+        assert "10.100.0.10" in content
 
     def test_group_vars_all(self, sample_infra, tmp_path):
         generate(sample_infra, tmp_path)
@@ -140,14 +150,14 @@ class TestGenerate:
         generate(sample_infra, tmp_path)
         content = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "net-admin" in content
-        assert "192.168.0.0/24" in content
-        assert "192.168.0.1" in content
+        assert "10.100.0.0/24" in content
+        assert "10.100.0.254" in content
 
     def test_host_vars_content(self, sample_infra, tmp_path):
         generate(sample_infra, tmp_path)
         content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
         assert "instance_type: lxc" in content
-        assert "192.168.0.10" in content
+        assert "10.100.0.10" in content
         assert "base_system" in content
         assert "security.nesting" in content
 
@@ -196,7 +206,61 @@ class TestGenerate:
         assert "gpu-compute" in gv
 
 
-# ── detect_orphans ───────────────────────────────────────────
+# -- ephemeral -----------------------------------------------------------------
+
+
+class TestEphemeral:
+    def test_ephemeral_default_false(self, sample_infra, tmp_path):
+        """Domain without ephemeral -> host_vars contains instance_ephemeral: false."""
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_ephemeral: false" in content
+        gv = (tmp_path / "group_vars" / "admin.yml").read_text()
+        assert "domain_ephemeral: false" in gv
+
+    def test_ephemeral_domain_true(self, sample_infra, tmp_path):
+        """Domain with ephemeral: true -> machines inherit instance_ephemeral: true."""
+        sample_infra["domains"]["admin"]["ephemeral"] = True
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_ephemeral: true" in content
+        gv = (tmp_path / "group_vars" / "admin.yml").read_text()
+        assert "domain_ephemeral: true" in gv
+
+    def test_ephemeral_machine_override(self, sample_infra, tmp_path):
+        """Domain ephemeral: true + machine ephemeral: false -> machine gets false."""
+        sample_infra["domains"]["admin"]["ephemeral"] = True
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ephemeral"] = False
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_ephemeral: false" in content
+
+    def test_ephemeral_validation_error(self, sample_infra):
+        """ephemeral: 'yes' (string) -> validation error."""
+        sample_infra["domains"]["admin"]["ephemeral"] = "yes"
+        errors = validate(sample_infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+    def test_orphan_protection(self, sample_infra, tmp_path):
+        """Protected orphan is reported but not deleted by --clean-orphans."""
+        generate(sample_infra, tmp_path)
+        # Create an orphan file that has ephemeral: false (protected)
+        orphan_hv = tmp_path / "host_vars" / "old-machine.yml"
+        orphan_hv.write_text("instance_ephemeral: false\ninstance_name: old-machine\n")
+        # Create an unprotected orphan
+        orphan_eph = tmp_path / "host_vars" / "temp-machine.yml"
+        orphan_eph.write_text("instance_ephemeral: true\ninstance_name: temp-machine\n")
+
+        orphans = detect_orphans(sample_infra, tmp_path)
+        assert len(orphans) == 2
+
+        # Verify protection flags
+        orphan_dict = {o[0].stem: o[1] for o in orphans}
+        assert orphan_dict["old-machine"] is True  # protected
+        assert orphan_dict["temp-machine"] is False  # not protected
+
+
+# -- detect_orphans ------------------------------------------------------------
 
 
 class TestOrphans:
