@@ -136,3 +136,22 @@ validation.
 
 **Consequence**: Contributors must have all validators installed. `make init`
 installs them.
+
+---
+
+## ADR-013: Snapshot MVP via shell script, not Ansible role
+
+**Context**: Snapshot and restore are imperative, one-shot operations ("take a
+snapshot now", "restore to this snapshot now"). They do not follow the
+declarative reconciliation pattern (read/compare/create/update/orphans) that
+all infra roles use. An Ansible playbook would be a glorified for-loop around
+`incus snapshot` with unnecessary overhead.
+
+**Decision**: The snapshot MVP is `scripts/snap.sh`, a standalone Bash script
+wrapping `incus snapshot` CLI commands. It queries Incus directly
+(`incus list --all-projects`) to resolve instance-to-project mappings.
+Supports `self` keyword to auto-detect the current instance via `hostname`.
+
+**Consequence**: Makefile snapshot targets invoke `scripts/snap.sh`. Validated
+by `shellcheck`. A declarative Ansible role may supersede this in a future
+phase if pre/post hooks or scheduling are needed.

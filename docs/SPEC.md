@@ -203,7 +203,47 @@ Every infra role follows exactly this 6-step pattern:
 5. **Update** what exists but differs
 6. **Detect orphans** — report, delete if `auto_cleanup: true`
 
-## 8. Validators
+## 8. Snapshots (scripts/snap.sh)
+
+Imperative operations (not declarative reconciliation). Wraps `incus snapshot`.
+
+### Interface
+
+```bash
+scripts/snap.sh create  <instance|self> [snap-name]    # Default name: snap-YYYYMMDD-HHMMSS
+scripts/snap.sh restore <instance|self> <snap-name>
+scripts/snap.sh list    [instance|self]                 # All instances if omitted
+scripts/snap.sh delete  <instance|self> <snap-name>
+```
+
+### Makefile targets
+
+```bash
+make snap              I=<name|self> [S=<snap>]   # Create
+make snap-restore      I=<name|self>  S=<snap>    # Restore
+make snap-list        [I=<name|self>]              # List
+make snap-delete       I=<name|self>  S=<snap>    # Delete
+```
+
+### Instance-to-project resolution
+
+Queries `incus list --all-projects --format json` to find which Incus project
+contains the instance. ADR-008 (globally unique names) guarantees unambiguous
+resolution.
+
+### "self" keyword
+
+When `I=self`, the script uses `hostname` to detect the current instance name.
+Works from any instance with access to the Incus socket (typically the admin
+container). Fails with a clear error if the hostname is not found.
+
+### Self-restore safety
+
+Restoring the instance you are running inside kills your session. The script
+warns and asks for confirmation (`Type 'yes' to confirm`). Use `--force` to
+skip the prompt (for scripted use).
+
+## 9. Validators
 
 Every file type has a dedicated validator. No file escapes validation.
 
@@ -218,7 +258,7 @@ Every file type has a dedicated validator. No file escapes validation.
 
 `make lint` runs all validators in sequence. CI must pass all of them.
 
-## 9. Development workflow
+## 10. Development workflow
 
 This project follows **spec-driven, test-driven development**:
 
@@ -229,7 +269,7 @@ This project follows **spec-driven, test-driven development**:
 5. **Review**: Run the reviewer agent
 6. **Commit**: Only when everything passes
 
-## 10. Tech stack
+## 11. Tech stack
 
 | Component | Version | Role |
 |-----------|---------|------|
@@ -243,7 +283,7 @@ This project follows **spec-driven, test-driven development**:
 | shellcheck | — | Shell script validation |
 | ruff | — | Python linting |
 
-## 11. Out of scope
+## 12. Out of scope
 
 Managed manually or by host bootstrap scripts:
 - NVIDIA driver installation/configuration

@@ -54,14 +54,17 @@ apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
 # ── Snapshots ─────────────────────────────────────────────
-snapshot: ## Snapshot all instances
-	ansible-playbook snapshot.yml
+snap: ## Create snapshot (I=<instance|self> [S=<name>])
+	@bash scripts/snap.sh create $(I) $(S)
 
-snapshot-domain: ## Snapshot a domain (G=<group>)
-	ansible-playbook snapshot.yml -e "targets=$(G)"
+snap-restore: ## Restore snapshot (I=<instance|self> S=<snap-name>)
+	@bash scripts/snap.sh restore $(I) $(S)
 
-restore: ## Restore a snapshot (NAME=<n>)
-	ansible-playbook snapshot.yml -e "action=restore" -e "name=$(NAME)"
+snap-list: ## List snapshots ([I=<instance|self>])
+	@bash scripts/snap.sh list $(I)
+
+snap-delete: ## Delete snapshot (I=<instance|self> S=<snap-name>)
+	@bash scripts/snap.sh delete $(I) $(S)
 
 # ── Testing ───────────────────────────────────────────────
 test: test-generator test-roles ## Run all tests
@@ -91,5 +94,5 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-limit snapshot snapshot-domain restore test test-generator \
-        test-roles init help
+        apply-limit snap snap-restore snap-list snap-delete \
+        test test-generator test-roles init help
