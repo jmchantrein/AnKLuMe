@@ -71,13 +71,31 @@ phase N is complete and validated.
 
 ## Phase 4: Snapshots
 
-**Goal**: `make snapshot` / `make restore`
+### Phase 4a: Imperative snapshot MVP (ADR-013)
+
+**Goal**: `make snap` / `make snap-restore` via shell script
+
+**Deliverables**:
+- `scripts/snap.sh` — Bash wrapper around `incus snapshot`
+- `self` keyword for auto-detection from inside an instance
+- `tests/test_snap.py` — pytest suite with mocked `incus`
+- Makefile targets: `snap`, `snap-restore`, `snap-list`, `snap-delete`
+
+**Validation criteria**:
+- [x] `shellcheck` clean
+- [x] Individual instance snapshot/restore
+- [x] `self` detection via hostname
+- [x] Self-restore safety warning
+- [x] All pytest tests pass
+
+### Phase 4b: Declarative snapshots (future, if needed)
+
+**Goal**: Ansible role with pre/post hooks, scheduling
 
 **Deliverables**:
 - `roles/incus_snapshots/`
 - `snapshot.yml`
-- Individual, per-domain, and global snapshots
-- Restore + delete
+- Pre/post hooks (stop services before snapshot, etc.)
 
 ---
 
