@@ -44,7 +44,7 @@ def validate(infra):
         return errors
 
     domains = infra.get("domains") or {}
-    base_subnet = infra.get("global", {}).get("base_subnet", "192.168")
+    base_subnet = infra.get("global", {}).get("base_subnet", "10.100")
     subnet_ids, all_machines, all_ips = {}, {}, {}
 
     for dname, domain in domains.items():
@@ -60,6 +60,10 @@ def validate(infra):
         else:
             subnet_ids[sid] = dname
 
+        domain_eph = domain.get("ephemeral")
+        if domain_eph is not None and not isinstance(domain_eph, bool):
+            errors.append(f"Domain '{dname}': ephemeral must be a boolean, got {type(domain_eph).__name__}")
+
         domain_profiles = set(domain.get("profiles") or {})
         for mname, machine in (domain.get("machines") or {}).items():
             if mname in all_machines:
@@ -74,6 +78,9 @@ def validate(infra):
                     all_ips[ip] = mname
                 if sid is not None and not ip.startswith(f"{base_subnet}.{sid}."):
                     errors.append(f"Machine '{mname}': IP {ip} not in subnet {base_subnet}.{sid}.0/24")
+            machine_eph = machine.get("ephemeral")
+            if machine_eph is not None and not isinstance(machine_eph, bool):
+                errors.append(f"Machine '{mname}': ephemeral must be a boolean, got {type(machine_eph).__name__}")
             for p in machine.get("profiles") or []:
                 if p != "default" and p not in domain_profiles:
                     errors.append(f"Machine '{mname}': profile '{p}' not defined in domain '{dname}'")
@@ -117,7 +124,7 @@ def generate(infra, base_dir, dry_run=False):
     # group_vars/all.yml
     all_vars = {k: v for k, v in {
         "project_name": infra.get("project_name"),
-        "base_subnet": g.get("base_subnet", "192.168"),
+        "base_subnet": g.get("base_subnet", "10.100"),
         "default_os_image": g.get("default_os_image"),
         "default_connection": g.get("default_connection"),
         "default_user": g.get("default_user"),
@@ -128,7 +135,7 @@ def generate(infra, base_dir, dry_run=False):
     for dname, domain in domains.items():
         machines = domain.get("machines") or {}
         sid = domain.get("subnet_id")
-        bs = g.get("base_subnet", "192.168")
+        bs = g.get("base_subnet", "10.100")
 
         # inventory/<domain>.yml
         hosts = {}
@@ -139,11 +146,13 @@ def generate(infra, base_dir, dry_run=False):
         written.append(fp)
 
         # group_vars/<domain>.yml
+        domain_ephemeral = domain.get("ephemeral", False)
         gvars = {k: v for k, v in {
             "domain_name": dname,
             "domain_description": domain.get("description", ""),
+            "domain_ephemeral": domain_ephemeral,
             "incus_project": dname,
-            "incus_network": {"name": f"net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.1"},
+            "incus_network": {"name": f"net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
             "subnet_id": sid,
             "ansible_connection": g.get("default_connection"),
             "ansible_user": g.get("default_user"),
@@ -155,11 +164,14 @@ def generate(infra, base_dir, dry_run=False):
 
         # host_vars/<machine>.yml
         for mname, m in machines.items():
+            machine_eph = m.get("ephemeral")
+            instance_ephemeral = machine_eph if machine_eph is not None else domain_ephemeral
             hvars = {k: v for k, v in {
                 "instance_name": mname,
                 "instance_type": m.get("type", "lxc"),
                 "instance_description": m.get("description", ""),
                 "instance_domain": dname,
+                "instance_ephemeral": instance_ephemeral,
                 "instance_os_image": m.get("os_image", g.get("default_os_image")),
                 "instance_ip": m.get("ip"),
                 "instance_gpu": m.get("gpu"),
@@ -175,22 +187,64 @@ def generate(infra, base_dir, dry_run=False):
 
 
 def detect_orphans(infra, base_dir):
-    """Return file paths that exist on disk but no longer match infra.yml."""
+    """Return orphan files as list of (filepath, is_protected) tuples.
+
+    Protected orphans (ephemeral=false) should be reported but never auto-deleted.
+    """
     base = Path(base_dir)
     domains = infra.get("domains") or {}
     domain_names = set(domains)
     machine_names = {m for d in domains.values() for m in (d.get("machines") or {})}
+
+    # Build protection map from last known state in files
+    protected_domains = set()
+    protected_machines = set()
+    for dname, domain in domains.items():
+        domain_eph = domain.get("ephemeral", False)
+        if not domain_eph:
+            protected_domains.add(dname)
+        for mname, machine in (domain.get("machines") or {}).items():
+            machine_eph = machine.get("ephemeral")
+            resolved = machine_eph if machine_eph is not None else domain_eph
+            if not resolved:
+                protected_machines.add(mname)
+
     orphans = []
 
     for subdir, valid_names in [("inventory", domain_names), ("group_vars", domain_names | {"all"})]:
         d = base / subdir
         if d.exists():
-            orphans.extend(f for f in d.glob("*.yml") if f.stem not in valid_names)
+            for f in d.glob("*.yml"):
+                if f.stem not in valid_names:
+                    # Check if the orphan file corresponds to a previously protected domain
+                    is_protected = _is_orphan_protected(f)
+                    orphans.append((f, is_protected))
 
     hv = base / "host_vars"
     if hv.exists():
-        orphans.extend(f for f in hv.glob("*.yml") if f.stem not in machine_names)
+        for f in hv.glob("*.yml"):
+            if f.stem not in machine_names:
+                is_protected = _is_orphan_protected(f)
+                orphans.append((f, is_protected))
+
     return orphans
+
+
+def _is_orphan_protected(filepath):
+    """Check if an orphan file contains ephemeral: false (protected)."""
+    try:
+        content = Path(filepath).read_text()
+        data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            return False
+        # Check domain-level or instance-level ephemeral
+        for key in ("domain_ephemeral", "instance_ephemeral"):
+            if key in data:
+                return not data[key]
+        # Default: not protected (no ephemeral info found)
+        return False
+    except Exception:
+        return False
 
 
 def main(argv=None):
@@ -223,12 +277,18 @@ def main(argv=None):
     orphans = detect_orphans(infra, args.base_dir)
     if orphans:
         print(f"\nOrphan files ({len(orphans)}):")
-        for o in orphans:
-            print(f"  ORPHAN: {o}")
+        for filepath, is_protected in orphans:
+            if is_protected:
+                print(f"  PROTECTED (ephemeral=false): {filepath} — manual removal required")
+            else:
+                print(f"  ORPHAN: {filepath}")
         if args.clean_orphans and not args.dry_run:
-            for o in orphans:
-                Path(o).unlink()
-                print(f"  Deleted: {o}")
+            for filepath, is_protected in orphans:
+                if is_protected:
+                    print(f"  Skipped (protected): {filepath}")
+                else:
+                    Path(filepath).unlink()
+                    print(f"  Deleted: {filepath}")
 
     if not args.dry_run:
         print("\nDone. Run `make lint` to validate.")
