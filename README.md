@@ -1,5 +1,6 @@
 # AnKLuMe 🔨
 
+[![WIP](https://img.shields.io/badge/status-WIP-yellow)](docs/ROADMAP.md)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Ansible](https://img.shields.io/badge/ansible-%3E%3D2.16-EE0000?logo=ansible&logoColor=white)](https://www.ansible.com/)
 [![Incus](https://img.shields.io/badge/incus-%3E%3D6.0%20LTS-orange)](https://linuxcontainers.org/incus/)
