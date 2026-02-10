@@ -1,0 +1,62 @@
+#!/bin/sh
+# pre-commit hook — Prevent accidental commit of personal infrastructure data.
+# Installed by `make install-hooks`. Bypass with `git commit --no-verify`.
+set -e
+
+# Skip if dev marker exists
+if [ -f .anklume-no-verify ]; then
+    exit 0
+fi
+
+errors=""
+
+# 1. Check for user-specific files in staging area
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+for file in $staged; do
+    case "$file" in
+        infra.yml)
+            errors="${errors}\n    - ${file} (user-specific file, use infra.yml.example)"
+            ;;
+        inventory/*.yml|group_vars/*.yml|host_vars/*.yml)
+            errors="${errors}\n    - ${file} (generated user-specific file)"
+            ;;
+    esac
+done
+
+# 2. Check for private IPs in non-exempt staged files
+for file in $staged; do
+    # Exempt: examples, docs, tests, READMEs, markdown, spec files
+    case "$file" in
+        *.example|docs/*|tests/*|README*|CONTRIBUTING*|CLAUDE.md|*.md)
+            continue
+            ;;
+    esac
+
+    # Skip binary files
+    if ! git diff --cached --diff-filter=ACM -p -- "$file" | head -1 | grep -q '^diff'; then
+        continue
+    fi
+
+    # Search staged content for private IPs
+    ip_match=$(git diff --cached -p -- "$file" \
+        | grep '^+' | grep -v '^+++' \
+        | grep -oE '(192\.168\.[0-9]+\.[0-9]+|10\.[0-9]+\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)' \
+        | head -1) || true
+
+    if [ -n "$ip_match" ]; then
+        errors="${errors}\n    - ${file} (contains private IP ${ip_match})"
+    fi
+done
+
+if [ -n "$errors" ]; then
+    printf '[AnKLuMe] BLOCKED: Staged files contain personal infrastructure data.\n\n'
+    printf '  Detected:'
+    printf '%b\n' "$errors"
+    printf '\n  These files belong to YOUR infrastructure, not the framework repo.\n\n'
+    printf '  If you know what you are doing:\n'
+    printf '    git commit --no-verify\n\n'
+    printf '  See CONTRIBUTING.md for details.\n'
+    exit 1
+fi
+
+exit 0

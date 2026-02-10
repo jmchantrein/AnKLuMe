@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Ansible
+*.retry
+
+# Molecule
+.molecule/
+.cache/
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ── User-specific infrastructure ────────────────────────────
+#
+# The framework repo ships infra.yml.example as a template.
+# Users create their own infra.yml and run `make sync` to generate
+# inventory/, group_vars/, and host_vars/ files.
+# These contain real IPs, subnet layouts, and machine names specific
+# to each user's infrastructure — they must NOT be pushed to the
+# public framework repository.
+#
+# If you are developing the framework itself and need to commit
+# generated test fixtures, use: git add --force <file>
+infra.yml
+inventory/
+group_vars/
+host_vars/
+
+# AnKLuMe dev mode marker (bypass pre-commit hook)
+.anklume-no-verify
