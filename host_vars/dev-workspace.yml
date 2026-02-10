@@ -1,0 +1,17 @@
+---
+# === MANAGED BY infra.yml ===
+# Do not edit this section — it will be overwritten by `make sync`
+instance_name: dev-workspace
+instance_type: lxc
+instance_description: Main development workspace
+instance_domain: work
+instance_os_image: images:debian/13
+instance_ip: 192.168.1.10
+instance_config:
+  limits.cpu: '4'
+  limits.memory: 8GiB
+instance_roles:
+  - base_system
+# === END MANAGED ===
+
+# Your custom variables below:

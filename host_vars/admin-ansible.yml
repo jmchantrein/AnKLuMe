@@ -1,0 +1,16 @@
+---
+# === MANAGED BY infra.yml ===
+# Do not edit this section — it will be overwritten by `make sync`
+instance_name: admin-ansible
+instance_type: lxc
+instance_description: Ansible controller — drives the whole infra
+instance_domain: admin
+instance_os_image: images:debian/13
+instance_ip: 192.168.0.10
+instance_config:
+  security.nesting: 'true'
+instance_roles:
+  - base_system
+# === END MANAGED ===
+
+# Your custom variables below:
