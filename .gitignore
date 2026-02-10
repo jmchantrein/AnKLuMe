@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Ansible
+*.retry
+
+# Molecule
+.molecule/
+.cache/
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Do NOT ignore generated Ansible files — they are the secondary source
+# of truth and should be committed to git:
+# inventory/
+# group_vars/
+# host_vars/
