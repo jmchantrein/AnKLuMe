@@ -108,7 +108,7 @@ The admin container:
 project_name: my-infra
 
 global:
-  base_subnet: "192.168"            # Domains use <base_subnet>.<subnet_id>.0/24
+  base_subnet: "10.100"             # Domains use <base_subnet>.<subnet_id>.0/24
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
@@ -117,6 +117,7 @@ domains:
   <domain-name>:
     description: "What this domain is for"
     subnet_id: <0-254>               # Must be unique across all domains
+    ephemeral: false                  # Optional (default: false). See below.
     profiles:                         # Optional: extra Incus profiles
       <profile-name>:
         devices: { ... }
@@ -126,12 +127,35 @@ domains:
         description: "What this machine does"
         type: lxc                     # "lxc" or "vm"
         ip: "<base_subnet>.<subnet_id>.<host>"  # Optional (DHCP if omitted)
+        ephemeral: false              # Optional (default: inherit from domain)
         gpu: false                    # true to enable GPU passthrough
         profiles: [default]           # List of Incus profiles
         config: { ... }              # Incus instance config overrides
         storage_volumes: { ... }     # Optional: dedicated volumes
         roles: [base_system]         # Ansible roles for provisioning
 ```
+
+### Gateway convention
+
+Each domain network uses `<base_subnet>.<subnet_id>.254` as its gateway
+address. This is set automatically by the generator and cannot be overridden.
+
+### Ephemeral directive
+
+The `ephemeral` boolean controls whether a domain or machine is protected
+from accidental deletion:
+
+- **Domain level**: `ephemeral: false` (default) protects the entire domain.
+- **Machine level**: overrides the domain value for that specific machine.
+- **Inheritance**: if not specified on a machine, it inherits from its domain.
+  If not specified on a domain, it defaults to `false` (protected).
+
+**Semantics**:
+- `ephemeral: false` (protected): any delete operation (machine, network,
+  domain) that would destroy this resource is refused by tooling.
+  `detect_orphans()` reports protected resources but `--clean-orphans`
+  skips them.
+- `ephemeral: true`: the resource can be freely created and destroyed.
 
 ### Validation constraints
 
@@ -140,6 +164,7 @@ domains:
 - `subnet_id`: unique per domain, range 0-254
 - IPs: globally unique, must be within the correct subnet
 - Profiles referenced by a machine must exist in its domain
+- `ephemeral`: must be a boolean if present (at both domain and machine level)
 
 ## 6. Generator (scripts/generate.py)
 
@@ -161,7 +186,8 @@ host_vars/<machine>.yml     # Machine-specific variables
 # Do not edit this section — it will be overwritten by `make sync`
 incus_network:
   name: net-example
-  subnet: 192.168.0.0/24
+  subnet: 10.100.0.0/24
+  gateway: 10.100.0.254
 # === END MANAGED ===
 
 # Your custom variables below:
