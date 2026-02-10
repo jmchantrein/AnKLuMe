@@ -1,0 +1,11 @@
+---
+profile: production
+
+exclude_paths:
+  - .claude/
+  - tests/
+
+skip_list: []
+
+warn_list:
+  - experimental
