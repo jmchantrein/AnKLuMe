@@ -1,0 +1,12 @@
+---
+# === MANAGED BY infra.yml ===
+# Do not edit this section — it will be overwritten by `make sync`
+all:
+  children:
+    work:
+      hosts:
+        dev-workspace:
+          ansible_host: 192.168.1.10
+# === END MANAGED ===
+
+# Your custom variables below:
