@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_project: molecule-test
+    domain_description: "Molecule test project"
+    domain_ephemeral: true
+  roles:
+    - role: incus_projects

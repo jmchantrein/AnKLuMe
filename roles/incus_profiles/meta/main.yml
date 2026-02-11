@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: incus_profiles
+  author: AnKLuMe
+  description: Reconcile default profile in each Incus project
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: ArchLinux
+      versions:
+        - all
+dependencies: []

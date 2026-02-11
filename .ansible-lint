@@ -5,7 +5,11 @@ exclude_paths:
   - .claude/
   - tests/
 
-skip_list: []
+skip_list:
+  # Input variables (incus_project, incus_network, instance_name, etc.)
+  # are shared across roles via PSOT-generated group_vars/host_vars.
+  # Their naming is dictated by the generator contract, not role scope.
+  - var-naming[no-role-prefix]
 
 warn_list:
   - experimental

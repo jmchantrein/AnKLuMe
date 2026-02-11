@@ -1,0 +1,84 @@
+---
+- name: Verify incus_instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Read instance list
+      ansible.builtin.command:
+        cmd: incus list --project molecule-test --format json
+      register: verify_instances_raw
+      changed_when: false
+
+    - name: Verify | Parse instance list
+      ansible.builtin.set_fact:
+        verify_instances: "{{ verify_instances_raw.stdout | from_json }}"
+
+    - name: Verify | Instance exists
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test-instance' in (verify_instances | map(attribute='name') | list)"
+        fail_msg: "Instance molecule-test-instance does not exist"
+
+    - name: Verify | Find instance data
+      ansible.builtin.set_fact:
+        verify_instance: >-
+          {{ verify_instances | selectattr('name', 'equalto', 'molecule-test-instance') | first }}
+
+    - name: Verify | Instance is running
+      ansible.builtin.assert:
+        that:
+          - "verify_instance.status == 'Running'"
+        fail_msg: "Instance is not running"
+
+    - name: Verify | Instance is a container (LXC)
+      ansible.builtin.assert:
+        that:
+          - "verify_instance.type == 'container'"
+        fail_msg: "Instance is not a container"
+
+    - name: Verify | Read instance config
+      ansible.builtin.command:
+        cmd: incus config show molecule-test-instance --project molecule-test --format json
+      register: verify_instance_config_raw
+      changed_when: false
+
+    - name: Verify | Parse instance config
+      ansible.builtin.set_fact:
+        verify_instance_config: "{{ verify_instance_config_raw.stdout | from_json }}"
+
+    - name: Verify | Instance config keys are set
+      ansible.builtin.assert:
+        that:
+          - "verify_instance_config.config['limits.cpu'] == '1'"
+          - "verify_instance_config.config['limits.memory'] == '256MiB'"
+        fail_msg: "Instance config keys are not set correctly"
+
+    - name: Verify | Instance has correct static IP device override
+      ansible.builtin.assert:
+        that:
+          - "'eth0' in verify_instance_config.devices"
+          - "verify_instance_config.devices.eth0['ipv4.address'] == '10.200.99.10'"
+        fail_msg: "Instance does not have correct static IP"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_instances
+      vars:
+        instance_name: molecule-test-instance
+        instance_type: lxc
+        instance_description: "Molecule test instance"
+        instance_domain: molecule-test
+        instance_os_image: "images:debian/13"
+        instance_ip: "10.200.99.10"
+        instance_config:
+          limits.cpu: "1"
+          limits.memory: "256MiB"
+        instance_ephemeral: true
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
