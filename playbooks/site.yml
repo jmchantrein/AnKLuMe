@@ -1,0 +1,67 @@
+---
+# site.yml — Master playbook for AnKLuMe infrastructure
+#
+# Phase 1 (Infra): Runs on localhost, drives Incus via CLI.
+#   Roles are applied per domain group so each domain gets its own
+#   project, network, profile, and instances.
+#
+# Usage:
+#   make apply                     # Full infrastructure
+#   make apply-infra               # Infrastructure only (--tags infra)
+#   make apply-limit G=<domain>    # Single domain (--limit <domain>)
+#   make check                     # Dry-run (--check --diff)
+
+# Phase 1: Infrastructure — one play per domain group
+- name: "Infrastructure | Reconcile Incus resources"
+  hosts: all
+  connection: local
+  gather_facts: false
+  tags:
+    - infra
+  tasks:
+    - name: Infrastructure | Apply incus_projects
+      ansible.builtin.include_role:
+        name: incus_projects
+        apply:
+          tags:
+            - projects
+            - infra
+      tags:
+        - projects
+        - infra
+      run_once: true
+
+    - name: Infrastructure | Apply incus_networks
+      ansible.builtin.include_role:
+        name: incus_networks
+        apply:
+          tags:
+            - networks
+            - infra
+      tags:
+        - networks
+        - infra
+      run_once: true
+
+    - name: Infrastructure | Apply incus_profiles
+      ansible.builtin.include_role:
+        name: incus_profiles
+        apply:
+          tags:
+            - profiles
+            - infra
+      tags:
+        - profiles
+        - infra
+      run_once: true
+
+    - name: Infrastructure | Apply incus_instances
+      ansible.builtin.include_role:
+        name: incus_instances
+        apply:
+          tags:
+            - instances
+            - infra
+      tags:
+        - instances
+        - infra

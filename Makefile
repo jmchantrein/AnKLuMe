@@ -35,23 +35,23 @@ lint-python: ## Validate Python files
 	fi
 
 check: ## Dry-run (ansible-playbook --check --diff)
-	ansible-playbook site.yml --check --diff
+	ansible-playbook playbooks/site.yml --check --diff
 
 syntax: ## Syntax check only
-	ansible-playbook site.yml --syntax-check
+	ansible-playbook playbooks/site.yml --syntax-check
 
 # ── Apply ─────────────────────────────────────────────────
 apply: ## Apply full infrastructure + provisioning
-	ansible-playbook site.yml
+	ansible-playbook playbooks/site.yml
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
-	ansible-playbook site.yml --tags infra
+	ansible-playbook playbooks/site.yml --tags infra
 
 apply-provision: ## Apply provisioning only (packages, services)
-	ansible-playbook site.yml --tags provision
+	ansible-playbook playbooks/site.yml --tags provision
 
 apply-limit: ## Apply a single domain (G=<group>)
-	ansible-playbook site.yml --limit $(G)
+	ansible-playbook playbooks/site.yml --limit $(G)
 
 # ── Snapshots ─────────────────────────────────────────────
 snap: ## Create snapshot (I=<instance|self> [S=<name>])
