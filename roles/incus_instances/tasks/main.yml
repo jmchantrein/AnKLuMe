@@ -162,9 +162,21 @@
   loop: "{{ (instance_devices | default({})) | dict2items }}"
   loop_control:
     label: "{{ item.key }} ({{ item.value.type }})"
+  register: incus_device_add_result
   when:
     - instance_devices is defined and (instance_devices | length > 0)
     - item.key not in (incus_instance_devices | default({}))
+  changed_when: true
+
+- name: IncusInstances | Restart instance if devices changed
+  ansible.builtin.command:
+    argv:
+      - incus
+      - restart
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: incus_device_add_result is changed
   changed_when: true
 
 - name: IncusInstances | Wait for instance to be running

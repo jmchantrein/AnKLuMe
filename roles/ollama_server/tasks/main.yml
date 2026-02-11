@@ -23,9 +23,11 @@
          if ollama_gpu_check.rc == 0
          else 'No GPU detected — Ollama will run in CPU-only mode' }}
 
-- name: OllamaServer | Install curl
+- name: OllamaServer | Install prerequisites
   ansible.builtin.apt:
-    name: curl
+    name:
+      - curl
+      - zstd
     state: present
 
 - name: OllamaServer | Install Ollama
