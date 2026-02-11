@@ -28,10 +28,10 @@
       - simplestreams
       - --public
   register: incus_remote_add
-  changed_when: "'already exists' not in incus_remote_add.stderr"
+  changed_when: "'exists' not in incus_remote_add.stderr"
   failed_when:
     - incus_remote_add.rc != 0
-    - "'already exists' not in incus_remote_add.stderr"
+    - "'exists' not in incus_remote_add.stderr"
   run_once: true
 
 - name: IncusInstances | Read existing instances in project
