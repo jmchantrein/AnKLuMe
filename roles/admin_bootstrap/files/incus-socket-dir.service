@@ -1,0 +1,13 @@
+[Unit]
+Description=Create Incus socket directory for proxy device
+DefaultDependencies=no
+Before=network.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /var/run/incus
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
