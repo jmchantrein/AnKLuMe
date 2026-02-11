@@ -1,6 +1,11 @@
 ---
 # IncusProfiles | Reconcile the default profile in each project
 #
+# Runs on the controller via connection:local (ADR-015).
+# Variables come from each host's group_vars/host_vars (PSOT-generated).
+# Multiple hosts may share the same domain — the reconciliation pattern
+# (check if exists → create if missing) ensures idempotence.
+#
 # Each project's default profile is configured with:
 #   - eth0: nic device attached to the domain's bridge
 #   - root: disk device with pool=default
