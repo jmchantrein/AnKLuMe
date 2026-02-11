@@ -6,6 +6,7 @@ __pycache__/
 
 # Ansible
 *.retry
+.ansible/
 
 # Molecule
 .molecule/
