@@ -422,6 +422,105 @@ e) Script `scripts/ai-develop.sh` — autonomous development:
 
 ---
 
+## Phase 14: Speech-to-Text (STT) Service
+
+**Goal**: Provide local, GPU-accelerated speech-to-text as a service
+accessible by Open WebUI and other containers.
+
+**Context**: Voice interaction with LLMs requires transcribing audio
+to text before sending it to Ollama. Running STT locally preserves
+privacy (no audio sent to cloud) and fits the compartmentalization
+philosophy. Open WebUI already supports custom STT endpoints natively.
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────┐
+│ homelab domain (net-homelab, 10.100.3.0/24)     │
+│                                                   │
+│  ┌──────────────┐    ┌──────────────────────┐   │
+│  │ homelab-stt   │    │ homelab-llm          │   │
+│  │ GPU (shared)  │    │ GPU (shared)         │   │
+│  │               │    │                      │   │
+│  │ faster-whisper│    │ Ollama               │   │
+│  │ + Speaches    │    │ :11434               │   │
+│  │ :8000         │    │                      │   │
+│  └──────┬───────┘    └──────────────────────┘   │
+│         │                      ▲                  │
+│         │    /v1/audio/        │  /api/generate   │
+│         │    transcriptions    │                  │
+│         ▼                      │                  │
+│  ┌──────────────────────────────┐                │
+│  │ homelab-webui                │                │
+│  │ Open WebUI :3000             │                │
+│  │ STT → homelab-stt:8000      │                │
+│  │ LLM → homelab-llm:11434     │                │
+│  └──────────────────────────────┘                │
+└─────────────────────────────────────────────────┘
+```
+
+**Engine choice**: **faster-whisper** with **Whisper Large V3 Turbo**
+model. faster-whisper uses CTranslate2 for up to 4x speedup over
+vanilla Whisper on NVIDIA GPUs, with lower memory usage. Whisper
+Large V3 Turbo provides the best accuracy/speed trade-off for
+multilingual workloads (French + English).
+
+**API server**: **Speaches** (formerly faster-whisper-server). Exposes
+an OpenAI-compatible `/v1/audio/transcriptions` endpoint that Open
+WebUI can consume directly. Single container, no orchestration needed.
+
+**Alternative engines** (for future consideration):
+- **OWhisper**: "Ollama for STT" — unified CLI/server for multiple
+  STT backends (whisper.cpp, Moonshine). Newer project (Aug 2025),
+  promising UX but less mature.
+- **NVIDIA Parakeet TDT 0.6B**: Blazing fast (RTFx 3386) but
+  English-only. Ideal if multilingual is not required.
+- **Vosk**: Lightweight, CPU-only. For instances without GPU access.
+
+**Deliverables**:
+- `roles/stt_server/` — Install faster-whisper + Speaches server
+  (systemd service, GPU detection, model download)
+- PSOT support: `homelab-stt` instance with GPU device + config
+- Open WebUI integration: configure STT endpoint in admin settings
+  (or via `open_webui_stt_url` variable)
+- `make apply-stt` Makefile target
+- `gpu_policy: shared` required if STT and Ollama share the same GPU
+  (ADR-018). Document the trade-off: shared GPU means concurrent
+  inference competes for VRAM.
+
+**Optional TTS deliverable** (text-to-speech for full voice loop):
+- **Piper TTS** as a lightweight, local text-to-speech engine
+- Could run in the same `homelab-stt` container or a dedicated one
+- Exposes an API endpoint for Open WebUI TTS configuration
+- Deferred unless voice output is explicitly needed
+
+**Variables (roles/stt_server/defaults/main.yml)**:
+```yaml
+stt_engine: "faster-whisper"
+stt_model: "large-v3-turbo"
+stt_host: "0.0.0.0:8000"
+stt_quantization: "float16"    # float16, int8_float16, or int8
+stt_language: ""               # Empty = auto-detect
+```
+
+**References**:
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [Speaches (OpenAI-compatible server)](https://github.com/speaches-ai/speaches)
+- [OWhisper](https://hyprnote.com/product/owhisper)
+- [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)
+- [Open WebUI STT features](https://docs.openwebui.com/features/)
+- [Best open-source STT models 2026](https://northflank.com/blog/best-open-source-speech-to-text-stt-model-in-2026-benchmarks)
+
+**Validation criteria**:
+- [ ] `homelab-stt` container starts with GPU access
+- [ ] Speaches API responds on `/v1/audio/transcriptions`
+- [ ] Open WebUI voice input transcribes correctly (FR + EN)
+- [ ] Idempotent on second run
+- [ ] Concurrent GPU usage with Ollama stable (shared mode)
+- [ ] Transcription latency < 2s for 10s audio clip
+
+---
+
 ## Current State
 
 **Completed**:
