@@ -1,17 +1,19 @@
 ---
 # site.yml — Master playbook for AnKLuMe infrastructure
 #
-# Architecture pattern:
-#   - hosts: all — each host provides its own PSOT variables
-#   - connection: local — all Incus commands run on the controller
-#     (admin-ansible) which has the Incus socket mounted
-#   - No run_once — each host executes the roles for its own domain;
-#     the reconciliation pattern (check → create if missing) ensures
-#     idempotence across hosts sharing the same domain
+# Two-phase architecture (ADR-006):
 #
-# This follows the standard Ansible pattern for API-driven infrastructure
-# management (similar to cloud/network device management from a controller).
-# See ADR-015 in docs/ARCHITECTURE.md.
+# Phase 1 — Infrastructure (tag: infra):
+#   - hosts: all, connection: local
+#   - Drives Incus via CLI on the controller (admin-ansible)
+#   - Creates projects, networks, profiles, instances
+#   - See ADR-015 in docs/ARCHITECTURE.md
+#
+# Phase 2 — Provisioning (tag: provision):
+#   - hosts: all, connection: community.general.incus
+#   - Connects INTO instances via `incus exec`
+#   - Installs packages, configures locale, timezone, services
+#   - admin_bootstrap applied only to the admin group (ADR-019)
 #
 # Concurrency note:
 #   With forks > 1, multiple hosts may attempt to create the same resource
@@ -20,10 +22,12 @@
 #   serial: 1 line below.
 #
 # Usage:
-#   make apply                     # Full infrastructure
-#   make apply-infra               # Infrastructure only (--tags infra)
-#   make apply-limit G=<domain>    # Single domain (--limit <domain>)
-#   make check                     # Dry-run (--check --diff)
+#   make apply                      # Full infrastructure + provisioning
+#   make apply-infra                # Infrastructure only (--tags infra)
+#   make apply-provision            # Provisioning only (--tags provision)
+#   make apply-base                 # Base system only (--tags base)
+#   make apply-limit G=<domain>     # Single domain (--limit <domain>)
+#   make check                      # Dry-run (--check --diff)
 
 - name: "Infrastructure | Reconcile Incus resources"
   hosts: all
@@ -77,3 +81,47 @@
       tags:
         - instances
         - infra
+
+# ── Phase 2: Provisioning ──────────────────────────────────
+# Connects INTO instances via the community.general.incus plugin
+# (uses `incus exec` under the hood — no SSH needed).
+#
+# ansible_host is overridden to inventory_hostname because the PSOT
+# generator sets ansible_host to the instance IP (useful for networking),
+# but the Incus connection plugin needs the container name.
+
+- name: "Provisioning | Configure instances"
+  hosts: all
+  gather_facts: true
+  # serial: 1  # Uncomment for strict sequential provisioning
+  tags:
+    - provision
+  vars:
+    ansible_connection: community.general.incus
+    ansible_user: root
+    ansible_incus_project: "{{ incus_project }}"
+    ansible_host: "{{ inventory_hostname }}"
+
+  tasks:
+    - name: Provisioning | Apply base_system
+      ansible.builtin.include_role:
+        name: base_system
+        apply:
+          tags:
+            - base
+            - provision
+      tags:
+        - base
+        - provision
+
+    - name: Provisioning | Apply admin_bootstrap
+      ansible.builtin.include_role:
+        name: admin_bootstrap
+        apply:
+          tags:
+            - admin
+            - provision
+      when: "'admin' in group_names"
+      tags:
+        - admin
+        - provision
