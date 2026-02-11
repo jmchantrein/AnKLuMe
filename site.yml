@@ -92,7 +92,7 @@
 
 - name: "Provisioning | Configure instances"
   hosts: all
-  gather_facts: true
+  gather_facts: false
   # serial: 1  # Uncomment for strict sequential provisioning
   tags:
     - provision
@@ -101,6 +101,19 @@
     ansible_user: root
     ansible_incus_project: "{{ incus_project }}"
     ansible_host: "{{ inventory_hostname }}"
+
+  pre_tasks:
+    - name: Provisioning | Bootstrap Python on target
+      ansible.builtin.raw: |
+        test -x /usr/bin/python3 || (apt-get update && apt-get install -y python3)
+      changed_when: false
+      tags:
+        - always
+
+    - name: Provisioning | Gather facts after Python bootstrap
+      ansible.builtin.setup:
+      tags:
+        - always
 
   tasks:
     - name: Provisioning | Apply base_system
