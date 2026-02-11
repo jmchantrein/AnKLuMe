@@ -14,89 +14,89 @@
 
 - name: IncusProfiles | Read current default profile
   ansible.builtin.command:
-    cmd: "incus profile show default --project {{ incus_project }} --format json"
+    argv:
+      - incus
+      - profile
+      - show
+      - default
+      - --project
+      - "{{ incus_project }}"
   register: incus_profiles_show_raw
   changed_when: false
+  check_mode: false  # Safe: read-only command
 
 - name: IncusProfiles | Parse current profile devices
   ansible.builtin.set_fact:
     incus_profiles_current_devices: >-
-      {{ (incus_profiles_show_raw.stdout | from_json).devices | default({}) }}
-
-- name: IncusProfiles | Build desired devices
-  ansible.builtin.set_fact:
-    incus_profiles_desired_devices:
-      eth0:
-        type: nic
-        network: "{{ incus_network.name }}"
-        name: eth0
-      root:
-        type: disk
-        pool: default
-        path: /
-
-- name: IncusProfiles | Set eth0 nic device
-  ansible.builtin.command:
-    cmd: >-
-      incus profile device set default eth0
-      {{ item.key }}={{ item.value }}
-      --project {{ incus_project }}
-  loop: "{{ incus_profiles_desired_devices.eth0 | dict2items }}"
-  loop_control:
-    label: "eth0.{{ item.key }}={{ item.value }}"
-  when: >-
-    incus_profiles_current_devices.get('eth0', {}).get(item.key, '')
-    != item.value | string
-  changed_when: true
-  failed_when: false
-  register: incus_profiles_eth0_result
+      {{ (incus_profiles_show_raw.stdout | from_yaml).devices | default({}) }}
 
 - name: IncusProfiles | Add eth0 device if missing
   ansible.builtin.command:
-    cmd: >-
-      incus profile device add default eth0 nic
-      network={{ incus_network.name }}
-      name=eth0
-      --project {{ incus_project }}
+    argv:
+      - incus
+      - profile
+      - device
+      - add
+      - default
+      - eth0
+      - nic
+      - "network={{ incus_network.name }}"
+      - name=eth0
+      - --project
+      - "{{ incus_project }}"
   when: "'eth0' not in incus_profiles_current_devices"
   changed_when: true
 
-- name: IncusProfiles | Update eth0 device properties
+- name: IncusProfiles | Update eth0 network if wrong
   ansible.builtin.command:
-    cmd: >-
-      incus profile device set default eth0
-      {{ item.key }}={{ item.value }}
-      --project {{ incus_project }}
-  loop: "{{ incus_profiles_desired_devices.eth0 | dict2items }}"
-  loop_control:
-    label: "eth0.{{ item.key }}={{ item.value }}"
-  when: >-
-    'eth0' in incus_profiles_current_devices
-    and (incus_profiles_current_devices['eth0'][item.key] | default(''))
-    != (item.value | string)
+    argv:
+      - incus
+      - profile
+      - device
+      - set
+      - default
+      - eth0
+      - "network={{ incus_network.name }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - "'eth0' in incus_profiles_current_devices"
+    - "incus_profiles_current_devices['eth0']['network'] | default('') != incus_network.name"
   changed_when: true
 
 - name: IncusProfiles | Add root device if missing
   ansible.builtin.command:
-    cmd: >-
-      incus profile device add default root disk
-      pool=default
-      path=/
-      --project {{ incus_project }}
+    argv:
+      - incus
+      - profile
+      - device
+      - add
+      - default
+      - root
+      - disk
+      - pool=default
+      - path=/
+      - --project
+      - "{{ incus_project }}"
   when: "'root' not in incus_profiles_current_devices"
   changed_when: true
 
-- name: IncusProfiles | Update root device properties
+- name: IncusProfiles | Update root device if wrong
   ansible.builtin.command:
-    cmd: >-
-      incus profile device set default root
-      {{ item.key }}={{ item.value }}
-      --project {{ incus_project }}
-  loop: "{{ incus_profiles_desired_devices.root | dict2items }}"
-  loop_control:
-    label: "root.{{ item.key }}={{ item.value }}"
-  when: >-
-    'root' in incus_profiles_current_devices
-    and (incus_profiles_current_devices['root'][item.key] | default(''))
-    != (item.value | string)
+    argv:
+      - incus
+      - profile
+      - device
+      - set
+      - default
+      - root
+      - pool=default
+      - path=/
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - "'root' in incus_profiles_current_devices"
+    - >-
+      incus_profiles_current_devices['root']['pool'] | default('') != 'default'
+      or incus_profiles_current_devices['root']['path'] | default('') != '/'
   changed_when: true
