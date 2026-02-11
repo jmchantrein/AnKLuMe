@@ -155,3 +155,23 @@ Supports `self` keyword to auto-detect the current instance via `hostname`.
 **Consequence**: Makefile snapshot targets invoke `scripts/snap.sh`. Validated
 by `shellcheck`. A declarative Ansible role may supersede this in a future
 phase if pre/post hooks or scheduling are needed.
+
+---
+
+## ADR-014: Networks live in the default Incus project
+
+**Context**: Incus projects can control whether networks are project-specific
+or shared. Our projects use `features.networks=false`, meaning networks are
+managed globally in the default project.
+
+**Decision**: All domain bridges are created in the default project. Each
+project's default profile references the appropriate bridge by name.
+
+**Justification**:
+- Simpler management: one place for all networks
+- nftables isolation happens at the host level, not at the Incus project level
+- Consistent with Incus upstream recommendations for most deployments
+- Reference: https://linuxcontainers.org/incus/docs/main/explanation/projects/
+
+**Consequences**: Network-related Ansible tasks do not use the `--project`
+flag. Profile tasks DO need `--project` to configure each project's profile.

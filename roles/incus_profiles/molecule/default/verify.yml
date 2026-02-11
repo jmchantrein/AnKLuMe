@@ -1,0 +1,64 @@
+---
+- name: Verify incus_profiles
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Read default profile
+      ansible.builtin.command:
+        cmd: incus profile show default --project molecule-test --format json
+      register: verify_profile_raw
+      changed_when: false
+
+    - name: Verify | Parse profile
+      ansible.builtin.set_fact:
+        verify_profile: "{{ verify_profile_raw.stdout | from_json }}"
+
+    - name: Verify | Default profile exists
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.name == 'default'"
+        fail_msg: "Default profile does not exist in project molecule-test"
+
+    - name: Verify | eth0 device is type nic
+      ansible.builtin.assert:
+        that:
+          - "'eth0' in verify_profile.devices"
+          - "verify_profile.devices.eth0.type == 'nic'"
+        fail_msg: "eth0 device is missing or not type nic"
+
+    - name: Verify | eth0 device has correct network
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0.network == 'net-molecule-test'"
+        fail_msg: "eth0 network is not net-molecule-test"
+
+    - name: Verify | root device is type disk
+      ansible.builtin.assert:
+        that:
+          - "'root' in verify_profile.devices"
+          - "verify_profile.devices.root.type == 'disk'"
+        fail_msg: "root device is missing or not type disk"
+
+    - name: Verify | root device has pool default
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.root.pool == 'default'"
+        fail_msg: "root device pool is not default"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_profiles
+      vars:
+        incus_project: molecule-test
+        incus_network:
+          name: net-molecule-test
+          subnet: "10.200.99.0/24"
+          gateway: "10.200.99.254"
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"

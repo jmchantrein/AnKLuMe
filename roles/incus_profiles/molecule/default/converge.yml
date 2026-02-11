@@ -1,0 +1,48 @@
+---
+- name: Converge - setup prerequisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Setup | Ensure molecule-test project exists
+      ansible.builtin.command:
+        cmd: incus project create molecule-test
+      register: setup_project_result
+      changed_when: setup_project_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure project features
+      ansible.builtin.command:
+        cmd: "incus project set molecule-test {{ item.key }}={{ item.value }}"
+      loop:
+        - key: features.images
+          value: "true"
+        - key: features.profiles
+          value: "true"
+        - key: features.storage.volumes
+          value: "true"
+        - key: features.networks
+          value: "false"
+      loop_control:
+        label: "{{ item.key }}={{ item.value }}"
+      changed_when: false
+
+    - name: Setup | Ensure net-molecule-test network exists
+      ansible.builtin.command:
+        cmd: incus network create net-molecule-test
+      register: setup_network_result
+      changed_when: setup_network_result.rc == 0
+      failed_when: false
+
+- name: Converge - apply incus_profiles
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_project: molecule-test
+    incus_network:
+      name: net-molecule-test
+      subnet: "10.200.99.0/24"
+      gateway: "10.200.99.254"
+  roles:
+    - role: incus_profiles

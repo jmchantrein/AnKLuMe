@@ -1,0 +1,17 @@
+---
+- name: Cleanup incus_networks
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Cleanup | Check if net-molecule-test network exists
+      ansible.builtin.command:
+        cmd: incus network list --format json
+      register: cleanup_networks_raw
+      changed_when: false
+
+    - name: Cleanup | Delete net-molecule-test network
+      ansible.builtin.command:
+        cmd: incus network delete net-molecule-test
+      when: "'net-molecule-test' in (cleanup_networks_raw.stdout | from_json | map(attribute='name') | list)"
+      changed_when: true

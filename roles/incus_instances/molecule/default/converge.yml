@@ -1,0 +1,75 @@
+---
+- name: Converge - setup prerequisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Setup | Ensure molecule-test project exists
+      ansible.builtin.command:
+        cmd: incus project create molecule-test
+      register: setup_project_result
+      changed_when: setup_project_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure project features
+      ansible.builtin.command:
+        cmd: "incus project set molecule-test {{ item.key }}={{ item.value }}"
+      loop:
+        - key: features.images
+          value: "true"
+        - key: features.profiles
+          value: "true"
+        - key: features.storage.volumes
+          value: "true"
+        - key: features.networks
+          value: "false"
+      loop_control:
+        label: "{{ item.key }}={{ item.value }}"
+      changed_when: false
+
+    - name: Setup | Ensure net-molecule-test network exists
+      ansible.builtin.command:
+        cmd: incus network create net-molecule-test
+      register: setup_network_result
+      changed_when: setup_network_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure default profile eth0
+      ansible.builtin.command:
+        cmd: >-
+          incus profile device add default eth0 nic
+          network=net-molecule-test
+          name=eth0
+          --project molecule-test
+      register: setup_profile_eth0
+      changed_when: setup_profile_eth0.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure default profile root
+      ansible.builtin.command:
+        cmd: >-
+          incus profile device add default root disk
+          pool=default
+          path=/
+          --project molecule-test
+      register: setup_profile_root
+      changed_when: setup_profile_root.rc == 0
+      failed_when: false
+
+- name: Converge - apply incus_instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    instance_name: molecule-test-instance
+    instance_type: lxc
+    instance_description: "Molecule test instance"
+    instance_domain: molecule-test
+    instance_os_image: "images:debian/13"
+    instance_ip: "10.200.99.10"
+    instance_config:
+      limits.cpu: "1"
+      limits.memory: "256MiB"
+    instance_ephemeral: true
+  roles:
+    - role: incus_instances

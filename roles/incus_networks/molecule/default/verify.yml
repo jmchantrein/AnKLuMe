@@ -1,0 +1,66 @@
+---
+- name: Verify incus_networks
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Read network list
+      ansible.builtin.command:
+        cmd: incus network list --format json
+      register: verify_networks_raw
+      changed_when: false
+
+    - name: Verify | Parse network list
+      ansible.builtin.set_fact:
+        verify_networks: "{{ verify_networks_raw.stdout | from_json }}"
+
+    - name: Verify | Network exists
+      ansible.builtin.assert:
+        that:
+          - "'net-molecule-test' in (verify_networks | map(attribute='name') | list)"
+        fail_msg: "Network net-molecule-test does not exist"
+
+    - name: Verify | Read network config
+      ansible.builtin.command:
+        cmd: incus network show net-molecule-test --format json
+      register: verify_network_show_raw
+      changed_when: false
+
+    - name: Verify | Parse network config
+      ansible.builtin.set_fact:
+        verify_network: "{{ verify_network_show_raw.stdout | from_json }}"
+
+    - name: Verify | Network has correct ipv4.address
+      ansible.builtin.assert:
+        that:
+          - "verify_network.config['ipv4.address'] == '10.200.99.254/24'"
+        fail_msg: "Network ipv4.address is not 10.200.99.254/24"
+
+    - name: Verify | Network has ipv4.nat enabled
+      ansible.builtin.assert:
+        that:
+          - "verify_network.config['ipv4.nat'] == 'true'"
+        fail_msg: "Network ipv4.nat is not true"
+
+    - name: Verify | Network has ipv6 disabled
+      ansible.builtin.assert:
+        that:
+          - "verify_network.config['ipv6.address'] == 'none'"
+        fail_msg: "Network ipv6.address is not none"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_networks
+      vars:
+        incus_network:
+          name: net-molecule-test
+          subnet: "10.200.99.0/24"
+          gateway: "10.200.99.254"
+        domain_ephemeral: true
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
