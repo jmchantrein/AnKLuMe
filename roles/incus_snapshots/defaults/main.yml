@@ -1,0 +1,12 @@
+---
+# Default variables for incus_snapshots
+#
+# Action to perform: create, restore, delete, list
+snapshot_action: "create"
+
+# Snapshot name (auto-generated timestamp if not provided)
+# Uses ansible_date_time which requires gather_facts on the controller
+snapshot_name: "{{ ansible_date_time.iso8601_basic_short }}"
+
+# Whether to stop instance before snapshot (safer for consistency)
+snapshot_stop_first: false
