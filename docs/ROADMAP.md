@@ -1,286 +1,547 @@
-# ROADMAP.md — Phases d'implémentation
+# ROADMAP.md — Implementation Phases
 
-Chaque phase produit un livrable testable. Ne pas commencer la phase N+1
-avant que la phase N soit complète et validée.
-
----
-
-## Phase 1 : Générateur SSOT ✅ COMPLÈTE
-
-**Objectif** : `infra.yml` → arborescence Ansible complète
-
-**Livrables** :
-- `scripts/generate.py` — le générateur (PSOT)
-- `infra.yml` — fichier SSOT avec les 4 domaines (admin, pro, perso, homelab)
-- Inventaire généré dans `inventory/`
-- group_vars et host_vars générés avec sections managées
-- Validation des contraintes (noms uniques, subnets uniques, IPs valides)
-- Détection d'orphelins
-- `make sync` et `make sync-dry`
-
-**Critères de validation** :
-- [x] `make sync` idempotent (relancer ne change rien)
-- [x] Ajouter un domaine dans infra.yml + `make sync` → fichiers créés
-- [x] Supprimer un domaine → orphelins détectés et listés
-- [x] Sections managées préservées, contenu libre conservé
-- [x] Contraintes de validation : erreur claire si nom/subnet/IP dupliqué
+Each phase produces a testable deliverable. Do not start phase N+1
+before phase N is complete and validated.
 
 ---
 
-## Phase 2 : Rôles infrastructure (réconciliation Incus) ✅ COMPLÈTE
+## Phase 1: PSOT Generator ✅ COMPLETE
 
-**Objectif** : `make apply --tags infra` crée toute l'infrastructure Incus
+**Goal**: `infra.yml` → complete Ansible file tree
 
-**Livrables** :
+**Deliverables**:
+- `scripts/generate.py` — the PSOT generator
+- `infra.yml` — PSOT file with 4 domains (admin, pro, perso, homelab)
+- Generated inventory in `inventory/`
+- Generated group_vars and host_vars with managed sections
+- Constraint validation (unique names, unique subnets, valid IPs)
+- Orphan detection
+- `make sync` and `make sync-dry`
+
+**Validation criteria**:
+- [x] `make sync` idempotent (re-running changes nothing)
+- [x] Add a domain in infra.yml + `make sync` → files created
+- [x] Remove a domain → orphans detected and listed
+- [x] Managed sections preserved, user content kept
+- [x] Validation constraints: clear error on duplicate name/subnet/IP
+
+---
+
+## Phase 2: Infrastructure Roles (Incus Reconciliation) ✅ COMPLETE
+
+**Goal**: `make apply --tags infra` creates all Incus infrastructure
+
+**Deliverables**:
 - `roles/incus_networks/` — bridges
-- `roles/incus_projects/` — projets + profil default (root + eth0)
-- `roles/incus_profiles/` — profils extra (GPU, nesting)
-- `roles/incus_instances/` — containers LXC (device override, IP statique)
-- `site.yml` — playbook maître au root du projet (ADR-016)
+- `roles/incus_projects/` — projects + default profile (root + eth0)
+- `roles/incus_profiles/` — extra profiles (GPU, nesting)
+- `roles/incus_instances/` — LXC containers (device override, static IP)
+- `site.yml` — master playbook at project root (ADR-016)
 
-**Critères de validation** :
-- [x] `ansible-lint` 0 violation, profil production
-- [x] Idempotent (0 changed sur la 2e exécution)
-- [x] Les 4 domaines créés avec IPs statiques correctes
-- [x] `--tags networks` fonctionne seul
-- [x] `--limit homelab` fonctionne seul
+**Validation criteria**:
+- [x] `ansible-lint` 0 violations, production profile
+- [x] Idempotent (0 changed on second run)
+- [x] All 4 domains created with correct static IPs
+- [x] `--tags networks` works standalone
+- [x] `--limit homelab` works standalone
 
-**Leçons apprises (ADR-015, ADR-016)** :
-- `run_once: true` incompatible avec le pattern hosts:all + connection:local
-  (seul le premier host exécute le rôle → un seul domaine créé)
-- Les variables de connexion dans group_vars (`ansible_connection`) ont
-  priorité sur `connection:` du playbook → ne pas les mettre dans le PSOT
-- Le playbook doit être à la racine du projet pour que la résolution
-  des group_vars/host_vars fonctionne
-- Incus `device set` échoue sur un device hérité de profil → utiliser
-  `device override` d'abord
-- Ansible 2.19 exige que les conditionals `when:` évaluent à un bool
-  strict → utiliser `| length > 0` pour tester un dict/string
+**Lessons learned (ADR-015, ADR-016)**:
+- `run_once: true` incompatible with hosts:all + connection:local pattern
+- Connection variables in group_vars override playbook `connection:`
+- Playbook must be at project root for group_vars/host_vars resolution
+- Incus `device set` fails on profile-inherited device → use `device override`
+- Ansible 2.19 requires `when:` conditionals to evaluate to strict bool
 
 ---
 
-## Phase 2b : Durcissement post-déploiement ✦ PRIORITÉ
+## Phase 2b: Post-Deployment Hardening ✦ PRIORITY
 
-**Objectif** : Corriger les problèmes découverts pendant le déploiement Phase 2
+**Goal**: Fix issues discovered during Phase 2 deployment
 
-**Livrables** :
-- Commit des hotfixes manuels (failed_when images remote)
-- Systemd service pour le proxy socket admin-ansible (ADR-019)
-- ADR-017, ADR-018, ADR-019 documentés dans ARCHITECTURE.md
-- Tests Molecule mis à jour pour les fixes
+**Deliverables**:
+- Commit manual hotfixes (failed_when images remote)
+- Systemd service for admin-ansible proxy socket (ADR-019)
+- ADR-017, ADR-018, ADR-019 documented in ARCHITECTURE.md
+- Molecule tests updated for fixes
 
-**Critères de validation** :
-- [ ] admin-ansible redémarre sans intervention manuelle
-- [ ] `ansible-playbook site.yml` idempotent après les fixes
-- [ ] `make lint` passe
-- [ ] ADR-017 à ADR-019 présentes dans ARCHITECTURE.md
-
----
-
-## Phase 3 : Provisioning des instances
-
-**Objectif** : `make apply --tags provision` installe les paquets et services
-
-**Livrables** :
-- `roles/base_system/` — paquets de base, locale, user
-- `roles/incus_provision/` — méthodes d'installation (apt, pip, script, git)
-- `site.yml` — phase provisioning ajoutée
-- Connection plugin `community.general.incus` configuré
-
-**Critères de validation** :
-- [ ] Instance créée + provisionnée en un seul `make apply`
-- [ ] Re-provisioning idempotent
-- [ ] Paquets installés vérifiables
+**Validation criteria**:
+- [ ] admin-ansible restarts without manual intervention
+- [ ] `ansible-playbook site.yml` idempotent after fixes
+- [ ] `make lint` passes
+- [ ] ADR-017 to ADR-019 present in ARCHITECTURE.md
 
 ---
 
-## Phase 4 : Snapshots
+## Phase 3: Instance Provisioning ✅ COMPLETE
 
-**Objectif** : `make snapshot` / `make restore`
+**Goal**: `make apply --tags provision` installs packages and services
 
-**Livrables** :
-- `roles/incus_snapshots/`
-- `snapshot.yml`
-- Snapshot individuel, par domaine, global
-- Restore + delete
+**Deliverables**:
+- `roles/base_system/` — base packages, locale, timezone
+- `roles/admin_bootstrap/` — admin-specific provisioning (ansible, git)
+- `site.yml` — provisioning phase added
+- Connection plugin `community.general.incus` configured
 
-**Critères de validation** :
-- [ ] Snapshot + restore round-trip fonctionnel
-- [ ] Snapshot par domaine ne touche que ce domaine
-
----
-
-## Phase 5 : GPU + LLM
-
-**Objectif** : Container Ollama avec GPU fonctionnel + Open WebUI
-
-**Livrables** :
-- `roles/ollama_server/`
-- `roles/open_webui/`
-- Guide `docs/gpu-llm.md`
-- Profil `nvidia-compute` dans infra.yml
-
-**Critères de validation** :
-- [ ] `nvidia-smi` fonctionne dans le container Ollama
-- [ ] Modèle LLM téléchargeable et interrogeable
-- [ ] Open WebUI accessible depuis le navigateur de l'hôte
-- [ ] GPU policy `exclusive` validée par le PSOT (ADR-018)
+**Validation criteria**:
+- [x] Instance created + provisioned in a single `make apply`
+- [x] Re-provisioning idempotent
+- [x] Installed packages verifiable
 
 ---
 
-## Phase 6 : Tests Molecule
+## Phase 4: Snapshots ✅ COMPLETE
 
-**Objectif** : Tests automatisés pour chaque rôle
+**Goal**: `make snapshot` / `make restore`
 
-**Livrables** :
-- `molecule/` dans chaque rôle
-- CI/CD compatible (GitHub Actions ou script local)
+**Deliverables**:
+- `roles/incus_snapshots/` — Ansible role for snapshot management
+- `snapshot.yml` — standalone playbook
+- Individual, per-domain, and global snapshot support
+- Restore + delete with idempotency
+
+**Validation criteria**:
+- [x] Snapshot + restore round-trip functional
+- [x] Per-domain snapshot only touches that domain
 
 ---
 
-## Phase 7 : Documentation + publication
+## Phase 5: GPU + LLM ✅ COMPLETE
 
-**Objectif** : Projet utilisable par d'autres
+**Goal**: Ollama container with GPU + Open WebUI
 
-**Livrables** :
-- `README.md` complet
+**Deliverables**:
+- `roles/ollama_server/` — Ollama installation with GPU detection
+- `roles/open_webui/` — Open WebUI frontend via pip
+- `instance_devices` support in PSOT generator and incus_instances role
+- Conditional provisioning in site.yml (instance_roles-based)
+- `make apply-llm` target
+
+**Validation criteria**:
+- [x] GPU device correctly added to target instance
+- [x] `nvidia-smi` works inside the GPU container
+- [x] Ollama service running and responding on port 11434
+- [x] Idempotent on second run
+
+---
+
+## Phase 6: Molecule Tests
+
+**Goal**: Automated tests for each role
+
+**Deliverables**:
+- `molecule/` directory in each role
+- CI/CD compatible (GitHub Actions or local script)
+
+**Note**: Tests currently run on the same Incus host (temporary).
+Phase 12 will provide proper isolation via Incus-in-Incus.
+
+---
+
+## Phase 7: Documentation + Publication
+
+**Goal**: Project usable by others
+
+**Deliverables**:
+- `README.md` complete
 - `docs/quickstart.md`
-- `docs/lab-tp.md` — guide de déploiement de TPs
-- `docs/gpu-llm.md` — guide GPU
-- Exemples de domaines (demo, tp-reseaux)
+- `docs/lab-tp.md` — lab deployment guide
+- `docs/gpu-llm.md` — GPU guide
+- `examples/` directory with documented infra.yml files:
+  - `examples/student-sysadmin.infra.yml` — Sysadmin student: 2 simple
+    domains (admin + lab), no GPU, isolated network for lab exercises
+  - `examples/teacher-lab.infra.yml` — Teacher: 1 admin domain + N
+    student domains generated dynamically, pre-lab snapshots
+  - `examples/pro-workstation.infra.yml` — Pro workstation:
+    admin/perso/pro/homelab, GPU on homelab, strict network isolation
+  - `examples/sandbox-isolation.infra.yml` — Untrusted software testing
+    (e.g., OpenClaw): maximum isolation, no external network, snapshot
+    before each execution
+  - `examples/llm-supervisor.infra.yml` — 2 LLMs isolated in separate
+    domains + 1 supervisor container communicating with both via API,
+    for testing LLM monitoring/management by another LLM
+  - `examples/developer.infra.yml` — AnKLuMe developer: includes a
+    dev-test domain with Incus-in-Incus (Phase 12)
+  - Each example accompanied by a README explaining the use case,
+    hardware requirements, and how to get started
 
 ---
 
-## Phase 8 : Isolation nftables inter-bridges
+## Phase 8: nftables Inter-Bridge Isolation
 
-**Objectif** : Bloquer le trafic entre domaines au niveau réseau
+**Goal**: Block traffic between domains at the network level
 
-**Contexte** : Par défaut, Incus crée des chaînes nftables par bridge
-mais n'interdit pas le forwarding entre bridges différents. Cela signifie
-qu'un container dans un domaine peut communiquer avec les containers des
-autres domaines, ce qui brise l'isolation réseau.
+**Context**: By default, Incus creates nftables chains per bridge but
+does not forbid forwarding between different bridges. A container in one
+domain can communicate with containers in other domains, breaking
+network isolation.
 
-**Livrables** :
-- `roles/incus_nftables/` — règles d'isolation inter-bridges
-- Règles : DROP tout trafic entre net-X et net-Y par défaut
-- Exception : admin → all (pour Ansible et monitoring)
-- Intégration dans site.yml (tag `nftables`)
+**Deliverables**:
+- `roles/incus_nftables/` — inter-bridge isolation rules
+- Rules: DROP all traffic between net-X and net-Y by default
+- Exception: admin → all (for Ansible and monitoring)
+- Integration in site.yml (tag `nftables`)
 - Documentation `docs/network-isolation.md`
 
-**Critères de validation** :
-- [ ] Trafic entre domaines non-admin bloqué (ex: perso ↛ pro)
-- [ ] Trafic depuis admin vers tous les domaines autorisé (Ansible, monitoring)
-- [ ] NAT vers Internet fonctionnel depuis tous les bridges
-- [ ] Idempotent (règles nftables appliquées une seule fois)
+**Validation criteria**:
+- [ ] Traffic between non-admin domains blocked (e.g., perso ↛ pro)
+- [ ] Traffic from admin to all domains allowed (Ansible, monitoring)
+- [ ] NAT to Internet functional from all bridges
+- [ ] Idempotent (nftables rules applied only once)
 
-**Notes** :
-- Les règles nftables sont sur l'HÔTE, pas dans les containers
-- C'est une exception au principe "Ansible ne modifie pas l'hôte" (ADR-004)
-- Alternative : gérer via Incus ACLs si la version le supporte
+**Notes**:
+- nftables rules are on the HOST, not in containers
+- This is an exception to "Ansible does not modify the host" (ADR-004)
+- Alternative: manage via Incus ACLs if the version supports it
 
 ---
 
-## Phase 9 : Support VM (instances KVM)
+## Phase 9: VM Support (KVM Instances)
 
-**Objectif** : Permettre de déclarer `type: vm` dans infra.yml
+**Goal**: Allow declaring `type: vm` in infra.yml
 
-**Contexte** : Certaines charges de travail nécessitent une isolation plus
-forte que LXC (workloads non fiables, GPU vfio-pci, kernel custom, OS
-non-Linux). Le framework doit supporter les VMs KVM en plus des containers
-LXC, de manière transparente.
+**Context**: Some workloads require stronger isolation than LXC
+(untrusted workloads, GPU vfio-pci, custom kernel, non-Linux guests).
 
-**Livrables** :
-- `incus_instances` : branchement sur `instance_type` pour passer `--vm`
-- Profils VM-spécifiques (agent réseau, resources, secure boot)
-- Support `incus-agent` pour la connexion Ansible aux VMs
-- Validation PSOT : contraintes VM (mémoire minimum, CPU minimum)
+**Deliverables**:
+- `incus_instances`: branch on `instance_type` to pass `--vm`
+- VM-specific profiles (network agent, resources, secure boot)
+- `incus-agent` support for Ansible connection to VMs
+- PSOT validation: VM constraints (minimum memory, minimum CPU)
 - Guide `docs/vm-support.md`
 
-**Critères de validation** :
-- [ ] `type: vm` dans infra.yml → VM KVM créée et joignable
-- [ ] Provisioning via `community.general.incus` fonctionne dans la VM
-- [ ] VM et LXC coexistent dans le même domaine
-- [ ] `make apply` idempotent avec un mix LXC + VM
+**Validation criteria**:
+- [ ] `type: vm` in infra.yml → KVM VM created and reachable
+- [ ] Provisioning via `community.general.incus` works in the VM
+- [ ] VM and LXC coexist in the same domain
+- [ ] `make apply` idempotent with LXC + VM mix
 
-**Notes** :
-- Les VMs sont plus lentes à démarrer (~30s vs ~2s pour LXC)
-- Le `wait_for_running` devra avoir un timeout plus long pour les VMs
-- Les VMs utilisent `incus-agent` au lieu de `incus exec` direct
+**Notes**:
+- VMs are slower to start (~30s vs ~2s for LXC)
+- `wait_for_running` will need a longer timeout for VMs
+- VMs use `incus-agent` instead of direct `incus exec`
 
 ---
 
-## Phase 10 : Gestion GPU avancée
+## Phase 10: Advanced GPU Management
 
-**Objectif** : GPU passthrough pour LXC et VM avec politique de sécurité
+**Goal**: GPU passthrough for LXC and VM with security policy
 
-**Livrables** :
-- Implémentation de `gpu_policy: exclusive|shared` dans le PSOT (ADR-018)
-- Profil `nvidia-compute` pour LXC (device gpu + nvidia.runtime)
-- Profil `gpu-passthrough` pour VM (vfio-pci + IOMMU)
-- Validation PSOT : un seul GPU par instance en mode exclusive
-- Gestion du device GPU au démarrage (vérification disponibilité)
+**Deliverables**:
+- Implementation of `gpu_policy: exclusive|shared` in PSOT (ADR-018)
+- `nvidia-compute` profile for LXC (gpu device + nvidia.runtime)
+- `gpu-passthrough` profile for VM (vfio-pci + IOMMU)
+- PSOT validation: one GPU per instance in exclusive mode
+- GPU device management at startup (availability check)
 - Guide `docs/gpu-advanced.md`
 
-**Critères de validation** :
-- [ ] LXC avec GPU : `nvidia-smi` fonctionne
-- [ ] VM avec GPU : `nvidia-smi` fonctionne (vfio-pci)
-- [ ] Mode exclusive : erreur PSOT si 2 instances déclarent GPU
-- [ ] Mode shared : warning PSOT, 2 LXC partagent le GPU
-- [ ] Restart du container GPU sans perte d'accès
+**Validation criteria**:
+- [ ] LXC with GPU: `nvidia-smi` works
+- [ ] VM with GPU: `nvidia-smi` works (vfio-pci)
+- [ ] Exclusive mode: PSOT error if 2 instances declare GPU
+- [ ] Shared mode: PSOT warning, 2 LXC share the GPU
+- [ ] GPU container restart without losing access
 
 ---
 
-## Phase 11 : VM firewall dédiée (sys-firewall style)
+## Phase 11: Dedicated Firewall VM (sys-firewall Style)
 
-**Objectif** : Optionnel — routage de tout le trafic inter-domaine via une
-VM firewall dédiée, à la manière de QubesOS sys-firewall
+**Goal**: Optional — route all inter-domain traffic through a dedicated
+firewall VM, QubesOS sys-firewall style
 
-**Contexte** : En Phase 8, l'isolation se fait via nftables sur l'hôte.
-Cette phase ajoute une option pour router tout le trafic via une VM
-firewall dédiée, offrant une isolation plus forte (la firewall a son
-propre kernel, contrairement aux containers LXC qui partagent le kernel
-hôte).
+**Context**: In Phase 8, isolation is done via nftables on the host.
+This phase adds an option to route all traffic through a dedicated
+firewall VM, offering stronger isolation (the firewall has its own
+kernel, unlike LXC containers that share the host kernel).
 
-**Livrables** :
-- `infra.yml` : option `global.firewall_mode: host|vm`
-- VM `sys-firewall` dans le domaine admin
-- Configuration routage : tous les bridges passent par sys-firewall
-- nftables/iptables dans la VM firewall
-- Monitoring et logging centralisé
+**Deliverables**:
+- `infra.yml`: option `global.firewall_mode: host|vm`
+- `sys-firewall` VM in the admin domain
+- Routing configuration: all bridges go through sys-firewall
+- nftables/iptables in the firewall VM
+- Centralized monitoring and logging
 
-**Critères de validation** :
-- [ ] Mode `host` : comportement Phase 8 (nftables sur l'hôte)
-- [ ] Mode `vm` : tout le trafic inter-bridge transite par sys-firewall
-- [ ] Pas de single point of failure excessif (health check + restart auto)
-- [ ] Performance : latence ajoutée < 1ms pour le trafic inter-bridge
+**Validation criteria**:
+- [ ] `host` mode: Phase 8 behavior (nftables on host)
+- [ ] `vm` mode: all inter-bridge traffic goes through sys-firewall
+- [ ] No excessive single point of failure (health check + auto restart)
+- [ ] Performance: added latency < 1ms for inter-bridge traffic
 
-**Notes** :
-- Complexité élevée — ne pas implémenter avant que Phase 8 soit stable
-- Le gain de sécurité en LXC est marginal (même kernel que l'hôte)
-- Le gain est significatif si les workloads sont dans des VMs
-- Impact performance : double hop réseau (container → VM FW → container)
+**Notes**:
+- High complexity — do not implement before Phase 8 is stable
+- Security gain for LXC is marginal (same kernel as host)
+- Security gain is significant for VM workloads
+- Performance impact: double network hop (container → FW VM → container)
 
 ---
 
-## État actuel
+## Phase 12: Incus-in-Incus Test Environment
 
-**Complétées** :
-- Phase 1 : Générateur PSOT fonctionnel (make sync idempotent)
-- Phase 2 : Infrastructure Incus déployée et idempotente
+**Goal**: Test AnKLuMe in an isolated sandbox (AnKLuMe testing itself)
+without impacting production infrastructure.
 
-**Infrastructure déployée** :
+**Principle**: A test-runner container with `security.nesting: "true"`
+runs its own Incus and deploys a complete AnKLuMe instance inside.
+Molecule tests execute within this nested environment.
 
-| Domaine | Container       | IP          | Réseau      | Statut  |
-|---------|-----------------|-------------|-------------|---------|
-| admin   | admin-ansible   | 10.100.0.10 | net-admin   | Running |
-| perso   | perso-desktop   | 10.100.1.10 | net-perso   | Running |
-| pro     | pro-dev         | 10.100.2.10 | net-pro     | Running |
-| homelab | homelab-llm     | 10.100.3.10 | net-homelab | Running |
+**Deliverables**:
+- Incus profile `nesting` with `security.nesting`,
+  `security.syscalls.intercept.mknod`,
+  `security.syscalls.intercept.setxattr`
+- Role `dev_test_runner` that provisions the test container:
+  - Installs Incus inside the container (`apt install incus`)
+  - Initializes Incus (`incus admin init --minimal`)
+  - Clones the AnKLuMe repo
+  - Installs Molecule + ansible-lint + dependencies
+- Script `scripts/run-tests.sh` that:
+  1. Creates the test-runner container (or reuses it)
+  2. Runs `molecule test` for each role inside the container
+  3. Collects results
+  4. Optionally destroys the test-runner container
+- `examples/developer.infra.yml` including the dev-test domain
+- Makefile targets: `make test-sandboxed`, `make test-runner-create`,
+  `make test-runner-destroy`
 
-**ADRs actives** : ADR-001 à ADR-016 + ADR-017 à ADR-019 (cette tâche)
+**References**:
+- [Incus nesting documentation](https://linuxcontainers.org/incus/docs/main/faq/)
+- [Incus container inside Incus](https://discuss.linuxcontainers.org/t/incus-container-inside-incus/23146)
+- [Debusine worker Incus-in-Incus](https://freexian-team.pages.debian.net/debusine/howtos/set-up-incus.html)
 
-**Problèmes connus** :
-- Trafic inter-bridges ouvert (Phase 8)
-- admin-ansible nécessite intervention manuelle au restart (Phase 2b)
-- Hotfix `'exists'` dans failed_when non commité (Phase 2b)
-- Pas de support VM effectif malgré `type:` dans infra.yml (Phase 9)
+**Validation criteria**:
+- [ ] test-runner container starts with functional Incus inside
+- [ ] `molecule test` for base_system passes in the sandbox
+- [ ] No impact on production projects/networks
+- [ ] Automatic cleanup of test resources
+
+---
+
+## Phase 13: LLM-Assisted Testing and Development
+
+**Goal**: Allow an LLM (local or remote) to analyze test results, propose
+fixes, and optionally submit PRs autonomously.
+
+**Modes** (configurable via `ANKLUME_AI_MODE` environment variable):
+
+| Mode | Value | Description |
+|------|-------|-------------|
+| None | `none` | Standard Molecule tests, no AI (default) |
+| Local | `local` | Local LLM via Ollama (e.g., qwen2.5-coder:32b) |
+| Remote | `remote` | Cloud API (Claude API, OpenAI API via key) |
+| Claude Code | `claude-code` | Claude Code CLI in autonomous mode |
+| Aider | `aider` | Aider CLI connected to Ollama or remote API |
+
+**Architecture**:
+
+```
++--------------------------------------------------+
+| test-runner (Incus-in-Incus, Phase 12)           |
+|                                                   |
+|  1. molecule test -> logs                        |
+|  2. if fail -> send logs to LLM                  |
+|  3. LLM analyzes -> proposes patch               |
+|  4. apply patch in branch fix/<issue>            |
+|  5. molecule test again                          |
+|  6. if pass -> git push + create PR              |
+|  7. if fail again -> report + stop (max retries) |
+|                                                   |
+|  LLM backend (configurable):                    |
+|  - Ollama (homelab-llm:11434 or local)           |
+|  - Claude API (ANTHROPIC_API_KEY)                |
+|  - Claude Code CLI (claude -p "...")              |
+|  - Aider (aider --model ollama_chat/...)          |
++--------------------------------------------------+
+```
+
+**Deliverables**:
+
+a) Script `scripts/ai-test-loop.sh` — main orchestrator:
+   - Runs `molecule test` and captures logs
+   - On failure: sends context (log + failing file + CLAUDE.md) to LLM
+   - LLM proposes a diff/patch
+   - Applies the patch, re-tests
+   - Max retries configurable (default: 3)
+   - On success: commit + push to branch + PR creation via `gh` CLI
+   - Dry-run mode: displays the patch without applying it
+
+b) LLM backend integrations (uniform pattern: send context, receive patch):
+   - Ollama (local): `curl http://homelab-llm:11434/api/generate`
+   - Claude Code CLI: `claude -p "Analyze this failure..."`
+   - Aider: `aider --model ollama_chat/... --message "Fix..."`
+   - Direct API (Claude, OpenAI): REST call with structured prompt
+
+c) Configuration (`anklume.conf.yml` or environment variables):
+   ```yaml
+   ai:
+     mode: none
+     ollama_url: "http://homelab-llm:11434"
+     ollama_model: "qwen2.5-coder:32b"
+     anthropic_api_key: ""
+     max_retries: 3
+     auto_pr: false
+     dry_run: true
+   ```
+
+d) Makefile targets:
+   - `make ai-test` — run tests with AI-assisted fixing
+   - `make ai-develop` — autonomous development session
+
+e) Script `scripts/ai-develop.sh` — autonomous development:
+   - Takes a task description as input (TASK)
+   - Creates a feature branch
+   - Uses the chosen LLM to implement the task
+   - Runs tests, iterates if fail (max retries)
+   - If tests pass → PR; full session log for human review
+
+**Safety guardrails**:
+- `dry_run: true` by default (LLM proposes, human applies)
+- `auto_pr: false` by default (human creates the PR)
+- Max retries to prevent infinite loops
+- Every session is fully logged
+- Incus-in-Incus sandbox (Phase 12) isolates all execution
+- Never direct access to production from test-runner
+
+**Design principles**:
+- KISS: orchestrator is a simple shell script, not a complex framework
+- DRY: single orchestration script with pluggable backends
+- Security by default: dry_run + no auto_pr + sandbox isolation
+
+**References**:
+- [Claude Code CLI](https://code.claude.com/docs/en/overview)
+- [Aider + Ollama](https://aider.chat/docs/llms/ollama.html)
+- [Self-healing CI patterns](https://optimumpartners.com/insight/how-to-architect-self-healing-ci/cd-for-agentic-ai/)
+- [claude-flow (multi-agent orchestration)](https://github.com/ruvnet/claude-flow)
+- [Self-Evolving Agents cookbook](https://developers.openai.com/cookbook/examples/partners/self_evolving_agents/autonomous_agent_retraining)
+
+**Validation criteria**:
+- [ ] `make ai-test AI_MODE=none` = standard Molecule tests (no regression)
+- [ ] `make ai-test AI_MODE=local` = tests + failure analysis by local Ollama
+- [ ] `make ai-test AI_MODE=claude-code` = tests + fix proposed by Claude Code
+- [ ] `make ai-test AI_MODE=aider` = tests + fix via Aider
+- [ ] dry_run prevents any automatic modification by default
+- [ ] Auto-created PRs are clearly labeled (ai-generated)
+- [ ] Full session log for every execution
+
+---
+
+## Phase 14: Speech-to-Text (STT) Service
+
+**Goal**: Provide local, GPU-accelerated speech-to-text as a service
+accessible by Open WebUI and other containers.
+
+**Context**: Voice interaction with LLMs requires transcribing audio
+to text before sending it to Ollama. Running STT locally preserves
+privacy (no audio sent to cloud) and fits the compartmentalization
+philosophy. Open WebUI already supports custom STT endpoints natively.
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────┐
+│ homelab domain (net-homelab, 10.100.3.0/24)     │
+│                                                   │
+│  ┌──────────────┐    ┌──────────────────────┐   │
+│  │ homelab-stt   │    │ homelab-llm          │   │
+│  │ GPU (shared)  │    │ GPU (shared)         │   │
+│  │               │    │                      │   │
+│  │ faster-whisper│    │ Ollama               │   │
+│  │ + Speaches    │    │ :11434               │   │
+│  │ :8000         │    │                      │   │
+│  └──────┬───────┘    └──────────────────────┘   │
+│         │                      ▲                  │
+│         │    /v1/audio/        │  /api/generate   │
+│         │    transcriptions    │                  │
+│         ▼                      │                  │
+│  ┌──────────────────────────────┐                │
+│  │ homelab-webui                │                │
+│  │ Open WebUI :3000             │                │
+│  │ STT → homelab-stt:8000      │                │
+│  │ LLM → homelab-llm:11434     │                │
+│  └──────────────────────────────┘                │
+└─────────────────────────────────────────────────┘
+```
+
+**Engine choice**: **faster-whisper** with **Whisper Large V3 Turbo**
+model. faster-whisper uses CTranslate2 for up to 4x speedup over
+vanilla Whisper on NVIDIA GPUs, with lower memory usage. Whisper
+Large V3 Turbo provides the best accuracy/speed trade-off for
+multilingual workloads (French + English).
+
+**API server**: **Speaches** (formerly faster-whisper-server). Exposes
+an OpenAI-compatible `/v1/audio/transcriptions` endpoint that Open
+WebUI can consume directly. Single container, no orchestration needed.
+
+**Alternative engines** (for future consideration):
+- **OWhisper**: "Ollama for STT" — unified CLI/server for multiple
+  STT backends (whisper.cpp, Moonshine). Newer project (Aug 2025),
+  promising UX but less mature.
+- **NVIDIA Parakeet TDT 0.6B**: Blazing fast (RTFx 3386) but
+  English-only. Ideal if multilingual is not required.
+- **Vosk**: Lightweight, CPU-only. For instances without GPU access.
+
+**Deliverables**:
+- `roles/stt_server/` — Install faster-whisper + Speaches server
+  (systemd service, GPU detection, model download)
+- PSOT support: `homelab-stt` instance with GPU device + config
+- Open WebUI integration: configure STT endpoint in admin settings
+  (or via `open_webui_stt_url` variable)
+- `make apply-stt` Makefile target
+- `gpu_policy: shared` required if STT and Ollama share the same GPU
+  (ADR-018). Document the trade-off: shared GPU means concurrent
+  inference competes for VRAM.
+
+**Optional TTS deliverable** (text-to-speech for full voice loop):
+- **Piper TTS** as a lightweight, local text-to-speech engine
+- Could run in the same `homelab-stt` container or a dedicated one
+- Exposes an API endpoint for Open WebUI TTS configuration
+- Deferred unless voice output is explicitly needed
+
+**Variables (roles/stt_server/defaults/main.yml)**:
+```yaml
+stt_engine: "faster-whisper"
+stt_model: "large-v3-turbo"
+stt_host: "0.0.0.0:8000"
+stt_quantization: "float16"    # float16, int8_float16, or int8
+stt_language: ""               # Empty = auto-detect
+```
+
+**References**:
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [Speaches (OpenAI-compatible server)](https://github.com/speaches-ai/speaches)
+- [OWhisper](https://hyprnote.com/product/owhisper)
+- [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)
+- [Open WebUI STT features](https://docs.openwebui.com/features/)
+- [Best open-source STT models 2026](https://northflank.com/blog/best-open-source-speech-to-text-stt-model-in-2026-benchmarks)
+
+**Validation criteria**:
+- [ ] `homelab-stt` container starts with GPU access
+- [ ] Speaches API responds on `/v1/audio/transcriptions`
+- [ ] Open WebUI voice input transcribes correctly (FR + EN)
+- [ ] Idempotent on second run
+- [ ] Concurrent GPU usage with Ollama stable (shared mode)
+- [ ] Transcription latency < 2s for 10s audio clip
+
+---
+
+## Current State
+
+**Completed**:
+- Phase 1: PSOT generator functional (make sync idempotent)
+- Phase 2: Incus infrastructure deployed and idempotent
+- Phase 3: Instance provisioning (base_system + admin_bootstrap)
+- Phase 4: Snapshot management (role + playbook)
+- Phase 5: GPU passthrough + Ollama + Open WebUI roles
+
+**Deployed infrastructure**:
+
+| Domain | Container | IP | Network | Status |
+|--------|-----------|-----|---------|--------|
+| admin | admin-ansible | 10.100.0.10 | net-admin | Running |
+| perso | perso-desktop | 10.100.1.10 | net-perso | Running |
+| pro | pro-dev | 10.100.2.10 | net-pro | Running |
+| homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
+
+**Active ADRs**: ADR-001 to ADR-019
+
+**Known issues**:
+- Inter-bridge traffic open (Phase 8)
+- admin-ansible requires manual intervention at restart (Phase 2b)
+- No effective VM support despite `type:` in infra.yml (Phase 9)
