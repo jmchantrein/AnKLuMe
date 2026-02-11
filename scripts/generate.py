@@ -122,12 +122,15 @@ def generate(infra, base_dir, dry_run=False):
     written = []
 
     # group_vars/all.yml
+    # Connection params stored as psot_* (informational only).
+    # They must NOT be named ansible_connection / ansible_user because
+    # inventory variables override play-level keywords (Ansible precedence).
     all_vars = {k: v for k, v in {
         "project_name": infra.get("project_name"),
         "base_subnet": g.get("base_subnet", "10.100"),
         "default_os_image": g.get("default_os_image"),
-        "default_connection": g.get("default_connection"),
-        "default_user": g.get("default_user"),
+        "psot_default_connection": g.get("default_connection"),
+        "psot_default_user": g.get("default_user"),
     }.items() if v is not None}
     fp, _ = _write_managed(base / "group_vars" / "all.yml", all_vars, dry_run)
     written.append(fp)
@@ -154,8 +157,6 @@ def generate(infra, base_dir, dry_run=False):
             "incus_project": dname,
             "incus_network": {"name": f"net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
             "subnet_id": sid,
-            "ansible_connection": g.get("default_connection"),
-            "ansible_user": g.get("default_user"),
         }.items() if v is not None}
         if domain.get("profiles"):
             gvars["incus_profiles"] = domain["profiles"]
