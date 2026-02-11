@@ -1,0 +1,71 @@
+---
+# BaseSystem | Base provisioning for all instances
+#
+# Applied to every instance via the provisioning play.
+# Installs packages, configures locale and timezone.
+#
+# Input variables (from defaults, overridable in group_vars/host_vars):
+#   - base_system_packages (list): base packages to install
+#   - base_system_extra_packages (list): additional per-host packages
+#   - base_system_locale (string): locale to generate and set as default
+#   - base_system_timezone (string): timezone name (e.g. Europe/Paris)
+
+- name: BaseSystem | Wait for dpkg lock to be released
+  ansible.builtin.command:
+    argv:
+      - fuser
+      - /var/lib/dpkg/lock-frontend
+  register: base_system_dpkg_lock
+  changed_when: false
+  failed_when: false
+  retries: 30
+  delay: 5
+  until: base_system_dpkg_lock.rc != 0
+
+- name: BaseSystem | Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: BaseSystem | Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_system_packages + base_system_extra_packages }}"
+    state: present
+
+- name: BaseSystem | Generate locale
+  community.general.locale_gen:
+    name: "{{ base_system_locale }}"
+    state: present
+
+- name: BaseSystem | Set default locale
+  ansible.builtin.copy:
+    content: "LANG={{ base_system_locale }}\n"
+    dest: /etc/default/locale
+    mode: "0644"
+
+- name: BaseSystem | Set timezone
+  ansible.builtin.copy:
+    content: "{{ base_system_timezone }}\n"
+    dest: /etc/timezone
+    mode: "0644"
+
+- name: BaseSystem | Set localtime symlink
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ base_system_timezone }}"
+    dest: /etc/localtime
+    state: link
+    force: true
+
+- name: BaseSystem | Read init process name
+  ansible.builtin.slurp:
+    src: /proc/1/comm
+  register: base_system_pid1
+
+- name: BaseSystem | Verify systemd is init system
+  ansible.builtin.assert:
+    that:
+      - "'systemd' in (base_system_pid1.content | b64decode)"
+    fail_msg: >-
+      Expected systemd as PID 1, got '{{ base_system_pid1.content | b64decode | trim }}'.
+      Incus containers should use systemd by default.
+    success_msg: "systemd confirmed as PID 1"
