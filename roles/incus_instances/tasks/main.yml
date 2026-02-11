@@ -13,9 +13,16 @@
 
 - name: IncusInstances | Read existing instances in project
   ansible.builtin.command:
-    cmd: "incus list --project {{ instance_domain }} --format json"
+    argv:
+      - incus
+      - list
+      - --project
+      - "{{ instance_domain }}"
+      - --format
+      - json
   register: incus_instances_raw
   changed_when: false
+  check_mode: false  # Safe: read-only command
 
 - name: IncusInstances | Parse existing instance names
   ansible.builtin.set_fact:
@@ -24,9 +31,13 @@
 
 - name: IncusInstances | Launch LXC container if missing
   ansible.builtin.command:
-    cmd: >-
-      incus launch {{ instance_os_image }} {{ instance_name }}
-      --project {{ instance_domain }}
+    argv:
+      - incus
+      - launch
+      - "{{ instance_os_image }}"
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
   when:
     - instance_name not in incus_instances_existing
     - instance_type == 'lxc'
@@ -34,10 +45,14 @@
 
 - name: IncusInstances | Launch VM if missing
   ansible.builtin.command:
-    cmd: >-
-      incus launch {{ instance_os_image }} {{ instance_name }}
-      --vm
-      --project {{ instance_domain }}
+    argv:
+      - incus
+      - launch
+      - "{{ instance_os_image }}"
+      - "{{ instance_name }}"
+      - --vm
+      - --project
+      - "{{ instance_domain }}"
   when:
     - instance_name not in incus_instances_existing
     - instance_type == 'vm'
@@ -45,10 +60,14 @@
 
 - name: IncusInstances | Apply instance config keys
   ansible.builtin.command:
-    cmd: >-
-      incus config set {{ instance_name }}
-      {{ item.key }}={{ item.value }}
-      --project {{ instance_domain }}
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "{{ item.key }}={{ item.value }}"
+      - --project
+      - "{{ instance_domain }}"
   loop: "{{ instance_config | default({}) | dict2items }}"
   loop_control:
     label: "{{ item.key }}={{ item.value }}"
@@ -57,18 +76,31 @@
 
 - name: IncusInstances | Set static IP via device override
   ansible.builtin.command:
-    cmd: >-
-      incus config device set {{ instance_name }} eth0
-      ipv4.address={{ instance_ip }}
-      --project {{ instance_domain }}
+    argv:
+      - incus
+      - config
+      - device
+      - set
+      - "{{ instance_name }}"
+      - eth0
+      - "ipv4.address={{ instance_ip }}"
+      - --project
+      - "{{ instance_domain }}"
   when: instance_ip is defined and instance_ip
   changed_when: false
 
 - name: IncusInstances | Wait for instance to be running
   ansible.builtin.command:
-    cmd: "incus list --project {{ instance_domain }} --format json"
+    argv:
+      - incus
+      - list
+      - --project
+      - "{{ instance_domain }}"
+      - --format
+      - json
   register: incus_instances_status_raw
   changed_when: false
+  check_mode: false  # Safe: read-only command
   until: >-
     (incus_instances_status_raw.stdout | from_json
     | selectattr('name', 'equalto', instance_name)

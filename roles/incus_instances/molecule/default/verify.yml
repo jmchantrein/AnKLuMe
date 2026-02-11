@@ -6,7 +6,13 @@
   tasks:
     - name: Verify | Read instance list
       ansible.builtin.command:
-        cmd: incus list --project molecule-test --format json
+        argv:
+          - incus
+          - list
+          - --project
+          - molecule-test
+          - --format
+          - json
       register: verify_instances_raw
       changed_when: false
 
@@ -39,13 +45,19 @@
 
     - name: Verify | Read instance config
       ansible.builtin.command:
-        cmd: incus config show molecule-test-instance --project molecule-test --format json
+        argv:
+          - incus
+          - config
+          - show
+          - molecule-test-instance
+          - --project
+          - molecule-test
       register: verify_instance_config_raw
       changed_when: false
 
     - name: Verify | Parse instance config
       ansible.builtin.set_fact:
-        verify_instance_config: "{{ verify_instance_config_raw.stdout | from_json }}"
+        verify_instance_config: "{{ verify_instance_config_raw.stdout | from_yaml }}"
 
     - name: Verify | Instance config keys are set
       ansible.builtin.assert:
