@@ -1,0 +1,124 @@
+---
+- name: Verify incus_snapshots
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Read snapshot list
+      ansible.builtin.command:
+        argv:
+          - incus
+          - snapshot
+          - list
+          - molecule-test-instance
+          - --project
+          - molecule-test
+          - --format
+          - json
+      register: verify_snapshots_raw
+      changed_when: false
+
+    - name: Verify | Parse snapshot list
+      ansible.builtin.set_fact:
+        verify_snapshots: "{{ verify_snapshots_raw.stdout | from_json }}"
+
+    - name: Verify | Snapshot exists
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test-snap' in (verify_snapshots | map(attribute='name') | list)"
+        fail_msg: "Snapshot molecule-test-snap does not exist"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_snapshots
+      vars:
+        incus_project: molecule-test
+        snapshot_action: create
+        snapshot_name: molecule-test-snap
+        inventory_hostname: molecule-test-instance
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
+
+    - name: Verify | Test list action
+      ansible.builtin.include_role:
+        name: incus_snapshots
+      vars:
+        incus_project: molecule-test
+        snapshot_action: list
+        inventory_hostname: molecule-test-instance
+
+    - name: Verify | Test restore action
+      ansible.builtin.include_role:
+        name: incus_snapshots
+      vars:
+        incus_project: molecule-test
+        snapshot_action: restore
+        snapshot_name: molecule-test-snap
+        snapshot_stop_first: false
+        inventory_hostname: molecule-test-instance
+
+    - name: Verify | Snapshot still exists after restore
+      ansible.builtin.command:
+        argv:
+          - incus
+          - snapshot
+          - list
+          - molecule-test-instance
+          - --project
+          - molecule-test
+          - --format
+          - json
+      register: verify_snapshots_after_restore
+      changed_when: false
+
+    - name: Verify | Parse snapshots after restore
+      ansible.builtin.set_fact:
+        verify_snap_names_restore: >-
+          {{ verify_snapshots_after_restore.stdout | from_json
+          | map(attribute='name') | list }}
+
+    - name: Verify | Confirm snapshot preserved after restore
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test-snap' in verify_snap_names_restore"
+        fail_msg: "Snapshot was lost after restore"
+
+    - name: Verify | Test snapshot delete action
+      ansible.builtin.include_role:
+        name: incus_snapshots
+      vars:
+        incus_project: molecule-test
+        snapshot_action: delete
+        snapshot_name: molecule-test-snap
+        inventory_hostname: molecule-test-instance
+
+    - name: Verify | Confirm snapshot was deleted
+      ansible.builtin.command:
+        argv:
+          - incus
+          - snapshot
+          - list
+          - molecule-test-instance
+          - --project
+          - molecule-test
+          - --format
+          - json
+      register: verify_snapshots_after_delete
+      changed_when: false
+
+    - name: Verify | Parse snapshots after delete
+      ansible.builtin.set_fact:
+        verify_snap_names_after: >-
+          {{ verify_snapshots_after_delete.stdout | from_json
+          | map(attribute='name') | list }}
+
+    - name: Verify | Snapshot no longer exists
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test-snap' not in verify_snap_names_after"
+        fail_msg: "Snapshot molecule-test-snap still exists after delete"

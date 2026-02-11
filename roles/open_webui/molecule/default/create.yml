@@ -1,0 +1,51 @@
+---
+- name: Create test container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create | Ensure images remote exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - remote
+          - add
+          - images
+          - https://images.linuxcontainers.org
+          - --protocol
+          - simplestreams
+          - --public
+      register: create_remote_result
+      changed_when: "'exists' not in create_remote_result.stderr"
+      failed_when:
+        - create_remote_result.rc != 0
+        - "'exists' not in create_remote_result.stderr"
+
+    - name: Create | Launch molecule test container
+      ansible.builtin.command:
+        cmd: incus launch images:debian/13 molecule-test-instance --project default
+      register: create_launch_result
+      changed_when: create_launch_result.rc == 0
+      failed_when:
+        - create_launch_result.rc != 0
+        - "'already exists' not in create_launch_result.stderr"
+
+    - name: Create | Wait for container to be running
+      ansible.builtin.command:
+        argv:
+          - incus
+          - list
+          - molecule-test-instance
+          - --project
+          - default
+          - --format
+          - json
+      register: create_info_result
+      changed_when: false
+      until: >-
+        (create_info_result.stdout | from_json
+        | selectattr('name', 'equalto', 'molecule-test-instance')
+        | map(attribute='status') | first | default(''))
+        == 'Running'
+      retries: 15
+      delay: 2

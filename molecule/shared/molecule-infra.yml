@@ -1,0 +1,22 @@
+---
+# Shared Molecule config template for infrastructure roles
+#
+# Infrastructure roles run on the controller (connection: local) and
+# drive Incus via CLI. The test host is not managed by Molecule — we
+# run against localhost with the Incus socket.
+#
+# Copy this template into roles/<role>/molecule/default/molecule.yml
+# and adjust as needed.
+
+driver:
+  name: delegated
+platforms:
+  - name: molecule-test
+    managed: false
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      gathering: explicit
+verifier:
+  name: ansible

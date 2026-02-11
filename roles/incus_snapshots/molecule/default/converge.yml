@@ -1,0 +1,113 @@
+---
+- name: Converge - setup prerequisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Setup | Ensure molecule-test project exists
+      ansible.builtin.command:
+        cmd: incus project create molecule-test
+      register: setup_project_result
+      changed_when: setup_project_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure project features
+      ansible.builtin.command:
+        cmd: "incus project set molecule-test {{ item.key }}={{ item.value }}"
+      loop:
+        - key: features.images
+          value: "true"
+        - key: features.profiles
+          value: "true"
+        - key: features.storage.volumes
+          value: "true"
+        - key: features.networks
+          value: "false"
+      loop_control:
+        label: "{{ item.key }}={{ item.value }}"
+      changed_when: false
+
+    - name: Setup | Ensure net-molecule-test network exists
+      ansible.builtin.command:
+        cmd: incus network create net-molecule-test
+      register: setup_network_result
+      changed_when: setup_network_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure default profile eth0
+      ansible.builtin.command:
+        cmd: >-
+          incus profile device add default eth0 nic
+          network=net-molecule-test
+          name=eth0
+          --project molecule-test
+      register: setup_profile_eth0
+      changed_when: setup_profile_eth0.rc == 0
+      failed_when: false
+
+    - name: Setup | Configure default profile root
+      ansible.builtin.command:
+        cmd: >-
+          incus profile device add default root disk
+          pool=default
+          path=/
+          --project molecule-test
+      register: setup_profile_root
+      changed_when: setup_profile_root.rc == 0
+      failed_when: false
+
+    - name: Setup | Ensure images remote exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - remote
+          - add
+          - images
+          - https://images.linuxcontainers.org
+          - --protocol
+          - simplestreams
+          - --public
+      register: setup_remote_result
+      changed_when: "'exists' not in setup_remote_result.stderr"
+      failed_when:
+        - setup_remote_result.rc != 0
+        - "'exists' not in setup_remote_result.stderr"
+
+    - name: Setup | Launch molecule-test-instance
+      ansible.builtin.command:
+        cmd: >-
+          incus launch images:debian/13 molecule-test-instance
+          --project molecule-test
+      register: setup_instance_result
+      changed_when: setup_instance_result.rc == 0
+      failed_when: false
+
+    - name: Setup | Wait for instance to be running
+      ansible.builtin.command:
+        argv:
+          - incus
+          - list
+          - --project
+          - molecule-test
+          - --format
+          - json
+      register: setup_instance_status
+      changed_when: false
+      until: >-
+        (setup_instance_status.stdout | from_json
+        | selectattr('name', 'equalto', 'molecule-test-instance')
+        | map(attribute='status') | first | default(''))
+        == 'Running'
+      retries: 30
+      delay: 2
+
+- name: Converge - apply incus_snapshots
+  hosts: molecule-test-instance
+  connection: local
+  gather_facts: true
+  vars:
+    incus_project: molecule-test
+    snapshot_action: create
+    snapshot_name: molecule-test-snap
+  roles:
+    - role: incus_snapshots
