@@ -1,9 +1,23 @@
 ---
 # site.yml — Master playbook for AnKLuMe infrastructure
 #
-# Phase 1 (Infra): Runs on localhost, drives Incus via CLI.
-#   Roles are applied per domain group so each domain gets its own
-#   project, network, profile, and instances.
+# Architecture pattern:
+#   - hosts: all — each host provides its own PSOT variables
+#   - connection: local — all Incus commands run on the controller
+#     (admin-ansible) which has the Incus socket mounted
+#   - No run_once — each host executes the roles for its own domain;
+#     the reconciliation pattern (check → create if missing) ensures
+#     idempotence across hosts sharing the same domain
+#
+# This follows the standard Ansible pattern for API-driven infrastructure
+# management (similar to cloud/network device management from a controller).
+# See ADR-015 in docs/ARCHITECTURE.md.
+#
+# Concurrency note:
+#   With forks > 1, multiple hosts may attempt to create the same resource
+#   simultaneously. The reconciliation pattern handles this gracefully in
+#   most cases. If strict sequential execution is needed, uncomment the
+#   serial: 1 line below.
 #
 # Usage:
 #   make apply                     # Full infrastructure
@@ -11,13 +25,14 @@
 #   make apply-limit G=<domain>    # Single domain (--limit <domain>)
 #   make check                     # Dry-run (--check --diff)
 
-# Phase 1: Infrastructure — one play per domain group
 - name: "Infrastructure | Reconcile Incus resources"
   hosts: all
   connection: local
   gather_facts: false
+  # serial: 1  # Uncomment for strict sequential execution (prevents race conditions)
   tags:
     - infra
+
   tasks:
     - name: Infrastructure | Apply incus_projects
       ansible.builtin.include_role:
@@ -29,7 +44,6 @@
       tags:
         - projects
         - infra
-      run_once: true
 
     - name: Infrastructure | Apply incus_networks
       ansible.builtin.include_role:
@@ -41,7 +55,6 @@
       tags:
         - networks
         - infra
-      run_once: true
 
     - name: Infrastructure | Apply incus_profiles
       ansible.builtin.include_role:
@@ -53,7 +66,6 @@
       tags:
         - profiles
         - infra
-      run_once: true
 
     - name: Infrastructure | Apply incus_instances
       ansible.builtin.include_role:
