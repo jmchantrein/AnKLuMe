@@ -22,13 +22,13 @@
 
     - name: Verify | Read project config
       ansible.builtin.command:
-        cmd: incus project show molecule-test --format json
+        cmd: incus project show molecule-test
       register: verify_project_show_raw
       changed_when: false
 
     - name: Verify | Parse project config
       ansible.builtin.set_fact:
-        verify_project: "{{ verify_project_show_raw.stdout | from_json }}"
+        verify_project: "{{ verify_project_show_raw.stdout | from_yaml }}"
 
     - name: Verify | Project has correct features
       ansible.builtin.assert:
