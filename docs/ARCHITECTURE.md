@@ -225,3 +225,127 @@ and `roles/`.
 
 **Consequence**: Variable resolution works correctly out of the box.
 The layout matches what Ansible users expect from standard projects.
+
+---
+
+## ADR-017: Instance type abstraction — LXC now, VM-ready later
+
+**Context:** All current instances are LXC containers. However, some use
+cases require KVM VMs: stronger isolation (GPU with vfio-pci, untrusted
+workloads), full kernel customization, or running non-Linux guests.
+
+**Decision:** The `instance_type` variable (from infra.yml `type: lxc|vm`)
+is present in host_vars but the `incus_instances` role currently treats all
+instances as LXC containers. The codebase MUST be kept VM-aware from now on:
+
+1. **infra.yml already supports `type: lxc|vm`** — no schema change needed
+2. **incus_instances role:** the `incus launch` command must pass `--vm`
+   when `instance_type == 'vm'`. This is the ONLY change needed for basic
+   VM creation. All other reconciliation logic (device override, IP config,
+   wait for running) works identically.
+3. **Profiles:** VM instances may need different default profiles (e.g.,
+   `agent.nic.enp5s0.mode` for network config inside VMs). This is a
+   Phase 8+ concern.
+4. **GPU in VMs:** Requires vfio-pci passthrough + IOMMU groups, which is
+   significantly more complex than LXC GPU passthrough. Deferred to Phase 9+.
+5. **Connection plugin:** VMs use `incus exec` just like LXC containers,
+   so the `community.general.incus` connection plugin works for both.
+
+**Consequence:** All new code in incus_instances MUST branch on
+`instance_type` where behavior differs between LXC and VM. Today the
+only difference is the `--vm` flag on `incus launch`. Future phases will
+add VM-specific profiles, devices, and boot configuration.
+
+**What NOT to do now:** Do not add VM-specific roles, profiles, or devices
+until there is a concrete use case. Keep the abstraction minimal.
+
+---
+
+## ADR-018: GPU access policy — exclusive by default, shared optional
+
+**Context:** GPU passthrough in LXC containers exposes the host kernel's
+GPU driver to the container, expanding the attack surface. Binding the
+same GPU to multiple containers simultaneously introduces risks:
+- No VRAM isolation on consumer GPUs (no SR-IOV)
+- Shared driver state could cause crashes
+- Any container with GPU access can potentially read GPU memory
+
+**Decision:**
+1. **Default policy: `gpu_policy: exclusive`** — the PSOT generator
+   validates that at most ONE instance across all domains has a GPU device.
+   If multiple instances declare `gpu: true`, the generator errors with a
+   clear message.
+2. **Optional override: `gpu_policy: shared`** — set in `infra.yml`
+   `global.gpu_policy: shared` to allow multiple instances to share the
+   GPU. The generator emits a warning but does not error.
+3. **GPU in VMs:** When `instance_type: vm` has GPU access, it uses
+   vfio-pci passthrough which provides hardware-level isolation. The
+   exclusive policy still applies by default (only one VM can own a
+   PCI device), but `shared` mode is irrelevant for VMs (you can't
+   share a PCI device between VMs without SR-IOV).
+
+**Validation rules for the PSOT generator (scripts/generate.py):**
+- Count instances with `gpu: true` or with a profile containing a `gpu` device
+- If count > 1 and `global.gpu_policy` != `shared` → error
+- If count > 1 and `global.gpu_policy` == `shared` → warning
+- If a VM instance has `gpu: true` → validate host has IOMMU enabled (Phase 9+)
+
+**Consequence:** Safe by default. Users who know what they're doing can
+opt into shared GPU access explicitly.
+
+---
+
+## ADR-019: admin-ansible proxy socket resilience at boot
+
+**Context:** The `admin-ansible` container has an Incus proxy device that
+maps the host's Incus socket (`/var/lib/incus/unix.socket`) to
+`/var/run/incus/unix.socket` inside the container. When the container is
+restarted, the `/var/run/` directory is ephemeral (tmpfs) and the
+`/var/run/incus/` subdirectory does not exist yet when the proxy device
+tries to bind, causing the container to fail to start with:
+
+```
+Error: Failed to listen on /var/run/incus/unix.socket:
+listen unix /var/run/incus/unix.socket: bind: no such file or directory
+```
+
+The workaround today is manual: remove the proxy device, start the
+container, create the directory, re-add the proxy device. This must be
+automated.
+
+**Decision:** Add a systemd oneshot service in the `admin-ansible`
+container that creates `/var/run/incus/` before the proxy device starts.
+This service runs early in boot (`Before=network.target`,
+`After=local-fs.target`).
+
+Implementation in the `base_admin` role (or provisioning for admin-ansible):
+
+```ini
+# /etc/systemd/system/incus-socket-dir.service
+[Unit]
+Description=Create Incus socket directory for proxy device
+DefaultDependencies=no
+Before=network.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /var/run/incus
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Why not `raw.lxc`:** The `lxc.hook.pre-start` hook runs on the HOST,
+not inside the container. While it could create the directory in the
+container's rootfs, it requires knowing the rootfs path and runs as root
+on the host — which conflicts with our principle that Ansible does not
+modify the host (ADR-004). A systemd service inside the container is
+self-contained and portable.
+
+**Scope:** This fix applies ONLY to `admin-ansible`. Other containers do
+not have the proxy device and are not affected.
+
+**Consequence:** `admin-ansible` survives restarts without manual
+intervention. The systemd service is idempotent (mkdir -p).
