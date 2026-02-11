@@ -175,3 +175,34 @@ project's default profile references the appropriate bridge by name.
 
 **Consequences**: Network-related Ansible tasks do not use the `--project`
 flag. Profile tasks DO need `--project` to configure each project's profile.
+
+---
+
+## ADR-015: Playbook uses hosts:all with connection:local
+
+**Context**: All Incus commands must run on the Ansible controller
+(`admin-ansible`) which has the Incus socket mounted. Other hosts in the
+inventory do not have access to Incus and do not exist yet when the
+infrastructure roles run.
+
+**Decision**: The `site.yml` playbook uses `hosts: all` with
+`connection: local`. Each host provides its PSOT-generated variables
+(domain, network config, instance config). All commands execute locally
+on the controller via the Incus socket. No `run_once` is used — each
+host runs the roles independently.
+
+**Why not `run_once`**: With `run_once: true`, only one host per play
+executes each task. Since each host has variables for its own domain,
+this means only one domain's resources get created. Removing `run_once`
+allows every host to create its domain's resources, with idempotence
+guaranteed by the reconciliation pattern (check if exists → skip).
+
+**Why not `delegate_to`**: Since ALL tasks run locally (not just some),
+`connection: local` is cleaner than `delegate_to: localhost` on every
+task. The Ansible documentation recommends `connection: local` when
+the entire play targets a local API.
+
+**Concurrency**: With `forks > 1`, two hosts from the same domain could
+try to create the same project simultaneously. The reconciliation pattern
+handles this gracefully (second host sees the resource already exists).
+For strict sequential execution, `serial: 1` can be enabled.
