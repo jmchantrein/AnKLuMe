@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: open_webui
+  author: AnKLuMe
+  description: Install Open WebUI frontend for Ollama
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: ArchLinux
+      versions:
+        - all
+dependencies: []

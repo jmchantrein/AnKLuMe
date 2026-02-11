@@ -178,6 +178,7 @@ def generate(infra, base_dir, dry_run=False):
                 "instance_gpu": m.get("gpu"),
                 "instance_profiles": m.get("profiles"),
                 "instance_config": m.get("config"),
+                "instance_devices": m.get("devices"),
                 "instance_storage_volumes": m.get("storage_volumes"),
                 "instance_roles": m.get("roles"),
             }.items() if v is not None}

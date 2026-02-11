@@ -207,6 +207,26 @@ class TestGenerate:
         gv = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "gpu-compute" in gv
 
+    def test_host_vars_with_devices(self, sample_infra, tmp_path):
+        """Machine with devices declaration produces instance_devices in host_vars."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["devices"] = {
+            "gpu": {"type": "gpu"},
+        }
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = {
+            "nvidia.runtime": "true",
+        }
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_devices" in content
+        assert "gpu" in content
+        assert "nvidia.runtime" in content
+
+    def test_host_vars_without_devices(self, sample_infra, tmp_path):
+        """Machine without devices declaration omits instance_devices from host_vars."""
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
+        assert "instance_devices" not in content
+
     def test_no_connection_vars_in_group_vars(self, sample_infra, tmp_path):
         """ansible_connection and ansible_user must NOT appear in any group_vars file.
 

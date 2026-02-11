@@ -1,0 +1,48 @@
+---
+# OpenWebUI | Install Open WebUI frontend for Ollama
+#
+# Applied via the provisioning play (connection: community.general.incus).
+# Runs INSIDE the target container — typically a separate container from Ollama.
+#
+# Input variables (from defaults, overridable in host_vars):
+#   - open_webui_port (int): port to listen on
+#   - open_webui_ollama_url (string): URL of the Ollama API server
+
+- name: OpenWebUI | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+      - python3-venv
+    state: present
+
+- name: OpenWebUI | Install Open WebUI via pip
+  ansible.builtin.pip:
+    name: open-webui
+    state: present
+    extra_args: --break-system-packages
+
+- name: OpenWebUI | Create systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/open-webui.service
+    content: |
+      [Unit]
+      Description=Open WebUI
+      After=network.target
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/open-webui serve --port {{ open_webui_port }}
+      Environment="OLLAMA_BASE_URL={{ open_webui_ollama_url }}"
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  notify: OpenWebUI | Restart Open WebUI
+
+- name: OpenWebUI | Enable and start Open WebUI service
+  ansible.builtin.systemd:
+    name: open-webui
+    enabled: true
+    state: started
+    daemon_reload: true
