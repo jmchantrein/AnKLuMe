@@ -22,13 +22,13 @@
 
     - name: Verify | Read network config
       ansible.builtin.command:
-        cmd: incus network show net-molecule-test --format json
+        cmd: incus network show net-molecule-test
       register: verify_network_show_raw
       changed_when: false
 
     - name: Verify | Parse network config
       ansible.builtin.set_fact:
-        verify_network: "{{ verify_network_show_raw.stdout | from_json }}"
+        verify_network: "{{ verify_network_show_raw.stdout | from_yaml }}"
 
     - name: Verify | Network has correct ipv4.address
       ansible.builtin.assert:

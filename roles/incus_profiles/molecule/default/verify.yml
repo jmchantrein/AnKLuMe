@@ -6,13 +6,19 @@
   tasks:
     - name: Verify | Read default profile
       ansible.builtin.command:
-        cmd: incus profile show default --project molecule-test --format json
+        argv:
+          - incus
+          - profile
+          - show
+          - default
+          - --project
+          - molecule-test
       register: verify_profile_raw
       changed_when: false
 
     - name: Verify | Parse profile
       ansible.builtin.set_fact:
-        verify_profile: "{{ verify_profile_raw.stdout | from_json }}"
+        verify_profile: "{{ verify_profile_raw.stdout | from_yaml }}"
 
     - name: Verify | Default profile exists
       ansible.builtin.assert:

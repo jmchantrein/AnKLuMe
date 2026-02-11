@@ -18,6 +18,7 @@
     cmd: incus network list --format json
   register: incus_networks_raw
   changed_when: false
+  check_mode: false  # Safe: read-only command
 
 - name: IncusNetworks | Parse existing network names
   ansible.builtin.set_fact:
@@ -26,20 +27,29 @@
 
 - name: IncusNetworks | Create network if missing
   ansible.builtin.command:
-    cmd: "incus network create {{ incus_network.name }}"
+    argv:
+      - incus
+      - network
+      - create
+      - "{{ incus_network.name }}"
   when: incus_network.name not in incus_networks_existing
   changed_when: true
 
 - name: IncusNetworks | Read network config
   ansible.builtin.command:
-    cmd: "incus network show {{ incus_network.name }} --format json"
+    argv:
+      - incus
+      - network
+      - show
+      - "{{ incus_network.name }}"
   register: incus_networks_show_raw
   changed_when: false
+  check_mode: false  # Safe: read-only command
 
 - name: IncusNetworks | Parse network config
   ansible.builtin.set_fact:
     incus_networks_current_config: >-
-      {{ (incus_networks_show_raw.stdout | from_json).config | default({}) }}
+      {{ (incus_networks_show_raw.stdout | from_yaml).config | default({}) }}
 
 - name: IncusNetworks | Build desired config
   ansible.builtin.set_fact:
@@ -50,9 +60,12 @@
 
 - name: IncusNetworks | Set network config
   ansible.builtin.command:
-    cmd: >-
-      incus network set {{ incus_network.name }}
-      {{ item.key }}={{ item.value }}
+    argv:
+      - incus
+      - network
+      - set
+      - "{{ incus_network.name }}"
+      - "{{ item.key }}={{ item.value }}"
   loop: "{{ incus_networks_desired_config | dict2items }}"
   loop_control:
     label: "{{ item.key }}={{ item.value }}"
