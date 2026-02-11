@@ -145,6 +145,8 @@ class TestGenerate:
         content = (tmp_path / "group_vars" / "all.yml").read_text()
         assert "project_name: test-infra" in content
         assert "base_subnet" in content
+        assert "psot_default_connection: community.general.incus" in content
+        assert "psot_default_user: root" in content
 
     def test_group_vars_domain_has_network(self, sample_infra, tmp_path):
         generate(sample_infra, tmp_path)
@@ -204,6 +206,19 @@ class TestGenerate:
         generate(sample_infra, tmp_path)
         gv = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "gpu-compute" in gv
+
+    def test_no_connection_vars_in_group_vars(self, sample_infra, tmp_path):
+        """ansible_connection and ansible_user must NOT appear in any group_vars file.
+
+        Connection is a playbook concern, not an inventory concern. Inventory
+        variables override play-level keywords (Ansible precedence), which
+        would break infrastructure roles that need connection: local.
+        """
+        generate(sample_infra, tmp_path)
+        for f in (tmp_path / "group_vars").glob("*.yml"):
+            content = f.read_text()
+            assert "ansible_connection" not in content, f"{f.name} contains ansible_connection"
+            assert "ansible_user" not in content, f"{f.name} contains ansible_user"
 
 
 # -- ephemeral -----------------------------------------------------------------

@@ -200,6 +200,22 @@ incus_network:
 3. **Orphans** → listed in a report, interactive deletion proposed
 4. **Validation** → all constraints checked before writing any file
 
+### Connection variables
+
+`default_connection` and `default_user` from `infra.yml`'s `global:` section
+are stored in `group_vars/all.yml` as `psot_default_connection` and
+`psot_default_user` (informational only). Playbooks may reference these
+values if needed.
+
+They are **NOT** output as `ansible_connection` or `ansible_user` in any
+generated file. Rationale: Ansible inventory variables override play-level
+keywords ([variable precedence](https://docs.ansible.com/ansible/latest/reference_appendices/general_precedence.html)).
+If `ansible_connection: community.general.incus` appeared in domain
+group_vars, it would override `connection: local` in the playbook, causing
+infrastructure roles to attempt connecting into containers that do not yet
+exist. Connection is an operational concern of the playbook, not a
+declarative property of the infrastructure.
+
 ## 7. Ansible roles
 
 ### Phase 1: Infrastructure (connection: local, target: localhost)

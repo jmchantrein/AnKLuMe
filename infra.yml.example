@@ -28,6 +28,12 @@ project_name: my-infra
 global:
   base_subnet: "10.100"
   default_os_image: "images:debian/13"
+  # default_connection and default_user are stored in group_vars/all.yml as
+  # psot_default_connection / psot_default_user (informational only).
+  # They are NOT injected as ansible_connection / ansible_user into domain
+  # group_vars because Ansible inventory variables override play-level
+  # keywords, which would break infrastructure roles that need
+  # connection: local. Connection is controlled at the playbook level.
   default_connection: community.general.incus
   default_user: root
 
