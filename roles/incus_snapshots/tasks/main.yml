@@ -1,0 +1,151 @@
+---
+# IncusSnapshots | Manage instance snapshots
+#
+# Runs on the controller via connection:local (ADR-015).
+# Variables come from each host's group_vars (incus_project)
+# and host_vars (inventory_hostname as instance name).
+#
+# Input variables:
+#   - snapshot_action (string): create, restore, delete, list
+#   - snapshot_name (string): snapshot name (auto-generated if not set)
+#   - snapshot_stop_first (boolean): stop instance before action
+#   - incus_project (string): from PSOT group_vars
+
+# ── Read existing snapshots ──────────────────────────────
+- name: IncusSnapshots | List existing snapshots
+  ansible.builtin.command:
+    argv:
+      - incus
+      - snapshot
+      - list
+      - "{{ inventory_hostname }}"
+      - --project
+      - "{{ incus_project }}"
+      - --format
+      - json
+  register: incus_snapshots_raw
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: IncusSnapshots | Parse snapshot names
+  ansible.builtin.set_fact:
+    incus_snapshots_existing: >-
+      {{ (incus_snapshots_raw.stdout | default('[]') | from_json) | map(attribute='name') | list }}
+
+# ── Action: create ───────────────────────────────────────
+- name: IncusSnapshots | Stop instance before snapshot
+  ansible.builtin.command:
+    argv:
+      - incus
+      - stop
+      - "{{ inventory_hostname }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'create'
+    - snapshot_stop_first | bool
+  changed_when: true
+
+- name: IncusSnapshots | Create snapshot
+  ansible.builtin.command:
+    argv:
+      - incus
+      - snapshot
+      - create
+      - "{{ inventory_hostname }}"
+      - "{{ snapshot_name }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'create'
+    - snapshot_name not in incus_snapshots_existing
+  changed_when: true
+
+- name: IncusSnapshots | Skip create (snapshot already exists)
+  ansible.builtin.debug:
+    msg: "Snapshot '{{ snapshot_name }}' already exists on {{ inventory_hostname }}, skipping."
+  when:
+    - snapshot_action == 'create'
+    - snapshot_name in incus_snapshots_existing
+
+- name: IncusSnapshots | Start instance after snapshot
+  ansible.builtin.command:
+    argv:
+      - incus
+      - start
+      - "{{ inventory_hostname }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'create'
+    - snapshot_stop_first | bool
+  changed_when: true
+
+# ── Action: restore ──────────────────────────────────────
+- name: IncusSnapshots | Verify snapshot exists before restore
+  ansible.builtin.fail:
+    msg: >-
+      Snapshot '{{ snapshot_name }}' does not exist on {{ inventory_hostname }}.
+      Available snapshots: {{ incus_snapshots_existing | join(', ') }}
+  when:
+    - snapshot_action == 'restore'
+    - snapshot_name not in incus_snapshots_existing
+
+- name: IncusSnapshots | Stop instance before restore
+  ansible.builtin.command:
+    argv:
+      - incus
+      - stop
+      - "{{ inventory_hostname }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'restore'
+    - snapshot_stop_first | bool
+  changed_when: true
+
+- name: IncusSnapshots | Restore snapshot
+  ansible.builtin.command:
+    argv:
+      - incus
+      - snapshot
+      - restore
+      - "{{ inventory_hostname }}"
+      - "{{ snapshot_name }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'restore'
+    - snapshot_name in incus_snapshots_existing
+  changed_when: true
+
+# ── Action: delete ───────────────────────────────────────
+- name: IncusSnapshots | Delete snapshot
+  ansible.builtin.command:
+    argv:
+      - incus
+      - snapshot
+      - delete
+      - "{{ inventory_hostname }}"
+      - "{{ snapshot_name }}"
+      - --project
+      - "{{ incus_project }}"
+  when:
+    - snapshot_action == 'delete'
+    - snapshot_name in incus_snapshots_existing
+  changed_when: true
+
+- name: IncusSnapshots | Skip delete (snapshot does not exist)
+  ansible.builtin.debug:
+    msg: "Snapshot '{{ snapshot_name }}' does not exist on {{ inventory_hostname }}, nothing to delete."
+  when:
+    - snapshot_action == 'delete'
+    - snapshot_name not in incus_snapshots_existing
+
+# ── Action: list ─────────────────────────────────────────
+- name: IncusSnapshots | Display snapshots
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: {{ incus_snapshots_existing }}"
+  when:
+    - snapshot_action == 'list'

@@ -56,18 +56,24 @@ apply-base: ## Apply base_system only
 apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
-# ── Snapshots ─────────────────────────────────────────────
-snap: ## Create snapshot (I=<instance|self> [S=<name>])
-	@bash scripts/snap.sh create $(I) $(S)
+# ── Snapshots (Ansible role) ──────────────────────────────
+snapshot: ## Create snapshot of all instances (NAME=optional)
+	ansible-playbook snapshot.yml $(if $(NAME),-e snapshot_name=$(NAME))
 
-snap-restore: ## Restore snapshot (I=<instance|self> S=<snap-name>)
-	@bash scripts/snap.sh restore $(I) $(S)
+snapshot-domain: ## Create snapshot of one domain (D=domain NAME=optional)
+	ansible-playbook snapshot.yml --limit $(D) $(if $(NAME),-e snapshot_name=$(NAME))
 
-snap-list: ## List snapshots ([I=<instance|self>])
-	@bash scripts/snap.sh list $(I)
+restore: ## Restore snapshot (NAME=required)
+	ansible-playbook snapshot.yml -e snapshot_action=restore -e snapshot_name=$(NAME)
 
-snap-delete: ## Delete snapshot (I=<instance|self> S=<snap-name>)
-	@bash scripts/snap.sh delete $(I) $(S)
+restore-domain: ## Restore snapshot for one domain (D=domain NAME=required)
+	ansible-playbook snapshot.yml -e snapshot_action=restore -e snapshot_name=$(NAME) --limit $(D)
+
+snapshot-delete: ## Delete snapshot (NAME=required)
+	ansible-playbook snapshot.yml -e snapshot_action=delete -e snapshot_name=$(NAME)
+
+snapshot-list: ## List snapshots for all instances
+	ansible-playbook snapshot.yml -e snapshot_action=list
 
 # ── Testing ───────────────────────────────────────────────
 test: test-generator test-roles ## Run all tests
@@ -103,5 +109,6 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit snap snap-restore snap-list snap-delete \
+        apply-base apply-limit snapshot snapshot-domain restore \
+        restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles init install-hooks help
