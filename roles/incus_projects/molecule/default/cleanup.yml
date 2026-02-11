@@ -1,0 +1,17 @@
+---
+- name: Cleanup incus_projects
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Cleanup | Check if molecule-test project exists
+      ansible.builtin.command:
+        cmd: incus project list --format json
+      register: cleanup_projects_raw
+      changed_when: false
+
+    - name: Cleanup | Delete molecule-test project
+      ansible.builtin.command:
+        cmd: incus project delete molecule-test
+      when: "'molecule-test' in (cleanup_projects_raw.stdout | from_json | map(attribute='name') | list)"
+      changed_when: true

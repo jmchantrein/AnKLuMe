@@ -1,0 +1,61 @@
+---
+- name: Verify incus_projects
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Read project list
+      ansible.builtin.command:
+        cmd: incus project list --format json
+      register: verify_projects_raw
+      changed_when: false
+
+    - name: Verify | Parse project list
+      ansible.builtin.set_fact:
+        verify_projects: "{{ verify_projects_raw.stdout | from_json }}"
+
+    - name: Verify | Project exists
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test' in (verify_projects | map(attribute='name') | list)"
+        fail_msg: "Project molecule-test does not exist"
+
+    - name: Verify | Read project config
+      ansible.builtin.command:
+        cmd: incus project show molecule-test --format json
+      register: verify_project_show_raw
+      changed_when: false
+
+    - name: Verify | Parse project config
+      ansible.builtin.set_fact:
+        verify_project: "{{ verify_project_show_raw.stdout | from_json }}"
+
+    - name: Verify | Project has correct features
+      ansible.builtin.assert:
+        that:
+          - "verify_project.config['features.images'] == 'true'"
+          - "verify_project.config['features.profiles'] == 'true'"
+          - "verify_project.config['features.storage.volumes'] == 'true'"
+          - "verify_project.config['features.networks'] == 'false'"
+        fail_msg: "Project features are incorrect"
+
+    - name: Verify | Project description matches
+      ansible.builtin.assert:
+        that:
+          - "verify_project.description == 'Molecule test project'"
+        fail_msg: "Project description does not match"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_projects
+      vars:
+        incus_project: molecule-test
+        domain_description: "Molecule test project"
+        domain_ephemeral: true
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
