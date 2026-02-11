@@ -1,0 +1,25 @@
+---
+# snapshot.yml — Snapshot management for AnKLuMe instances
+#
+# Standalone playbook (not part of site.yml). Snapshots are an operational
+# action, not a desired-state reconciliation (ADR-013).
+#
+# Usage:
+#   ansible-playbook snapshot.yml                                              # Create snapshot (all, auto-name)
+#   ansible-playbook snapshot.yml -e snapshot_action=create                    # Explicit create
+#   ansible-playbook snapshot.yml -e snapshot_action=create -e snapshot_name=before-upgrade
+#   ansible-playbook snapshot.yml -e snapshot_action=restore -e snapshot_name=before-upgrade
+#   ansible-playbook snapshot.yml -e snapshot_action=delete -e snapshot_name=before-upgrade
+#   ansible-playbook snapshot.yml -e snapshot_action=list
+#   ansible-playbook snapshot.yml --limit homelab                              # Single domain
+#   ansible-playbook snapshot.yml --limit homelab-llm                          # Single instance
+
+- name: "Snapshots | Manage instance snapshots"
+  hosts: all
+  connection: local
+  gather_facts: true
+  tags:
+    - snapshot
+
+  roles:
+    - role: incus_snapshots
