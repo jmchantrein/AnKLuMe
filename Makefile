@@ -50,6 +50,9 @@ apply-infra: ## Apply infrastructure only (networks, projects, instances)
 apply-provision: ## Apply provisioning only (packages, services)
 	ansible-playbook site.yml --tags provision
 
+apply-base: ## Apply base_system only
+	ansible-playbook site.yml --tags base
+
 apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
@@ -100,5 +103,5 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-limit snap snap-restore snap-list snap-delete \
+        apply-base apply-limit snap snap-restore snap-list snap-delete \
         test test-generator test-roles init install-hooks help

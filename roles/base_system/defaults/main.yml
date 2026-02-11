@@ -1,0 +1,25 @@
+---
+# Default variables for base_system
+# Override in group_vars or host_vars as needed.
+
+base_system_packages:
+  - curl
+  - wget
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - vim
+  - less
+  - htop
+  - net-tools
+  - iputils-ping
+  - dnsutils
+  - sudo
+  - locales
+  - systemd
+  - python3
+
+base_system_extra_packages: []
+
+base_system_locale: "en_US.UTF-8"
+base_system_timezone: "Europe/Paris"

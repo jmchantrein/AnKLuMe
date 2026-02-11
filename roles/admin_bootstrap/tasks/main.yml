@@ -1,0 +1,49 @@
+---
+# AdminBootstrap | Provisioning specific to admin-ansible
+#
+# Deploys the incus-socket-dir systemd service (ADR-019) so the container
+# survives restarts, and ensures Ansible + git are installed.
+#
+# This role is applied only to hosts in the 'admin' group.
+
+- name: AdminBootstrap | Deploy incus-socket-dir systemd service
+  ansible.builtin.copy:
+    src: incus-socket-dir.service
+    dest: /etc/systemd/system/incus-socket-dir.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: admin_bootstrap_socket_service
+
+- name: AdminBootstrap | Enable incus-socket-dir service
+  ansible.builtin.systemd:
+    name: incus-socket-dir
+    enabled: true
+    daemon_reload: "{{ admin_bootstrap_socket_service.changed }}"
+
+- name: AdminBootstrap | Install admin packages
+  ansible.builtin.apt:
+    name: "{{ admin_bootstrap_packages }}"
+    state: present
+
+- name: AdminBootstrap | Check community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - list
+      - community.general
+  register: admin_bootstrap_collection_check
+  changed_when: false
+  failed_when: false
+
+- name: AdminBootstrap | Install community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - install
+      - community.general
+  register: admin_bootstrap_collection_install
+  when: admin_bootstrap_collection_check.rc != 0
+  changed_when: true
