@@ -1,0 +1,26 @@
+---
+# Shared Molecule config template for provisioning roles
+#
+# Provisioning roles run INSIDE containers via community.general.incus.
+# Molecule manages the container lifecycle via create.yml / destroy.yml.
+#
+# Copy this template into roles/<role>/molecule/default/molecule.yml
+# and adjust as needed.
+
+driver:
+  name: delegated
+platforms:
+  - name: molecule-test-instance
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      molecule-test-instance:
+        ansible_connection: community.general.incus
+        ansible_user: root
+        ansible_incus_project: default
+  config_options:
+    defaults:
+      gathering: explicit
+verifier:
+  name: ansible

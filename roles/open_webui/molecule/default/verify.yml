@@ -1,0 +1,70 @@
+---
+- name: Verify open_webui
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check open-webui is installed via pip
+      ansible.builtin.command:
+        cmd: pip show open-webui
+      register: verify_pip_show
+      changed_when: false
+
+    - name: Verify | open-webui package is present
+      ansible.builtin.assert:
+        that:
+          - verify_pip_show.rc == 0
+          - "'open-webui' in verify_pip_show.stdout"
+        fail_msg: "open-webui pip package is not installed"
+
+    - name: Verify | Check systemd service file exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/open-webui.service
+      register: verify_service_file
+
+    - name: Verify | Systemd service file deployed
+      ansible.builtin.assert:
+        that:
+          - verify_service_file.stat.exists
+          - verify_service_file.stat.mode == '0644'
+        fail_msg: "open-webui.service not deployed correctly"
+
+    - name: Verify | Read systemd service content
+      ansible.builtin.command:
+        cmd: cat /etc/systemd/system/open-webui.service
+      register: verify_service_content
+      changed_when: false
+
+    - name: Verify | Service has correct port
+      ansible.builtin.assert:
+        that:
+          - "'--port 3000' in verify_service_content.stdout"
+        fail_msg: "open-webui service does not have correct port"
+
+    - name: Verify | Service has correct Ollama URL
+      ansible.builtin.assert:
+        that:
+          - "'OLLAMA_BASE_URL=http://localhost:11434' in verify_service_content.stdout"
+        fail_msg: "open-webui service does not have correct Ollama URL"
+
+    - name: Verify | Check service is enabled
+      ansible.builtin.command:
+        cmd: systemctl is-enabled open-webui
+      register: verify_service_enabled
+      changed_when: false
+
+    - name: Verify | Service is enabled
+      ansible.builtin.assert:
+        that:
+          - "'enabled' in verify_service_enabled.stdout"
+        fail_msg: "open-webui service is not enabled"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: open_webui
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"

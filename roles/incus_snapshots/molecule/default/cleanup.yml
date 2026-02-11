@@ -1,0 +1,49 @@
+---
+- name: Cleanup incus_snapshots
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Cleanup | Delete snapshot if it exists
+      ansible.builtin.command:
+        cmd: >-
+          incus snapshot delete molecule-test-instance molecule-test-snap
+          --project molecule-test
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Stop molecule-test-instance
+      ansible.builtin.command:
+        cmd: incus stop molecule-test-instance --project molecule-test --force
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Delete molecule-test-instance
+      ansible.builtin.command:
+        cmd: incus delete molecule-test-instance --project molecule-test
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Remove eth0 device from default profile
+      ansible.builtin.command:
+        cmd: incus profile device remove default eth0 --project molecule-test
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Remove root device from default profile
+      ansible.builtin.command:
+        cmd: incus profile device remove default root --project molecule-test
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Delete molecule-test project
+      ansible.builtin.command:
+        cmd: incus project delete molecule-test
+      changed_when: true
+      failed_when: false
+
+    - name: Cleanup | Delete net-molecule-test network
+      ansible.builtin.command:
+        cmd: incus network delete net-molecule-test
+      changed_when: true
+      failed_when: false

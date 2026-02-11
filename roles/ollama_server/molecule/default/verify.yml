@@ -1,0 +1,74 @@
+---
+- name: Verify ollama_server
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check Ollama binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/ollama
+      register: verify_ollama_binary
+
+    - name: Verify | Ollama binary installed
+      ansible.builtin.assert:
+        that:
+          - verify_ollama_binary.stat.exists
+          - verify_ollama_binary.stat.executable
+        fail_msg: "Ollama binary not found at /usr/local/bin/ollama"
+
+    - name: Verify | Check systemd override directory exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/ollama.service.d
+      register: verify_override_dir
+
+    - name: Verify | Override directory exists
+      ansible.builtin.assert:
+        that:
+          - verify_override_dir.stat.exists
+          - verify_override_dir.stat.isdir
+        fail_msg: "Ollama systemd override directory does not exist"
+
+    - name: Verify | Check override config exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/ollama.service.d/override.conf
+      register: verify_override_conf
+
+    - name: Verify | Override config deployed
+      ansible.builtin.assert:
+        that:
+          - verify_override_conf.stat.exists
+        fail_msg: "Ollama override.conf not deployed"
+
+    - name: Verify | Read override config content
+      ansible.builtin.command:
+        cmd: cat /etc/systemd/system/ollama.service.d/override.conf
+      register: verify_override_content
+      changed_when: false
+
+    - name: Verify | Override config has correct listen address
+      ansible.builtin.assert:
+        that:
+          - "'OLLAMA_HOST=0.0.0.0:11434' in verify_override_content.stdout"
+        fail_msg: "Ollama listen address not configured correctly"
+
+    - name: Verify | Check Ollama service is enabled
+      ansible.builtin.command:
+        cmd: systemctl is-enabled ollama
+      register: verify_service_enabled
+      changed_when: false
+
+    - name: Verify | Service is enabled
+      ansible.builtin.assert:
+        that:
+          - "'enabled' in verify_service_enabled.stdout"
+        fail_msg: "Ollama service is not enabled"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: ollama_server
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"

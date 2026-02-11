@@ -85,10 +85,15 @@ test-generator: ## Run generator pytest tests
 	python3 -m pytest tests/ -v
 
 test-roles: ## Run Molecule tests for all roles
-	@for role in roles/incus_*/; do \
-		echo "=== Testing $$role ==="; \
-		(cd "$$role" && molecule test) || exit 1; \
+	@for role in roles/*/; do \
+		if [ -d "$$role/molecule" ]; then \
+			echo "=== Testing $$(basename $$role) ==="; \
+			(cd "$$role" && molecule test) || exit 1; \
+		fi; \
 	done
+
+test-role: ## Run Molecule test for one role (R=role_name)
+	cd roles/$(R) && molecule test
 
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
@@ -114,4 +119,4 @@ help: ## Show this help
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-llm snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
-        test test-generator test-roles init install-hooks help
+        test test-generator test-roles test-role init install-hooks help

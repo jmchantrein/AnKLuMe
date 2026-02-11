@@ -1,0 +1,49 @@
+---
+- name: Verify admin_bootstrap
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check systemd service file exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/incus-socket-dir.service
+      register: verify_service_file
+
+    - name: Verify | Systemd service file deployed
+      ansible.builtin.assert:
+        that:
+          - verify_service_file.stat.exists
+          - verify_service_file.stat.mode == '0644'
+        fail_msg: "incus-socket-dir.service not deployed correctly"
+
+    - name: Verify | Check service is enabled
+      ansible.builtin.command:
+        cmd: systemctl is-enabled incus-socket-dir.service
+      register: verify_service_enabled
+      changed_when: false
+
+    - name: Verify | Service is enabled
+      ansible.builtin.assert:
+        that:
+          - "'enabled' in verify_service_enabled.stdout"
+        fail_msg: "incus-socket-dir.service is not enabled"
+
+    - name: Verify | Check git is installed
+      ansible.builtin.command:
+        cmd: which git
+      changed_when: false
+
+    - name: Verify | Check ansible is installed
+      ansible.builtin.command:
+        cmd: which ansible
+      changed_when: false
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: admin_bootstrap
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
