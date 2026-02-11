@@ -1,6 +1,11 @@
 ---
 # IncusNetworks | Reconcile domain bridges
 #
+# Runs on the controller via connection:local (ADR-015).
+# Variables come from each host's group_vars/host_vars (PSOT-generated).
+# Multiple hosts may share the same domain — the reconciliation pattern
+# (check if exists → create if missing) ensures idempotence.
+#
 # Networks are global resources in Incus. When projects use
 # features.networks=false (our default), networks live in the default
 # project and are shared across all projects. Network commands do NOT
