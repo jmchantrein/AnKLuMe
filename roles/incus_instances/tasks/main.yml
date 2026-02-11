@@ -16,6 +16,24 @@
 #   - instance_config (dict, optional): Incus config keys
 #   - instance_ephemeral (boolean): protection flag
 
+- name: IncusInstances | Ensure images remote exists
+  ansible.builtin.command:
+    argv:
+      - incus
+      - remote
+      - add
+      - images
+      - https://images.linuxcontainers.org
+      - --protocol
+      - simplestreams
+      - --public
+  register: incus_remote_add
+  changed_when: "'already exists' not in incus_remote_add.stderr"
+  failed_when:
+    - incus_remote_add.rc != 0
+    - "'already exists' not in incus_remote_add.stderr"
+  run_once: true
+
 - name: IncusInstances | Read existing instances in project
   ansible.builtin.command:
     argv:
@@ -76,10 +94,46 @@
   loop: "{{ instance_config | default({}) | dict2items }}"
   loop_control:
     label: "{{ item.key }}={{ item.value }}"
-  when: instance_config is defined and instance_config
+  when: instance_config is defined and (instance_config | length > 0)
   changed_when: false
 
-- name: IncusInstances | Set static IP via device override
+- name: IncusInstances | Check if eth0 is already overridden
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - show
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: incus_instance_devices_raw
+  changed_when: false
+  check_mode: false  # Safe: read-only command
+
+- name: IncusInstances | Parse instance devices
+  ansible.builtin.set_fact:
+    incus_instance_devices: >-
+      {{ incus_instance_devices_raw.stdout | from_yaml }}
+
+- name: IncusInstances | Override eth0 from profile (first time)
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - override
+      - "{{ instance_name }}"
+      - eth0
+      - "ipv4.address={{ instance_ip }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_ip is defined and (instance_ip | length > 0)
+    - "'eth0' not in (incus_instance_devices | default({}))"
+  changed_when: true
+
+- name: IncusInstances | Update eth0 IP if already overridden
   ansible.builtin.command:
     argv:
       - incus
@@ -91,8 +145,11 @@
       - "ipv4.address={{ instance_ip }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_ip is defined and instance_ip
-  changed_when: false
+  when:
+    - instance_ip is defined and (instance_ip | length > 0)
+    - "'eth0' in (incus_instance_devices | default({}))"
+    - (incus_instance_devices.eth0['ipv4.address'] | default('')) != instance_ip
+  changed_when: true
 
 - name: IncusInstances | Wait for instance to be running
   ansible.builtin.command:
