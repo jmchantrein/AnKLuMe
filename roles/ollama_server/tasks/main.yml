@@ -1,0 +1,72 @@
+---
+# OllamaServer | Install and configure Ollama LLM inference server
+#
+# Applied via the provisioning play (connection: community.general.incus).
+# Runs INSIDE the target container — not on the controller.
+#
+# Input variables (from defaults, overridable in host_vars):
+#   - ollama_host (string): listen address
+#   - ollama_default_model (string): model to auto-pull (empty = skip)
+#   - ollama_service_enabled (boolean): enable and start systemd service
+
+- name: OllamaServer | Check GPU access
+  ansible.builtin.command:
+    cmd: nvidia-smi
+  register: ollama_gpu_check
+  changed_when: false
+  failed_when: false
+
+- name: OllamaServer | Report GPU status
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'GPU available: nvidia-smi succeeded'
+         if ollama_gpu_check.rc == 0
+         else 'No GPU detected — Ollama will run in CPU-only mode' }}
+
+- name: OllamaServer | Install curl
+  ansible.builtin.apt:
+    name: curl
+    state: present
+
+- name: OllamaServer | Install Ollama
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://ollama.com/install.sh | sh
+    creates: /usr/local/bin/ollama
+
+- name: OllamaServer | Create systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    mode: "0755"
+
+- name: OllamaServer | Configure Ollama listen address
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST={{ ollama_host }}"
+    mode: "0644"
+  notify: OllamaServer | Restart Ollama
+
+- name: OllamaServer | Enable and start Ollama service
+  ansible.builtin.systemd:
+    name: ollama
+    enabled: "{{ ollama_service_enabled }}"
+    state: started
+    daemon_reload: true
+
+- name: OllamaServer | Wait for Ollama API to be ready
+  ansible.builtin.command:
+    cmd: curl -sf http://localhost:11434/api/tags
+  register: ollama_api_check
+  changed_when: false
+  retries: 15
+  delay: 2
+  until: ollama_api_check.rc == 0
+
+- name: OllamaServer | Pull default model
+  ansible.builtin.command:
+    cmd: "ollama pull {{ ollama_default_model }}"
+  when: ollama_default_model | length > 0
+  changed_when: false
+  timeout: 600

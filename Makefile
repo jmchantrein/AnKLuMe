@@ -56,6 +56,9 @@ apply-base: ## Apply base_system only
 apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
+apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
+	ansible-playbook site.yml --tags llm
+
 # ── Snapshots (Ansible role) ──────────────────────────────
 snapshot: ## Create snapshot of all instances (NAME=optional)
 	ansible-playbook snapshot.yml $(if $(NAME),-e snapshot_name=$(NAME))
@@ -109,6 +112,6 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit snapshot snapshot-domain restore \
+        apply-base apply-limit apply-llm snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles init install-hooks help

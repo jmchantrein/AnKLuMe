@@ -1,0 +1,12 @@
+---
+# Default variables for ollama_server
+# Override in group_vars or host_vars as needed.
+
+# Ollama listen address (0.0.0.0 to allow access from other containers)
+ollama_host: "0.0.0.0:11434"
+
+# Default model to pull after install (empty = skip)
+ollama_default_model: ""
+
+# Whether to enable and start the Ollama systemd service
+ollama_service_enabled: true

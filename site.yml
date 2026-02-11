@@ -138,3 +138,31 @@
       tags:
         - admin
         - provision
+
+    - name: Provisioning | Apply ollama_server
+      ansible.builtin.include_role:
+        name: ollama_server
+        apply:
+          tags:
+            - llm
+            - ollama
+            - provision
+      when: "'ollama_server' in (instance_roles | default([]))"
+      tags:
+        - llm
+        - ollama
+        - provision
+
+    - name: Provisioning | Apply open_webui
+      ansible.builtin.include_role:
+        name: open_webui
+        apply:
+          tags:
+            - llm
+            - webui
+            - provision
+      when: "'open_webui' in (instance_roles | default([]))"
+      tags:
+        - llm
+        - webui
+        - provision
