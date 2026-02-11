@@ -65,6 +65,7 @@
       - set
       - "{{ incus_project }}"
       - "description={{ domain_description }}"
+      - --property
   when: >-
     (incus_projects_show_raw.stdout | from_yaml).description | default('')
     != domain_description
