@@ -206,3 +206,22 @@ the entire play targets a local API.
 try to create the same project simultaneously. The reconciliation pattern
 handles this gracefully (second host sees the resource already exists).
 For strict sequential execution, `serial: 1` can be enabled.
+
+---
+
+## ADR-016: Standard Ansible directory layout with playbook at root
+
+**Context**: Ansible's `host_group_vars` plugin loads variable files from
+paths relative to the playbook file or the inventory source. With the
+playbook in `playbooks/site.yml`, Ansible looked for `playbooks/group_vars/`
+instead of the actual `group_vars/` at the project root, causing all
+PSOT-generated variables to be undefined.
+
+**Decision**: Adopt the standard Ansible directory layout with `site.yml`
+at the project root, alongside `group_vars/`, `host_vars/`, `inventory/`,
+and `roles/`.
+
+**Reference**: https://docs.ansible.com/ansible/2.9/user_guide/playbooks_best_practices.html#directory-layout
+
+**Consequence**: Variable resolution works correctly out of the box.
+The layout matches what Ansible users expect from standard projects.
