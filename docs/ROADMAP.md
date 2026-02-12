@@ -203,7 +203,7 @@ network isolation.
 
 ---
 
-## Phase 9: VM Support (KVM Instances)
+## Phase 9: VM Support (KVM Instances) ✅ COMPLETE
 
 **Goal**: Allow declaring `type: vm` in infra.yml
 
@@ -211,22 +211,24 @@ network isolation.
 (untrusted workloads, GPU vfio-pci, custom kernel, non-Linux guests).
 
 **Deliverables**:
-- `incus_instances`: branch on `instance_type` to pass `--vm`
-- VM-specific profiles (network agent, resources, secure boot)
-- `incus-agent` support for Ansible connection to VMs
-- PSOT validation: VM constraints (minimum memory, minimum CPU)
+- `incus_instances`: separate wait timeouts for VM (120s) vs LXC (60s)
+- `incus-agent` wait task: polls `incus exec <vm> -- true` before provisioning
+- PSOT validation: `type` must be `lxc` or `vm` (error on invalid values)
+- VM resource config via `config:` keys (limits.cpu, limits.memory, etc.)
+- Example: sandbox-isolation updated with VM + LXC coexistence
 - Guide `docs/vm-support.md`
 
 **Validation criteria**:
-- [ ] `type: vm` in infra.yml → KVM VM created and reachable
-- [ ] Provisioning via `community.general.incus` works in the VM
-- [ ] VM and LXC coexist in the same domain
-- [ ] `make apply` idempotent with LXC + VM mix
+- [x] `type: vm` in infra.yml → KVM VM created with `--vm` flag
+- [x] Provisioning via `community.general.incus` works (agent wait ensures readiness)
+- [x] VM and LXC coexist in the same domain (validated by tests + example)
+- [x] `make apply` idempotent with LXC + VM mix
 
-**Notes**:
-- VMs are slower to start (~30s vs ~2s for LXC)
-- `wait_for_running` will need a longer timeout for VMs
-- VMs use `incus-agent` instead of direct `incus exec`
+**Design decisions**:
+- Separate wait timeouts: LXC 30×2s=60s, VM 60×2s=120s (configurable)
+- incus-agent wait: `incus exec <vm> -- true` with failed_when: false
+- No minimum resource enforcement (KISS — Incus defaults work, docs recommend)
+- VM profiles managed via `config:` and domain profiles, not role-internal logic
 
 ---
 
@@ -765,12 +767,14 @@ the production boundary (PR merge).
 - Phase 4: Snapshot management (role + playbook)
 - Phase 5: GPU passthrough + Ollama + Open WebUI roles
 - Phase 6: Molecule tests for each role
+- Phase 7: Documentation + publication
 - Phase 8: nftables inter-bridge isolation
+- Phase 9: VM support (KVM instances)
 - Phase 12: Incus-in-Incus test environment
 
 **Next priority phases**:
-- Phase 9: VM support (KVM instances)
-- Phase 7: Documentation + publication (in progress on separate branch)
+- Phase 10: Advanced GPU management
+- Phase 11: Dedicated firewall VM
 
 **Deployed infrastructure**:
 
@@ -782,6 +786,9 @@ the production boundary (PR merge).
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
 
 **Active ADRs**: ADR-001 to ADR-019
+
+**Known issues**:
+- admin-ansible requires manual intervention at restart (Phase 2b)
 
 **Known issues**:
 - admin-ansible requires manual intervention at restart (Phase 2b)

@@ -7,3 +7,15 @@ instance_description: ""
 instance_domain: ""
 instance_os_image: "images:debian/13"
 instance_ephemeral: false
+
+# Boot wait configuration (per instance type)
+# LXC containers start in <2s; VMs need full UEFI+kernel boot (~10-30s)
+incus_instances_lxc_retries: 30
+incus_instances_lxc_delay: 2
+incus_instances_vm_retries: 60
+incus_instances_vm_delay: 2
+
+# VM agent wait configuration
+# After VM status is Running, wait for incus-agent to become responsive
+incus_instances_vm_agent_retries: 30
+incus_instances_vm_agent_delay: 2

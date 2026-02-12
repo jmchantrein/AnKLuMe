@@ -276,6 +276,75 @@ class TestEphemeral:
         errors = validate(sample_infra)
         assert any("ephemeral must be a boolean" in e for e in errors)
 
+
+# -- VM support ----------------------------------------------------------------
+
+
+class TestVMSupport:
+    def test_vm_type_accepted(self, sample_infra):
+        """type: vm is a valid instance type."""
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
+        assert validate(sample_infra) == []
+
+    def test_lxc_type_accepted(self, sample_infra):
+        """type: lxc is the default and valid."""
+        assert validate(sample_infra) == []
+
+    def test_invalid_type_rejected(self, sample_infra):
+        """type: docker is not a valid instance type."""
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "docker"
+        errors = validate(sample_infra)
+        assert any("type must be 'lxc' or 'vm'" in e for e in errors)
+
+    def test_vm_host_vars_type(self, sample_infra, tmp_path):
+        """VM machine produces instance_type: vm in host_vars."""
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
+        assert "instance_type: vm" in content
+
+    def test_vm_and_lxc_coexist(self, sample_infra, tmp_path):
+        """VM and LXC instances can coexist in the same domain."""
+        sample_infra["domains"]["work"]["machines"]["work-vm"] = {
+            "description": "VM instance",
+            "type": "vm",
+            "ip": "10.100.1.20",
+        }
+        errors = validate(sample_infra)
+        assert errors == []
+        generate(sample_infra, tmp_path)
+        lxc_hv = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
+        vm_hv = (tmp_path / "host_vars" / "work-vm.yml").read_text()
+        assert "instance_type: lxc" in lxc_hv
+        assert "instance_type: vm" in vm_hv
+
+    def test_vm_with_config(self, sample_infra, tmp_path):
+        """VM with resource config generates correct host_vars."""
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
+        sample_infra["domains"]["work"]["machines"]["dev-ws"]["config"] = {
+            "limits.cpu": "2",
+            "limits.memory": "2GiB",
+        }
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
+        assert "instance_type: vm" in content
+        assert "limits.cpu" in content
+        assert "limits.memory" in content
+
+    def test_default_type_is_lxc(self, sample_infra, tmp_path):
+        """Machine without explicit type defaults to lxc."""
+        del sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"]
+        errors = validate(sample_infra)
+        assert errors == []
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
+        assert "instance_type: lxc" in content
+
+
+# -- orphan protection ---------------------------------------------------------
+
+
+class TestEphemeralOrphans:
     def test_orphan_protection(self, sample_infra, tmp_path):
         """Protected orphan is reported but not deleted by --clean-orphans."""
         generate(sample_infra, tmp_path)
