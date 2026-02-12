@@ -256,3 +256,64 @@ concern. ADR-004 (no hypervisor in inventory) means we can't check IOMMU
 from the admin container.
 
 ---
+
+## Phase 11: Dedicated Firewall VM
+
+### D-018: Two-role architecture for firewall VM
+
+**Context**: The firewall VM needs both infrastructure setup (multi-NIC
+profile) and provisioning (nftables inside the VM). These run in different
+playbook phases with different connection types.
+
+**Decision**: Split into two roles:
+- `incus_firewall_vm`: Infrastructure role (connection: local). Discovers
+  bridges, creates a `firewall-multi-nic` profile with one NIC per domain
+  bridge, attached to the sys-firewall VM.
+- `firewall_router`: Provisioning role (connection: community.general.incus).
+  Runs inside the VM: enables IP forwarding, installs nftables, deploys
+  isolation rules via Jinja2 template.
+
+**Rationale**: Matches the two-phase architecture (ADR-006). Infrastructure
+creates the topology, provisioning configures the VM internals.
+
+### D-019: Admin bridge always eth0
+
+**Context**: The firewall VM needs one NIC per domain bridge. The admin
+bridge must be predictable for nftables rules.
+
+**Decision**: The `incus_firewall_vm` role sorts bridges with `net-admin`
+always first (eth0). Other bridges are sorted alphabetically and assigned
+eth1, eth2, etc. The nftables template uses this ordering to identify
+the admin interface.
+
+**Consequence**: Firewall rules can reference `eth0` as the admin interface
+without configuration. Adding new domains automatically adds new NICs.
+
+### D-020: firewall_mode validation in PSOT generator
+
+**Context**: infra.yml supports `global.firewall_mode: host|vm`. Invalid
+values should be caught early by `make sync`, not at deployment time.
+
+**Decision**: Add `firewall_mode` validation to `validate()` in generate.py.
+Valid values: `host` (default) and `vm`. Invalid values produce a
+validation error. The generator does not enforce that a `sys-firewall`
+machine exists when `vm` mode is set — that is the operator's responsibility.
+
+**Rationale**: KISS — the generator validates values, not deployment topology.
+Checking for sys-firewall existence would couple the generator to role-level
+concerns.
+
+### D-021: Defense in depth — host + VM modes can coexist
+
+**Context**: Phase 8 provides host-level nftables isolation. Phase 11 adds
+VM-level firewall routing. Should they be mutually exclusive?
+
+**Decision**: Both modes can coexist for layered security. Host nftables
+blocks direct bridge-to-bridge forwarding. The firewall VM routes permitted
+traffic and logs decisions. Even if the firewall VM is compromised, host
+rules still prevent direct inter-bridge traffic.
+
+**Consequence**: Documented in `docs/firewall-vm.md`. The operator can
+choose host-only, VM-only, or both. No code enforces exclusivity.
+
+---

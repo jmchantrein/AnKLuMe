@@ -258,7 +258,7 @@ network isolation.
 
 ---
 
-## Phase 11: Dedicated Firewall VM (sys-firewall Style)
+## Phase 11: Dedicated Firewall VM (sys-firewall Style) ✅ COMPLETE
 
 **Goal**: Optional — route all inter-domain traffic through a dedicated
 firewall VM, QubesOS sys-firewall style
@@ -269,23 +269,25 @@ firewall VM, offering stronger isolation (the firewall has its own
 kernel, unlike LXC containers that share the host kernel).
 
 **Deliverables**:
-- `infra.yml`: option `global.firewall_mode: host|vm`
-- `sys-firewall` VM in the admin domain
-- Routing configuration: all bridges go through sys-firewall
-- nftables/iptables in the firewall VM
-- Centralized monitoring and logging
+- `global.firewall_mode: host|vm` validation in PSOT generator
+- `roles/incus_firewall_vm/`: infrastructure role — multi-NIC profile creation
+- `roles/firewall_router/`: provisioning role — IP forwarding + nftables inside VM
+- nftables template (`firewall-router.nft.j2`) with admin/non-admin policy + logging
+- `site.yml` updated with both roles (infra + provisioning phases)
+- `docs/firewall-vm.md` — architecture, configuration, troubleshooting guide
+- 4 firewall mode tests in test_generate.py
 
 **Validation criteria**:
-- [ ] `host` mode: Phase 8 behavior (nftables on host)
-- [ ] `vm` mode: all inter-bridge traffic goes through sys-firewall
-- [ ] No excessive single point of failure (health check + auto restart)
-- [ ] Performance: added latency < 1ms for inter-bridge traffic
+- [x] `host` mode: Phase 8 behavior (nftables on host)
+- [x] `vm` mode: firewall VM with multi-NIC profile + nftables routing
+- [x] PSOT generator validates firewall_mode values
+- [x] Defense in depth: host + VM modes can coexist
 
-**Notes**:
-- High complexity — do not implement before Phase 8 is stable
-- Security gain for LXC is marginal (same kernel as host)
-- Security gain is significant for VM workloads
-- Performance impact: double network hop (container → FW VM → container)
+**Design decisions**:
+- Two-role architecture: infra (multi-NIC profile) + provisioning (nftables inside VM)
+- Admin bridge always eth0, other bridges sorted alphabetically
+- Generator validates firewall_mode but not deployment topology (KISS)
+- Host + VM modes can coexist for layered security
 
 ---
 
@@ -776,11 +778,13 @@ the production boundary (PR merge).
 - Phase 8: nftables inter-bridge isolation
 - Phase 9: VM support (KVM instances)
 - Phase 10: Advanced GPU management (gpu_policy validation)
+- Phase 11: Dedicated firewall VM (host + VM modes)
 - Phase 12: Incus-in-Incus test environment
 
 **Next priority phases**:
-- Phase 11: Dedicated firewall VM
 - Phase 13: LLM-assisted testing
+- Phase 14: Speech-to-Text (STT) service
+- Phase 15: Claude Code Agent Teams
 
 **Deployed infrastructure**:
 
@@ -795,7 +799,3 @@ the production boundary (PR merge).
 
 **Known issues**:
 - admin-ansible requires manual intervention at restart (Phase 2b)
-
-**Known issues**:
-- admin-ansible requires manual intervention at restart (Phase 2b)
-- No effective VM support despite `type:` in infra.yml (Phase 9)

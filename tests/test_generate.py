@@ -418,6 +418,31 @@ class TestGPUPolicy:
         assert any("GPU policy is 'exclusive'" in e for e in errors)
 
 
+# -- firewall mode (Phase 11) -------------------------------------------------
+
+
+class TestFirewallMode:
+    def test_default_host_mode_valid(self, sample_infra):
+        """No firewall_mode set defaults to 'host' (valid)."""
+        assert validate(sample_infra) == []
+
+    def test_host_mode_valid(self, sample_infra):
+        """Explicit firewall_mode: host is valid."""
+        sample_infra["global"]["firewall_mode"] = "host"
+        assert validate(sample_infra) == []
+
+    def test_vm_mode_valid(self, sample_infra):
+        """firewall_mode: vm is valid."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        assert validate(sample_infra) == []
+
+    def test_invalid_mode_rejected(self, sample_infra):
+        """Invalid firewall_mode triggers error."""
+        sample_infra["global"]["firewall_mode"] = "container"
+        errors = validate(sample_infra)
+        assert any("firewall_mode must be 'host' or 'vm'" in e for e in errors)
+
+
 # -- orphan protection ---------------------------------------------------------
 
 
