@@ -1,0 +1,85 @@
+---
+- name: Verify dev_test_runner
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check incus is installed
+      ansible.builtin.command:
+        cmd: which incus
+      changed_when: false
+
+    - name: Verify | Check nested Incus daemon is running
+      ansible.builtin.command:
+        argv:
+          - incus
+          - storage
+          - list
+          - --format
+          - json
+      register: verify_storage
+      changed_when: false
+
+    - name: Verify | Assert storage pool exists
+      ansible.builtin.assert:
+        that:
+          - (verify_storage.stdout | from_json | length) > 0
+        fail_msg: "No storage pools found in nested Incus"
+
+    - name: Verify | Check nested Incus network
+      ansible.builtin.command:
+        argv:
+          - incus
+          - network
+          - list
+          - --format
+          - json
+      register: verify_network
+      changed_when: false
+
+    - name: Verify | Assert bridge exists
+      ansible.builtin.assert:
+        that:
+          - (verify_network.stdout | from_json | selectattr('name', 'equalto', 'incusbr0') | list | length) > 0
+        fail_msg: "incusbr0 bridge not found in nested Incus"
+
+    - name: Verify | Check molecule is installed
+      ansible.builtin.command:
+        cmd: molecule --version
+      changed_when: false
+
+    - name: Verify | Check ansible-lint is installed
+      ansible.builtin.command:
+        cmd: ansible-lint --version
+      changed_when: false
+
+    - name: Verify | Check git is configured
+      ansible.builtin.command:
+        cmd: git config --global user.name
+      register: verify_git_name
+      changed_when: false
+
+    - name: Verify | Assert git user is configured
+      ansible.builtin.assert:
+        that:
+          - "'AnKLuMe Runner' in verify_git_name.stdout"
+        fail_msg: "Git user name not configured"
+
+    - name: Verify | Check repo is cloned
+      ansible.builtin.stat:
+        path: /root/AnKLuMe/CLAUDE.md
+      register: verify_repo
+
+    - name: Verify | Assert repo exists
+      ansible.builtin.assert:
+        that:
+          - verify_repo.stat.exists
+        fail_msg: "AnKLuMe repo not cloned to /root/AnKLuMe"
+
+    - name: Verify | Check community.general collection
+      ansible.builtin.command:
+        argv:
+          - ansible-galaxy
+          - collection
+          - list
+          - community.general
+      changed_when: false
