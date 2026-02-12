@@ -39,14 +39,24 @@ domains:
     ephemeral: true
     machines:
       sbx-test:
-        description: "Disposable test container"
+        description: "Disposable test container (lightweight isolation)"
         type: lxc
         ip: "10.100.10.10"
         ephemeral: true
         roles:
           - base_system
+      sbx-vm:
+        description: "Disposable VM sandbox (hardware-level isolation)"
+        type: vm
+        ip: "10.100.10.20"
+        ephemeral: true
+        config:
+          limits.cpu: "2"
+          limits.memory: "2GiB"
+        roles:
+          - base_system
       sbx-monitor:
-        description: "Monitoring container (observes sbx-test)"
+        description: "Monitoring container (observes sandbox instances)"
         type: lxc
         ip: "10.100.10.11"
         roles:

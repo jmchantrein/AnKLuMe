@@ -154,3 +154,56 @@ in the repository, so no `.gitignore` entry is needed.
 repository.
 
 ---
+
+## Phase 9: VM Support (KVM Instances)
+
+### D-011: Separate wait timeouts for VM vs LXC
+
+**Context**: The `incus_instances` role had a single wait loop (30 retries
+× 2s = 60s) for all instance types. VMs take 10-30 seconds for UEFI+kernel
+boot, while LXC containers start in <2 seconds.
+
+**Decision**: Split the wait into type-specific tasks with configurable
+defaults: LXC keeps 30×2s=60s, VMs get 60×2s=120s. Variables are
+role-prefixed (`incus_instances_vm_retries`, etc.) per project conventions.
+
+**Consequence**: VMs have adequate boot time without slowing LXC deployments.
+
+### D-012: incus-agent wait as separate task
+
+**Context**: After a VM reaches "Running" status, the `incus-agent` inside
+the guest still needs seconds to initialize. Without the agent, `incus exec`
+and the `community.general.incus` connection plugin fail, breaking the
+provisioning phase.
+
+**Decision**: Add a dedicated "wait for incus-agent" task that polls
+`incus exec <vm> -- true` with `failed_when: false` + `until` loop.
+Only runs for VMs (`when: instance_type == 'vm'`).
+
+**Consequence**: Provisioning phase reliably connects to VMs. No impact
+on LXC container workflow.
+
+### D-013: Instance type validation without minimum resource enforcement
+
+**Context**: ROADMAP mentions "VM constraints (minimum memory, minimum CPU)"
+but Incus defaults (1 vCPU, 1 GiB) work for most lightweight Linux guests.
+Enforcing minimums in the generator would add complexity for marginal benefit.
+
+**Decision**: Validate that `type` is `lxc` or `vm` (error on invalid values).
+Do NOT enforce minimum resource requirements — Incus defaults are adequate
+and users can override via `config:` in infra.yml.
+
+**Rationale**: KISS — the generator validates structure, not policy. Resource
+recommendations belong in documentation (`docs/vm-support.md`), not code.
+
+### D-014: VM example in sandbox-isolation
+
+**Context**: Needed a practical example showing VM+LXC coexistence. The
+sandbox-isolation example is the natural fit since VMs provide stronger
+isolation for untrusted workloads.
+
+**Decision**: Add `sbx-vm` (type: vm, 2 vCPU, 2 GiB) alongside existing
+`sbx-test` (type: lxc) in the sandbox-isolation example. Updated README
+with hardware requirements and isolation comparison.
+
+---

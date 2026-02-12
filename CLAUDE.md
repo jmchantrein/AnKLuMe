@@ -98,3 +98,4 @@ For details, read these files with `@path`:
 - @docs/ARCHITECTURE.md — Architecture decisions (ADR-style)
 - @docs/ROADMAP.md — Implementation phases and priorities
 - @docs/network-isolation.md — nftables inter-bridge isolation (Phase 8)
+- @docs/vm-support.md — KVM VM support guide (Phase 9)

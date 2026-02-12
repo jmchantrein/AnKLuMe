@@ -47,6 +47,8 @@ def validate(infra):
     base_subnet = infra.get("global", {}).get("base_subnet", "10.100")
     subnet_ids, all_machines, all_ips = {}, {}, {}
 
+    valid_types = ("lxc", "vm")
+
     for dname, domain in domains.items():
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):
             errors.append(f"Domain '{dname}': invalid name (lowercase alphanumeric + hyphen)")
@@ -70,6 +72,12 @@ def validate(infra):
                 errors.append(f"Machine '{mname}': duplicate (already in '{all_machines[mname]}')")
             else:
                 all_machines[mname] = dname
+
+            # Validate instance type
+            mtype = machine.get("type", "lxc")
+            if mtype not in valid_types:
+                errors.append(f"Machine '{mname}': type must be 'lxc' or 'vm', got '{mtype}'")
+
             ip = machine.get("ip")
             if ip:
                 if ip in all_ips:
