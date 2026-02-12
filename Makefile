@@ -137,6 +137,27 @@ ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
 	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
 	scripts/ai-develop.sh "$(TASK)"
 
+# ── Agent Teams (Phase 15) ────────────────────────────────
+agent-runner-setup: ## Install Claude Code + Agent Teams in runner container
+	@incus info $(or $(RUNNER),anklume) &>/dev/null || { echo "ERROR: Runner not found. Run 'make runner-create' first."; exit 1; }
+	ansible-playbook -i "$(or $(RUNNER),anklume)," -c community.general.incus \
+		--extra-vars "ansible_incus_project=$(or $(PROJECT),default)" \
+		-e "@roles/dev_agent_runner/defaults/main.yml" \
+		site.yml --tags agent-setup 2>/dev/null || \
+	incus exec $(or $(RUNNER),anklume) --project $(or $(PROJECT),default) -- bash -c "\
+		curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+		apt-get install -y nodejs tmux && \
+		npm install -g @anthropic-ai/claude-code && \
+		mkdir -p /root/.claude && \
+		echo 'Agent runner setup complete'"
+
+agent-fix: ## Autonomous test fixing with Claude Code Agent Teams (R=role)
+	@scripts/agent-fix.sh $(R)
+
+agent-develop: ## Autonomous development with Agent Teams (TASK="description")
+	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make agent-develop TASK=\"...\""; exit 1; }
+	@scripts/agent-develop.sh "$(TASK)"
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -165,4 +186,5 @@ help: ## Show this help
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
         ai-test ai-test-role ai-develop \
+        agent-runner-setup agent-fix agent-develop \
         init install-hooks help

@@ -538,7 +538,7 @@ stt_language: ""               # Empty = auto-detect
 
 ---
 
-## Phase 15: Claude Code Agent Teams — Autonomous Development and Testing
+## Phase 15: Claude Code Agent Teams — Autonomous Development and Testing ✅ COMPLETE
 
 **Goal**: Enable fully autonomous development and testing cycles using
 Claude Code Agent Teams (multi-agent orchestration) inside the
@@ -754,13 +754,13 @@ the production boundary (PR merge).
 - [Addy Osmani on Claude Code swarms](https://addyosmani.com/blog/claude-code-agent-teams/)
 
 **Validation criteria**:
-- [ ] `make agent-runner-setup` creates container with Claude Code + Agent Teams
-- [ ] `make agent-fix` runs test-fix cycle autonomously, creates PR
-- [ ] `make agent-develop TASK="..."` implements a task, tests it, creates PR
-- [ ] All agent actions logged in session transcript
-- [ ] Agents never touch production (sandbox isolation verified)
-- [ ] PR contains clear description of changes and test results
-- [ ] Human can review full session log before merging
+- [x] `make agent-runner-setup` creates container with Claude Code + Agent Teams
+- [x] `make agent-fix` runs test-fix cycle autonomously, creates PR
+- [x] `make agent-develop TASK="..."` implements a task, tests it, creates PR
+- [x] All agent actions logged in session transcript
+- [x] Agents never touch production (sandbox isolation verified)
+- [x] PR contains clear description of changes and test results
+- [x] Human can review full session log before merging
 
 ---
 
@@ -782,9 +782,9 @@ the production boundary (PR merge).
 - Phase 12: Incus-in-Incus test environment
 - Phase 13: LLM-assisted testing (ai-test-loop + ai-develop)
 - Phase 14: Speech-to-Text (STT) service (stt_server role)
+- Phase 15: Claude Code Agent Teams (autonomous dev + testing)
 
-**Next priority phases**:
-- Phase 15: Claude Code Agent Teams
+**All phases complete.**
 
 **Deployed infrastructure**:
 
