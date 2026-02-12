@@ -521,6 +521,232 @@ stt_language: ""               # Empty = auto-detect
 
 ---
 
+## Phase 15: Claude Code Agent Teams — Autonomous Development and Testing
+
+**Goal**: Enable fully autonomous development and testing cycles using
+Claude Code Agent Teams (multi-agent orchestration) inside the
+Incus-in-Incus sandbox, with human oversight at the PR merge level.
+
+**Prerequisites**: Phase 12 (Incus-in-Incus), Phase 13 (AI-assisted
+testing infrastructure), Claude Code CLI >= 1.0.34, Anthropic API key
+or Max plan.
+
+**Context**: Phase 13 provides pluggable LLM backends (Ollama, Claude
+API, Aider, Claude Code CLI) for AI-assisted test fixing via a shell
+script orchestrator. Phase 15 goes further: it uses Claude Code's native
+Agent Teams feature (shipped with Opus 4.6, February 2026) to orchestrate
+multiple Claude Code instances working in parallel inside the sandbox.
+Phase 13 remains the lightweight, backend-agnostic option. Phase 15 is
+the full-power option for users with Claude Code access.
+
+**Architecture**:
+
+```
++----------------------------------------------------------------+
+| Container: test-runner (Incus-in-Incus, Phase 12)              |
+| security.nesting: true                                         |
+| CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1                         |
+| --dangerously-skip-permissions (safe: isolated sandbox)        |
+|                                                                |
+| Claude Code Agent Teams (Opus 4.6)                             |
+|                                                                |
+|  Team Lead: orchestrator                                       |
+|  +-- reads ROADMAP / task description                          |
+|  +-- decomposes work into shared task list                     |
+|  +-- assigns tasks to teammates                                |
+|  +-- synthesizes results, creates PR                           |
+|                                                                |
+|  Teammate "Builder": feature implementation                    |
+|  +-- implements Ansible roles, playbooks, configs              |
+|  +-- follows CLAUDE.md conventions                             |
+|  +-- commits to feature branch                                 |
+|                                                                |
+|  Teammate "Tester": continuous testing                         |
+|  +-- runs molecule test for affected roles                     |
+|  +-- reports failures to team via shared task list             |
+|  +-- validates idempotence                                     |
+|                                                                |
+|  Teammate "Reviewer": code quality                             |
+|  +-- runs ansible-lint, yamllint                               |
+|  +-- checks ADR compliance                                     |
+|  +-- verifies no regression on other roles                     |
+|  +-- approves or rejects with feedback to Builder              |
+|                                                                |
+|  Nested Incus (Molecule test targets run here)                 |
++----------------------------------------------------------------+
+```
+
+**Operational modes**:
+
+a) **Fix mode** (`make agent-fix`):
+   - Lead runs `molecule test` across all roles
+   - On failure: spawns Fixer teammate(s) per failing role
+   - Fixers analyze logs + source, propose and apply patches
+   - Tester re-runs affected tests after each fix
+   - Loop until all tests pass or max retries reached
+   - On success: Lead creates PR with summary of all fixes
+
+b) **Develop mode** (`make agent-develop TASK="Implement Phase N"`):
+   - Lead reads ROADMAP.md, CLAUDE.md, and task description
+   - Decomposes the phase into parallel subtasks
+   - Spawns Builder(s) for implementation, Tester for validation,
+     Reviewer for quality
+   - Teammates coordinate via shared task list and inter-agent messaging
+   - Builder implements, Tester validates, Reviewer checks quality
+   - Iterate until Tester + Reviewer both approve
+   - Lead creates PR with full implementation + passing tests
+
+**Deliverables**:
+
+a) Role `dev_agent_runner` — extends `dev_test_runner` (Phase 12):
+   - Installs Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+   - Installs Node.js >= 18 (Claude Code requirement)
+   - Installs tmux (for Agent Teams split-pane mode)
+   - Configures Claude Code settings:
+     ```json
+     {
+       "env": {
+         "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+       },
+       "permissions": {
+         "allow": [
+           "Edit",
+           "MultiEdit",
+           "Bash(molecule *)",
+           "Bash(ansible-lint *)",
+           "Bash(yamllint *)",
+           "Bash(git *)",
+           "Bash(incus *)",
+           "Bash(make *)"
+         ],
+         "deny": [
+           "Bash(rm -rf /)",
+           "Bash(curl * | bash)",
+           "Bash(wget * | bash)"
+         ]
+       },
+       "defaultMode": "bypassPermissions"
+     }
+     ```
+   - Copies CLAUDE.md and project context into container
+   - Configures git (user, email, remote, credentials)
+
+b) Script `scripts/agent-fix.sh` — Fix mode orchestrator:
+   - Creates/reuses test-runner container
+   - Injects Anthropic API key (from env or `anklume.conf.yml`)
+   - Launches Claude Code with prompt:
+     ```
+     Run molecule test for all roles. For each failure:
+     1. Analyze the error log and the relevant source files
+     2. Create a fix branch (fix/<role>-<issue>)
+     3. Apply the fix
+     4. Re-run the test
+     5. If it passes, commit with a descriptive message
+     If all tests pass, create a single PR summarizing all fixes.
+     Use agent teams: spawn a Tester and a Fixer teammate.
+     Max retries per role: 3.
+     ```
+   - Captures full session transcript for audit
+   - Exits with summary: which roles fixed, which still failing
+
+c) Script `scripts/agent-develop.sh` — Develop mode orchestrator:
+   - Takes TASK description (free text or "Phase N" reference)
+   - Creates feature branch (`feature/<task-slug>`)
+   - Launches Claude Code with prompt:
+     ```
+     Read ROADMAP.md and CLAUDE.md. Your task: {TASK}
+     Use agent teams to parallelize the work:
+     - Builder teammate(s) for implementation
+     - Tester teammate to run molecule tests continuously
+     - Reviewer teammate to check code quality and ADR compliance
+     Iterate until all tests pass and Reviewer approves.
+     Then create a PR with a comprehensive description.
+     ```
+   - Full session transcript saved
+   - Summary output: files changed, tests passed/failed, PR URL
+
+d) Makefile targets:
+   ```makefile
+   agent-fix:          ## Autonomous test fixing with Claude Code Agent Teams
+   agent-develop:      ## Autonomous feature development (TASK required)
+   agent-runner-setup: ## Setup the agent-runner container with Claude Code
+   ```
+
+e) CLAUDE.md additions for Agent Teams context:
+   - Section describing the project structure for agents
+   - Role naming conventions, ADR index, test patterns
+   - Instructions for Molecule test execution
+   - Git workflow: feature branches, PR conventions, commit messages
+
+f) PreToolUse hook (`scripts/agent-audit-hook.sh`):
+   - Logs every tool invocation (tool name, args, timestamp)
+   - Stored in `logs/agent-session-<timestamp>.jsonl`
+   - Enables post-hoc audit of everything the agents did
+
+**Permission model and human-in-the-loop**:
+
+| Layer | Control |
+|-------|---------|
+| Sandbox | Incus-in-Incus = total isolation. No access to production projects/nets |
+| Claude Code permissions | `bypassPermissions` (safe in sandbox) + PreToolUse audit hook logs everything |
+| Git workflow | Agents work on feature/fix branches. Never commit to main. PR created automatically |
+| Human gate | PR merge = human decision. Full session transcript available. `git diff` reviewable before merge |
+
+The key principle: full autonomy inside the sandbox, human approval at
+the production boundary (PR merge).
+
+**Cost considerations**:
+- Agent Teams consume significantly more tokens (3-5x a single session)
+- Each teammate has its own context window
+- Recommended: use `agent-fix` for targeted fixes (lower cost),
+  `agent-develop` for full phase implementation (higher cost, higher value)
+- Estimated costs per mode (Opus 4.6 at $5/$25 per MTok):
+  - `agent-fix` (single role): ~$3-8
+  - `agent-fix` (all roles): ~$15-40
+  - `agent-develop` (small phase): ~$20-60
+  - `agent-develop` (large phase): ~$50-150
+
+**Design principles**:
+
+*Defense in depth*:
+- Incus-in-Incus sandbox = OS-level isolation
+- Claude Code permissions = application-level control
+- Git branch protection = workflow-level gate
+- PR merge = human-level decision
+- Audit logs = accountability
+
+*Autonomous but auditable*:
+- Agents have full freedom inside the sandbox
+- Every action is logged (PreToolUse hook)
+- Full session transcript saved
+- PR description auto-generated with summary
+- Human reviews before anything reaches production
+
+*Progressive trust*:
+- Start with `agent-fix` (lower risk, targeted scope)
+- Graduate to `agent-develop` as confidence builds
+- Phase 13 backends remain available for lighter-weight usage
+- Can always fall back to manual development
+
+**References**:
+- [Claude Code Agent Teams docs](https://code.claude.com/docs/en/agent-teams)
+- [Claude Code permissions](https://code.claude.com/docs/en/permissions)
+- [Claude Code sandboxing](https://www.anthropic.com/engineering/claude-code-sandboxing)
+- [Opus 4.6 features](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-6)
+- [Agent Teams setup guide](https://serenitiesai.com/articles/claude-code-agent-teams-documentation)
+- [Addy Osmani on Claude Code swarms](https://addyosmani.com/blog/claude-code-agent-teams/)
+
+**Validation criteria**:
+- [ ] `make agent-runner-setup` creates container with Claude Code + Agent Teams
+- [ ] `make agent-fix` runs test-fix cycle autonomously, creates PR
+- [ ] `make agent-develop TASK="..."` implements a task, tests it, creates PR
+- [ ] All agent actions logged in session transcript
+- [ ] Agents never touch production (sandbox isolation verified)
+- [ ] PR contains clear description of changes and test results
+- [ ] Human can review full session log before merging
+
+---
+
 ## Current State
 
 **Completed**:
