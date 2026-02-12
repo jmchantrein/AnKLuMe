@@ -1,0 +1,6 @@
+---
+# incus_nftables defaults
+incus_nftables_admin_bridge: "net-admin"
+incus_nftables_bridge_pattern: "net-"
+incus_nftables_output_path: "/opt/anklume/nftables-isolation.nft"
+incus_nftables_apply: false

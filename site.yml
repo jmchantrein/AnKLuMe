@@ -1,7 +1,7 @@
 ---
 # site.yml — Master playbook for AnKLuMe infrastructure
 #
-# Two-phase architecture (ADR-006):
+# Three-phase architecture (ADR-006):
 #
 # Phase 1 — Infrastructure (tag: infra):
 #   - hosts: all, connection: local
@@ -14,6 +14,11 @@
 #   - Connects INTO instances via `incus exec`
 #   - Installs packages, configures locale, timezone, services
 #   - admin_bootstrap applied only to the admin group (ADR-019)
+#
+# Phase 3 — Network isolation (tag: nftables):
+#   - hosts: localhost, connection: local
+#   - Generates nftables inter-bridge isolation rules
+#   - Deploy on host with: make nftables-deploy
 #
 # Concurrency note:
 #   With forks > 1, multiple hosts may attempt to create the same resource
@@ -28,6 +33,8 @@
 #   make apply-base                 # Base system only (--tags base)
 #   make apply-limit G=<domain>     # Single domain (--limit <domain>)
 #   make check                      # Dry-run (--check --diff)
+#   make nftables                   # Generate nftables isolation rules
+#   make nftables-deploy            # Deploy rules on host (run FROM host)
 
 - name: "Infrastructure | Reconcile Incus resources"
   hosts: all
@@ -166,3 +173,17 @@
         - llm
         - webui
         - provision
+
+# ── Phase 3: Network isolation ───────────────────────────────
+# Generates nftables rules to isolate non-admin bridges.
+# Rules are generated inside the admin container; deploy on
+# the host with: make nftables-deploy
+
+- name: "Firewall | Generate inter-bridge isolation rules"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags:
+    - nftables
+  roles:
+    - role: incus_nftables
