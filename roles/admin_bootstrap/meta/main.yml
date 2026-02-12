@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: admin_bootstrap
+  namespace: anklume
   author: AnKLuMe
   description: Admin-specific provisioning (Incus socket fix, Ansible, git)
   license: Apache-2.0

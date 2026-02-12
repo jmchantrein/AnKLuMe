@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: ollama_server
+  namespace: anklume
   author: AnKLuMe
   description: Install and configure Ollama LLM inference server
   license: Apache-2.0

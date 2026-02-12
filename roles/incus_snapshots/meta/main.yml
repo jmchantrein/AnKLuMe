@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: incus_snapshots
+  namespace: anklume
   author: AnKLuMe
   description: Manage Incus instance snapshots (create, restore, delete, list)
   license: Apache-2.0

@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: incus_projects
+  namespace: anklume
   author: AnKLuMe
   description: Reconcile Incus projects for each domain
   license: Apache-2.0
