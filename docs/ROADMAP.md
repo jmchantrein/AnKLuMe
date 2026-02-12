@@ -331,7 +331,7 @@ Molecule tests execute within this nested environment.
 
 ---
 
-## Phase 13: LLM-Assisted Testing and Development
+## Phase 13: LLM-Assisted Testing and Development ✅ COMPLETE
 
 **Goal**: Allow an LLM (local or remote) to analyze test results, propose
 fixes, and optionally submit PRs autonomously.
@@ -429,13 +429,13 @@ e) Script `scripts/ai-develop.sh` — autonomous development:
 - [Self-Evolving Agents cookbook](https://developers.openai.com/cookbook/examples/partners/self_evolving_agents/autonomous_agent_retraining)
 
 **Validation criteria**:
-- [ ] `make ai-test AI_MODE=none` = standard Molecule tests (no regression)
-- [ ] `make ai-test AI_MODE=local` = tests + failure analysis by local Ollama
-- [ ] `make ai-test AI_MODE=claude-code` = tests + fix proposed by Claude Code
-- [ ] `make ai-test AI_MODE=aider` = tests + fix via Aider
-- [ ] dry_run prevents any automatic modification by default
-- [ ] Auto-created PRs are clearly labeled (ai-generated)
-- [ ] Full session log for every execution
+- [x] `make ai-test AI_MODE=none` = standard Molecule tests (no regression)
+- [x] `make ai-test AI_MODE=local` = tests + failure analysis by local Ollama
+- [x] `make ai-test AI_MODE=claude-code` = tests + fix proposed by Claude Code
+- [x] `make ai-test AI_MODE=aider` = tests + fix via Aider
+- [x] dry_run prevents any automatic modification by default
+- [x] Auto-created PRs are clearly labeled (ai-generated)
+- [x] Full session log for every execution
 
 ---
 
@@ -780,9 +780,9 @@ the production boundary (PR merge).
 - Phase 10: Advanced GPU management (gpu_policy validation)
 - Phase 11: Dedicated firewall VM (host + VM modes)
 - Phase 12: Incus-in-Incus test environment
+- Phase 13: LLM-assisted testing (ai-test-loop + ai-develop)
 
 **Next priority phases**:
-- Phase 13: LLM-assisted testing
 - Phase 14: Speech-to-Text (STT) service
 - Phase 15: Claude Code Agent Teams
 

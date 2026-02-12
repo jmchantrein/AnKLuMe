@@ -115,6 +115,25 @@ runner-create: ## Create the AnKLuMe runner container
 runner-destroy: ## Destroy the AnKLuMe runner container
 	@scripts/run-tests.sh destroy
 
+# ── AI-Assisted Testing (Phase 13) ────────────────────────
+ai-test: ## Run tests + AI-assisted fixing (AI_MODE=none|local|remote|claude-code|aider)
+	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	ANKLUME_AI_MAX_RETRIES=$(or $(MAX_RETRIES),3) \
+	scripts/ai-test-loop.sh
+
+ai-test-role: ## AI-assisted test for one role (R=role_name AI_MODE=backend)
+	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	ANKLUME_AI_MAX_RETRIES=$(or $(MAX_RETRIES),3) \
+	scripts/ai-test-loop.sh $(R)
+
+ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
+	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make ai-develop TASK=\"...\" AI_MODE=claude-code"; exit 1; }
+	ANKLUME_AI_MODE=$(or $(AI_MODE),claude-code) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	scripts/ai-develop.sh "$(TASK)"
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -142,4 +161,5 @@ help: ## Show this help
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
+        ai-test ai-test-role ai-develop \
         init install-hooks help
