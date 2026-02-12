@@ -101,3 +101,4 @@ For details, read these files with `@path`:
 - @docs/vm-support.md — KVM VM support guide (Phase 9)
 - @docs/gpu-advanced.md — GPU management and security policy (Phase 10)
 - @docs/firewall-vm.md — Dedicated firewall VM guide (Phase 11)
+- @docs/ai-testing.md — AI-assisted testing and development (Phase 13)

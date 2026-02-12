@@ -317,3 +317,65 @@ rules still prevent direct inter-bridge traffic.
 choose host-only, VM-only, or both. No code enforces exclusivity.
 
 ---
+
+## Phase 13: LLM-Assisted Testing and Development
+
+### D-022: Shell script orchestrator (not Python framework)
+
+**Context**: The AI-assisted testing system needs to orchestrate test
+runs, LLM queries, and fix application. Could be implemented as a Python
+framework, an Ansible role, or shell scripts.
+
+**Decision**: Use plain Bash scripts (`ai-test-loop.sh`, `ai-develop.sh`)
+with a shared config helper (`ai-config.sh`). The orchestrator sources
+the config helper and dispatches to backend-specific functions.
+
+**Rationale**: KISS — shell scripts are the natural fit for orchestrating
+CLI tools (molecule, claude, aider, curl). No new Python dependencies.
+Matches the existing pattern (`run-tests.sh`, `deploy-nftables.sh`).
+
+### D-023: Safety-first defaults (dry_run=true, auto_pr=false)
+
+**Context**: AI-generated code modifications carry risk. The system
+should be safe to run without unexpected side effects.
+
+**Decision**: Default to maximum safety:
+- `dry_run=true`: LLM proposes fixes, human reviews and applies
+- `auto_pr=false`: human creates the PR manually
+- Max retries: 3 (prevents infinite loops)
+- Full session logging (always enabled)
+
+**Consequence**: Users must explicitly opt into destructive operations.
+Progressive trust: dry_run → no-dry-run → auto_pr.
+
+### D-024: Environment variables over config file
+
+**Context**: ROADMAP specifies both `anklume.conf.yml` and environment
+variables for configuration. Need clear precedence rules.
+
+**Decision**: Environment variables take precedence over config file
+values, which take precedence over defaults. Config file is optional
+(`anklume.conf.yml`), parsed with a Python one-liner using PyYAML
+(already a project dependency). Config file is gitignored since it
+may contain API keys.
+
+**Rationale**: Environment variables work everywhere (CI, containers,
+scripts). Config file is convenience for local development.
+
+### D-025: Backend-specific fix strategies
+
+**Context**: Different AI backends have different capabilities. Ollama
+and Claude API return text (patches), while Claude Code and Aider
+operate directly on files.
+
+**Decision**: Two fix strategies:
+- **Patch-based** (Ollama, Claude API): LLM returns a unified diff,
+  script applies it with `patch -p1`
+- **Direct modification** (Claude Code, Aider): CLI tool modifies
+  files directly, script just invokes the tool with the right context
+
+**Consequence**: Claude Code and Aider are more capable (can browse
+files, understand context better) but require their CLI installed.
+Ollama/API mode works with just `curl`.
+
+---

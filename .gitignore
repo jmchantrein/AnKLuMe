@@ -39,5 +39,11 @@ Thumbs.db
 /group_vars/
 /host_vars/
 
+# AI session logs
+/logs/
+
+# AI config with secrets
+/anklume.conf.yml
+
 # AnKLuMe dev mode marker (bypass pre-commit hook)
 .anklume-no-verify
