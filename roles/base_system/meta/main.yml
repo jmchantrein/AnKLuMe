@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: base_system
+  namespace: anklume
   author: AnKLuMe
   description: Base provisioning for all instances (packages, locale, timezone)
   license: Apache-2.0
