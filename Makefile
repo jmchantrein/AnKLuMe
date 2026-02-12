@@ -59,6 +59,13 @@ apply-limit: ## Apply a single domain (G=<group>)
 apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
 	ansible-playbook site.yml --tags llm
 
+# ── nftables Isolation ───────────────────────────────────
+nftables: ## Generate nftables isolation rules
+	ansible-playbook site.yml --tags nftables
+
+nftables-deploy: ## Deploy nftables rules on host (run FROM host)
+	scripts/deploy-nftables.sh
+
 # ── Snapshots (Ansible role) ──────────────────────────────
 snapshot: ## Create snapshot of all instances (NAME=optional)
 	ansible-playbook snapshot.yml $(if $(NAME),-e snapshot_name=$(NAME))
@@ -130,7 +137,8 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit apply-llm snapshot snapshot-domain restore \
+        apply-base apply-limit apply-llm nftables nftables-deploy \
+        snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
