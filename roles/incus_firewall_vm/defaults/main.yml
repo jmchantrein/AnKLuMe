@@ -1,0 +1,17 @@
+---
+# IncusFirewallVM | Defaults for multi-NIC firewall profile
+#
+# Creates a profile with one NIC per domain bridge, attached to
+# the sys-firewall VM in the admin project.
+
+# Bridge prefix to discover AnKLuMe bridges
+incus_firewall_vm_bridge_pattern: "net-"
+
+# Admin bridge name (first NIC, eth0)
+incus_firewall_vm_admin_bridge: "net-admin"
+
+# Profile name for the firewall multi-NIC configuration
+incus_firewall_vm_profile: "firewall-multi-nic"
+
+# Admin project where the firewall VM lives
+incus_firewall_vm_project: "admin"

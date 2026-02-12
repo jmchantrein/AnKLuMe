@@ -52,9 +52,13 @@ def validate(infra):
 
     valid_types = ("lxc", "vm")
     valid_gpu_policies = ("exclusive", "shared")
+    valid_firewall_modes = ("host", "vm")
+    firewall_mode = g.get("firewall_mode", "host")
 
     if gpu_policy not in valid_gpu_policies:
         errors.append(f"global.gpu_policy must be 'exclusive' or 'shared', got '{gpu_policy}'")
+    if firewall_mode not in valid_firewall_modes:
+        errors.append(f"global.firewall_mode must be 'host' or 'vm', got '{firewall_mode}'")
 
     for dname, domain in domains.items():
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):

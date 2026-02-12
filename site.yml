@@ -89,6 +89,19 @@
         - instances
         - infra
 
+    - name: Infrastructure | Apply incus_firewall_vm
+      ansible.builtin.include_role:
+        name: incus_firewall_vm
+        apply:
+          tags:
+            - firewall
+            - infra
+      when: "'firewall_router' in (instance_roles | default([]))"
+      run_once: true
+      tags:
+        - firewall
+        - infra
+
 # ── Phase 2: Provisioning ──────────────────────────────────
 # Connects INTO instances via the community.general.incus plugin
 # (uses `incus exec` under the hood — no SSH needed).
@@ -172,6 +185,18 @@
       tags:
         - llm
         - webui
+        - provision
+
+    - name: Provisioning | Apply firewall_router
+      ansible.builtin.include_role:
+        name: firewall_router
+        apply:
+          tags:
+            - firewall
+            - provision
+      when: "'firewall_router' in (instance_roles | default([]))"
+      tags:
+        - firewall
         - provision
 
 # ── Phase 3: Network isolation ───────────────────────────────

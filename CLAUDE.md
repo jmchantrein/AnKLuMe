@@ -100,3 +100,4 @@ For details, read these files with `@path`:
 - @docs/network-isolation.md — nftables inter-bridge isolation (Phase 8)
 - @docs/vm-support.md — KVM VM support guide (Phase 9)
 - @docs/gpu-advanced.md — GPU management and security policy (Phase 10)
+- @docs/firewall-vm.md — Dedicated firewall VM guide (Phase 11)

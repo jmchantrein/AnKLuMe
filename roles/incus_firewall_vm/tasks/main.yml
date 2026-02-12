@@ -1,0 +1,76 @@
+---
+# IncusFirewallVM | Create multi-NIC profile for the firewall VM
+#
+# Runs on the controller via connection:local (ADR-015).
+# Discovers all AnKLuMe bridges and creates a profile with one
+# NIC per bridge. The sys-firewall VM uses this profile to have
+# network presence on every domain bridge.
+#
+# This role runs ONLY when global.firewall_mode == 'vm'.
+
+- name: IncusFirewallVM | Read existing networks
+  ansible.builtin.command:
+    cmd: incus network list --format json
+  register: incus_firewall_vm_networks_raw
+  changed_when: false
+  check_mode: false
+
+- name: IncusFirewallVM | Filter AnKLuMe bridges
+  ansible.builtin.set_fact:
+    incus_firewall_vm_bridges: >-
+      {{ incus_firewall_vm_networks_raw.stdout | from_json
+         | selectattr('name', 'match', '^' ~ incus_firewall_vm_bridge_pattern)
+         | map(attribute='name') | sort | list }}
+
+- name: IncusFirewallVM | Ensure admin bridge is first
+  ansible.builtin.set_fact:
+    incus_firewall_vm_ordered_bridges: >-
+      {{ [incus_firewall_vm_admin_bridge]
+         + (incus_firewall_vm_bridges | reject('equalto', incus_firewall_vm_admin_bridge) | list) }}
+
+- name: IncusFirewallVM | Check if profile exists
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - show
+      - "{{ incus_firewall_vm_profile }}"
+      - --project
+      - "{{ incus_firewall_vm_project }}"
+  register: incus_firewall_vm_profile_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: IncusFirewallVM | Create profile if missing
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - create
+      - "{{ incus_firewall_vm_profile }}"
+      - --project
+      - "{{ incus_firewall_vm_project }}"
+  when: incus_firewall_vm_profile_check.rc != 0
+  changed_when: true
+
+- name: IncusFirewallVM | Add NIC device for each bridge
+  ansible.builtin.command:
+    cmd: >-
+      incus profile device add
+      {{ incus_firewall_vm_profile }}
+      eth{{ idx }} nic
+      nictype=bridged
+      parent={{ bridge }}
+      name=eth{{ idx }}
+      --project {{ incus_firewall_vm_project }}
+  loop: "{{ incus_firewall_vm_ordered_bridges }}"
+  loop_control:
+    index_var: idx
+    loop_var: bridge
+    label: "eth{{ idx }} → {{ bridge }}"
+  register: incus_firewall_vm_nic_add
+  changed_when: incus_firewall_vm_nic_add.rc == 0
+  failed_when:
+    - incus_firewall_vm_nic_add.rc != 0
+    - "'already exists' not in (incus_firewall_vm_nic_add.stderr | default(''))"

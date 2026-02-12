@@ -1,0 +1,59 @@
+---
+# FirewallRouter | Configure the firewall VM as an inter-domain router
+#
+# Runs INSIDE the sys-firewall VM via community.general.incus connection.
+# Enables IP forwarding, installs nftables, and deploys isolation rules
+# with centralized logging.
+#
+# Input variables:
+#   - firewall_router_interfaces (list): NIC → bridge mapping
+#   - firewall_router_admin_bridge (string): admin bridge name
+#   - firewall_router_logging (bool): enable nftables logging
+#   - firewall_router_log_prefix (string): nftables log prefix
+
+- name: FirewallRouter | Enable IPv4 forwarding
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-ip-forward.conf
+    content: |
+      net.ipv4.ip_forward = 1
+    mode: "0644"
+  register: firewall_router_sysctl
+
+- name: FirewallRouter | Apply sysctl settings
+  ansible.builtin.command:
+    cmd: sysctl -p /etc/sysctl.d/99-ip-forward.conf
+  when: firewall_router_sysctl is changed
+  changed_when: true
+
+- name: FirewallRouter | Install nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+    update_cache: true
+
+- name: FirewallRouter | Create nftables.d directory
+  ansible.builtin.file:
+    path: /etc/nftables.d
+    state: directory
+    mode: "0755"
+
+- name: FirewallRouter | Deploy isolation rules
+  ansible.builtin.template:
+    src: firewall-router.nft.j2
+    dest: /etc/nftables.d/anklume-firewall.nft
+    mode: "0644"
+  register: firewall_router_rules
+
+- name: FirewallRouter | Include nftables.d in main config
+  ansible.builtin.lineinfile:
+    path: /etc/nftables.conf
+    line: 'include "/etc/nftables.d/*.nft"'
+    insertafter: EOF
+  register: firewall_router_include
+
+- name: FirewallRouter | Reload nftables
+  ansible.builtin.systemd:
+    name: nftables
+    state: restarted
+    enabled: true
+  when: firewall_router_rules is changed or firewall_router_include is changed
