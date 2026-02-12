@@ -1,0 +1,78 @@
+---
+- name: Verify base_system
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check curl is installed
+      ansible.builtin.command:
+        cmd: which curl
+      changed_when: false
+
+    - name: Verify | Check vim is installed
+      ansible.builtin.command:
+        cmd: which vim
+      changed_when: false
+
+    - name: Verify | Check htop is installed
+      ansible.builtin.command:
+        cmd: which htop
+      changed_when: false
+
+    - name: Verify | Read locale config
+      ansible.builtin.command:
+        cmd: cat /etc/default/locale
+      register: verify_locale
+      changed_when: false
+
+    - name: Verify | Locale is configured
+      ansible.builtin.assert:
+        that:
+          - "'en_US.UTF-8' in verify_locale.stdout"
+        fail_msg: "Locale is not set to en_US.UTF-8"
+
+    - name: Verify | Read timezone config
+      ansible.builtin.command:
+        cmd: cat /etc/timezone
+      register: verify_timezone
+      changed_when: false
+
+    - name: Verify | Timezone is configured
+      ansible.builtin.assert:
+        that:
+          - "'Europe/Paris' in verify_timezone.stdout"
+        fail_msg: "Timezone is not set to Europe/Paris"
+
+    - name: Verify | Check localtime symlink
+      ansible.builtin.stat:
+        path: /etc/localtime
+      register: verify_localtime
+
+    - name: Verify | Localtime points to correct timezone
+      ansible.builtin.assert:
+        that:
+          - verify_localtime.stat.islnk
+          - "'Europe/Paris' in verify_localtime.stat.lnk_source"
+        fail_msg: "/etc/localtime does not point to Europe/Paris"
+
+    - name: Verify | Check systemd is PID 1
+      ansible.builtin.command:
+        cmd: cat /proc/1/comm
+      register: verify_pid1
+      changed_when: false
+
+    - name: Verify | Systemd confirmed
+      ansible.builtin.assert:
+        that:
+          - "'systemd' in verify_pid1.stdout"
+        fail_msg: "systemd is not PID 1"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: base_system
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"
