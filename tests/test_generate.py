@@ -2,7 +2,7 @@
 
 import pytest
 import yaml
-from generate import MANAGED_BEGIN, MANAGED_END, detect_orphans, generate, load_infra, validate
+from generate import MANAGED_BEGIN, MANAGED_END, detect_orphans, generate, get_warnings, load_infra, validate
 
 
 @pytest.fixture()
@@ -339,6 +339,83 @@ class TestVMSupport:
         generate(sample_infra, tmp_path)
         content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
         assert "instance_type: lxc" in content
+
+
+# -- GPU policy (ADR-018) -----------------------------------------------------
+
+
+class TestGPUPolicy:
+    def _add_gpu_machine(self, infra, domain, name, ip, via_flag=True):
+        """Helper: add a GPU-enabled machine to infra."""
+        machines = infra["domains"][domain]["machines"]
+        if via_flag:
+            machines[name] = {"type": "lxc", "ip": ip, "gpu": True}
+        else:
+            # GPU via profile device
+            infra["domains"][domain].setdefault("profiles", {})
+            infra["domains"][domain]["profiles"]["gpu-profile"] = {
+                "devices": {"gpu0": {"type": "gpu", "gputype": "physical"}}
+            }
+            machines[name] = {"type": "lxc", "ip": ip, "profiles": ["default", "gpu-profile"]}
+
+    def test_single_gpu_exclusive_ok(self, sample_infra):
+        """One GPU instance in exclusive mode (default) is valid."""
+        self._add_gpu_machine(sample_infra, "work", "gpu-ws", "10.100.1.20")
+        assert validate(sample_infra) == []
+
+    def test_multiple_gpu_exclusive_error(self, sample_infra):
+        """Multiple GPU instances in exclusive mode triggers error."""
+        self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
+        self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
+        errors = validate(sample_infra)
+        assert any("GPU policy is 'exclusive'" in e for e in errors)
+        assert any("gpu-a" in e and "gpu-b" in e for e in errors)
+
+    def test_multiple_gpu_shared_no_error(self, sample_infra):
+        """Multiple GPU instances with shared policy passes validation."""
+        sample_infra["global"]["gpu_policy"] = "shared"
+        self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
+        self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
+        assert validate(sample_infra) == []
+
+    def test_shared_gpu_warning(self, sample_infra):
+        """Shared GPU policy emits warning when multiple instances share GPU."""
+        sample_infra["global"]["gpu_policy"] = "shared"
+        self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
+        self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
+        warnings = get_warnings(sample_infra)
+        assert any("shared" in w.lower() for w in warnings)
+
+    def test_no_gpu_no_warning(self, sample_infra):
+        """No GPU instances produces no warnings."""
+        assert get_warnings(sample_infra) == []
+
+    def test_single_gpu_no_warning(self, sample_infra):
+        """Single GPU instance produces no warning even in shared mode."""
+        sample_infra["global"]["gpu_policy"] = "shared"
+        self._add_gpu_machine(sample_infra, "work", "gpu-ws", "10.100.1.20")
+        assert get_warnings(sample_infra) == []
+
+    def test_gpu_via_profile_device_detected(self, sample_infra):
+        """GPU access via profile device is detected by exclusive policy."""
+        self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20", via_flag=True)
+        self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20", via_flag=False)
+        errors = validate(sample_infra)
+        assert any("GPU policy is 'exclusive'" in e for e in errors)
+
+    def test_invalid_gpu_policy(self, sample_infra):
+        """Invalid gpu_policy value triggers error."""
+        sample_infra["global"]["gpu_policy"] = "permissive"
+        errors = validate(sample_infra)
+        assert any("gpu_policy must be 'exclusive' or 'shared'" in e for e in errors)
+
+    def test_default_gpu_policy_is_exclusive(self, sample_infra):
+        """Without gpu_policy in global, default is exclusive."""
+        self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
+        self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
+        # No gpu_policy set, should default to exclusive and error
+        errors = validate(sample_infra)
+        assert any("GPU policy is 'exclusive'" in e for e in errors)
 
 
 # -- orphan protection ---------------------------------------------------------

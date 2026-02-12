@@ -207,3 +207,52 @@ isolation for untrusted workloads.
 with hardware requirements and isolation comparison.
 
 ---
+
+## Phase 10: Advanced GPU Management
+
+### D-015: GPU policy validation in generator (ADR-018)
+
+**Context**: ADR-018 specifies exclusive/shared GPU policy but the
+validation was not implemented in the generator.
+
+**Decision**: Implement GPU policy enforcement in `validate()`:
+- Count GPU instances via `gpu: true` flag AND profile device detection
+- `exclusive` (default): error if >1 GPU instance
+- `shared`: no error, but `get_warnings()` emits a warning
+- Invalid `gpu_policy` value triggers a validation error
+
+Profile device detection scans domain-level profiles referenced by the
+machine to find any device with `type: gpu`. This catches both direct
+(`gpu: true`) and indirect (profile-based) GPU access.
+
+### D-016: get_warnings() as separate function
+
+**Context**: Warnings (non-fatal) should not block `make sync` but should
+be visible to the user. Changing `validate()` return type would break
+backward compatibility with existing tests.
+
+**Decision**: Add `get_warnings(infra)` as a separate function that returns
+a list of warning strings. Called in `main()` after validation passes.
+Warnings are printed to stderr with `WARNING:` prefix.
+
+**Rationale**: DRY — GPU instance scanning logic is duplicated between
+`validate()` and `get_warnings()` but they serve different purposes
+(errors vs warnings). KISS wins over DRY here since the alternative
+(shared return tuple) would change the API.
+
+### D-017: VM GPU documented but not enforced
+
+**Context**: ROADMAP mentions GPU in VMs via vfio-pci. However, vfio-pci
+requires host-level IOMMU configuration that AnKLuMe cannot validate from
+inside the admin container.
+
+**Decision**: Document VM GPU setup in `docs/gpu-advanced.md` but do not
+add runtime validation for IOMMU. The generator enforces exclusive policy
+regardless of instance type. VM GPU profiles use `pci:` device syntax
+documented by Incus upstream.
+
+**Rationale**: KISS — IOMMU detection is a host concern, not an infra.yml
+concern. ADR-004 (no hypervisor in inventory) means we can't check IOMMU
+from the admin container.
+
+---
