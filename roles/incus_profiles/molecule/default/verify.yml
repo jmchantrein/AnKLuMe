@@ -36,8 +36,8 @@
     - name: Verify | eth0 device has correct network
       ansible.builtin.assert:
         that:
-          - "verify_profile.devices.eth0.network == 'net-molecule-test'"
-        fail_msg: "eth0 network is not net-molecule-test"
+          - "verify_profile.devices.eth0.network == 'net-mol-test'"
+        fail_msg: "eth0 network is not net-mol-test"
 
     - name: Verify | root device is type disk
       ansible.builtin.assert:
@@ -58,7 +58,7 @@
       vars:
         incus_project: molecule-test
         incus_network:
-          name: net-molecule-test
+          name: net-mol-test
           subnet: "10.200.99.0/24"
           gateway: "10.200.99.254"
       register: idempotency_result

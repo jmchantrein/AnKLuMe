@@ -17,12 +17,12 @@
     - name: Verify | Network exists
       ansible.builtin.assert:
         that:
-          - "'net-molecule-test' in (verify_networks | map(attribute='name') | list)"
-        fail_msg: "Network net-molecule-test does not exist"
+          - "'net-mol-test' in (verify_networks | map(attribute='name') | list)"
+        fail_msg: "Network net-mol-test does not exist"
 
     - name: Verify | Read network config
       ansible.builtin.command:
-        cmd: incus network show net-molecule-test
+        cmd: incus network show net-mol-test
       register: verify_network_show_raw
       changed_when: false
 
@@ -53,7 +53,7 @@
         name: incus_networks
       vars:
         incus_network:
-          name: net-molecule-test
+          name: net-mol-test
           subnet: "10.200.99.0/24"
           gateway: "10.200.99.254"
         domain_ephemeral: true
