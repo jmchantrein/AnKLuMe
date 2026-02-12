@@ -34,10 +34,10 @@ Thumbs.db
 #
 # If you are developing the framework itself and need to commit
 # generated test fixtures, use: git add --force <file>
-infra.yml
-inventory/
-group_vars/
-host_vars/
+/infra.yml
+/inventory/
+/group_vars/
+/host_vars/
 
 # AnKLuMe dev mode marker (bypass pre-commit hook)
 .anklume-no-verify
