@@ -27,9 +27,9 @@
         label: "{{ item.key }}={{ item.value }}"
       changed_when: false
 
-    - name: Setup | Ensure net-molecule-test network exists
+    - name: Setup | Ensure net-mol-test network exists
       ansible.builtin.command:
-        cmd: incus network create net-molecule-test
+        cmd: incus network create net-mol-test
       register: setup_network_result
       changed_when: setup_network_result.rc == 0
       failed_when: false
@@ -38,7 +38,7 @@
       ansible.builtin.command:
         cmd: >-
           incus profile device add default eth0 nic
-          network=net-molecule-test
+          network=net-mol-test
           name=eth0
           --project molecule-test
       register: setup_profile_eth0

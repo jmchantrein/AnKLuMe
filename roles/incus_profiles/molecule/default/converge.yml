@@ -27,9 +27,9 @@
         label: "{{ item.key }}={{ item.value }}"
       changed_when: false
 
-    - name: Setup | Ensure net-molecule-test network exists
+    - name: Setup | Ensure net-mol-test network exists
       ansible.builtin.command:
-        cmd: incus network create net-molecule-test
+        cmd: incus network create net-mol-test
       register: setup_network_result
       changed_when: setup_network_result.rc == 0
       failed_when: false
@@ -41,7 +41,7 @@
   vars:
     incus_project: molecule-test
     incus_network:
-      name: net-molecule-test
+      name: net-mol-test
       subnet: "10.200.99.0/24"
       gateway: "10.200.99.254"
   roles:

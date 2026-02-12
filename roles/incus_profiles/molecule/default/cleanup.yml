@@ -22,8 +22,8 @@
       changed_when: true
       failed_when: false
 
-    - name: Cleanup | Delete net-molecule-test network
+    - name: Cleanup | Delete net-mol-test network
       ansible.builtin.command:
-        cmd: incus network delete net-molecule-test
+        cmd: incus network delete net-mol-test
       changed_when: true
       failed_when: false
