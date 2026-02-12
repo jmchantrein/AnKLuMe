@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: molecule-test-instance
+  gather_facts: false
+  pre_tasks:
+    - name: Converge | Bootstrap Python on target
+      ansible.builtin.raw: |
+        test -x /usr/bin/python3 || (apt-get update && apt-get install -y python3)
+      changed_when: false
+
+    - name: Converge | Gather facts
+      ansible.builtin.setup:
+  roles:
+    - role: dev_test_runner
+      vars:
+        dev_test_runner_repo_url: "https://github.com/jmchantrein/AnKLuMe.git"
+        dev_test_runner_repo_branch: "main"

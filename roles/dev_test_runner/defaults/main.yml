@@ -1,0 +1,30 @@
+---
+# Default variables for dev_test_runner
+# Override in group_vars or host_vars as needed.
+
+dev_test_runner_repo_url: "https://github.com/jmchantrein/AnKLuMe.git"
+dev_test_runner_repo_branch: "main"
+dev_test_runner_repo_dest: "/root/AnKLuMe"
+
+dev_test_runner_git_user_name: "AnKLuMe Runner"
+dev_test_runner_git_user_email: "runner@anklume.local"
+
+# Preseed configuration for nested Incus
+dev_test_runner_incus_bridge_subnet: "10.250.0.1/24"
+dev_test_runner_incus_bridge_name: "incusbr0"
+dev_test_runner_incus_storage_driver: "dir"
+
+# Packages to install for testing
+dev_test_runner_packages:
+  - python3
+  - python3-pip
+  - python3-venv
+  - git
+  - make
+
+# Python packages for testing (installed via pip)
+dev_test_runner_pip_packages:
+  - molecule
+  - molecule-plugins
+  - ansible-lint
+  - yamllint
