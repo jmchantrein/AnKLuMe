@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+# Speaches — OpenAI-compatible STT server (faster-whisper backend)
+
+[Unit]
+Description=Speaches Speech-to-Text Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/speaches \
+  --host {{ stt_server_host }} \
+  --port {{ stt_server_port }}
+{% if stt_server_language | length > 0 %}
+Environment=WHISPER__MODEL={{ stt_server_model }}
+Environment=WHISPER__COMPUTE_TYPE={{ stt_server_quantization }}
+Environment=WHISPER__LANGUAGE={{ stt_server_language }}
+{% else %}
+Environment=WHISPER__MODEL={{ stt_server_model }}
+Environment=WHISPER__COMPUTE_TYPE={{ stt_server_quantization }}
+{% endif %}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

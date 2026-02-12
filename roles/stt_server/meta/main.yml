@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: stt_server
+  description: "Install faster-whisper + Speaches STT server"
+  company: AnKLuMe
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - trixie
+  galaxy_tags:
+    - stt
+    - whisper
+    - speech
+dependencies: []

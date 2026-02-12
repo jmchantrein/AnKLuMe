@@ -379,3 +379,47 @@ files, understand context better) but require their CLI installed.
 Ollama/API mode works with just `curl`.
 
 ---
+
+## Phase 14: Speech-to-Text (STT) Service
+
+### D-026: Speaches over raw faster-whisper
+
+**Context**: Need an API server for STT. Options: raw faster-whisper
+Python library, faster-whisper-server, Speaches, OWhisper.
+
+**Decision**: Use Speaches (formerly faster-whisper-server) as the API
+layer. It provides an OpenAI-compatible `/v1/audio/transcriptions`
+endpoint that Open WebUI consumes directly. Single pip install, no
+Docker or complex orchestration needed.
+
+**Rationale**: KISS — one `pip install speaches` gives us both
+faster-whisper and the API server. OpenAI compatibility means no
+custom integration code for Open WebUI.
+
+### D-027: GPU shared mode required for STT + Ollama
+
+**Context**: STT and Ollama both need GPU access for acceptable
+performance. They run in separate containers.
+
+**Decision**: Document that `gpu_policy: shared` is required when both
+STT and Ollama containers have GPU access. The generator already
+validates this (Phase 10, ADR-018). Recommend `int8_float16`
+quantization for STT to reduce VRAM pressure.
+
+**Consequence**: Users explicitly opt into shared GPU. VRAM competition
+is a known trade-off documented in `docs/stt-service.md`.
+
+### D-028: Model downloaded on first request
+
+**Context**: Whisper models are large (1-6 GB). Pre-downloading during
+provisioning would slow deployment and might fail on slow networks.
+
+**Decision**: Let Speaches download the model on the first transcription
+request (its default behavior). The service starts immediately and
+downloads asynchronously. This matches Ollama's behavior with
+`ollama pull`.
+
+**Rationale**: KISS — no custom download task in the Ansible role.
+The model is cached after first download.
+
+---

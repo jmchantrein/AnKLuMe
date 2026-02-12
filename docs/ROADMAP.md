@@ -439,7 +439,7 @@ e) Script `scripts/ai-develop.sh` — autonomous development:
 
 ---
 
-## Phase 14: Speech-to-Text (STT) Service
+## Phase 14: Speech-to-Text (STT) Service ✅ COMPLETE
 
 **Goal**: Provide local, GPU-accelerated speech-to-text as a service
 accessible by Open WebUI and other containers.
@@ -529,12 +529,12 @@ stt_language: ""               # Empty = auto-detect
 - [Best open-source STT models 2026](https://northflank.com/blog/best-open-source-speech-to-text-stt-model-in-2026-benchmarks)
 
 **Validation criteria**:
-- [ ] `homelab-stt` container starts with GPU access
-- [ ] Speaches API responds on `/v1/audio/transcriptions`
-- [ ] Open WebUI voice input transcribes correctly (FR + EN)
-- [ ] Idempotent on second run
-- [ ] Concurrent GPU usage with Ollama stable (shared mode)
-- [ ] Transcription latency < 2s for 10s audio clip
+- [x] `homelab-stt` container starts with GPU access
+- [x] Speaches API responds on `/v1/audio/transcriptions`
+- [x] Open WebUI voice input transcribes correctly (FR + EN)
+- [x] Idempotent on second run
+- [x] Concurrent GPU usage with Ollama stable (shared mode)
+- [x] Transcription latency < 2s for 10s audio clip
 
 ---
 
@@ -781,9 +781,9 @@ the production boundary (PR merge).
 - Phase 11: Dedicated firewall VM (host + VM modes)
 - Phase 12: Incus-in-Incus test environment
 - Phase 13: LLM-assisted testing (ai-test-loop + ai-develop)
+- Phase 14: Speech-to-Text (STT) service (stt_server role)
 
 **Next priority phases**:
-- Phase 14: Speech-to-Text (STT) service
 - Phase 15: Claude Code Agent Teams
 
 **Deployed infrastructure**:
