@@ -1,0 +1,10 @@
+---
+- name: Destroy test environment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Destroy | Remove test directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test
+        state: absent
