@@ -44,10 +44,17 @@ def validate(infra):
         return errors
 
     domains = infra.get("domains") or {}
-    base_subnet = infra.get("global", {}).get("base_subnet", "10.100")
+    g = infra.get("global", {})
+    base_subnet = g.get("base_subnet", "10.100")
+    gpu_policy = g.get("gpu_policy", "exclusive")
     subnet_ids, all_machines, all_ips = {}, {}, {}
+    gpu_instances = []  # Track machines with GPU access
 
     valid_types = ("lxc", "vm")
+    valid_gpu_policies = ("exclusive", "shared")
+
+    if gpu_policy not in valid_gpu_policies:
+        errors.append(f"global.gpu_policy must be 'exclusive' or 'shared', got '{gpu_policy}'")
 
     for dname, domain in domains.items():
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):
@@ -66,7 +73,8 @@ def validate(infra):
         if domain_eph is not None and not isinstance(domain_eph, bool):
             errors.append(f"Domain '{dname}': ephemeral must be a boolean, got {type(domain_eph).__name__}")
 
-        domain_profiles = set(domain.get("profiles") or {})
+        domain_profiles = domain.get("profiles") or {}
+        domain_profile_names = set(domain_profiles)
         for mname, machine in (domain.get("machines") or {}).items():
             if mname in all_machines:
                 errors.append(f"Machine '{mname}': duplicate (already in '{all_machines[mname]}')")
@@ -77,6 +85,18 @@ def validate(infra):
             mtype = machine.get("type", "lxc")
             if mtype not in valid_types:
                 errors.append(f"Machine '{mname}': type must be 'lxc' or 'vm', got '{mtype}'")
+
+            # Track GPU instances (direct flag or profile with gpu device)
+            has_gpu = machine.get("gpu", False)
+            if not has_gpu:
+                for pname in machine.get("profiles") or []:
+                    if pname in domain_profiles:
+                        pdevices = domain_profiles[pname].get("devices") or {}
+                        if any(d.get("type") == "gpu" for d in pdevices.values()):
+                            has_gpu = True
+                            break
+            if has_gpu:
+                gpu_instances.append(mname)
 
             ip = machine.get("ip")
             if ip:
@@ -90,10 +110,48 @@ def validate(infra):
             if machine_eph is not None and not isinstance(machine_eph, bool):
                 errors.append(f"Machine '{mname}': ephemeral must be a boolean, got {type(machine_eph).__name__}")
             for p in machine.get("profiles") or []:
-                if p != "default" and p not in domain_profiles:
+                if p != "default" and p not in domain_profile_names:
                     errors.append(f"Machine '{mname}': profile '{p}' not defined in domain '{dname}'")
 
+    # GPU policy enforcement (ADR-018)
+    if len(gpu_instances) > 1 and gpu_policy == "exclusive":
+        errors.append(
+            f"GPU policy is 'exclusive' but {len(gpu_instances)} instances have GPU access: "
+            f"{', '.join(gpu_instances)}. Set global.gpu_policy: shared to allow this."
+        )
+
     return errors
+
+
+def get_warnings(infra):
+    """Return non-fatal warnings about the infra configuration."""
+    warnings = []
+    g = infra.get("global", {})
+    gpu_policy = g.get("gpu_policy", "exclusive")
+    domains = infra.get("domains") or {}
+    gpu_instances = []
+
+    for domain in domains.values():
+        domain_profiles = domain.get("profiles") or {}
+        for mname, machine in (domain.get("machines") or {}).items():
+            has_gpu = machine.get("gpu", False)
+            if not has_gpu:
+                for pname in machine.get("profiles") or []:
+                    if pname in domain_profiles:
+                        pdevices = domain_profiles[pname].get("devices") or {}
+                        if any(d.get("type") == "gpu" for d in pdevices.values()):
+                            has_gpu = True
+                            break
+            if has_gpu:
+                gpu_instances.append(mname)
+
+    if len(gpu_instances) > 1 and gpu_policy == "shared":
+        warnings.append(
+            f"GPU policy is 'shared': {len(gpu_instances)} instances share GPU access "
+            f"({', '.join(gpu_instances)}). No VRAM isolation on consumer GPUs."
+        )
+
+    return warnings
 
 
 def _managed_block(content_yaml):
@@ -272,6 +330,10 @@ def main(argv=None):
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         sys.exit(1)
+
+    warnings = get_warnings(infra)
+    for w in warnings:
+        print(f"WARNING: {w}", file=sys.stderr)
 
     domains = infra.get("domains") or {}
     if not domains:
