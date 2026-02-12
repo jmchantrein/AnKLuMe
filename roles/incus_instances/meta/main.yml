@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: incus_instances
+  namespace: anklume
   author: AnKLuMe
   description: Reconcile Incus containers and VMs
   license: Apache-2.0

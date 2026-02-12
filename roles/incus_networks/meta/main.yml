@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: incus_networks
+  namespace: anklume
   author: AnKLuMe
   description: Reconcile Incus domain bridges
   license: Apache-2.0

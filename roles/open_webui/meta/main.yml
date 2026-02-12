@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   role_name: open_webui
+  namespace: anklume
   author: AnKLuMe
   description: Install Open WebUI frontend for Ollama
   license: Apache-2.0
