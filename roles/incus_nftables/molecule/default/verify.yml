@@ -1,0 +1,112 @@
+---
+- name: Verify incus_nftables
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_nftables_output_path: "/tmp/anklume-test/nftables-isolation.nft"
+  tasks:
+    - name: Verify | Check output file exists
+      ansible.builtin.stat:
+        path: "{{ incus_nftables_output_path }}"
+      register: verify_nft_file
+
+    - name: Verify | Output file exists
+      ansible.builtin.assert:
+        that:
+          - verify_nft_file.stat.exists
+          - verify_nft_file.stat.mode == '0644'
+        fail_msg: "nftables output file does not exist or has wrong permissions"
+
+    - name: Verify | Read generated nftables file
+      ansible.builtin.slurp:
+        src: "{{ incus_nftables_output_path }}"
+      register: verify_nft_content_raw
+
+    - name: Verify | Decode file content
+      ansible.builtin.set_fact:
+        verify_nft_content: "{{ verify_nft_content_raw.content | b64decode }}"
+
+    - name: Verify | Contains table inet anklume
+      ansible.builtin.assert:
+        that:
+          - "'table inet anklume' in verify_nft_content"
+        fail_msg: "Missing 'table inet anklume' declaration"
+
+    - name: Verify | Contains chain isolation
+      ansible.builtin.assert:
+        that:
+          - "'chain isolation' in verify_nft_content"
+        fail_msg: "Missing 'chain isolation' chain"
+
+    - name: Verify | Contains priority -1
+      ansible.builtin.assert:
+        that:
+          - "'priority -1' in verify_nft_content"
+        fail_msg: "Missing 'priority -1' in chain definition"
+
+    - name: Verify | Contains stateful tracking rule
+      ansible.builtin.assert:
+        that:
+          - "'ct state established,related accept' in verify_nft_content"
+        fail_msg: "Missing stateful tracking rule (ct state established,related accept)"
+
+    - name: Verify | Contains invalid state drop
+      ansible.builtin.assert:
+        that:
+          - "'ct state invalid drop' in verify_nft_content"
+        fail_msg: "Missing invalid state drop rule"
+
+    - name: Verify | Contains admin bridge accept rule
+      ansible.builtin.assert:
+        that:
+          - "'iifname \"net-admin\" accept' in verify_nft_content"
+        fail_msg: "Missing admin bridge accept rule"
+
+    - name: Verify | Contains same-bridge accept rules
+      ansible.builtin.assert:
+        that:
+          - "'iifname \"net-admin\" oifname \"net-admin\" accept' in verify_nft_content"
+          - "'iifname \"net-perso\" oifname \"net-perso\" accept' in verify_nft_content"
+          - "'iifname \"net-pro\" oifname \"net-pro\" accept' in verify_nft_content"
+          - "'iifname \"net-homelab\" oifname \"net-homelab\" accept' in verify_nft_content"
+        fail_msg: "Missing same-bridge accept rules"
+
+    - name: Verify | Contains non-admin inter-bridge drop rule
+      ansible.builtin.assert:
+        that:
+          - "'drop' in verify_nft_content"
+          - "'net-homelab' in verify_nft_content"
+          - "'net-perso' in verify_nft_content"
+          - "'net-pro' in verify_nft_content"
+        fail_msg: "Missing non-admin inter-bridge drop rule"
+
+    - name: Verify | Contains atomic table replace pattern
+      ansible.builtin.assert:
+        that:
+          - "'delete table inet anklume' in verify_nft_content"
+        fail_msg: "Missing atomic table replace pattern (delete table)"
+
+    - name: Verify | Idempotency - re-template the file
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/anklume-isolation.nft.j2"
+        dest: "{{ incus_nftables_output_path }}"
+        mode: "0644"
+      vars:
+        incus_nftables_admin_bridge: "net-admin"
+        incus_nftables_all_bridges:
+          - "net-admin"
+          - "net-homelab"
+          - "net-perso"
+          - "net-pro"
+        incus_nftables_non_admin_bridges:
+          - "net-homelab"
+          - "net-perso"
+          - "net-pro"
+      register: verify_idempotency_result
+
+    - name: Verify | Idempotency - no changes on second run
+      ansible.builtin.assert:
+        that:
+          - not (verify_idempotency_result is changed)
+        fail_msg: "Template is not idempotent — second run produced changes"

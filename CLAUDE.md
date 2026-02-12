@@ -52,6 +52,8 @@ make apply         # Apply full infrastructure
 make apply-limit G=<group>  # Apply a single domain
 make test          # Run Molecule + pytest
 make snapshot      # Snapshot all instances
+make nftables      # Generate nftables isolation rules
+make nftables-deploy  # Deploy rules on host (run FROM host)
 make help          # List all commands
 ```
 
@@ -95,3 +97,4 @@ For details, read these files with `@path`:
 - @docs/SPEC.md — Full specification (architecture, formats, roles)
 - @docs/ARCHITECTURE.md — Architecture decisions (ADR-style)
 - @docs/ROADMAP.md — Implementation phases and priorities
+- @docs/network-isolation.md — nftables inter-bridge isolation (Phase 8)

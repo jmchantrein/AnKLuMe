@@ -1,0 +1,14 @@
+---
+driver:
+  name: default
+platforms:
+  - name: molecule-test
+    managed: false
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      gathering: explicit
+      roles_path: ${MOLECULE_PROJECT_DIRECTORY}/..
+verifier:
+  name: ansible

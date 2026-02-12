@@ -1,0 +1,32 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_nftables_output_path: "/tmp/anklume-test/nftables-isolation.nft"
+    incus_nftables_apply: false
+    incus_nftables_admin_bridge: "net-admin"
+    incus_nftables_bridge_pattern: "net-"
+    # Simulate bridges that would be returned by incus network list
+    incus_nftables_all_bridges:
+      - "net-admin"
+      - "net-homelab"
+      - "net-perso"
+      - "net-pro"
+    incus_nftables_non_admin_bridges:
+      - "net-homelab"
+      - "net-perso"
+      - "net-pro"
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: "{{ incus_nftables_output_path | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template nftables isolation rules
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/anklume-isolation.nft.j2"
+        dest: "{{ incus_nftables_output_path }}"
+        mode: "0644"

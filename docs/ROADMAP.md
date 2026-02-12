@@ -166,7 +166,7 @@ Phase 12 will provide proper isolation via Incus-in-Incus.
 
 ---
 
-## Phase 8: nftables Inter-Bridge Isolation
+## Phase 8: nftables Inter-Bridge Isolation ✅ COMPLETE
 
 **Goal**: Block traffic between domains at the network level
 
@@ -180,13 +180,21 @@ network isolation.
 - Rules: DROP all traffic between net-X and net-Y by default
 - Exception: admin → all (for Ansible and monitoring)
 - Integration in site.yml (tag `nftables`)
+- `scripts/deploy-nftables.sh` — host-side deployment script
 - Documentation `docs/network-isolation.md`
 
 **Validation criteria**:
-- [ ] Traffic between non-admin domains blocked (e.g., perso ↛ pro)
-- [ ] Traffic from admin to all domains allowed (Ansible, monitoring)
-- [ ] NAT to Internet functional from all bridges
-- [ ] Idempotent (nftables rules applied only once)
+- [x] Traffic between non-admin domains blocked (e.g., perso ↛ pro)
+- [x] Traffic from admin to all domains allowed (Ansible, monitoring)
+- [x] NAT to Internet functional from all bridges
+- [x] Idempotent (nftables rules applied only once)
+
+**Design decisions**:
+- nftables priority -1 (before Incus chains at priority 0)
+- Two-step workflow: generate in admin container, deploy on host
+- Same-bridge accept rules for br_netfilter compatibility
+- Atomic table replacement (delete + recreate)
+- ADR-004 exception: deploy script runs on host, not via Ansible
 
 **Notes**:
 - nftables rules are on the HOST, not in containers
@@ -752,9 +760,17 @@ the production boundary (PR merge).
 **Completed**:
 - Phase 1: PSOT generator functional (make sync idempotent)
 - Phase 2: Incus infrastructure deployed and idempotent
+- Phase 2b: Post-deployment hardening (ADR-017 to ADR-019)
 - Phase 3: Instance provisioning (base_system + admin_bootstrap)
 - Phase 4: Snapshot management (role + playbook)
 - Phase 5: GPU passthrough + Ollama + Open WebUI roles
+- Phase 6: Molecule tests for each role
+- Phase 8: nftables inter-bridge isolation
+- Phase 12: Incus-in-Incus test environment
+
+**Next priority phases**:
+- Phase 9: VM support (KVM instances)
+- Phase 7: Documentation + publication (in progress on separate branch)
 
 **Deployed infrastructure**:
 
@@ -768,6 +784,5 @@ the production boundary (PR merge).
 **Active ADRs**: ADR-001 to ADR-019
 
 **Known issues**:
-- Inter-bridge traffic open (Phase 8)
 - admin-ansible requires manual intervention at restart (Phase 2b)
 - No effective VM support despite `type:` in infra.yml (Phase 9)

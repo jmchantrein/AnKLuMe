@@ -1,0 +1,54 @@
+---
+# IncusNftables | Generate inter-bridge isolation rules
+#
+# Runs on the controller via connection:local.
+# Reads current Incus bridges, filters AnKLuMe bridges,
+# and generates nftables rules that isolate non-admin domains
+# while allowing admin → all traffic.
+#
+# Input variables (from defaults/main.yml):
+#   - incus_nftables_admin_bridge (string): admin bridge name
+#   - incus_nftables_bridge_pattern (string): prefix for AnKLuMe bridges
+#   - incus_nftables_output_path (string): where to write the rules
+#   - incus_nftables_apply (boolean): whether to apply rules immediately
+
+- name: IncusNftables | Read existing networks
+  ansible.builtin.command:
+    cmd: incus network list --format json
+  register: incus_nftables_networks_raw
+  changed_when: false
+  check_mode: false
+
+- name: IncusNftables | Filter AnKLuMe bridges
+  ansible.builtin.set_fact:
+    incus_nftables_all_bridges: >-
+      {{ incus_nftables_networks_raw.stdout | from_json
+         | selectattr('name', 'match', '^' ~ incus_nftables_bridge_pattern)
+         | map(attribute='name')
+         | sort
+         | list }}
+
+- name: IncusNftables | Identify non-admin bridges
+  ansible.builtin.set_fact:
+    incus_nftables_non_admin_bridges: >-
+      {{ incus_nftables_all_bridges
+         | reject('equalto', incus_nftables_admin_bridge)
+         | list }}
+
+- name: IncusNftables | Create output directory
+  ansible.builtin.file:
+    path: "{{ incus_nftables_output_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: IncusNftables | Template nftables isolation rules
+  ansible.builtin.template:
+    src: anklume-isolation.nft.j2
+    dest: "{{ incus_nftables_output_path }}"
+    mode: "0644"
+
+- name: IncusNftables | Apply nftables rules
+  ansible.builtin.command:
+    cmd: "nft -f {{ incus_nftables_output_path }}"
+  when: incus_nftables_apply | bool
+  changed_when: true
