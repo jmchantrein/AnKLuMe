@@ -423,3 +423,51 @@ downloads asynchronously. This matches Ollama's behavior with
 The model is cached after first download.
 
 ---
+
+## Phase 15: Claude Code Agent Teams
+
+### D-029: Sandbox-first architecture
+
+**Context**: Agent Teams with `--dangerously-skip-permissions` and
+`bypassPermissions` mode give Claude Code full system access. This is
+dangerous on a production machine but safe inside an Incus-in-Incus
+sandbox that cannot reach production resources.
+
+**Decision**: Agent Teams ONLY run inside the Phase 12 sandbox container.
+The `agent-fix.sh` and `agent-develop.sh` scripts verify the runner
+container exists and inject the API key at runtime. The
+`dev_agent_runner` role configures the sandbox with appropriate
+permissions and audit hooks.
+
+**Rationale**: Defense in depth — OS-level isolation (Incus) +
+application-level permissions (Claude Code) + workflow-level gates
+(PR merge) + audit logging (PreToolUse hook).
+
+### D-030: Separate scripts from Phase 13
+
+**Context**: Phase 13 has `ai-test-loop.sh` and `ai-develop.sh` for
+lightweight AI-assisted workflows. Phase 15 uses Claude Code Agent
+Teams for full multi-agent orchestration.
+
+**Decision**: Keep Phase 13 and Phase 15 scripts separate. Phase 13
+scripts run locally with pluggable backends (Ollama, API, CLI).
+Phase 15 scripts require Incus-in-Incus sandbox + Claude Code CLI
++ API key. Different complexity levels for different use cases.
+
+**Consequence**: Users choose the right tool for the job. Phase 13
+for quick fixes (low cost), Phase 15 for complex development
+(higher cost, higher capability).
+
+### D-031: PreToolUse audit hook for accountability
+
+**Context**: Agent Teams can execute many tools autonomously. For
+post-hoc audit, every tool invocation should be logged.
+
+**Decision**: Deploy `agent-audit-hook.sh` as a PreToolUse hook in the
+runner container. It logs every tool call (name, args, timestamp) to
+a JSONL file in `logs/`. The hook is optional but enabled by default.
+
+**Rationale**: Accountability — full trace of what the agents did.
+The JSONL format allows easy filtering and analysis.
+
+---

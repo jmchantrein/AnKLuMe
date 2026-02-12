@@ -103,3 +103,4 @@ For details, read these files with `@path`:
 - @docs/firewall-vm.md — Dedicated firewall VM guide (Phase 11)
 - @docs/ai-testing.md — AI-assisted testing and development (Phase 13)
 - @docs/stt-service.md — Speech-to-Text service guide (Phase 14)
+- @docs/agent-teams.md — Claude Code Agent Teams guide (Phase 15)
