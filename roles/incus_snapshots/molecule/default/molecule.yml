@@ -1,0 +1,18 @@
+---
+driver:
+  name: delegated
+platforms:
+  - name: molecule-test-instance
+    managed: false
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      molecule-test-instance:
+        ansible_connection: local
+        incus_project: molecule-test
+  config_options:
+    defaults:
+      gathering: explicit
+verifier:
+  name: ansible
