@@ -1,0 +1,91 @@
+---
+- name: Create test container with nesting support
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create | Ensure images remote exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - remote
+          - add
+          - images
+          - https://images.linuxcontainers.org
+          - --protocol
+          - simplestreams
+          - --public
+      register: create_remote_result
+      changed_when: "'exists' not in create_remote_result.stderr"
+      failed_when:
+        - create_remote_result.rc != 0
+        - "'exists' not in create_remote_result.stderr"
+
+    - name: Create | Ensure nesting profile exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - show
+          - nesting
+      register: create_nesting_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create | Create nesting profile
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - create
+          - nesting
+      when: create_nesting_check.rc != 0
+      changed_when: true
+
+    - name: Create | Set nesting profile config
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - set
+          - nesting
+          - "{{ item }}"
+      loop:
+        - security.nesting=true
+        - security.syscalls.intercept.mknod=true
+        - security.syscalls.intercept.setxattr=true
+      when: create_nesting_check.rc != 0
+      changed_when: true
+
+    - name: Create | Launch molecule test container with nesting
+      ansible.builtin.command:
+        cmd: >-
+          incus launch images:debian/13 molecule-test-instance
+          --project default
+          --profile default
+          --profile nesting
+      register: create_launch_result
+      changed_when: create_launch_result.rc == 0
+      failed_when:
+        - create_launch_result.rc != 0
+        - "'already exists' not in create_launch_result.stderr"
+
+    - name: Create | Wait for container to be running
+      ansible.builtin.command:
+        argv:
+          - incus
+          - list
+          - molecule-test-instance
+          - --project
+          - default
+          - --format
+          - json
+      register: create_info_result
+      changed_when: false
+      until: >-
+        (create_info_result.stdout | from_json
+        | selectattr('name', 'equalto', 'molecule-test-instance')
+        | map(attribute='status') | first | default(''))
+        == 'Running'
+      retries: 15
+      delay: 2

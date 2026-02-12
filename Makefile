@@ -95,6 +95,19 @@ test-roles: ## Run Molecule tests for all roles
 test-role: ## Run Molecule test for one role (R=role_name)
 	cd roles/$(R) && molecule test
 
+# ── Sandboxed Testing (Incus-in-Incus) ──────────────────
+test-sandboxed: ## Run all Molecule tests in isolated sandbox
+	@scripts/run-tests.sh full
+
+test-sandboxed-role: ## Run one role's test in sandbox (R=role_name)
+	@scripts/run-tests.sh full $(R)
+
+runner-create: ## Create the AnKLuMe runner container
+	@scripts/run-tests.sh create
+
+runner-destroy: ## Destroy the AnKLuMe runner container
+	@scripts/run-tests.sh destroy
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -119,4 +132,6 @@ help: ## Show this help
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-llm snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
-        test test-generator test-roles test-role init install-hooks help
+        test test-generator test-roles test-role \
+        test-sandboxed test-sandboxed-role runner-create runner-destroy \
+        init install-hooks help

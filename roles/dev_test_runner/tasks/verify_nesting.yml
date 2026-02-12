@@ -1,0 +1,78 @@
+---
+# DevTestRunner | Verify nested Incus works
+#
+# Launches a test container inside the nested Incus, verifies it runs,
+# then cleans up. This confirms the nesting mechanism is functional.
+
+- name: DevTestRunner | Ensure images remote exists
+  ansible.builtin.command:
+    argv:
+      - incus
+      - remote
+      - add
+      - images
+      - https://images.linuxcontainers.org
+      - --protocol
+      - simplestreams
+      - --public
+  register: dev_test_runner_remote_result
+  changed_when: "'exists' not in dev_test_runner_remote_result.stderr"
+  failed_when:
+    - dev_test_runner_remote_result.rc != 0
+    - "'exists' not in dev_test_runner_remote_result.stderr"
+
+- name: DevTestRunner | Verify nested Incus can launch containers
+  ansible.builtin.command:
+    argv:
+      - incus
+      - launch
+      - images:debian/13
+      - verify-test
+  register: dev_test_runner_verify_launch
+  changed_when: true
+
+- name: DevTestRunner | Wait for verify container to be running
+  ansible.builtin.command:
+    argv:
+      - incus
+      - list
+      - verify-test
+      - --format
+      - json
+  register: dev_test_runner_verify_status
+  changed_when: false
+  until: >-
+    (dev_test_runner_verify_status.stdout | from_json
+    | selectattr('name', 'equalto', 'verify-test')
+    | map(attribute='status') | first | default(''))
+    == 'Running'
+  retries: 30
+  delay: 2
+
+- name: DevTestRunner | Read OS release from verify container
+  ansible.builtin.command:
+    argv:
+      - incus
+      - exec
+      - verify-test
+      - --
+      - cat
+      - /etc/os-release
+  register: dev_test_runner_verify_os
+  changed_when: false
+
+- name: DevTestRunner | Assert verify container is Debian
+  ansible.builtin.assert:
+    that:
+      - "'Debian' in dev_test_runner_verify_os.stdout"
+    fail_msg: "Verify container is not running Debian"
+    success_msg: "Nested Incus verified: Debian container launched successfully"
+
+- name: DevTestRunner | Destroy verify container
+  ansible.builtin.command:
+    argv:
+      - incus
+      - delete
+      - verify-test
+      - --force
+  changed_when: true

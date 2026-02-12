@@ -1,0 +1,146 @@
+---
+# DevTestRunner | Provisions a container for nested Incus usage
+#
+# This role runs INSIDE the target container (connection: incus).
+# It installs Incus, initializes it with a working network via preseed,
+# and installs development/testing dependencies.
+#
+# Prerequisites:
+#   - Container must have the nesting profile applied:
+#     security.nesting, security.syscalls.intercept.mknod,
+#     security.syscalls.intercept.setxattr
+#
+# Input variables (from defaults, overridable in group_vars/host_vars):
+#   - dev_test_runner_repo_url (string): Git repository to clone
+#   - dev_test_runner_repo_branch (string): Branch to checkout
+#   - dev_test_runner_repo_dest (string): Clone destination path
+#   - dev_test_runner_incus_bridge_subnet (string): Bridge subnet
+#   - dev_test_runner_incus_bridge_name (string): Bridge name
+#   - dev_test_runner_incus_storage_driver (string): Storage driver
+
+# ── Install Incus ────────────────────────────────────────────────
+
+- name: DevTestRunner | Wait for dpkg lock to be released
+  ansible.builtin.command:
+    argv:
+      - fuser
+      - /var/lib/dpkg/lock-frontend
+  register: dev_test_runner_dpkg_lock
+  changed_when: false
+  failed_when: false
+  retries: 30
+  delay: 5
+  until: dev_test_runner_dpkg_lock.rc != 0
+
+- name: DevTestRunner | Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: DevTestRunner | Install Incus and base packages
+  ansible.builtin.apt:
+    name: "{{ ['incus', 'incus-client'] + dev_test_runner_packages }}"
+    state: present
+
+# ── Initialize nested Incus ─────────────────────────────────────
+
+- name: DevTestRunner | Check if nested Incus is already initialized
+  ansible.builtin.command:
+    argv:
+      - incus
+      - storage
+      - list
+      - --format
+      - json
+  register: dev_test_runner_storage_check
+  changed_when: false
+  failed_when: false
+
+- name: DevTestRunner | Initialize nested Incus with preseed
+  ansible.builtin.shell:
+    cmd: |
+      cat <<'PRESEED' | incus admin init --preseed
+      networks:
+      - config:
+          ipv4.address: {{ dev_test_runner_incus_bridge_subnet }}
+          ipv4.nat: "true"
+          ipv6.address: none
+        name: {{ dev_test_runner_incus_bridge_name }}
+        type: bridge
+      storage_pools:
+      - config: {}
+        name: default
+        driver: {{ dev_test_runner_incus_storage_driver }}
+      profiles:
+      - config: {}
+        devices:
+          eth0:
+            name: eth0
+            network: {{ dev_test_runner_incus_bridge_name }}
+            type: nic
+          root:
+            path: /
+            pool: default
+            type: disk
+        name: default
+      PRESEED
+  when: (dev_test_runner_storage_check.stdout | from_json | length) == 0
+  changed_when: true
+
+# ── Install testing tools ────────────────────────────────────────
+
+- name: DevTestRunner | Install pip packages for testing
+  ansible.builtin.pip:
+    name: "{{ dev_test_runner_pip_packages }}"
+    extra_args: --break-system-packages
+    state: present
+
+- name: DevTestRunner | Check community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - list
+      - community.general
+  register: dev_test_runner_collection_check
+  changed_when: false
+  failed_when: false
+
+- name: DevTestRunner | Install community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - install
+      - community.general
+  when: dev_test_runner_collection_check.rc != 0
+  changed_when: true
+
+# ── Clone repository ─────────────────────────────────────────────
+
+- name: DevTestRunner | Clone AnKLuMe repository
+  ansible.builtin.git:
+    repo: "{{ dev_test_runner_repo_url }}"
+    dest: "{{ dev_test_runner_repo_dest }}"
+    version: "{{ dev_test_runner_repo_branch }}"
+    update: true
+
+# ── Configure git ────────────────────────────────────────────────
+
+- name: DevTestRunner | Configure git user name
+  community.general.git_config:
+    name: user.name
+    value: "{{ dev_test_runner_git_user_name }}"
+    scope: global
+
+- name: DevTestRunner | Configure git user email
+  community.general.git_config:
+    name: user.email
+    value: "{{ dev_test_runner_git_user_email }}"
+    scope: global
+
+# ── Verify nested Incus works ───────────────────────────────────
+
+- name: DevTestRunner | Verify nesting
+  ansible.builtin.include_tasks:
+    file: verify_nesting.yml
