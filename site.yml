@@ -187,6 +187,18 @@
         - webui
         - provision
 
+    - name: Provisioning | Apply stt_server
+      ansible.builtin.include_role:
+        name: stt_server
+        apply:
+          tags:
+            - stt
+            - provision
+      when: "'stt_server' in (instance_roles | default([]))"
+      tags:
+        - stt
+        - provision
+
     - name: Provisioning | Apply firewall_router
       ansible.builtin.include_role:
         name: firewall_router

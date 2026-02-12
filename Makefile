@@ -59,6 +59,9 @@ apply-limit: ## Apply a single domain (G=<group>)
 apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
 	ansible-playbook site.yml --tags llm
 
+apply-stt: ## Apply STT role (Speaches + faster-whisper)
+	ansible-playbook site.yml --tags stt
+
 # ── nftables Isolation ───────────────────────────────────
 nftables: ## Generate nftables isolation rules
 	ansible-playbook site.yml --tags nftables
@@ -156,7 +159,7 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit apply-llm nftables nftables-deploy \
+        apply-base apply-limit apply-llm apply-stt nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
