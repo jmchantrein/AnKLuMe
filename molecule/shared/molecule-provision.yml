@@ -8,7 +8,7 @@
 # and adjust as needed.
 
 driver:
-  name: delegated
+  name: default
 platforms:
   - name: molecule-test-instance
 provisioner:
