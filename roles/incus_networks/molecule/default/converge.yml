@@ -5,7 +5,7 @@
   gather_facts: false
   vars:
     incus_network:
-      name: net-molecule-test
+      name: net-mol-test
       subnet: "10.200.99.0/24"
       gateway: "10.200.99.254"
     domain_ephemeral: true
