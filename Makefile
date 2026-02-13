@@ -70,6 +70,9 @@ apply-stt: ## Apply STT role (Speaches + faster-whisper)
 apply-ai: ## Apply AI tools roles (Ollama + WebUI + LobeChat + OpenCode)
 	ansible-playbook site.yml --tags llm,stt,lobechat,opencode
 
+export-images: ## Export images for nested Incus sharing
+	ansible-playbook site.yml --tags images -e incus_images_export_for_nesting=true
+
 # ── nftables Isolation ───────────────────────────────────
 nftables: ## Generate nftables isolation rules
 	ansible-playbook site.yml --tags nftables
@@ -126,6 +129,13 @@ runner-create: ## Create the AnKLuMe runner container
 runner-destroy: ## Destroy the AnKLuMe runner container
 	@scripts/run-tests.sh destroy
 
+# ── Behavior Matrix (Phase 18b) ──────────────────────────
+matrix-coverage: ## Show behavior matrix test coverage
+	python3 scripts/matrix-coverage.py
+
+matrix-generate: ## Generate tests for uncovered matrix cells (AI_MODE=...)
+	scripts/ai-matrix-test.sh $(if $(AI_MODE),--mode $(AI_MODE))
+
 # ── AI-Assisted Testing (Phase 13) ────────────────────────
 ai-test: ## Run tests + AI-assisted fixing (AI_MODE=none|local|remote|claude-code|aider)
 	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \
@@ -145,6 +155,13 @@ ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
 	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
 	scripts/ai-develop.sh "$(TASK)"
 
+# ── Experience Library (Phase 18d) ────────────────────────
+mine-experiences: ## Extract fix patterns from git history
+	python3 scripts/mine-experiences.py
+
+ai-improve: ## Spec-driven improvement loop (SCOPE=generator|roles|all)
+	scripts/ai-improve.sh --scope $(or $(SCOPE),all) $(if $(filter false,$(DRY_RUN)),,--dry-run)
+
 # ── Agent Teams (Phase 15) ────────────────────────────────
 agent-runner-setup: ## Install Claude Code + Agent Teams in runner container
 	@incus info $(or $(RUNNER),anklume) &>/dev/null || { echo "ERROR: Runner not found. Run 'make runner-create' first."; exit 1; }
@@ -158,6 +175,9 @@ agent-runner-setup: ## Install Claude Code + Agent Teams in runner container
 		npm install -g @anthropic-ai/claude-code && \
 		mkdir -p /root/.claude && \
 		echo 'Agent runner setup complete'"
+
+ai-switch: ## Switch AI-tools access to another domain (DOMAIN=<name>)
+	scripts/ai-switch.sh --domain $(DOMAIN) $(if $(NO_FLUSH),--no-flush)
 
 agent-fix: ## Autonomous test fixing with Claude Code Agent Teams (R=role)
 	@scripts/agent-fix.sh $(R)
@@ -176,6 +196,16 @@ upgrade: ## Safe framework update with conflict detection
 import-infra: ## Generate infra.yml from existing Incus state
 	@scripts/import-infra.sh $(if $(O),-o $(O))
 
+# ── Getting Started ──────────────────────────────────────
+guide: ## Interactive step-by-step onboarding tutorial
+	scripts/guide.sh $(if $(STEP),--step $(STEP)) $(if $(AUTO),--auto)
+
+quickstart: ## Copy example infra.yml and generate Ansible files
+	@test ! -f infra.yml || { echo "infra.yml already exists. Remove it first."; exit 1; }
+	@cp infra.yml.example infra.yml
+	@echo "Copied infra.yml.example -> infra.yml"
+	@echo "Edit infra.yml, then run: make sync && make apply"
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -193,18 +223,31 @@ install-hooks: ## Install git pre-commit hooks
 
 # ── Help ──────────────────────────────────────────────────
 help: ## Show this help
+	@echo ""
+	@echo "  AnKLuMe — Infrastructure Compartmentalization"
+	@echo ""
+	@echo "  GETTING STARTED:"
+	@echo "    make init        Install Ansible dependencies"
+	@echo "    make quickstart  Copy example infra.yml and sync"
+	@echo "    make guide       Interactive step-by-step tutorial"
+	@echo ""
+	@echo "  ALL TARGETS:"
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | sort | \
-		awk 'BEGIN {FS = ":.*## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
+        export-images \
         nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
-        ai-test ai-test-role ai-develop \
+        ai-test ai-test-role ai-develop ai-switch \
+        mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         flush upgrade import-infra \
-        init install-hooks help
+        matrix-coverage matrix-generate \
+        guide quickstart init install-hooks help
