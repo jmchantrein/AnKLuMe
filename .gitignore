@@ -35,9 +35,13 @@ Thumbs.db
 # If you are developing the framework itself and need to commit
 # generated test fixtures, use: git add --force <file>
 /infra.yml
+/infra/
 /inventory/
 /group_vars/
 /host_vars/
+
+# User custom roles (override framework roles)
+/roles_custom/
 
 # AI session logs
 /logs/

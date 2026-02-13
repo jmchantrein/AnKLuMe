@@ -20,6 +20,25 @@ table inet anklume {
         iifname "{{ bridge }}" oifname "{{ bridge }}" accept
 {% endfor %}
 
+{% if incus_nftables_resolved_policies | default([]) | length > 0 %}
+        # Network policies (ADR-021): selective cross-domain accept rules
+{% for rule in incus_nftables_resolved_policies %}
+        # {{ rule.description }}
+{% if rule.ports == 'all' %}
+        iifname "{{ rule.from_bridge }}" oifname "{{ rule.to_bridge }}" accept
+{% else %}
+        iifname "{{ rule.from_bridge }}" oifname "{{ rule.to_bridge }}" {{ rule.protocol }} dport { {{ rule.ports | join(', ') }} } accept
+{% endif %}
+{% if rule.bidirectional | default(false) %}
+{% if rule.ports == 'all' %}
+        iifname "{{ rule.to_bridge }}" oifname "{{ rule.from_bridge }}" accept
+{% else %}
+        iifname "{{ rule.to_bridge }}" oifname "{{ rule.from_bridge }}" {{ rule.protocol }} dport { {{ rule.ports | join(', ') }} } accept
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
 {% if incus_nftables_all_bridges | length > 1 %}
         # Inter-bridge forwarding: drop all cross-domain traffic
         # Admin communicates via Incus socket, not the network
