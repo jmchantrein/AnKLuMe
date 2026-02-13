@@ -12,7 +12,7 @@
 #   ansible-playbook snapshot.yml -e snapshot_action=delete -e snapshot_name=before-upgrade
 #   ansible-playbook snapshot.yml -e snapshot_action=list
 #   ansible-playbook snapshot.yml --limit homelab                              # Single domain
-#   ansible-playbook snapshot.yml --limit homelab-llm                          # Single instance
+#   ansible-playbook snapshot.yml --limit homelab-ai                           # Single instance
 
 - name: "Snapshots | Manage instance snapshots"
   hosts: all

@@ -33,6 +33,10 @@
       Type=simple
       ExecStart=/usr/local/bin/open-webui serve --port {{ open_webui_port }}
       Environment="OLLAMA_BASE_URL={{ open_webui_ollama_url }}"
+      {% if open_webui_stt_url | default('') | length > 0 %}
+      Environment="AUDIO_STT_ENGINE=openai"
+      Environment="AUDIO_STT_OPENAI_API_BASE_URL={{ open_webui_stt_url }}"
+      {% endif %}
       Restart=always
 
       [Install]

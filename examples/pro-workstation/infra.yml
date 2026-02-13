@@ -8,7 +8,7 @@
 # See docs/SPEC.md section 5 for the full format reference.
 
 # Professional workstation: 4 domains with strict compartmentalization.
-# GPU passthrough on the homelab domain for LLM inference.
+# GPU passthrough on the homelab domain for LLM inference + STT.
 
 project_name: pro-workstation
 
@@ -61,7 +61,7 @@ domains:
           - base_system
 
   homelab:
-    description: "Homelab with GPU for LLM"
+    description: "Homelab with GPU for LLM + STT"
     subnet_id: 3
     ephemeral: false
     profiles:
@@ -71,8 +71,8 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      pw-llm:
-        description: "LLM inference server with GPU"
+      pw-ai:
+        description: "AI server — Ollama + Speaches STT (single GPU)"
         type: lxc
         ip: "10.100.3.10"
         gpu: true
@@ -82,6 +82,7 @@ domains:
         roles:
           - base_system
           - ollama_server
+          - stt_server
       pw-webui:
         description: "Open WebUI frontend"
         type: lxc
