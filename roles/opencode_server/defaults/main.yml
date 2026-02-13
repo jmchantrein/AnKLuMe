@@ -1,0 +1,21 @@
+---
+# Default variables for opencode_server
+# Override in group_vars or host_vars as needed.
+
+# Port for OpenCode server to listen on
+opencode_server_port: 4096
+
+# Bind address
+opencode_server_host: "0.0.0.0"
+
+# URL of the Ollama server (OpenAI-compatible endpoint)
+opencode_server_ollama_url: "http://localhost:11434/v1"
+
+# Default model to use
+opencode_server_model: "qwen2.5-coder:32b"
+
+# HTTP Basic Auth password (required for server mode)
+opencode_server_password: "opencode"
+
+# Enable and start the systemd service
+opencode_server_enabled: true

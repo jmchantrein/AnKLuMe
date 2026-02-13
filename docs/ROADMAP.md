@@ -764,7 +764,7 @@ the production boundary (PR merge).
 
 ---
 
-## Phase 16: Security Policy, Cross-Domain Communication, and Bootstrap
+## Phase 16: Security Policy, Cross-Domain Communication, and Bootstrap ✅ COMPLETE
 
 **Goal**: Enforce nesting security policy, enable selective cross-domain
 access, provide robust bootstrap/lifecycle tooling.
@@ -793,8 +793,9 @@ c) **infra/ directory support**:
 
 d) **AI tools domain**:
    - New `ai-tools` domain with 4 machines (ai-ollama, ai-openwebui, ai-lobechat, ai-opencode)
-   - New roles: `lobechat`, `opencode_server`
-   - Debian 12 workaround for Python 3.13 containers
+   - New roles: `lobechat` (LobeChat web UI), `opencode_server` (OpenCode headless server)
+   - Example `examples/ai-tools/` with full AI stack configuration
+   - `make apply-ai` target for deploying all AI roles
 
 e) **Bootstrap script** (`bootstrap.sh`):
    - `--prod` / `--dev` modes with Incus preseed auto-configuration
@@ -810,16 +811,18 @@ f) **Lifecycle tooling**:
    - Version marker for compatibility checking
 
 **Validation criteria**:
-- [ ] `security.privileged: true` on LXC rejected when `vm_nested=false`
-- [ ] `security.privileged: true` on LXC accepted when `vm_nested=true`
-- [ ] `--YOLO` bypasses privileged restriction (warning instead of error)
-- [ ] Context files created correctly at each nesting level
-- [ ] `network_policies` rules generate correct nftables accept lines
-- [ ] `infra/` directory produces identical output to equivalent `infra.yml`
-- [ ] `bootstrap.sh --prod` configures Incus with detected FS backend
-- [ ] `make flush` destroys infrastructure, preserves user files
-- [ ] `make upgrade` preserves user files, detects conflicts
-- [ ] `make import-infra` generates valid infra.yml from running Incus
+- [x] `security.privileged: true` on LXC rejected when `vm_nested=false`
+- [x] `security.privileged: true` on LXC accepted when `vm_nested=true`
+- [x] `--YOLO` bypasses privileged restriction (warning instead of error)
+- [x] Context files created correctly at each nesting level
+- [x] `network_policies` rules generate correct nftables accept lines
+- [x] `infra/` directory produces identical output to equivalent `infra.yml`
+- [x] `bootstrap.sh --prod` configures Incus with detected FS backend
+- [x] `make flush` destroys infrastructure, preserves user files
+- [x] `make upgrade` preserves user files, detects conflicts
+- [x] `make import-infra` generates valid infra.yml from running Incus
+- [x] `lobechat` and `opencode_server` roles created and integrated
+- [x] AI tools example validates with PSOT generator
 
 ---
 
@@ -843,8 +846,10 @@ f) **Lifecycle tooling**:
 - Phase 14: Speech-to-Text (STT) service (stt_server role)
 - Phase 15: Claude Code Agent Teams (autonomous dev + testing)
 
+- Phase 16: Security policy, network policies, bootstrap, AI tools domain
+
 **Next**:
-- Phase 16: Security Policy, Cross-Domain Communication, and Bootstrap
+- Phase 17+ (to be defined)
 
 **Deployed infrastructure**:
 

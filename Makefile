@@ -67,6 +67,9 @@ apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
 apply-stt: ## Apply STT role (Speaches + faster-whisper)
 	ansible-playbook site.yml --tags stt
 
+apply-ai: ## Apply AI tools roles (Ollama + WebUI + LobeChat + OpenCode)
+	ansible-playbook site.yml --tags llm,stt,lobechat,opencode
+
 # ── nftables Isolation ───────────────────────────────────
 nftables: ## Generate nftables isolation rules
 	ansible-playbook site.yml --tags nftables
@@ -195,7 +198,7 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit apply-images apply-llm apply-stt \
+        apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
