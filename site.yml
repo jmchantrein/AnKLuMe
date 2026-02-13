@@ -78,6 +78,18 @@
         - profiles
         - infra
 
+    - name: Infrastructure | Apply incus_images
+      ansible.builtin.include_role:
+        name: incus_images
+        apply:
+          tags:
+            - images
+            - infra
+      run_once: true
+      tags:
+        - images
+        - infra
+
     - name: Infrastructure | Apply incus_instances
       ansible.builtin.include_role:
         name: incus_instances

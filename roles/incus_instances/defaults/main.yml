@@ -15,6 +15,11 @@ incus_instances_lxc_delay: 2
 incus_instances_vm_retries: 60
 incus_instances_vm_delay: 2
 
+# Extended boot wait when image needs downloading first
+# LXC: 120 retries x 2s = 4 min; VM: 150 retries x 2s = 5 min
+incus_instances_lxc_retries_with_download: 120
+incus_instances_vm_retries_with_download: 150
+
 # VM agent wait configuration
 # After VM status is Running, wait for incus-agent to become responsive
 incus_instances_vm_agent_retries: 30
