@@ -40,3 +40,54 @@ def test_at_least_six_examples():
     """The examples directory must contain at least 6 examples."""
     examples = discover_examples()
     assert len(examples) >= 6, f"Expected >= 6 examples, found {len(examples)}"
+
+
+class TestExampleSubnetUniqueness:
+    """Verify each example has no internal subnet or name conflicts."""
+
+    @pytest.mark.parametrize(
+        "example_path",
+        discover_examples(),
+        ids=lambda p: p.parent.name,
+    )
+    def test_unique_subnet_ids(self, example_path):
+        """Each example has unique subnet_ids."""
+        infra = load_infra(str(example_path))
+        seen = {}
+        for dname, domain in (infra.get("domains") or {}).items():
+            sid = domain.get("subnet_id")
+            if sid is not None:
+                assert sid not in seen, (
+                    f"Duplicate subnet_id {sid} in {example_path}: "
+                    f"{dname} and {seen[sid]}"
+                )
+                seen[sid] = dname
+
+    @pytest.mark.parametrize(
+        "example_path",
+        discover_examples(),
+        ids=lambda p: p.parent.name,
+    )
+    def test_unique_machine_names(self, example_path):
+        """Each example has globally unique machine names."""
+        infra = load_infra(str(example_path))
+        seen = {}
+        for dname, domain in (infra.get("domains") or {}).items():
+            for mname in (domain.get("machines") or {}):
+                assert mname not in seen, (
+                    f"Duplicate machine name '{mname}' in {example_path}: "
+                    f"domain {dname} and {seen[mname]}"
+                )
+                seen[mname] = dname
+
+    @pytest.mark.parametrize(
+        "example_path",
+        discover_examples(),
+        ids=lambda p: p.parent.name,
+    )
+    def test_readme_is_non_empty(self, example_path):
+        """Each example's README.md is non-empty."""
+        readme = example_path.parent / "README.md"
+        if readme.exists():
+            content = readme.read_text().strip()
+            assert len(content) > 10, f"README.md too short in {example_path.parent}"
