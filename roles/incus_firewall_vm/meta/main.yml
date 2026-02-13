@@ -2,7 +2,7 @@
 galaxy_info:
   author: AnKLuMe
   description: Create multi-NIC profile for the firewall VM
-  license: Apache-2.0
+  license: AGPL-3.0
   min_ansible_version: "2.16"
   namespace: anklume
   role_name: incus_firewall_vm

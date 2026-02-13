@@ -180,7 +180,7 @@ Voir [examples/README.md](examples/README.md) pour plus de détails.
 
 ## Licence
 
-[Apache 2.0](LICENSE)
+[AGPL-3.0](LICENSE)
 
 ---
 
