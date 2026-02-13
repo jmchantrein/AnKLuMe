@@ -64,7 +64,7 @@ jobs:
           python-version: "3.13"
           cache: pip
       - name: Install dependencies
-        run: pip install pytest pyyaml
+        run: pip install pytest pyyaml hypothesis
       - name: Run pytest
         run: pytest tests/ -v
 
