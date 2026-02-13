@@ -112,6 +112,9 @@ global:
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
+  ai_access_policy: open            # "exclusive" or "open" (default: open)
+  ai_access_default: pro            # Domain with initial access (required if exclusive)
+  ai_vram_flush: true               # Flush GPU VRAM on domain switch (default: true)
 
 domains:
   <domain-name>:
@@ -165,6 +168,12 @@ from accidental deletion:
 - IPs: globally unique, must be within the correct subnet
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
+- `ai_access_policy`: must be `exclusive` or `open`
+- When `ai_access_policy: exclusive`:
+  - `ai_access_default` is required and must reference a known domain
+  - `ai_access_default` cannot be `ai-tools` itself
+  - An `ai-tools` domain must exist
+  - At most one `network_policy` can target `ai-tools` as destination
 
 ### Auto-creation of sys-firewall (firewall_mode: vm)
 
@@ -503,3 +512,32 @@ Managed by `bootstrap.sh` or manual host configuration:
 The AnKLuMe framework DOES NOT modify the host directly from Ansible.
 It drives Incus via the socket. Host-level operations use dedicated
 scripts run by the operator.
+
+## 14. Behavior matrix testing
+
+A YAML behavior matrix (`tests/behavior_matrix.yml`) maps every
+capability to expected reactions at three depth levels:
+
+- **Depth 1**: single-feature tests (e.g., create domain with valid subnet_id)
+- **Depth 2**: pairwise interactions (e.g., domain ephemeral + machine override)
+- **Depth 3**: three-way interactions (e.g., domain + VM + GPU + firewall_mode)
+
+Each cell has a unique ID (e.g., `DL-001`). Tests reference cells via
+`# Matrix: DL-001` comments. `scripts/matrix-coverage.py` scans tests and
+reports coverage. `scripts/ai-matrix-test.sh` generates tests for uncovered
+cells using an LLM backend.
+
+Hypothesis property-based tests (`tests/test_properties.py`) complement
+the matrix with randomized infra.yml structures testing generator invariants.
+
+## 15. Image sharing across nesting levels
+
+To avoid redundant image downloads in nested Incus environments:
+
+1. Host exports images: `make export-images` (via `incus_images` role with
+   `incus_images_export_for_nesting: true`)
+2. Export directory mounted read-only into nested VMs as a disk device
+3. Nested Incus imports from local files (`dev_test_runner` role)
+
+No network access required for nested image imports. Read-only mount
+preserves isolation.

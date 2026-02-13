@@ -854,6 +854,75 @@ c) **Nettoyage du ROADMAP** :
 
 ---
 
+## Phase 18 : Securite avancee, tests, onboarding et auto-amelioration -- COMPLETE
+
+**Objectif** : Cinq sous-phases independantes couvrant la securite,
+les tests, l'onboarding, l'auto-amelioration et le partage d'images.
+
+### Phase 18a : Acces exclusif au reseau AI-Tools avec purge VRAM
+
+**Objectif** : Un seul domaine a la fois peut acceder a ai-tools.
+`make ai-switch DOMAIN=<nom>` bascule atomiquement l'acces avec purge VRAM.
+
+**Livrables** :
+- `ai_access_policy: exclusive|open` dans la section `global:` d'infra.yml
+- Champs `ai_access_default` et `ai_vram_flush`
+- Validation et auto-enrichissement des politiques reseau dans le generateur
+- `scripts/ai-switch.sh` -- bascule atomique avec purge VRAM
+- `roles/incus_nftables/` etendu avec `incus_nftables_ai_override`
+- Cible Makefile `make ai-switch DOMAIN=<nom>`
+- Documentation `docs/ai-switch.md`
+- 11 nouveaux tests pytest
+
+### Phase 18b : Tests exhaustifs par LLM (matrice de comportement)
+
+**Objectif** : Matrice de comportement reliant chaque capacite aux reactions
+attendues, avec couverture par tests generes par LLM et tests Hypothesis.
+
+**Livrables** :
+- `tests/behavior_matrix.yml` -- 120 cellules, 11 capacites, 3 niveaux
+- `scripts/matrix-coverage.py` -- rapport de couverture par IDs de matrice
+- `scripts/ai-matrix-test.sh` -- generateur de tests par LLM
+- `tests/test_properties.py` -- 9 tests Hypothesis pour le generateur
+- Annotations `# Matrix: XX-NNN` sur 54 tests existants
+- Integration CI : job `matrix-coverage` informatif
+
+### Phase 18c : Guide d'onboarding interactif
+
+**Objectif** : `make guide` lance un tutoriel interactif etape par etape.
+
+**Livrables** :
+- `scripts/guide.sh` -- tutoriel en 9 etapes (Bash pur, couleurs ANSI)
+- Cibles Makefile `make guide`, `make quickstart`
+- `make help` restructure avec categorie "GETTING STARTED"
+- Documentation `docs/guide.md`
+
+### Phase 18d : Logiciel auto-ameliorant (bibliotheque d'experiences)
+
+**Objectif** : Bibliotheque d'experiences persistante alimentee depuis
+l'historique git, avec boucle d'amelioration pilotee par les specs.
+
+**Livrables** :
+- Repertoire `experiences/` (fixes/, patterns/, decisions/)
+- `scripts/mine-experiences.py` -- extraction de patterns depuis git
+- `scripts/ai-improve.sh` -- boucle d'amelioration pilotee par les specs
+- `scripts/ai-test-loop.sh` etendu avec recherche d'experiences avant LLM
+- Flag `--learn` pour capturer de nouveaux correctifs
+- Cibles `make mine-experiences` et `make ai-improve`
+
+### Phase 18e : Depot d'images partage entre niveaux d'imbrication
+
+**Objectif** : Pre-exporter les images OS depuis l'hote, monter dans
+les VMs Incus imbriquees pour eviter les telechargements redondants.
+
+**Livrables** :
+- `roles/incus_images/` etendu avec taches d'export + `incus_images_export_for_nesting`
+- `roles/dev_test_runner/` etendu avec import depuis images montees
+- Timeout intelligent (`incus_images_download_timeout: 600`)
+- Cible Makefile `make export-images`
+
+---
+
 ## Etat Actuel
 
 **Complete** :
@@ -875,9 +944,10 @@ c) **Nettoyage du ROADMAP** :
 - Phase 15 : Claude Code Agent Teams (dev + tests autonomes)
 - Phase 16 : Politique de securite, politiques reseau, bootstrap, domaine AI tools
 - Phase 17 : Pipeline CI/CD + couverture complete des tests Molecule (18/18 roles)
+- Phase 18 : Securite avancee, tests, onboarding et auto-amelioration (18a-18e)
 
 **Suivant** :
-- Phase 18+ (a definir)
+- Phase 19+ (a definir)
 
 **Infrastructure deployee** :
 
@@ -888,6 +958,6 @@ c) **Nettoyage du ROADMAP** :
 | pro | pro-dev | 10.100.2.10 | net-pro | En fonctionnement |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | En fonctionnement |
 
-**ADRs actifs** : ADR-001 a ADR-031
+**ADRs actifs** : ADR-001 a ADR-035
 
 **Problemes connus** : Aucun
