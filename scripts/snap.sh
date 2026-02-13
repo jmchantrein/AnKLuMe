@@ -6,6 +6,12 @@ set -euo pipefail
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+# ── Pre-flight: verify Incus daemon is accessible ────────────
+
+if ! incus project list --format csv >/dev/null 2>&1; then
+    die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+fi
+
 # ── Instance-to-project resolution ──────────────────────────
 
 resolve_instance() {

@@ -31,6 +31,10 @@ log() {
 
 # ── Verify prerequisites ────────────────────────────────────
 verify_runner() {
+    if ! incus project list --format csv >/dev/null 2>&1; then
+        die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+    fi
+
     if ! incus info "$RUNNER_NAME" --project "$RUNNER_PROJECT" &>/dev/null; then
         die "Runner '${RUNNER_NAME}' not found. Run 'make runner-create' and 'make agent-runner-setup' first."
     fi
