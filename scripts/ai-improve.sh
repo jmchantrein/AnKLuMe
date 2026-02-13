@@ -164,7 +164,14 @@ build_improve_context() {
             for exp_file in experiences/fixes/*.yml; do
                 [ -f "$exp_file" ] || continue
                 echo "--- $(basename "$exp_file") ---"
-                head -20 "$exp_file"
+                cat "$exp_file"
+            done
+        fi
+        if [ -d experiences/patterns ]; then
+            for exp_file in experiences/patterns/*.yml; do
+                [ -f "$exp_file" ] || continue
+                echo "--- $(basename "$exp_file") ---"
+                cat "$exp_file"
             done
         fi
     } > "$context_file"

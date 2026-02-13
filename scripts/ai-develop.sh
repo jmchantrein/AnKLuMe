@@ -41,6 +41,22 @@ build_project_context() {
             # Extract the "Current State" section
             sed -n '/^## Current State/,/^---/p' docs/ROADMAP.md 2>/dev/null || true
         fi
+        echo ""
+        echo "=== Experience library (known patterns and fixes) ==="
+        if [ -d experiences/fixes ]; then
+            for exp_file in experiences/fixes/*.yml; do
+                [ -f "$exp_file" ] || continue
+                echo "--- $(basename "$exp_file") ---"
+                cat "$exp_file"
+            done
+        fi
+        if [ -d experiences/patterns ]; then
+            for exp_file in experiences/patterns/*.yml; do
+                [ -f "$exp_file" ] || continue
+                echo "--- $(basename "$exp_file") ---"
+                cat "$exp_file"
+            done
+        fi
     } > "$context_file"
 }
 
@@ -320,6 +336,14 @@ main() {
     ai_log "Dry-run: ${AI_DRY_RUN}"
     ai_log "Success: ${success}"
     ai_log "Session log: ${_ai_log_file}"
+
+    # Auto-learn: mine experiences from successful development
+    if [ "$success" = "true" ]; then
+        ai_log "Mining experiences from development session..."
+        python3 "$SCRIPT_DIR/mine-experiences.py" --incremental 2>&1 | while IFS= read -r line; do
+            ai_log "  $line"
+        done
+    fi
 
     # Create PR if successful
     if [ "$success" = "true" ]; then
