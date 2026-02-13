@@ -1,0 +1,61 @@
+---
+# OpencodeServer | Install and configure OpenCode headless server
+#
+# Applied via the provisioning play (connection: community.general.incus).
+# Runs INSIDE the target container.
+#
+# OpenCode runs in headless server mode (`opencode serve`), exposing
+# an HTTP API on the configured port. Clients connect via the API
+# or using `opencode attach` from a local terminal.
+#
+# Input variables (from defaults, overridable in host_vars):
+#   - opencode_server_port (int): port to listen on
+#   - opencode_server_host (string): bind address
+#   - opencode_server_ollama_url (string): Ollama OpenAI-compatible URL
+#   - opencode_server_model (string): default model name
+#   - opencode_server_password (string): HTTP Basic Auth password
+
+- name: OpencodeServer | Install Node.js repository
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: OpencodeServer | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - git
+    state: present
+    update_cache: true
+
+- name: OpencodeServer | Install OpenCode
+  ansible.builtin.command:
+    cmd: npm install -g opencode-ai
+    creates: /usr/local/bin/opencode
+
+- name: OpencodeServer | Create config directory
+  ansible.builtin.file:
+    path: /root/.config/opencode
+    state: directory
+    mode: "0755"
+
+- name: OpencodeServer | Deploy OpenCode configuration
+  ansible.builtin.template:
+    src: opencode-config.json.j2
+    dest: /root/.config/opencode/config.json
+    mode: "0644"
+  notify: OpencodeServer | Restart OpenCode
+
+- name: OpencodeServer | Deploy systemd service
+  ansible.builtin.template:
+    src: opencode.service.j2
+    dest: /etc/systemd/system/opencode.service
+    mode: "0644"
+  notify: OpencodeServer | Restart OpenCode
+
+- name: OpencodeServer | Enable and start OpenCode service
+  ansible.builtin.systemd:
+    name: opencode
+    enabled: "{{ opencode_server_enabled }}"
+    state: started
+    daemon_reload: true
