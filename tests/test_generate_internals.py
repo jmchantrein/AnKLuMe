@@ -571,3 +571,133 @@ class TestValidationEdgeCases:
         generate(infra, tmp_path)
         content = (tmp_path / "host_vars" / "dhcp-host.yml").read_text()
         assert "dhcp-host" in content
+
+
+# ── extract_all_images edge cases ──────────────────────────────
+
+
+class TestExtractImagesEdgeCases:
+    """Edge cases for extract_all_images."""
+
+    def test_no_default_and_no_machine_image(self):
+        """Both default_os_image and machine os_image None — image not added to set."""
+        from generate import extract_all_images
+
+        infra = {
+            "project_name": "test",
+            "global": {},  # No default_os_image
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "m": {"type": "lxc"},  # No os_image
+                    },
+                },
+            },
+        }
+        images = extract_all_images(infra)
+        # No image should be in the result since both are None
+        assert images == []
+
+    def test_many_duplicates_deduped(self):
+        """50 machines same image, only 1 in result."""
+        from generate import extract_all_images
+
+        machines = {}
+        for i in range(50):
+            machines[f"m{i}"] = {"type": "lxc", "os_image": "images:debian/13"}
+        infra = {
+            "project_name": "test",
+            "global": {},
+            "domains": {
+                "d": {"subnet_id": 0, "machines": machines},
+            },
+        }
+        images = extract_all_images(infra)
+        assert len(images) == 1
+        assert images[0] == "images:debian/13"
+
+
+# ── Template rendering edge cases ──────────────────────────────
+
+
+class TestTemplateEdgeCases:
+    """Edge cases for template rendering (generate output)."""
+
+    def test_profiles_null_not_in_group_vars(self, tmp_path):
+        """profiles: null is not output in group_vars."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "profiles": None,
+                    "machines": {
+                        "m": {"type": "lxc", "ip": "10.100.0.10"},
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "d.yml").read_text()
+        # profiles: null should not appear (the code checks `if domain.get("profiles"):`)
+        assert "incus_profiles" not in content
+
+    def test_empty_roles_list(self, tmp_path):
+        """Machine with roles: [] generates instance_roles: [] (empty list is falsy but not None)."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "m": {"type": "lxc", "ip": "10.100.0.10", "roles": []},
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "host_vars" / "m.yml").read_text()
+        # Empty list [] is falsy, so `{k: v ... if v is not None}` keeps it,
+        # but then `[]` is truthy for `is not None` check. Let's see what happens.
+        # Actually, the generate code filters by `if v is not None`, so [] passes.
+        # But then empty list in YAML is `instance_roles: []`
+        assert "instance_roles" in content
+
+    def test_null_values_omitted_in_host_vars(self, tmp_path):
+        """description: null etc. omitted from host_vars output."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "m": {
+                            "type": "lxc",
+                            "ip": "10.100.0.10",
+                            "description": None,
+                            "gpu": None,
+                            "profiles": None,
+                            "config": None,
+                            "devices": None,
+                            "storage_volumes": None,
+                            "roles": None,
+                        },
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "host_vars" / "m.yml").read_text()
+        # None values should be filtered out by `if v is not None`
+        # But description defaults to "" via m.get("description", ""), so "" is not None
+        # gpu=None gets passed through as m.get("gpu") which is None -> filtered
+        assert "instance_gpu" not in content
+        assert "instance_profiles" not in content
+        assert "instance_config" not in content
+        assert "instance_devices" not in content
+        assert "instance_storage_volumes" not in content
+        assert "instance_roles" not in content
