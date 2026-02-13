@@ -50,7 +50,7 @@
           - "'OLLAMA_HOST=0.0.0.0:11434' in verify_override_content.stdout"
         fail_msg: "Ollama listen address not configured correctly"
 
-    - name: Verify | Check Ollama service is enabled
+    - name: Verify | Check Ollama service is enabled  # noqa: command-instead-of-module
       ansible.builtin.command:
         cmd: systemctl is-enabled ollama
       register: verify_service_enabled

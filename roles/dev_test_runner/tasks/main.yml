@@ -56,7 +56,7 @@
   changed_when: false
   failed_when: false
 
-- name: DevTestRunner | Initialize nested Incus with preseed
+- name: DevTestRunner | Initialize nested Incus with preseed  # noqa: risky-shell-pipe
   ansible.builtin.shell:
     cmd: |
       cat <<'PRESEED' | incus admin init --preseed

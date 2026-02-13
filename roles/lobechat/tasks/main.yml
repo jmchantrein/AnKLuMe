@@ -10,7 +10,7 @@
 #   - lobechat_node_version (int): Node.js major version
 #   - lobechat_version (string): git branch or tag to deploy
 
-- name: LobeChat | Install Node.js repository
+- name: LobeChat | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell:
     cmd: >-
       curl -fsSL https://deb.nodesource.com/setup_{{ lobechat_node_version }}.x
@@ -38,14 +38,14 @@
     depth: 1
   register: lobechat_git_clone
 
-- name: LobeChat | Install dependencies
+- name: LobeChat | Install dependencies  # noqa: no-handler
   ansible.builtin.command:
     cmd: pnpm install --frozen-lockfile
     chdir: /opt/lobechat
   when: lobechat_git_clone is changed
   changed_when: true
 
-- name: LobeChat | Build application
+- name: LobeChat | Build application  # noqa: no-handler
   ansible.builtin.command:
     cmd: pnpm build
     chdir: /opt/lobechat

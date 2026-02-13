@@ -46,7 +46,7 @@
           - "'OLLAMA_BASE_URL=http://localhost:11434' in verify_service_content.stdout"
         fail_msg: "open-webui service does not have correct Ollama URL"
 
-    - name: Verify | Check service is enabled
+    - name: Verify | Check service is enabled  # noqa: command-instead-of-module
       ansible.builtin.command:
         cmd: systemctl is-enabled open-webui
       register: verify_service_enabled

@@ -15,7 +15,7 @@
 #   - opencode_server_model (string): default model name
 #   - opencode_server_password (string): HTTP Basic Auth password
 
-- name: OpencodeServer | Install Node.js repository
+- name: OpencodeServer | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell:
     cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     creates: /etc/apt/sources.list.d/nodesource.list

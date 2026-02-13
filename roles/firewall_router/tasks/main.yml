@@ -18,7 +18,7 @@
     mode: "0644"
   register: firewall_router_sysctl
 
-- name: FirewallRouter | Apply sysctl settings
+- name: FirewallRouter | Apply sysctl settings  # noqa: no-handler
   ansible.builtin.command:
     cmd: sysctl -p /etc/sysctl.d/99-ip-forward.conf
   when: firewall_router_sysctl is changed

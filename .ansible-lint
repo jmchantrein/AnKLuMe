@@ -4,6 +4,7 @@ profile: production
 exclude_paths:
   - .claude/
   - tests/
+  - molecule/shared/  # Template files, not real playbooks
 
 skip_list:
   # Input variables (incus_project, incus_network, instance_name, etc.)
