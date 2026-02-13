@@ -10,7 +10,7 @@ validation.
 |---------|---------|----------|-----|-------------|
 | [student-sysadmin](student-sysadmin/) | 2 | 3 | No | Simple admin + lab for sysadmin students |
 | [teacher-lab](teacher-lab/) | 4 | 7 | No | Admin + 3 student domains for classroom labs |
-| [pro-workstation](pro-workstation/) | 4 | 5 | Yes | Compartmentalized workstation with LLM homelab |
+| [pro-workstation](pro-workstation/) | 4 | 5 | Yes | Compartmentalized workstation with AI homelab (LLM + STT) |
 | [sandbox-isolation](sandbox-isolation/) | 2 | 3 | No | Maximum isolation for untrusted software |
 | [llm-supervisor](llm-supervisor/) | 4 | 5 | Yes | 2 LLMs + supervisor for multi-model orchestration |
 | [developer](developer/) | 2 | 3 | No | AnKLuMe dev setup with Incus-in-Incus testing |

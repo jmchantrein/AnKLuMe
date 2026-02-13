@@ -7,7 +7,7 @@
 
 # ── Defaults ─────────────────────────────────────────────────
 AI_MODE="${ANKLUME_AI_MODE:-none}"
-AI_OLLAMA_URL="${ANKLUME_AI_OLLAMA_URL:-http://homelab-llm:11434}"
+AI_OLLAMA_URL="${ANKLUME_AI_OLLAMA_URL:-http://homelab-ai:11434}"
 AI_OLLAMA_MODEL="${ANKLUME_AI_OLLAMA_MODEL:-qwen2.5-coder:32b}"
 AI_ANTHROPIC_KEY="${ANTHROPIC_API_KEY:-}"
 AI_MAX_RETRIES="${ANKLUME_AI_MAX_RETRIES:-3}"

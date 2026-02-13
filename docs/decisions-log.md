@@ -289,19 +289,28 @@ the admin interface.
 **Consequence**: Firewall rules can reference `eth0` as the admin interface
 without configuration. Adding new domains automatically adds new NICs.
 
-### D-020: firewall_mode validation in PSOT generator
+### D-020: firewall_mode validation and auto-creation in PSOT generator
 
 **Context**: infra.yml supports `global.firewall_mode: host|vm`. Invalid
 values should be caught early by `make sync`, not at deployment time.
+Originally, the generator only validated the value and left sys-firewall
+creation to the operator. This was error-prone: forgetting to declare
+sys-firewall led to a valid `make sync` but a broken `make apply`.
 
-**Decision**: Add `firewall_mode` validation to `validate()` in generate.py.
-Valid values: `host` (default) and `vm`. Invalid values produce a
-validation error. The generator does not enforce that a `sys-firewall`
-machine exists when `vm` mode is set — that is the operator's responsibility.
+**Decision**: Two-part approach:
+1. **Validation** (`validate()`): `firewall_mode` must be `host` or `vm`.
+   Invalid values produce a validation error.
+2. **Enrichment** (`enrich_infra()`): When `firewall_mode: vm` and no
+   `sys-firewall` machine exists in any domain, auto-inject one into the
+   admin domain with standard config (type: vm, ip: .253, 2 vCPU, 2 GiB,
+   roles: base_system + firewall_router). If the admin domain does not
+   exist, error and exit. If the user already declared sys-firewall,
+   their definition is preserved (no override).
 
-**Rationale**: KISS — the generator validates values, not deployment topology.
-Checking for sys-firewall existence would couple the generator to role-level
-concerns.
+**Rationale**: The generator validates values AND ensures a usable topology.
+Auto-creation is a safe default: it can always be overridden by declaring
+sys-firewall explicitly. Supersedes the original KISS-only rationale —
+a working default is more KISS than a manual step that users forget.
 
 ### D-021: Defense in depth — host + VM modes can coexist
 
@@ -396,18 +405,26 @@ Docker or complex orchestration needed.
 faster-whisper and the API server. OpenAI compatibility means no
 custom integration code for Open WebUI.
 
-### D-027: GPU shared mode required for STT + Ollama
+### D-027: Single container for STT + Ollama (revised)
 
 **Context**: STT and Ollama both need GPU access for acceptable
-performance. They run in separate containers.
+performance. Originally they ran in separate containers, requiring
+`gpu_policy: shared` to allow two GPU instances.
 
-**Decision**: Document that `gpu_policy: shared` is required when both
-STT and Ollama containers have GPU access. The generator already
-validates this (Phase 10, ADR-018). Recommend `int8_float16`
-quantization for STT to reduce VRAM pressure.
+**Decision** (revised): Co-locate Ollama and Speaches STT in a single
+container (e.g., `homelab-ai`). Both services run as independent systemd
+units sharing the GPU within the same process namespace. This avoids
+the need for `gpu_policy: shared` and keeps the default exclusive policy.
 
-**Consequence**: Users explicitly opt into shared GPU. VRAM competition
-is a known trade-off documented in `docs/stt-service.md`.
+**Rationale**: Shared GPU mode exposes cross-container VRAM access risks
+(ADR-018). A single container avoids this entirely while keeping the same
+functionality. The `ollama_server` and `stt_server` roles are independent
+and work correctly when applied to the same machine.
+
+**Consequence**: Examples and docs updated to use `*-ai` naming pattern
+(e.g., `pw-ai`, `homelab-ai`) for the merged container. `gpu_policy:
+shared` is only needed for truly separate GPU workloads (e.g.,
+`llm-supervisor` with two Ollama instances in different domains).
 
 ### D-028: Model downloaded on first request
 
@@ -469,5 +486,146 @@ a JSONL file in `logs/`. The hook is optional but enabled by default.
 
 **Rationale**: Accountability — full trace of what the agents did.
 The JSONL format allows easy filtering and analysis.
+
+---
+
+## Image Management Enhancements
+
+### D-032: Smart timeout and image pre-download
+
+**Context**: When an OS image is not cached locally, `incus launch`
+must download it first (potentially 200-800 MB). The existing boot
+wait timeouts (LXC 30x2s=60s, VM 60x2s=120s) are calibrated for
+cached images and may expire during first-time downloads on slow
+networks, causing spurious deployment failures.
+
+**Decision**: Two complementary features:
+
+1. **Smart timeout in incus_instances**: Before launching, the role
+   checks `incus image list --format json` for locally cached images.
+   If `instance_os_image` is not cached, extended timeouts are used
+   (LXC 120x2s=4min, VM 150x2s=5min) instead of the normal values.
+   New defaults: `incus_instances_lxc_retries_with_download: 120`,
+   `incus_instances_vm_retries_with_download: 150`.
+
+2. **Image pre-download role (incus_images)**: A new role that runs
+   BEFORE incus_instances (in site.yml). The PSOT generator collects
+   all unique image references via `extract_all_images()` and writes
+   them to `incus_all_images` in `group_vars/all.yml`. The role
+   compares this list against the local cache and pre-downloads
+   missing images via `incus image copy images:<name> local:`.
+   Runs once (`run_once: true`) since the image cache is host-global.
+
+**Rationale**: The pre-download role handles the common case (bulk
+download before any instance creation). The smart timeout provides a
+safety net for edge cases (image evicted between pre-download and
+launch, or running without the pre-download role).
+
+---
+
+## Generator Enhancements
+
+### D-033: enrich_infra() — auto-creation of sys-firewall VM
+
+**Context**: When `firewall_mode: vm` is set, the operator must also
+declare a `sys-firewall` machine in the admin domain with the correct
+type, IP, config, and roles. Forgetting any of these leads to a broken
+deployment that passes `make sync` but fails at `make apply`.
+
+**Decision**: Add `enrich_infra(infra)` function called in `main()`
+after `validate()` but before `generate()`. When `firewall_mode == "vm"`
+and no machine named `sys-firewall` exists in any domain:
+- Require that an `admin` domain exists (exit with error if not)
+- Auto-inject `sys-firewall` into the admin domain with:
+  - name: `sys-firewall`
+  - type: `vm`
+  - ip: `{base_subnet}.{admin_subnet_id}.253`
+  - config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
+  - roles: `[base_system, firewall_router]`
+  - description: `"Centralized firewall VM (auto-created by generator)"`
+  - ephemeral: `false`
+- Print informational message to stderr
+
+If the user already declared `sys-firewall` in any domain, their
+definition is preserved and no auto-creation occurs.
+
+**Rationale**: Convention over configuration. The 80% case is a standard
+sys-firewall in the admin domain. Power users who need a different config
+declare it explicitly and the generator respects their choice. Tested
+with 5 dedicated pytest cases.
+
+---
+
+## Network Isolation Hardening
+
+### D-034: Remove admin bridge accept rule from nftables
+
+**Context**: The `incus_nftables` role (Phase 8) and the `firewall_router`
+role (Phase 11) both contained a special rule allowing traffic from the
+admin bridge to all other bridges (`iifname "net-admin" accept`). This
+rule was added under the assumption that the admin container needs
+network-level access to other domains for Ansible provisioning.
+
+However, the admin container communicates with all instances via the
+Incus socket (ADR-004, ADR-007), not the network. Ansible uses the
+`community.general.incus` connection plugin, which calls `incus exec`
+over the Unix socket. No IP traffic crosses bridges for provisioning
+or monitoring. The admin accept rule was never triggered and was
+misleading, suggesting a network-level privilege that does not exist.
+
+**Decision**: Remove the admin bridge accept rule from both nftables
+templates. All domains (including admin) are now treated equally for
+network isolation:
+
+- `incus_nftables` template: removed `iifname "{{ incus_nftables_admin_bridge }}" accept`.
+  The drop rule now covers all inter-bridge traffic, not just non-admin.
+- `firewall_router` template: removed the admin-to-other accept rule.
+  All inter-domain forwarding is dropped, regardless of source domain.
+- Removed `incus_nftables_admin_bridge` variable (no longer used).
+- Removed `firewall_router_admin_bridge` variable (no longer used).
+- Removed SSH-from-admin rule in firewall VM input chain (admin uses
+  `incus exec`, not SSH).
+- Updated Molecule tests: the verify playbook now asserts the admin
+  accept rule is absent, not present.
+
+**Consequence**: Stronger isolation. The admin domain is no longer a
+special case in the firewall rules. `ping` from admin to other domains
+now fails (expected). All management traffic flows through the Incus
+socket, which is the correct and intended path.
+
+---
+
+## AI Container Consolidation
+
+### D-035: Merge homelab-llm and homelab-stt into homelab-ai
+
+**Context**: Phase 14 introduced the `stt_server` role with a separate
+`homelab-stt` container alongside `homelab-llm`. This required
+`gpu_policy: shared` so both containers could access the GPU. Shared
+GPU mode carries security risks (cross-container VRAM access, no
+isolation on consumer GPUs per ADR-018).
+
+**Decision**: Merge both GPU workloads into a single `homelab-ai`
+container with both `ollama_server` and `stt_server` roles. Changes:
+
+1. `open_webui` role: added `open_webui_stt_url` variable to
+   conditionally inject STT environment variables into the systemd
+   service (`AUDIO_STT_ENGINE=openai`,
+   `AUDIO_STT_OPENAI_API_BASE_URL`).
+2. `pro-workstation` example: `pw-llm` renamed to `pw-ai` with both
+   `ollama_server` and `stt_server` roles. GPU policy stays exclusive.
+3. Docs updated: `stt-service.md` architecture diagram shows single
+   container with two systemd services. `gpu-advanced.md` notes
+   the merge pattern. VRAM sharing section added.
+
+**Rationale**: The `ollama_server` and `stt_server` roles are
+independent systemd services that coexist without conflict. Running
+them in the same container simplifies the deployment (one GPU
+container, exclusive policy) while preserving the same functionality.
+Neither role was modified -- they already work independently.
+
+**Consequence**: Default `gpu_policy: exclusive` works for the common
+LLM + STT use case. `gpu_policy: shared` is only needed for truly
+separate GPU instances (e.g., multi-LLM setups like `llm-supervisor`).
 
 ---

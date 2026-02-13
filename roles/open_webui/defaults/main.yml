@@ -7,3 +7,8 @@ open_webui_port: 3000
 
 # URL of the Ollama server (override in host_vars to point to the GPU container)
 open_webui_ollama_url: "http://localhost:11434"
+
+# URL of the STT server for speech-to-text (empty = disabled)
+# When set, Open WebUI is configured with AUDIO_STT_ENGINE=openai
+# pointing to the Speaches API (OpenAI-compatible endpoint).
+open_webui_stt_url: ""

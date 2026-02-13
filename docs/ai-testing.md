@@ -60,7 +60,7 @@ make ai-develop TASK="Add a monitoring role" AI_MODE=claude-code DRY_RUN=false
 | `ANKLUME_AI_DRY_RUN` | `true` | Show fixes without applying |
 | `ANKLUME_AI_AUTO_PR` | `false` | Auto-create PRs on success |
 | `ANKLUME_AI_MAX_RETRIES` | `3` | Max fix attempts per role |
-| `ANKLUME_AI_OLLAMA_URL` | `http://homelab-llm:11434` | Ollama API URL |
+| `ANKLUME_AI_OLLAMA_URL` | `http://homelab-ai:11434` | Ollama API URL |
 | `ANKLUME_AI_OLLAMA_MODEL` | `qwen2.5-coder:32b` | Ollama model |
 | `ANTHROPIC_API_KEY` | — | API key for remote mode |
 | `ANKLUME_AI_LOG_DIR` | `logs` | Session log directory |
@@ -72,7 +72,7 @@ Create `anklume.conf.yml` at the project root:
 ```yaml
 ai:
   mode: none
-  ollama_url: "http://homelab-llm:11434"
+  ollama_url: "http://homelab-ai:11434"
   ollama_model: "qwen2.5-coder:32b"
   anthropic_api_key: ""
   max_retries: 3
@@ -109,11 +109,11 @@ Requires an Ollama instance accessible from the admin container:
 
 ```bash
 # Verify connectivity
-curl http://homelab-llm:11434/api/tags
+curl http://homelab-ai:11434/api/tags
 
 # Set mode
 export ANKLUME_AI_MODE=local
-export ANKLUME_AI_OLLAMA_URL=http://homelab-llm:11434
+export ANKLUME_AI_OLLAMA_URL=http://homelab-ai:11434
 export ANKLUME_AI_OLLAMA_MODEL=qwen2.5-coder:32b
 ```
 
@@ -218,7 +218,7 @@ to a valid backend.
 Verify the Ollama URL is reachable from where you run `make ai-test`:
 
 ```bash
-curl http://homelab-llm:11434/api/tags
+curl http://homelab-ai:11434/api/tags
 ```
 
 If running inside the admin container, ensure the homelab domain is

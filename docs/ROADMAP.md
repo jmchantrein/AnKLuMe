@@ -177,15 +177,15 @@ network isolation.
 
 **Deliverables**:
 - `roles/incus_nftables/` — inter-bridge isolation rules
-- Rules: DROP all traffic between net-X and net-Y by default
-- Exception: admin → all (for Ansible and monitoring)
+- Rules: DROP all inter-bridge traffic (admin included — D-034)
+- Admin communicates via Incus socket, not the network
 - Integration in site.yml (tag `nftables`)
 - `scripts/deploy-nftables.sh` — host-side deployment script
 - Documentation `docs/network-isolation.md`
 
 **Validation criteria**:
-- [x] Traffic between non-admin domains blocked (e.g., perso ↛ pro)
-- [x] Traffic from admin to all domains allowed (Ansible, monitoring)
+- [x] All inter-bridge traffic blocked (e.g., perso ↛ pro, admin ↛ pro)
+- [x] Admin manages instances via Incus socket (not network — D-034)
 - [x] NAT to Internet functional from all bridges
 - [x] Idempotent (nftables rules applied only once)
 

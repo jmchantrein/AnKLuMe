@@ -28,10 +28,11 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      homelab-llm:
+      homelab-ai:
         type: lxc
         gpu: true
         profiles: [default, nvidia-compute]
+        roles: [base_system, ollama_server, stt_server]
 ```
 
 If you add a second GPU machine in exclusive mode, `make sync` will fail:
@@ -39,7 +40,7 @@ If you add a second GPU machine in exclusive mode, `make sync` will fail:
 ```
 Validation errors:
   - GPU policy is 'exclusive' but 2 instances have GPU access:
-    homelab-llm, work-gpu. Set global.gpu_policy: shared to allow this.
+    homelab-ai, work-gpu. Set global.gpu_policy: shared to allow this.
 ```
 
 ### Shared mode
@@ -56,13 +57,24 @@ global:
 
 ```
 WARNING: GPU policy is 'shared': 2 instances share GPU access
-(homelab-llm, work-gpu). No VRAM isolation on consumer GPUs.
+(llm-alpha-server, llm-beta-server). No VRAM isolation on consumer GPUs.
 ```
 
 **Risks of shared GPU access:**
 - No VRAM isolation on consumer GPUs (no SR-IOV)
 - Shared driver state could cause crashes under load
 - Any container with GPU access can read GPU memory
+
+### Merging GPU workloads to avoid shared mode
+
+If your GPU workloads can coexist in a single container (e.g., Ollama
+and Speaches STT), merging them into one machine allows you to keep
+the default `gpu_policy: exclusive`. Both services run as separate
+systemd units and share VRAM within the same process namespace, without
+the security and stability risks of cross-container GPU sharing.
+
+See [stt-service.md](stt-service.md) for the recommended single-container
+architecture for LLM + STT.
 
 ## GPU in LXC containers
 
@@ -90,7 +102,7 @@ machines:
     type: lxc
     gpu: true
     profiles: [default, nvidia-compute]
-    roles: [base_system, ollama_server]
+    roles: [base_system, ollama_server, stt_server]
 ```
 
 ### How it works
@@ -103,7 +115,7 @@ machines:
 ### Verification
 
 ```bash
-incus exec homelab-llm --project homelab -- nvidia-smi
+incus exec homelab-ai --project homelab -- nvidia-smi
 ```
 
 ## GPU in KVM VMs

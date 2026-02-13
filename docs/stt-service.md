@@ -6,39 +6,47 @@ WebUI for voice input and with any client supporting the OpenAI STT API.
 
 ## Architecture
 
+The recommended architecture co-locates Ollama and Speaches in a single
+container (`homelab-ai`), sharing the GPU within one process namespace.
+This avoids the need for `gpu_policy: shared` and keeps the default
+exclusive GPU policy.
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ homelab domain (net-homelab, 10.100.3.0/24)         │
 │                                                      │
-│  ┌──────────────┐    ┌──────────────────────┐       │
-│  │ homelab-stt   │    │ homelab-llm          │       │
-│  │ GPU (shared)  │    │ GPU (shared)         │       │
-│  │               │    │                      │       │
-│  │ faster-whisper│    │ Ollama               │       │
-│  │ + Speaches    │    │ :11434               │       │
-│  │ :8000         │    │                      │       │
-│  └──────┬───────┘    └──────────────────────┘       │
-│         │                      ▲                     │
-│         │    /v1/audio/        │  /api/generate      │
-│         │    transcriptions    │                     │
-│         ▼                      │                     │
-│  ┌──────────────────────────────┐                   │
-│  │ homelab-webui                │                   │
-│  │ Open WebUI :3000             │                   │
-│  │ STT → homelab-stt:8000      │                   │
-│  │ LLM → homelab-llm:11434     │                   │
-│  └──────────────────────────────┘                   │
+│  ┌────────────────────────────────────┐             │
+│  │ homelab-ai                         │             │
+│  │ GPU (exclusive)                    │             │
+│  │                                    │             │
+│  │  ┌─────────────┐ ┌──────────────┐ │             │
+│  │  │ Ollama      │ │ Speaches     │ │             │
+│  │  │ :11434      │ │ :8000        │ │             │
+│  │  │ (systemd)   │ │ (systemd)    │ │             │
+│  │  └─────────────┘ └──────────────┘ │             │
+│  │       VRAM shared within container │             │
+│  └──────────┬──────────────┬─────────┘             │
+│             │              │                        │
+│  /api/generate    /v1/audio/transcriptions          │
+│             │              │                        │
+│             ▼              ▼                        │
+│  ┌──────────────────────────────────┐              │
+│  │ homelab-webui                    │              │
+│  │ Open WebUI :3000                 │              │
+│  │ LLM → homelab-ai:11434          │              │
+│  │ STT → homelab-ai:8000           │              │
+│  └──────────────────────────────────┘              │
 └─────────────────────────────────────────────────────┘
 ```
 
 ## Quick start
 
-### 1. Declare the STT instance in infra.yml
+### 1. Declare the AI instance in infra.yml
 
 ```yaml
 global:
   base_subnet: "10.100"
-  gpu_policy: shared  # Required if STT and Ollama share the GPU
+  # gpu_policy: exclusive  # Default — one container owns the GPU
 
 domains:
   homelab:
@@ -50,19 +58,13 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      homelab-llm:
+      homelab-ai:
+        description: "AI server — Ollama + Speaches STT"
         type: lxc
         ip: "10.100.3.10"
         gpu: true
         profiles: [default, nvidia-compute]
-        roles: [base_system, ollama_server]
-      homelab-stt:
-        description: "Speech-to-text server"
-        type: lxc
-        ip: "10.100.3.20"
-        gpu: true
-        profiles: [default, nvidia-compute]
-        roles: [base_system, stt_server]
+        roles: [base_system, ollama_server, stt_server]
       homelab-webui:
         type: lxc
         ip: "10.100.3.30"
@@ -80,12 +82,16 @@ make apply-stt     # STT role only
 
 ### 3. Configure Open WebUI
 
-In Open WebUI admin settings, set the STT endpoint:
+Set the STT endpoint in `host_vars/homelab-webui.yml`:
 
+```yaml
+open_webui_ollama_url: "http://10.100.3.10:11434"
+open_webui_stt_url: "http://10.100.3.10:8000/v1"
 ```
-STT Engine: OpenAI
-STT API URL: http://homelab-stt:8000/v1/audio/transcriptions
-```
+
+The `open_webui_stt_url` variable automatically configures Open WebUI
+with `AUDIO_STT_ENGINE=openai` and the correct API base URL. Leave it
+empty (the default) to disable STT integration.
 
 ## Engine and model
 
@@ -133,7 +139,7 @@ model (`medium`, `small`).
 If VRAM or latency is a concern:
 
 ```yaml
-# In host_vars/homelab-stt.yml (outside managed section)
+# In host_vars/homelab-ai.yml (outside managed section)
 stt_server_model: "medium"
 stt_server_quantization: "int8_float16"
 ```
@@ -147,31 +153,44 @@ stt_server_quantization: "int8_float16"
 | large-v3-turbo | 809M | ~6 GB | Excellent |
 | large-v3 | 1.55B | ~10 GB | Best |
 
-## Shared GPU with Ollama
+## VRAM sharing within a single container
 
-When both Ollama and the STT server use the same GPU:
+When Ollama and Speaches run in the same container, they share the GPU
+as two independent processes. The NVIDIA driver handles VRAM allocation
+at the process level:
 
-1. Set `gpu_policy: shared` in infra.yml global section
-2. Both containers get the `nvidia-compute` profile
-3. VRAM is shared — concurrent inference competes for memory
+- Ollama loads LLM weights into VRAM on demand (and can offload)
+- Speaches loads the Whisper model into VRAM on first transcription
+- Both processes compete for VRAM at the driver level
+- No container-level isolation overhead (no `gpu_policy: shared` needed)
 
 **Recommendations**:
-- Use `int8_float16` quantization for STT to reduce VRAM
+- Use `int8_float16` quantization for STT to reduce VRAM pressure
 - Avoid running large LLM inference and transcription simultaneously
-- Monitor VRAM usage: `nvidia-smi` on the host
+  on GPUs with less than 16 GB VRAM
+- Monitor VRAM usage: `nvidia-smi` inside the container or on the host
+- Ollama automatically offloads model layers to CPU when VRAM is full
+
+This is simpler and more efficient than the previous two-container
+approach, which required `gpu_policy: shared` and incurred Incus GPU
+device overhead for each container.
 
 ## Verification
 
 ```bash
 # Check service status
-incus exec homelab-stt --project homelab -- systemctl status speaches
+incus exec homelab-ai --project homelab -- systemctl status speaches
 
 # Test the API endpoint
-incus exec homelab-stt --project homelab -- \
+incus exec homelab-ai --project homelab -- \
   curl -s http://localhost:8000/health
 
+# Verify both services are running
+incus exec homelab-ai --project homelab -- systemctl status ollama
+incus exec homelab-ai --project homelab -- systemctl status speaches
+
 # Test transcription (from any container with network access)
-curl -X POST http://homelab-stt:8000/v1/audio/transcriptions \
+curl -X POST http://homelab-ai:8000/v1/audio/transcriptions \
   -H "Content-Type: multipart/form-data" \
   -F "file=@audio.wav" \
   -F "model=large-v3-turbo"
@@ -209,7 +228,7 @@ If both Ollama and STT run out of VRAM:
 nvidia-smi
 
 # Switch to smaller model or quantization
-# Edit host_vars/homelab-stt.yml:
+# Edit host_vars/homelab-ai.yml:
 stt_server_model: "small"
 stt_server_quantization: "int8"
 
@@ -221,8 +240,8 @@ make apply-stt
 
 ```bash
 # Check logs
-incus exec homelab-stt --project homelab -- journalctl -u speaches -f
+incus exec homelab-ai --project homelab -- journalctl -u speaches -f
 
 # Verify ffmpeg is installed (required dependency)
-incus exec homelab-stt --project homelab -- ffmpeg -version
+incus exec homelab-ai --project homelab -- ffmpeg -version
 ```

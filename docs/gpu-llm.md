@@ -78,7 +78,7 @@ To auto-pull a model during provisioning, set `ollama_default_model`
 in the host_vars for your LLM container (outside the managed section):
 
 ```yaml
-# host_vars/homelab-llm.yml (add below the managed section)
+# host_vars/homelab-ai.yml (add below the managed section)
 ollama_default_model: "llama3.2:3b"
 ```
 
@@ -118,7 +118,7 @@ make apply-llm
 ### Check GPU inside the container
 
 ```bash
-incus exec homelab-llm --project homelab -- nvidia-smi
+incus exec homelab-ai --project homelab -- nvidia-smi
 ```
 
 You should see the same GPU as on the host.
@@ -126,7 +126,7 @@ You should see the same GPU as on the host.
 ### Check Ollama
 
 ```bash
-incus exec homelab-llm --project homelab -- curl -s http://localhost:11434/api/tags
+incus exec homelab-ai --project homelab -- curl -s http://localhost:11434/api/tags
 ```
 
 This should return a JSON response with available models.
@@ -143,7 +143,7 @@ Open WebUI should respond with HTML. Access it from a browser at
 ### Test inference
 
 ```bash
-incus exec homelab-llm --project homelab -- ollama run llama3.2:3b "Hello, world!"
+incus exec homelab-ai --project homelab -- ollama run llama3.2:3b "Hello, world!"
 ```
 
 ## Storage volumes for models
