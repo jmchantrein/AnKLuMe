@@ -1,0 +1,98 @@
+---
+- name: Verify stt_server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Check service file exists
+      ansible.builtin.stat:
+        path: /tmp/anklume-test/stt/speaches.service
+      register: verify_service_file
+
+    - name: Verify | Service file exists
+      ansible.builtin.assert:
+        that:
+          - verify_service_file.stat.exists
+          - verify_service_file.stat.mode == '0644'
+        fail_msg: "speaches.service not found or wrong permissions"
+
+    - name: Verify | Read service file content
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/stt/speaches.service
+      register: verify_service_raw
+
+    - name: Verify | Decode service content
+      ansible.builtin.set_fact:
+        verify_service: "{{ verify_service_raw.content | b64decode }}"
+
+    - name: Verify | Contains ExecStart with speaches
+      ansible.builtin.assert:
+        that:
+          - "'ExecStart=/usr/local/bin/speaches' in verify_service"
+        fail_msg: "Missing ExecStart with speaches binary"
+
+    - name: Verify | Contains correct host and port
+      ansible.builtin.assert:
+        that:
+          - "'--host 0.0.0.0' in verify_service"
+          - "'--port 8000' in verify_service"
+        fail_msg: "Missing host/port configuration"
+
+    - name: Verify | Contains model configuration
+      ansible.builtin.assert:
+        that:
+          - "'WHISPER__MODEL=large-v3-turbo' in verify_service"
+        fail_msg: "Missing Whisper model configuration"
+
+    - name: Verify | Contains quantization configuration
+      ansible.builtin.assert:
+        that:
+          - "'WHISPER__COMPUTE_TYPE=float16' in verify_service"
+        fail_msg: "Missing quantization configuration"
+
+    - name: Verify | Default template has no language setting
+      ansible.builtin.assert:
+        that:
+          - "'WHISPER__LANGUAGE' not in verify_service"
+        fail_msg: "Default template should not include WHISPER__LANGUAGE"
+
+    - name: Verify | Read service file with language
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/stt/speaches-with-lang.service
+      register: verify_lang_raw
+
+    - name: Verify | Decode language service content
+      ansible.builtin.set_fact:
+        verify_lang_service: "{{ verify_lang_raw.content | b64decode }}"
+
+    - name: Verify | Language variant has WHISPER__LANGUAGE
+      ansible.builtin.assert:
+        that:
+          - "'WHISPER__LANGUAGE=fr' in verify_lang_service"
+        fail_msg: "Language variant should include WHISPER__LANGUAGE=fr"
+
+    - name: Verify | Contains systemd restart policy
+      ansible.builtin.assert:
+        that:
+          - "'Restart=always' in verify_service"
+          - "'WantedBy=multi-user.target' in verify_service"
+        fail_msg: "Missing systemd restart/install directives"
+
+    - name: Verify | Idempotency - re-template the file
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/speaches.service.j2"
+        dest: /tmp/anklume-test/stt/speaches.service
+        mode: "0644"
+      vars:
+        stt_server_host: "0.0.0.0"
+        stt_server_port: 8000
+        stt_server_model: "large-v3-turbo"
+        stt_server_quantization: "float16"
+        stt_server_language: ""
+      register: verify_idempotency
+
+    - name: Verify | Idempotency - no changes on second run
+      ansible.builtin.assert:
+        that:
+          - not (verify_idempotency is changed)
+        fail_msg: "Template is not idempotent — second run produced changes"

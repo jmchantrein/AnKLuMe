@@ -7,6 +7,7 @@
 [![Molecule](https://img.shields.io/badge/molecule-tested-green)](https://molecule.readthedocs.io/)
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
+[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
 
 **Isolation type QubesOS utilisant les fonctionnalités natives du noyau Linux (KVM/LXC).**
 

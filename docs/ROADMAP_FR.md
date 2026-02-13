@@ -56,7 +56,7 @@ avant que la phase N ne soit complete et validee.
 
 ---
 
-## Phase 2b : Durcissement Post-Deploiement -- PRIORITE
+## Phase 2b : Durcissement Post-Deploiement -- COMPLETE
 
 **Objectif** : Corriger les problemes decouverts pendant le deploiement Phase 2
 
@@ -67,10 +67,10 @@ avant que la phase N ne soit complete et validee.
 - Tests Molecule mis a jour pour les corrections
 
 **Criteres de validation** :
-- [ ] admin-ansible redemarre sans intervention manuelle
-- [ ] `ansible-playbook site.yml` idempotent apres corrections
-- [ ] `make lint` passe
-- [ ] ADR-017 a ADR-019 presents dans ARCHITECTURE.md
+- [x] admin-ansible redemarre sans intervention manuelle
+- [x] `ansible-playbook site.yml` idempotent apres corrections
+- [x] `make lint` passe
+- [x] ADR-017 a ADR-019 presents dans ARCHITECTURE.md
 
 ---
 
@@ -126,7 +126,7 @@ avant que la phase N ne soit complete et validee.
 
 ---
 
-## Phase 6 : Tests Molecule
+## Phase 6 : Tests Molecule -- COMPLETE
 
 **Objectif** : Tests automatises pour chaque role
 
@@ -139,7 +139,7 @@ La Phase 12 fournira une isolation appropriee via Incus-in-Incus.
 
 ---
 
-## Phase 7 : Documentation + Publication
+## Phase 7 : Documentation + Publication -- COMPLETE
 
 **Objectif** : Projet utilisable par d'autres
 
@@ -293,7 +293,7 @@ noyau, contrairement aux containers LXC qui partagent le noyau de l'hote).
 
 ---
 
-## Phase 12 : Environnement de Test Incus-in-Incus
+## Phase 12 : Environnement de Test Incus-in-Incus -- COMPLETE
 
 **Objectif** : Tester AnKLuMe dans un bac a sable isole (AnKLuMe se testant lui-meme)
 sans impacter l'infrastructure de production.
@@ -326,10 +326,10 @@ Les tests Molecule s'executent dans cet environnement imbrique.
 - [Worker Debusine Incus-in-Incus](https://freexian-team.pages.debian.net/debusine/howtos/set-up-incus.html)
 
 **Criteres de validation** :
-- [ ] Le container test-runner demarre avec un Incus fonctionnel a l'interieur
-- [ ] `molecule test` pour base_system passe dans le bac a sable
-- [ ] Pas d'impact sur les projets/reseaux de production
-- [ ] Nettoyage automatique des ressources de test
+- [x] Le container test-runner demarre avec un Incus fonctionnel a l'interieur
+- [x] `molecule test` pour base_system passe dans le bac a sable
+- [x] Pas d'impact sur les projets/reseaux de production
+- [x] Nettoyage automatique des ressources de test
 
 ---
 
@@ -768,6 +768,92 @@ a la frontiere de la production (fusion de la PR).
 
 ---
 
+## Phase 16 : Politique de Securite, Communication Inter-Domaines et Bootstrap -- COMPLETE
+
+**Objectif** : Appliquer la politique de securite d'imbrication, permettre
+l'acces selectif entre domaines, fournir un outillage robuste de bootstrap/cycle de vie.
+
+**Livrables** :
+
+a) **Politique de securite (ADR-020)** :
+   - Detection automatique du flag `vm_nested` via `systemd-detect-virt`
+   - Fichiers de contexte d'imbrication (`/etc/anklume/{absolute_level,relative_level,vm_nested,yolo}`)
+   - Validation du generateur : rejet de `security.privileged: true` sur LXC quand `vm_nested=false`
+   - Mode YOLO de contournement
+
+b) **Politiques reseau (ADR-021)** :
+   - Section `network_policies:` dans infra.yml (syntaxe liste d'autorisations plate)
+   - Validation du generateur des references from/to
+   - Generation de regles nftables (regles accept avant drop)
+
+c) **Support du repertoire infra/** :
+   - Le generateur accepte le repertoire `infra/` (base.yml + domains/*.yml + policies.yml)
+   - Auto-detection fichier unique vs repertoire
+   - Retrocompatible avec infra.yml
+
+d) **Domaine AI tools** :
+   - Nouveaux roles : `lobechat` (interface web LobeChat), `opencode_server` (serveur OpenCode headless)
+   - Exemple `examples/ai-tools/` avec configuration complete du stack IA
+   - Cible `make apply-ai`
+
+e) **Script de bootstrap** (`bootstrap.sh`) :
+   - Modes `--prod` / `--dev` avec auto-configuration du preseed Incus
+   - `--snapshot` pour les snapshots pre-modification du systeme de fichiers
+   - Mode `--YOLO`
+
+f) **Outillage de cycle de vie** :
+   - `make flush` -- detruire toute l'infrastructure AnKLuMe
+   - `make upgrade` -- mise a jour securisee du framework
+   - `make import-infra` -- generer infra.yml depuis l'etat Incus existant
+
+**Criteres de validation** :
+- [x] `security.privileged: true` sur LXC rejete quand `vm_nested=false`
+- [x] `network_policies` genere les regles nftables accept correctes
+- [x] Le repertoire `infra/` produit une sortie identique a l'equivalent `infra.yml`
+- [x] `bootstrap.sh --prod` configure Incus avec le backend FS detecte
+- [x] `make flush` detruit l'infrastructure, preserve les fichiers utilisateur
+- [x] Les roles `lobechat` et `opencode_server` crees et integres
+
+---
+
+## Phase 17 : Pipeline CI/CD et Couverture de Tests -- COMPLETE
+
+**Objectif** : CI automatisee via GitHub Actions, couverture complete
+des tests Molecule pour tous les roles.
+
+**Livrables** :
+
+a) **Workflow CI GitHub Actions** (`.github/workflows/ci.yml`) :
+   - Declenche sur push et pull requests
+   - 6 jobs paralleles : yamllint, ansible-lint, shellcheck, ruff,
+     pytest (generateur), ansible syntax-check
+   - Cache pip pour des executions plus rapides
+   - Badge dans README.md et README_FR.md
+
+b) **Tests Molecule pour les 7 roles restants** :
+   - `roles/stt_server/molecule/` -- test template (speaches.service)
+   - `roles/firewall_router/molecule/` -- test template (firewall-router.nft)
+   - `roles/incus_firewall_vm/molecule/` -- test infra (profil multi-NIC)
+   - `roles/incus_images/molecule/` -- test infra (listing d'images)
+   - `roles/lobechat/molecule/` -- test template (lobechat.service)
+   - `roles/opencode_server/molecule/` -- test template (service + config)
+   - `roles/dev_agent_runner/molecule/` -- test template (settings.json)
+
+c) **Nettoyage du ROADMAP** :
+   - Marqueurs Phase 2b, 6, 7, 12 corriges en COMPLETE
+   - ADRs actifs mis a jour jusqu'a ADR-031
+   - Problemes connus effaces
+   - ROADMAP francais synchronise (Phase 16 manquante ajoutee)
+
+**Criteres de validation** :
+- [x] La CI GitHub Actions passe sur push vers main
+- [x] `make lint` + `make test-generator` s'executent en CI
+- [x] Les 18 roles ont des repertoires `molecule/`
+- [x] Badge CI actif dans README.md
+- [x] Incoherences du ROADMAP resolues
+
+---
+
 ## Etat Actuel
 
 **Complete** :
@@ -787,8 +873,11 @@ a la frontiere de la production (fusion de la PR).
 - Phase 13 : Tests assistes par LLM (ai-test-loop + ai-develop)
 - Phase 14 : Service de reconnaissance vocale STT (role stt_server)
 - Phase 15 : Claude Code Agent Teams (dev + tests autonomes)
+- Phase 16 : Politique de securite, politiques reseau, bootstrap, domaine AI tools
+- Phase 17 : Pipeline CI/CD + couverture complete des tests Molecule (18/18 roles)
 
-**Toutes les phases sont completes.**
+**Suivant** :
+- Phase 18+ (a definir)
 
 **Infrastructure deployee** :
 
@@ -799,7 +888,6 @@ a la frontiere de la production (fusion de la PR).
 | pro | pro-dev | 10.100.2.10 | net-pro | En fonctionnement |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | En fonctionnement |
 
-**ADRs actifs** : ADR-001 a ADR-019
+**ADRs actifs** : ADR-001 a ADR-031
 
-**Problemes connus** :
-- admin-ansible necessite une intervention manuelle au redemarrage (Phase 2b)
+**Problemes connus** : Aucun

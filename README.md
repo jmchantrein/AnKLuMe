@@ -7,10 +7,7 @@
 [![Molecule](https://img.shields.io/badge/molecule-tested-green)](https://molecule.readthedocs.io/)
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
-<!-- Dynamic badges — uncomment when CI is configured:
-[![CI](https://github.com/<user>/anklume/actions/workflows/ci.yml/badge.svg)](https://github.com/<user>/anklume/actions)
-[![codecov](https://codecov.io/gh/<user>/anklume/branch/main/graph/badge.svg)](https://codecov.io/gh/<user>/anklume)
--->
+[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
 
 **QubesOS-like isolation using native Linux kernel features (KVM/LXC).**
 

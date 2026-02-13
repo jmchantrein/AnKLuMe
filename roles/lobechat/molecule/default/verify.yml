@@ -1,0 +1,90 @@
+---
+- name: Verify lobechat
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Check service file exists
+      ansible.builtin.stat:
+        path: /tmp/anklume-test/lobechat/lobechat.service
+      register: verify_service_file
+
+    - name: Verify | Service file exists
+      ansible.builtin.assert:
+        that:
+          - verify_service_file.stat.exists
+          - verify_service_file.stat.mode == '0644'
+        fail_msg: "lobechat.service not found or wrong permissions"
+
+    - name: Verify | Read service file content
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/lobechat/lobechat.service
+      register: verify_service_raw
+
+    - name: Verify | Decode service content
+      ansible.builtin.set_fact:
+        verify_service: "{{ verify_service_raw.content | b64decode }}"
+
+    - name: Verify | Contains ExecStart with node
+      ansible.builtin.assert:
+        that:
+          - "'ExecStart=/usr/bin/node .next/standalone/server.js' in verify_service"
+        fail_msg: "Missing ExecStart with node server.js"
+
+    - name: Verify | Contains correct port
+      ansible.builtin.assert:
+        that:
+          - "'PORT=3210' in verify_service"
+        fail_msg: "Missing default port 3210"
+
+    - name: Verify | Contains Ollama URL
+      ansible.builtin.assert:
+        that:
+          - "'OLLAMA_PROXY_URL=http://10.100.3.10:11434' in verify_service"
+        fail_msg: "Missing Ollama proxy URL"
+
+    - name: Verify | Contains Ollama enable flag
+      ansible.builtin.assert:
+        that:
+          - "'ENABLED_OLLAMA=1' in verify_service"
+        fail_msg: "Missing ENABLED_OLLAMA flag"
+
+    - name: Verify | Contains systemd directives
+      ansible.builtin.assert:
+        that:
+          - "'WorkingDirectory=/opt/lobechat' in verify_service"
+          - "'Restart=always' in verify_service"
+          - "'WantedBy=multi-user.target' in verify_service"
+        fail_msg: "Missing systemd directives"
+
+    - name: Verify | Read custom service file
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/lobechat/lobechat-custom.service
+      register: verify_custom_raw
+
+    - name: Verify | Decode custom service content
+      ansible.builtin.set_fact:
+        verify_custom: "{{ verify_custom_raw.content | b64decode }}"
+
+    - name: Verify | Custom variant has overridden values
+      ansible.builtin.assert:
+        that:
+          - "'PORT=8080' in verify_custom"
+          - "'OLLAMA_PROXY_URL=http://custom-host:11434' in verify_custom"
+        fail_msg: "Custom variant should have overridden port and URL"
+
+    - name: Verify | Idempotency - re-template the file
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/lobechat.service.j2"
+        dest: /tmp/anklume-test/lobechat/lobechat.service
+        mode: "0644"
+      vars:
+        lobechat_port: 3210
+        lobechat_ollama_url: "http://10.100.3.10:11434"
+      register: verify_idempotency
+
+    - name: Verify | Idempotency - no changes on second run
+      ansible.builtin.assert:
+        that:
+          - not (verify_idempotency is changed)
+        fail_msg: "Template is not idempotent — second run produced changes"

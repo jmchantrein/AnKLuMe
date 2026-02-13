@@ -1,0 +1,71 @@
+---
+- name: Verify incus_firewall_vm
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Check profile exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - show
+          - mol-firewall-multi-nic
+          - --project
+          - molecule-firewall
+      register: verify_profile_raw
+      changed_when: false
+
+    - name: Verify | Profile was created
+      ansible.builtin.assert:
+        that:
+          - verify_profile_raw.rc == 0
+        fail_msg: "Firewall multi-NIC profile was not created"
+
+    - name: Verify | Parse profile config
+      ansible.builtin.set_fact:
+        verify_profile: "{{ verify_profile_raw.stdout | from_yaml }}"
+
+    - name: Verify | Profile has NIC devices
+      ansible.builtin.assert:
+        that:
+          - "'devices' in verify_profile"
+          - "'eth0' in verify_profile.devices"
+          - "'eth1' in verify_profile.devices"
+        fail_msg: "Profile missing NIC devices (expected eth0 and eth1)"
+
+    - name: Verify | eth0 is connected to admin bridge
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0.parent == 'net-mol-admin'"
+          - "verify_profile.devices.eth0.type == 'nic'"
+        fail_msg: "eth0 should be connected to net-mol-admin"
+
+    - name: Verify | eth1 is connected to perso bridge
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth1.parent == 'net-mol-perso'"
+          - "verify_profile.devices.eth1.type == 'nic'"
+        fail_msg: "eth1 should be connected to net-mol-perso"
+
+    - name: Verify | Admin bridge is first (eth0)
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0.parent == 'net-mol-admin'"
+        fail_msg: "Admin bridge must be eth0 (first NIC)"
+
+    - name: Verify | Idempotency - run role again
+      ansible.builtin.include_role:
+        name: incus_firewall_vm
+      vars:
+        incus_firewall_vm_bridge_pattern: "net-mol-"
+        incus_firewall_vm_admin_bridge: "net-mol-admin"
+        incus_firewall_vm_profile: "mol-firewall-multi-nic"
+        incus_firewall_vm_project: "molecule-firewall"
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent — second run produced changes"

@@ -1,0 +1,26 @@
+---
+- name: Destroy incus_firewall_vm test resources
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Destroy | Delete test profile
+      ansible.builtin.command:
+        cmd: incus profile delete mol-firewall-multi-nic --project molecule-firewall
+      changed_when: true
+      failed_when: false
+
+    - name: Destroy | Delete test networks
+      ansible.builtin.command:
+        cmd: "incus network delete {{ item }}"
+      loop:
+        - net-mol-admin
+        - net-mol-perso
+      changed_when: true
+      failed_when: false
+
+    - name: Destroy | Delete test project
+      ansible.builtin.command:
+        cmd: incus project delete molecule-firewall
+      changed_when: true
+      failed_when: false

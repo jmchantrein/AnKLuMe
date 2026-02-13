@@ -1,0 +1,29 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    lobechat_port: 3210
+    lobechat_ollama_url: "http://10.100.3.10:11434"
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test/lobechat
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template lobechat systemd service
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/lobechat.service.j2"
+        dest: /tmp/anklume-test/lobechat/lobechat.service
+        mode: "0644"
+
+    - name: Converge | Template with custom port
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/lobechat.service.j2"
+        dest: /tmp/anklume-test/lobechat/lobechat-custom.service
+        mode: "0644"
+      vars:
+        lobechat_port: 8080
+        lobechat_ollama_url: "http://custom-host:11434"

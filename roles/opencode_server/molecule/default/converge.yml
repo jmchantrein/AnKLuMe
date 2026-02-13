@@ -1,0 +1,39 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    opencode_server_port: 4096
+    opencode_server_host: "0.0.0.0"
+    opencode_server_ollama_url: "http://localhost:11434/v1"
+    opencode_server_model: "qwen2.5-coder:32b"
+    opencode_server_password: "opencode"
+    opencode_server_enabled: true
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test/opencode
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template opencode systemd service
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/opencode.service.j2"
+        dest: /tmp/anklume-test/opencode/opencode.service
+        mode: "0644"
+
+    - name: Converge | Template opencode config
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/opencode-config.json.j2"
+        dest: /tmp/anklume-test/opencode/config.json
+        mode: "0644"
+
+    - name: Converge | Template with custom values
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/opencode-config.json.j2"
+        dest: /tmp/anklume-test/opencode/config-custom.json
+        mode: "0644"
+      vars:
+        opencode_server_ollama_url: "http://10.100.3.10:11434/v1"
+        opencode_server_model: "llama3.3:70b"
