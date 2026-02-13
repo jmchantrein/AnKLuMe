@@ -286,3 +286,272 @@ class TestMakefileVariableOverrides:
         recipe = ai_test_match.group(1)
         assert "AI_MODE" in recipe, "ai-test should reference AI_MODE"
         assert "ai-test-loop.sh" in recipe, "ai-test should call ai-test-loop.sh"
+
+
+# ── TestMakefilePhony ────────────────────────────────────
+
+
+class TestMakefilePhony:
+    """Verify .PHONY declarations in Makefile."""
+
+    def _get_phony_targets(self):
+        """Extract all targets listed in .PHONY."""
+        content = _parse_makefile()
+        # .PHONY spans multiple lines with backslash continuations
+        phony_match = re.search(
+            r"^\.PHONY:\s*(.*?)(?:\n(?!\s)|\Z)",
+            content,
+            re.MULTILINE | re.DOTALL,
+        )
+        assert phony_match, ".PHONY declaration not found"
+        raw = phony_match.group(1)
+        # Remove backslash-newline continuations and extra whitespace
+        raw = raw.replace("\\\n", " ")
+        return set(raw.split())
+
+    def test_all_documented_targets_in_phony(self):
+        """Every target with ## description must be in .PHONY."""
+        content = _parse_makefile()
+        documented = _extract_documented_targets(content)
+        phony_targets = self._get_phony_targets()
+        missing = []
+        for target in documented:
+            if target not in phony_targets:
+                missing.append(target)
+        assert not missing, f"Documented targets missing from .PHONY: {missing}"
+
+    def test_phony_line_exists(self):
+        """.PHONY line exists in Makefile."""
+        content = _parse_makefile()
+        assert ".PHONY:" in content, ".PHONY declaration not found in Makefile"
+
+    def test_phony_includes_core_targets(self):
+        """Core targets sync, lint, apply, test, help are in .PHONY."""
+        phony_targets = self._get_phony_targets()
+        core = ["sync", "lint", "apply", "test", "help"]
+        for target in core:
+            assert target in phony_targets, f"Core target '{target}' missing from .PHONY"
+
+
+# ── TestMakefileInfraSrcDetection ────────────────────────
+
+
+class TestMakefileInfraSrcDetection:
+    """Verify INFRA_SRC auto-detection logic."""
+
+    def test_infra_src_uses_wildcard(self):
+        """INFRA_SRC line uses $(wildcard ...) for auto-detection."""
+        content = _parse_makefile()
+        infra_src_match = re.search(r"^INFRA_SRC\s*:=\s*(.+)$", content, re.MULTILINE)
+        assert infra_src_match, "INFRA_SRC assignment not found"
+        value = infra_src_match.group(1)
+        assert "$(wildcard" in value, "INFRA_SRC should use $(wildcard ...) for detection"
+
+    def test_infra_src_defaults_to_infra_yml(self):
+        """INFRA_SRC default value is infra.yml when infra/base.yml absent."""
+        content = _parse_makefile()
+        infra_src_match = re.search(r"^INFRA_SRC\s*:=\s*(.+)$", content, re.MULTILINE)
+        assert infra_src_match, "INFRA_SRC assignment not found"
+        value = infra_src_match.group(1)
+        assert "infra.yml" in value, "INFRA_SRC should default to infra.yml"
+
+    def test_infra_src_uses_infra_dir_when_base_yml_exists(self):
+        """INFRA_SRC uses 'infra' when infra/base.yml exists."""
+        content = _parse_makefile()
+        infra_src_match = re.search(r"^INFRA_SRC\s*:=\s*(.+)$", content, re.MULTILINE)
+        assert infra_src_match, "INFRA_SRC assignment not found"
+        value = infra_src_match.group(1)
+        assert "infra/base.yml" in value, (
+            "INFRA_SRC should check for infra/base.yml"
+        )
+        assert ",infra," in value or ",infra)" in value, (
+            "INFRA_SRC should use 'infra' directory when infra/base.yml exists"
+        )
+
+
+# ── TestMakefileRecipes ──────────────────────────────────
+
+
+def _get_recipe(content, target):
+    """Extract the full recipe (all tab-indented lines) for a target.
+
+    Returns the concatenated recipe lines as a single string.
+    """
+    pattern = re.compile(
+        rf"^{re.escape(target)}:.*\n((?:\t.+\n?)+)", re.MULTILINE
+    )
+    match = pattern.search(content)
+    assert match, f"Target '{target}' recipe not found"
+    return match.group(1)
+
+
+class TestMakefileRecipes:
+    """Verify recipe correctness for specific targets."""
+
+    def test_apply_calls_ansible_playbook(self):
+        """apply target calls ansible-playbook site.yml."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "apply")
+        assert "ansible-playbook" in recipe, "apply should call ansible-playbook"
+        assert "site.yml" in recipe, "apply should target site.yml"
+
+    def test_apply_infra_uses_tags(self):
+        """apply-infra uses --tags infra."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "apply-infra")
+        assert "--tags infra" in recipe or "--tags=infra" in recipe, (
+            "apply-infra should use --tags infra"
+        )
+
+    def test_apply_provision_uses_tags(self):
+        """apply-provision uses --tags provision."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "apply-provision")
+        assert "--tags provision" in recipe or "--tags=provision" in recipe, (
+            "apply-provision should use --tags provision"
+        )
+
+    def test_nftables_calls_ansible_playbook(self):
+        """nftables target calls ansible-playbook with --tags nftables."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "nftables")
+        assert "ansible-playbook" in recipe, "nftables should call ansible-playbook"
+        assert "--tags nftables" in recipe, "nftables should use --tags nftables"
+
+    def test_nftables_deploy_calls_script(self):
+        """nftables-deploy calls scripts/deploy-nftables.sh."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "nftables-deploy")
+        assert "deploy-nftables.sh" in recipe, (
+            "nftables-deploy should call scripts/deploy-nftables.sh"
+        )
+
+    def test_flush_calls_script(self):
+        """flush calls scripts/flush.sh with FORCE handling."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "flush")
+        assert "flush.sh" in recipe, "flush should call scripts/flush.sh"
+        assert "FORCE" in recipe, "flush should handle FORCE variable"
+
+    def test_upgrade_calls_script(self):
+        """upgrade calls scripts/upgrade.sh."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "upgrade")
+        assert "upgrade.sh" in recipe, "upgrade should call scripts/upgrade.sh"
+
+    def test_import_infra_calls_script(self):
+        """import-infra calls scripts/import-infra.sh."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "import-infra")
+        assert "import-infra.sh" in recipe, (
+            "import-infra should call scripts/import-infra.sh"
+        )
+
+    def test_guide_calls_script(self):
+        """guide calls scripts/guide.sh with STEP and AUTO handling."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "guide")
+        assert "guide.sh" in recipe, "guide should call scripts/guide.sh"
+        assert "STEP" in recipe, "guide should handle STEP variable"
+        assert "AUTO" in recipe, "guide should handle AUTO variable"
+
+
+# ── TestMakefileShellSetting ─────────────────────────────
+
+
+class TestMakefileShellSetting:
+    """Verify shell and default goal settings."""
+
+    def test_shell_is_bash(self):
+        """SHELL := /bin/bash is set."""
+        content = _parse_makefile()
+        assert re.search(
+            r"^SHELL\s*:=\s*/bin/bash", content, re.MULTILINE
+        ), "SHELL should be set to /bin/bash"
+
+    def test_default_goal_is_help(self):
+        """.DEFAULT_GOAL := help is set."""
+        content = _parse_makefile()
+        assert re.search(
+            r"^\.DEFAULT_GOAL\s*:=\s*help", content, re.MULTILINE
+        ), ".DEFAULT_GOAL should be set to help"
+
+
+# ── TestMakefileSnapshotTargets ──────────────────────────
+
+
+class TestMakefileSnapshotTargets:
+    """Verify snapshot-related targets."""
+
+    SNAPSHOT_TARGETS = [
+        "snapshot",
+        "snapshot-domain",
+        "restore",
+        "restore-domain",
+        "snapshot-delete",
+        "snapshot-list",
+    ]
+
+    def test_snapshot_targets_exist(self):
+        """All snapshot targets are defined in the Makefile."""
+        content = _parse_makefile()
+        missing = []
+        for target in self.SNAPSHOT_TARGETS:
+            if f"\n{target}:" not in content:
+                missing.append(target)
+        assert not missing, f"Missing snapshot targets: {missing}"
+
+    def test_snapshot_uses_snapshot_yml(self):
+        """snapshot target calls ansible-playbook snapshot.yml."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "snapshot")
+        assert "ansible-playbook" in recipe, "snapshot should call ansible-playbook"
+        assert "snapshot.yml" in recipe, "snapshot should use snapshot.yml playbook"
+
+    def test_restore_passes_action_and_name(self):
+        """restore passes snapshot_action=restore and snapshot_name=$(NAME)."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "restore")
+        assert "snapshot_action=restore" in recipe, (
+            "restore should pass snapshot_action=restore"
+        )
+        assert "snapshot_name=$(NAME)" in recipe, (
+            "restore should pass snapshot_name=$(NAME)"
+        )
+
+
+# ── TestMakefileTestTargets ──────────────────────────────
+
+
+class TestMakefileTestTargets:
+    """Verify test-related targets."""
+
+    def test_test_depends_on_subtargets(self):
+        """test target depends on test-generator and test-roles."""
+        content = _parse_makefile()
+        test_match = re.search(r"^test:\s*(.+?)(?:\s*##.*)?$", content, re.MULTILINE)
+        assert test_match, "test target not found"
+        deps = test_match.group(1)
+        assert "test-generator" in deps, "test should depend on test-generator"
+        assert "test-roles" in deps, "test should depend on test-roles"
+
+    def test_test_generator_runs_pytest(self):
+        """test-generator runs python3 -m pytest."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "test-generator")
+        assert "python3 -m pytest" in recipe, (
+            "test-generator should run python3 -m pytest"
+        )
+
+    def test_test_roles_iterates_roles(self):
+        """test-roles iterates over roles/ directories."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "test-roles")
+        assert "roles/" in recipe, "test-roles should iterate over roles/ directories"
+        assert "molecule" in recipe, "test-roles should reference molecule"
+
+    def test_test_role_uses_r_variable(self):
+        """test-role uses $(R) variable."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "test-role")
+        assert "$(R)" in recipe, "test-role should use $(R) variable"
