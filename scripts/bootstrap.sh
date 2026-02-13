@@ -269,6 +269,56 @@ elif [ "$MODE" = "dev" ]; then
     echo "Development mode: using existing Incus configuration."
 fi
 
+# ── Ensure user has Incus socket access ───────────────────
+ensure_incus_group() {
+    # Detect the Incus admin group (incus-admin on Debian/Ubuntu, incus on some distros)
+    local incus_group=""
+    if getent group incus-admin &>/dev/null; then
+        incus_group="incus-admin"
+    elif getent group incus &>/dev/null; then
+        incus_group="incus"
+    else
+        echo "WARNING: No Incus group found (incus-admin or incus)."
+        echo "         Incus socket access may require manual configuration."
+        return
+    fi
+
+    # Determine the target user: if run via sudo, use the real user
+    local target_user="${SUDO_USER:-$(whoami)}"
+
+    # Skip if running as root without SUDO_USER (direct root login)
+    if [ "$target_user" = "root" ]; then
+        return
+    fi
+
+    # Check if user is already in the group
+    if id -nG "$target_user" 2>/dev/null | grep -qw "$incus_group"; then
+        echo "User '$target_user' already in group '$incus_group'."
+        return
+    fi
+
+    echo "User '$target_user' is NOT in group '$incus_group'."
+    echo "Adding '$target_user' to '$incus_group' for Incus socket access..."
+
+    if [ "$(id -u)" -eq 0 ]; then
+        usermod -aG "$incus_group" "$target_user"
+        echo "Done. Group membership will take effect on next login or with: newgrp $incus_group"
+    else
+        echo "Attempting with sudo..."
+        if sudo usermod -aG "$incus_group" "$target_user"; then
+            echo "Done. Group membership will take effect on next login or with: newgrp $incus_group"
+        else
+            echo "ERROR: Failed to add '$target_user' to '$incus_group'."
+            echo "       Run manually: sudo usermod -aG $incus_group $target_user"
+        fi
+    fi
+}
+
+if command -v incus &>/dev/null; then
+    echo "--- Ensuring Incus socket access ---"
+    ensure_incus_group
+fi
+
 # ── Import existing infrastructure ──────────────────────
 if [ "$IMPORT" = true ]; then
     echo "--- Importing existing infrastructure ---"
