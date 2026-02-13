@@ -340,6 +340,72 @@ class TestTemplates:
         assert "[Service]" in result
         assert "3210" in result
 
+    def test_opencode_service_template(self):
+        """OpenCode service template renders correctly."""
+        tmpl_dir = ROLES_DIR / "opencode_server" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("opencode.service.j2")
+
+        result = template.render(
+            opencode_server_port=4096,
+            opencode_server_host="0.0.0.0",
+            opencode_server_password="secret123",
+        )
+        assert "[Unit]" in result
+        assert "[Service]" in result
+        assert "4096" in result
+        assert "secret123" in result
+        assert "opencode serve" in result
+
+    def test_opencode_config_template(self):
+        """OpenCode config JSON template renders correctly."""
+        tmpl_dir = ROLES_DIR / "opencode_server" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("opencode-config.json.j2")
+
+        result = template.render(
+            opencode_server_ollama_url="http://ai-ollama:11434/v1",
+            opencode_server_model="qwen2.5-coder:32b",
+        )
+        import json
+        data = json.loads(result)
+        assert "provider" in data
+        assert "ollama" in data["provider"]
+        assert data["provider"]["ollama"]["options"]["baseURL"] == "http://ai-ollama:11434/v1"
+        assert "qwen2.5-coder:32b" in data["provider"]["ollama"]["models"]
+
+    def test_claude_settings_template(self):
+        """Claude Code settings JSON template renders correctly."""
+        tmpl_dir = ROLES_DIR / "dev_agent_runner" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("claude-settings.json.j2")
+
+        result = template.render(
+            dev_agent_runner_enable_teams=True,
+            dev_agent_runner_permissions_mode="bypassPermissions",
+        )
+        import json
+        data = json.loads(result)
+        assert data["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert data["defaultMode"] == "bypassPermissions"
+        assert "Edit" in data["permissions"]["allow"]
+        assert "Bash(molecule *)" in data["permissions"]["allow"]
+
+    def test_claude_settings_no_teams(self):
+        """Claude settings without Agent Teams omits the flag."""
+        tmpl_dir = ROLES_DIR / "dev_agent_runner" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("claude-settings.json.j2")
+
+        result = template.render(
+            dev_agent_runner_enable_teams=False,
+            dev_agent_runner_permissions_mode="default",
+        )
+        import json
+        data = json.loads(result)
+        assert "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" not in data.get("env", {})
+        assert data["defaultMode"] == "default"
+
 
 # ── Meta validation ─────────────────────────────────────────
 
