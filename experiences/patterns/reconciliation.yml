@@ -1,0 +1,85 @@
+# 6-step reconciliation pattern used by all AnKLuMe infrastructure roles.
+# Every infra role follows exactly this pattern (ADR-005, SPEC section 7).
+---
+- id: PAT-RECON-001
+  category: reconciliation
+  name: "Read current state"
+  description: "Query Incus for current resource state using CLI + JSON output"
+  example: |
+    - name: RoleName | Read current state
+      ansible.builtin.command:
+        cmd: incus <resource> list --format json
+      register: _current_state
+      changed_when: false
+      check_mode: false
+  notes:
+    - "Always use --format json for list commands"
+    - "Always set changed_when: false (read-only operation)"
+    - "Always set check_mode: false (safe to run in --check mode)"
+
+- id: PAT-RECON-002
+  category: reconciliation
+  name: "Parse into comparable structure"
+  description: "Convert JSON output into Ansible-friendly data structure"
+  example: |
+    - name: RoleName | Parse current state
+      ansible.builtin.set_fact:
+        _existing_resources: >-
+          {{ (_current_state.stdout | from_json) | map(attribute='name') | list }}
+  notes:
+    - "Use from_json for list output, from_yaml for show output"
+    - "Extract only fields needed for comparison"
+
+- id: PAT-RECON-003
+  category: reconciliation
+  name: "Build desired state"
+  description: "Construct desired state from group_vars/host_vars variables"
+  example: |
+    - name: RoleName | Build desired state
+      ansible.builtin.set_fact:
+        _desired_resources:
+          - "{{ incus_network.name }}"
+  notes:
+    - "Variables come from PSOT-generated group_vars/host_vars"
+    - "Use role-prefixed internal variable names"
+
+- id: PAT-RECON-004
+  category: reconciliation
+  name: "Create what is missing"
+  description: "Create resources that exist in desired state but not current"
+  example: |
+    - name: RoleName | Create resource
+      ansible.builtin.command:
+        cmd: incus <resource> create {{ item }}
+      when: item not in _existing_resources
+      changed_when: true
+  notes:
+    - "when: condition ensures idempotence"
+    - "changed_when: true because this genuinely modifies state"
+
+- id: PAT-RECON-005
+  category: reconciliation
+  name: "Update what differs"
+  description: "Update resources that exist but have wrong configuration"
+  example: |
+    - name: RoleName | Update resource config
+      ansible.builtin.command:
+        cmd: incus <resource> set {{ item.name }} {{ item.key }}={{ item.value }}
+      when: _current_config[item.key] != item.value
+      changed_when: true
+  notes:
+    - "Compare current vs desired config before updating"
+    - "Only update fields that actually differ"
+
+- id: PAT-RECON-006
+  category: reconciliation
+  name: "Detect orphans"
+  description: "Report resources in current state but not in desired state"
+  example: |
+    - name: RoleName | Detect orphan resources
+      ansible.builtin.debug:
+        msg: "Orphan detected: {{ item }}"
+      loop: "{{ _existing_resources | difference(_desired_resources) }}"
+  notes:
+    - "Report orphans; optionally delete if auto_cleanup: true"
+    - "Respect ephemeral flag (never delete protected resources)"

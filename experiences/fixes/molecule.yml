@@ -1,0 +1,106 @@
+# Molecule test fix patterns extracted from AnKLuMe git history.
+# Each entry documents a test failure and its resolution.
+---
+- id: FIX-MOL-001
+  category: molecule
+  problem: "driver 'delegated' renamed to 'default' in Molecule 25+"
+  solution: "Change driver.name from delegated to default in molecule.yml"
+  source_commit: "5bba495"
+  files_affected: ["roles/*/molecule/default/molecule.yml"]
+  prevention: "Use driver.name: default for all new roles"
+
+- id: FIX-MOL-002
+  category: molecule
+  problem: "roles_path not set; converge cannot find project roles"
+  solution: "Add provisioner.config_options.defaults.roles_path in molecule.yml"
+  source_commit: "32b80ac"
+  files_affected: ["roles/*/molecule/default/molecule.yml"]
+  prevention: "Infrastructure roles need roles_path: ../../ in molecule.yml"
+
+- id: FIX-MOL-003
+  category: molecule
+  problem: "roles_path points to wrong directory level"
+  solution: "Set roles_path to parent directory (../../) not grandparent"
+  source_commit: "35f5374"
+  files_affected: ["roles/*/molecule/default/molecule.yml"]
+  prevention: "roles_path is relative to the molecule scenario directory"
+
+- id: FIX-MOL-004
+  category: molecule
+  problem: "test network name exceeds 15-character Linux interface limit"
+  solution: "Shorten bridge names (e.g., mol-net instead of molecule-test-net)"
+  source_commit: "95fce82"
+  files_affected: ["roles/*/molecule/default/converge.yml"]
+  prevention: "Linux bridge names must be <= 15 characters"
+
+- id: FIX-MOL-005
+  category: molecule
+  problem: "test network has no explicit subnet; Incus assigns random one"
+  solution: "Set explicit ipv4.address on test network (e.g., 10.200.99.1/24)"
+  source_commit: "938dcef"
+  files_affected: ["roles/incus_instances/molecule/default/converge.yml"]
+  prevention: "Always specify subnet in test networks for predictable IPs"
+
+- id: FIX-MOL-006
+  category: molecule
+  problem: "Molecule verify uses assert on command stdout without register"
+  solution: "Register command output before asserting on it"
+  source_commit: "231717a"
+  files_affected: ["roles/*/molecule/default/verify.yml"]
+  prevention: "Always register command results before assertion"
+
+- id: FIX-MOL-007
+  category: molecule
+  problem: "cleanup task fails because resource does not exist yet"
+  solution: "Add failed_when: false to cleanup tasks (resource may not exist)"
+  source_commit: "313aca0"
+  files_affected: ["roles/*/molecule/default/cleanup.yml"]
+  prevention: "Cleanup should be idempotent; resource may never be created"
+
+- id: FIX-MOL-008
+  category: molecule
+  problem: "converge task creates resources in wrong Incus project"
+  solution: "Use --project flag consistently in all Incus commands"
+  source_commit: "231717a"
+  files_affected: ["roles/*/molecule/default/converge.yml"]
+  prevention: "Always specify --project for project-scoped resources"
+
+- id: FIX-MOL-009
+  category: molecule
+  problem: "Molecule test hangs waiting for VM instance to be ready"
+  solution: "Use separate wait timeouts for VM (120s) vs LXC (60s)"
+  source_commit: "8345178"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "VMs need longer boot wait; use vm_retries/vm_delay variables"
+
+- id: FIX-MOL-010
+  category: molecule
+  problem: "verify.yml asserts service status but service not installed yet"
+  solution: "Run converge before verify; use template-based tests for CI"
+  source_commit: "313aca0"
+  files_affected: ["roles/*/molecule/default/verify.yml"]
+  prevention: "Provision roles verify template output, not live services"
+
+- id: FIX-MOL-011
+  category: molecule
+  problem: "Molecule verify uses from_json on YAML output from incus show"
+  solution: "Use from_yaml instead of from_json for incus show output"
+  source_commit: "231717a"
+  files_affected: ["roles/*/molecule/default/verify.yml"]
+  prevention: "incus show outputs YAML, incus list --format json outputs JSON"
+
+- id: FIX-MOL-012
+  category: molecule
+  problem: "Molecule scenario missing galaxy namespace in meta/main.yml"
+  solution: "Add namespace: anklume to role metadata for Molecule resolution"
+  source_commit: "6ab6d16"
+  files_affected: ["roles/*/meta/main.yml"]
+  prevention: "All roles require galaxy_info.namespace for Molecule >=6"
+
+- id: FIX-MOL-013
+  category: molecule
+  problem: "Molecule converge fails: Python not installed in container"
+  solution: "Bootstrap Python via ansible.builtin.raw before gather_facts"
+  source_commit: "0f0bee4"
+  files_affected: ["site.yml"]
+  prevention: "Fresh Debian containers lack Python; raw module works without it"

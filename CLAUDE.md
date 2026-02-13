@@ -107,4 +107,6 @@ For details, read these files with `@path`:
 - @docs/ai-testing.md — AI-assisted testing and development (Phase 13)
 - @docs/stt-service.md — Speech-to-Text service guide (Phase 14)
 - @docs/agent-teams.md — Claude Code Agent Teams guide (Phase 15)
+- @docs/ai-switch.md — Exclusive AI-tools network access (Phase 18a)
+- @docs/guide.md — Interactive onboarding guide (Phase 18c)
 - @docs/decisions-log.md — Autonomous decisions pending review

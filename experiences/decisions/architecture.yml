@@ -1,0 +1,121 @@
+# Key architectural decisions from ARCHITECTURE.md (ADR-001 to ADR-031).
+# Extracted for quick reference by AI-assisted tools.
+---
+- id: DEC-ADR-001
+  category: architecture
+  decision: "Ansible inventory reflects the real infrastructure"
+  rationale: "Native Ansible mechanisms only. No custom dynamic loading."
+  consequence: "Each domain = Ansible group, each instance = host in group"
+  adr: "ADR-001"
+
+- id: DEC-ADR-002
+  category: architecture
+  decision: "infra.yml is the Primary Source of Truth (PSOT)"
+  rationale: "Reduces tedious manual editing of inventory files"
+  consequence: "make sync generates files; both infra.yml and generated files committed"
+  adr: "ADR-002"
+
+- id: DEC-ADR-004
+  category: architecture
+  decision: "No hypervisor in the inventory; admin container drives Incus"
+  rationale: "Host never appears in inventory; Ansible runs inside admin container"
+  consequence: "Phase 1 targets localhost; Phase 2 targets instances via incus connection"
+  adr: "ADR-004"
+
+- id: DEC-ADR-005
+  category: architecture
+  decision: "Incus via CLI, no native Ansible modules"
+  rationale: "No stable incus_* Ansible modules exist"
+  consequence: "Each infra role implements its own idempotency via command + JSON"
+  adr: "ADR-005"
+
+- id: DEC-ADR-006
+  category: architecture
+  decision: "Two distinct execution phases"
+  rationale: "Infra (local) and provisioning (incus) have different connection needs"
+  consequence: "Phase 1: hosts:localhost, connection:local; Phase 2: hosts:all, connection:incus"
+  adr: "ADR-006"
+
+- id: DEC-ADR-008
+  category: architecture
+  decision: "Globally unique machine names"
+  rationale: "Simplifies instance-to-project resolution and snapshot targeting"
+  consequence: "Generator validates uniqueness across all domains"
+  adr: "ADR-008"
+
+- id: DEC-ADR-009
+  category: architecture
+  decision: "Spec-driven, test-driven development"
+  rationale: "No code without a spec and a test"
+  consequence: "Workflow: spec -> test -> implement -> lint -> review -> commit"
+  adr: "ADR-009"
+
+- id: DEC-ADR-010
+  category: architecture
+  decision: "Python generator with no external dependencies beyond PyYAML"
+  rationale: "Minimal dependencies, easy to install"
+  consequence: "Only PyYAML and stdlib; no templating engine"
+  adr: "ADR-010"
+
+- id: DEC-ADR-014
+  category: architecture
+  decision: "Networks live in the default Incus project"
+  rationale: "Simpler management; nftables isolation at host level"
+  consequence: "Network commands: no --project flag. Profile commands: yes --project flag"
+  adr: "ADR-014"
+
+- id: DEC-ADR-015
+  category: architecture
+  decision: "Playbook uses hosts:all with connection:local"
+  rationale: "Each host provides its own PSOT variables; all commands execute locally"
+  consequence: "No run_once; idempotence via reconciliation pattern"
+  adr: "ADR-015"
+
+- id: DEC-ADR-016
+  category: architecture
+  decision: "Standard Ansible directory layout with playbook at root"
+  rationale: "Variable resolution works correctly with group_vars/ at root"
+  consequence: "site.yml at project root alongside group_vars/ and host_vars/"
+  adr: "ADR-016"
+
+- id: DEC-ADR-018
+  category: architecture
+  decision: "GPU policy: exclusive by default, shared optional"
+  rationale: "No VRAM isolation on consumer GPUs; prevent security risks"
+  consequence: "At most 1 GPU instance unless gpu_policy: shared set explicitly"
+  adr: "ADR-018"
+
+- id: DEC-ADR-020
+  category: architecture
+  decision: "Privileged LXC forbidden at first nesting level"
+  rationale: "LXC shares host kernel; only VMs provide hardware isolation"
+  consequence: "security.privileged: true rejected unless vm_nested or --YOLO"
+  adr: "ADR-020"
+
+- id: DEC-ADR-022
+  category: architecture
+  decision: "nftables priority -1 to coexist with Incus chains"
+  rationale: "Incus manages chains at priority 0; AnKLuMe runs before"
+  consequence: "Separate table inet anklume; no interference with Incus NAT/DHCP"
+  adr: "ADR-022"
+
+- id: DEC-ADR-023
+  category: architecture
+  decision: "Two-step nftables deployment (admin to host)"
+  rationale: "Admin container generates rules; host applies them"
+  consequence: "make nftables (generate) + make nftables-deploy (apply on host)"
+  adr: "ADR-023"
+
+- id: DEC-ADR-027
+  category: architecture
+  decision: "Agent Teams run only inside Incus-in-Incus sandbox"
+  rationale: "bypassPermissions is safe inside isolated sandbox"
+  consequence: "Full autonomy inside sandbox; human approval at PR merge boundary"
+  adr: "ADR-027"
+
+- id: DEC-ADR-029
+  category: architecture
+  decision: "dev_test_runner is a VM, not LXC"
+  rationale: "Avoids privileged LXC conflict (ADR-020); no AppArmor issues"
+  consequence: "Slower boot (~30s) but hardware-isolated; matches production"
+  adr: "ADR-029"

@@ -28,3 +28,7 @@ dev_test_runner_pip_packages:
   - molecule-plugins
   - ansible-lint
   - yamllint
+
+# Import pre-exported images from host into nested Incus
+# When true, images from /mnt/host-images/ are imported
+incus_images_import_from_host: false

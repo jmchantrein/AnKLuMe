@@ -1,0 +1,98 @@
+# Ansible-lint fix patterns extracted from AnKLuMe git history.
+# Each entry documents a known violation and its resolution.
+---
+- id: FIX-LINT-001
+  category: ansible-lint
+  problem: "meta/main.yml missing author or license field"
+  solution: "Add author: AnKLuMe and license: AGPL-3.0 to galaxy_info"
+  source_commit: "bd1852f"
+  files_affected: ["roles/*/meta/main.yml"]
+  prevention: "Template in molecule/shared/ includes required fields"
+
+- id: FIX-LINT-002
+  category: ansible-lint
+  problem: "galaxy namespace missing in role metadata"
+  solution: "Add namespace: anklume to galaxy_info in meta/main.yml"
+  source_commit: "6ab6d16"
+  files_affected: ["roles/*/meta/main.yml"]
+  prevention: "Include namespace in meta/main.yml template"
+
+- id: FIX-LINT-003
+  category: ansible-lint
+  problem: "curl|bash install pattern triggers command-instead-of-module"
+  solution: "Add noqa comment: # noqa: command-instead-of-module"
+  source_commit: "bd1852f"
+  files_affected: ["roles/dev_agent_runner/tasks/main.yml"]
+  prevention: "Document noqa usage for intentional shell patterns"
+
+- id: FIX-LINT-004
+  category: ansible-lint
+  problem: "git config via CLI triggers command-instead-of-module"
+  solution: "Add noqa: command-instead-of-module on git config tasks"
+  source_commit: "bd1852f"
+  files_affected: ["roles/dev_agent_runner/tasks/main.yml"]
+  prevention: "No ansible.builtin.git_config module exists"
+
+- id: FIX-LINT-005
+  category: ansible-lint
+  problem: "systemctl in verify tasks triggers command-instead-of-module"
+  solution: "Add noqa: command-instead-of-module to Molecule verify tasks"
+  source_commit: "bd1852f"
+  files_affected: ["roles/*/molecule/default/verify.yml"]
+  prevention: "Molecule verify uses command for validation, not management"
+
+- id: FIX-LINT-006
+  category: ansible-lint
+  problem: "inline when:changed_when triggers no-handler warning"
+  solution: "Add noqa: no-handler where handler pattern is inappropriate"
+  source_commit: "bd1852f"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Use handlers when possible; noqa when restart is inline"
+
+- id: FIX-LINT-007
+  category: ansible-lint
+  problem: "molecule/shared/ templates parsed by ansible-lint incorrectly"
+  solution: "Add molecule/shared/ to ansible-lint exclude paths"
+  source_commit: "bd1852f"
+  files_affected: [".ansible-lint"]
+  prevention: "Keep molecule/shared/ in exclude list"
+
+- id: FIX-LINT-008
+  category: ansible-lint
+  problem: "FQCN not used for command module"
+  solution: "Use ansible.builtin.command instead of command"
+  source_commit: "231717a"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Always use FQCN for all modules"
+
+- id: FIX-LINT-009
+  category: ansible-lint
+  problem: "missing changed_when on command tasks"
+  solution: "Add changed_when: false for read-only commands"
+  source_commit: "231717a"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Every command/shell task requires explicit changed_when"
+
+- id: FIX-LINT-010
+  category: ansible-lint
+  problem: "task name does not match RoleName | Description pattern"
+  solution: "Rename tasks to follow RoleName | Description convention"
+  source_commit: "313aca0"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Use format: RoleName | Description with initial capital"
+
+- id: FIX-LINT-011
+  category: ansible-lint
+  problem: "risky-shell-pipe warning on piped shell commands"
+  solution: "Use set -o pipefail or switch to ansible.builtin.command"
+  source_commit: "bd1852f"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Prefer command over shell; use pipefail when shell needed"
+
+- id: FIX-LINT-012
+  category: ansible-lint
+  problem: "ignore_errors used instead of failed_when"
+  solution: "Replace ignore_errors: true with failed_when: false"
+  source_commit: "313aca0"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Project convention: never use ignore_errors"
