@@ -615,3 +615,165 @@ exit 0
         result = run_flush(["--force"], env, cwd=tmp_path)
         assert result.returncode == 0
         assert "2 resources destroyed" in result.stdout
+
+
+# ── force requirement edge cases ──────────────────────────
+
+
+class TestFlushForceRequirement:
+    """Test production safety checks with various /etc/anklume states."""
+
+    def test_production_without_force_refuses(self, tmp_path):
+        """absolute_level=0, yolo=false, no --force → error."""
+        etc = tmp_path / "etc_anklume"
+        etc.mkdir()
+        (etc / "absolute_level").write_text("0")
+        (etc / "yolo").write_text("false")
+        patched = _make_patched_flush(tmp_path, etc)
+        env = os.environ.copy()
+        result = subprocess.run(
+            ["bash", str(patched)],
+            capture_output=True, text=True, env=env,
+        )
+        assert result.returncode != 0
+        assert "production" in result.stdout.lower() or "FORCE" in result.stdout
+
+    def test_production_with_force_proceeds(self, tmp_path):
+        """absolute_level=0, yolo=false, --force → proceeds (needs incus)."""
+        etc = tmp_path / "etc_anklume"
+        etc.mkdir()
+        (etc / "absolute_level").write_text("0")
+        (etc / "yolo").write_text("false")
+        patched = _make_patched_flush(tmp_path, etc)
+        # Mock incus to pass pre-flight but have nothing to delete
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then echo '[{"name":"default"}]'; exit 0; fi
+if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then exit 0; fi
+if [[ "$1" == "profile" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "network" && "$2" == "list" ]]; then echo "incusbr0"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = subprocess.run(
+            ["bash", str(patched), "--force"],
+            capture_output=True, text=True, env=env, cwd=tmp_path,
+        )
+        assert result.returncode == 0
+        assert "Flush" in result.stdout
+
+    def test_non_production_no_force_needed(self, tmp_path):
+        """absolute_level=1 (nested) → no --force required, proceeds directly."""
+        etc = tmp_path / "etc_anklume"
+        etc.mkdir()
+        (etc / "absolute_level").write_text("1")
+        (etc / "yolo").write_text("false")
+        patched = _make_patched_flush(tmp_path, etc)
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then echo '[{"name":"default"}]'; exit 0; fi
+if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then exit 0; fi
+if [[ "$1" == "profile" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "network" && "$2" == "list" ]]; then echo "incusbr0"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        # Use --force to skip confirmation prompt (since no stdin)
+        result = subprocess.run(
+            ["bash", str(patched), "--force"],
+            capture_output=True, text=True, env=env, cwd=tmp_path,
+        )
+        assert result.returncode == 0
+
+    def test_yolo_true_no_force_needed(self, tmp_path):
+        """absolute_level=0 but yolo=true → no --force required."""
+        etc = tmp_path / "etc_anklume"
+        etc.mkdir()
+        (etc / "absolute_level").write_text("0")
+        (etc / "yolo").write_text("true")
+        patched = _make_patched_flush(tmp_path, etc)
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then echo '[{"name":"default"}]'; exit 0; fi
+if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then exit 0; fi
+if [[ "$1" == "profile" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "network" && "$2" == "list" ]]; then echo "incusbr0"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = subprocess.run(
+            ["bash", str(patched), "--force"],
+            capture_output=True, text=True, env=env, cwd=tmp_path,
+        )
+        assert result.returncode == 0
+
+
+class TestFlushIncusErrors:
+    """Test graceful handling when incus commands fail during flush."""
+
+    def test_incus_not_reachable_pre_flight(self, tmp_path):
+        """When incus project list fails, flush exits with clear error."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_flush(["--force"], env, cwd=tmp_path)
+        assert result.returncode != 0
+        assert "Cannot connect" in result.stdout or "ERROR" in result.stdout
+
+    def test_no_bridges_found_clean_exit(self, tmp_path):
+        """When no net-* bridges exist, flush completes with 0 bridge deletions."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then echo '[{"name":"default"}]'; exit 0; fi
+if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then exit 0; fi
+if [[ "$1" == "profile" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "network" && "$2" == "list" ]]; then echo "incusbr0"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_flush(["--force"], env, cwd=tmp_path)
+        assert result.returncode == 0
+        assert "Nothing to flush" in result.stdout
+
+    def test_unknown_arg_shows_usage(self, tmp_path):
+        """Unknown argument shows usage and exits."""
+        env = os.environ.copy()
+        result = run_flush(["--banana"], env, cwd=tmp_path)
+        assert result.returncode != 0
+        assert "Usage" in result.stdout or "Usage" in result.stderr
