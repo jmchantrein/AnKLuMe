@@ -432,3 +432,128 @@ exit 0
         env["PATH"] = f"{mock_bin}:{env['PATH']}"
         result = run_import([], env, cwd=tmp_path)
         assert result.returncode == 0
+
+
+# ── IPv6 addresses are ignored ─────────────────────────
+
+
+class TestImportIPv6Filtering:
+    """Test that IPv6 addresses are filtered out and only IPv4 is captured."""
+
+    def test_ipv6_only_instance_has_no_ip(self, tmp_path):
+        """Instance with only IPv6 addresses is imported without an IP."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"v6only"}]')
+
+        v6_json = tmp_path / "v6.json"
+        v6_json.write_text(
+            '[{"name":"v6-box","type":"container",'
+            '"state":{"network":{"eth0":{"addresses":'
+            '[{"family":"inet6","address":"fd42::10"}]}}}}]',
+        )
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project v6only"* && "$*" == *"--format json"* ]]; then
+    cat "{v6_json}"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        assert "v6-box:" in content
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            if "v6-box:" in line:
+                block = "\n".join(lines[i:i + 5])
+                assert "ip:" not in block
+                break
+
+
+class TestImportMultipleInterfaces:
+    """Test that import picks the first non-lo IPv4 address."""
+
+    def test_multi_nic_picks_first_ipv4(self, tmp_path):
+        """Instance with multiple NICs picks the first non-lo IPv4."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"multi"}]')
+
+        multi_json = tmp_path / "multi.json"
+        multi_json.write_text(
+            '[{"name":"multi-nic","type":"container",'
+            '"state":{"network":{'
+            '"lo":{"addresses":[{"family":"inet","address":"127.0.0.1"}]},'
+            '"eth0":{"addresses":[{"family":"inet","address":"10.100.5.10"}]},'
+            '"eth1":{"addresses":[{"family":"inet","address":"10.100.6.20"}]}'
+            '}}}]',
+        )
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project multi"* && "$*" == *"--format json"* ]]; then
+    cat "{multi_json}"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        assert "10.100.5.10" in content
+        assert "127.0.0.1" not in content
+
+
+class TestImportOutputFileOverwrite:
+    """Test import output file behavior."""
+
+    def test_overwrites_existing_output(self, mock_env):
+        """Import overwrites existing output file."""
+        env, _, cwd = mock_env
+        output = cwd / "infra.imported.yml"
+        output.write_text("# old content\n")
+        run_import([], env, cwd=cwd)
+        content = output.read_text()
+        assert "# old content" not in content
+        assert "project_name" in content
+
+    def test_output_starts_with_header_comment(self, mock_env):
+        """Import output starts with informative header comments."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        content = (cwd / "infra.imported.yml").read_text()
+        assert content.startswith("#")
+        assert "WARNING" in content or "Review" in content
