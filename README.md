@@ -1,8 +1,8 @@
 # AnKLuMe 🔨
 
-<!-- Dynamic badges (auto-updated from GitHub) -->
+<!-- Badges -->
 [![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
-[![License](https://img.shields.io/github/license/jmchantrein/AnKLuMe)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/commits/main)
 [![Issues](https://img.shields.io/github/issues/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/issues)
 [![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/pulls)
