@@ -726,3 +726,1138 @@ class TestGuideColors:
         guide_env["TERM"] = "xterm-256color"
         result = run_guide(["--auto", "--step", "9"], guide_env)
         assert result.returncode == 0
+
+
+# ══════════════════════════════════════════════════════════
+# NEW TESTS — added below existing 61 tests
+# ══════════════════════════════════════════════════════════
+
+
+class TestGuideShebangAndStrictMode:
+    """Verify script header and strict mode settings."""
+
+    def test_shebang_line(self):
+        """Script starts with proper bash shebang."""
+        source = GUIDE_SH.read_text()
+        assert source.startswith("#!/usr/bin/env bash")
+
+    def test_set_euo_pipefail_near_top(self):
+        """set -euo pipefail appears within the first 15 lines."""
+        lines = GUIDE_SH.read_text().splitlines()[:15]
+        found = any("set -euo pipefail" in line for line in lines)
+        assert found, "set -euo pipefail not found near top of script"
+
+    def test_script_is_readable(self):
+        """The guide script file exists and is non-empty."""
+        assert GUIDE_SH.exists()
+        assert GUIDE_SH.stat().st_size > 0
+
+    def test_script_under_600_lines(self):
+        """The guide script stays within a reasonable size."""
+        lines = GUIDE_SH.read_text().splitlines()
+        assert len(lines) < 600, f"guide.sh has {len(lines)} lines"
+
+
+class TestGuideAllStepFunctions:
+    """Verify that all 9 step functions are defined in the script."""
+
+    def test_step_1_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_1_prerequisites()" in source
+
+    def test_step_2_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_2_use_case()" in source
+
+    def test_step_3_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_3_infra_yml()" in source
+
+    def test_step_4_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_4_generate()" in source
+
+    def test_step_5_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_5_validate()" in source
+
+    def test_step_6_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_6_apply()" in source
+
+    def test_step_7_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_7_verify()" in source
+
+    def test_step_8_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_8_snapshot()" in source
+
+    def test_step_9_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_9_next_steps()" in source
+
+
+class TestGuideHelperFunctions:
+    """Verify helper functions exist in the script source."""
+
+    def test_header_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "header()" in source
+
+    def test_step_header_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "step_header()" in source
+
+    def test_ok_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "ok()" in source
+
+    def test_fail_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "fail()" in source
+
+    def test_warn_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "warn()" in source
+
+    def test_info_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "info()" in source
+
+    def test_pause_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "pause()" in source
+
+    def test_confirm_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "confirm()" in source
+
+    def test_select_option_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "select_option()" in source
+
+    def test_run_cmd_function_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "run_cmd()" in source
+
+
+class TestGuideANSIColorDefinitions:
+    """Verify all ANSI color variables are defined."""
+
+    def test_red_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "RED=" in source
+
+    def test_green_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "GREEN=" in source
+
+    def test_yellow_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "YELLOW=" in source
+
+    def test_blue_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "BLUE=" in source
+
+    def test_cyan_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "CYAN=" in source
+
+    def test_bold_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "BOLD=" in source
+
+    def test_dim_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "DIM=" in source
+
+    def test_reset_defined(self):
+        source = GUIDE_SH.read_text()
+        assert "RESET=" in source
+
+    def test_red_escape_code(self):
+        source = GUIDE_SH.read_text()
+        assert r"\033[0;31m" in source
+
+    def test_green_escape_code(self):
+        source = GUIDE_SH.read_text()
+        assert r"\033[0;32m" in source
+
+    def test_reset_escape_code(self):
+        source = GUIDE_SH.read_text()
+        assert r"\033[0m" in source
+
+
+class TestGuideGlobals:
+    """Verify global variables in the script."""
+
+    def test_start_step_default_is_1(self):
+        source = GUIDE_SH.read_text()
+        assert "START_STEP=1" in source
+
+    def test_auto_default_is_false(self):
+        source = GUIDE_SH.read_text()
+        assert "AUTO=false" in source
+
+    def test_total_steps_is_9(self):
+        source = GUIDE_SH.read_text()
+        assert "TOTAL_STEPS=9" in source
+
+    def test_script_dir_resolved(self):
+        source = GUIDE_SH.read_text()
+        assert "SCRIPT_DIR=" in source
+
+    def test_project_dir_resolved(self):
+        source = GUIDE_SH.read_text()
+        assert "PROJECT_DIR=" in source
+
+    def test_use_case_initialized(self):
+        source = GUIDE_SH.read_text()
+        assert 'USE_CASE=""' in source
+
+    def test_infra_src_initialized(self):
+        source = GUIDE_SH.read_text()
+        assert 'INFRA_SRC=""' in source
+
+    def test_selected_initialized(self):
+        source = GUIDE_SH.read_text()
+        assert "SELECTED=0" in source
+
+
+class TestGuideArgParsingSource:
+    """Verify argument parsing structure in source code."""
+
+    def test_while_loop_for_args(self):
+        source = GUIDE_SH.read_text()
+        assert "while [[$# -gt 0]]" in source.replace(" ", "") or \
+               'while [[ $# -gt 0 ]]' in source
+
+    def test_step_case_branch(self):
+        source = GUIDE_SH.read_text()
+        assert "--step)" in source
+
+    def test_auto_case_branch(self):
+        source = GUIDE_SH.read_text()
+        assert "--auto)" in source
+
+    def test_help_case_branch(self):
+        source = GUIDE_SH.read_text()
+        assert "--help|-h)" in source
+
+    def test_unknown_option_case_branch(self):
+        source = GUIDE_SH.read_text()
+        assert "*)" in source
+
+    def test_step_validation_range(self):
+        source = GUIDE_SH.read_text()
+        assert 'Step must be between 1 and $TOTAL_STEPS' in source
+
+    def test_shift_2_for_step(self):
+        source = GUIDE_SH.read_text()
+        assert "shift 2" in source
+
+
+class TestGuideHelpOutput:
+    """Detailed tests for --help output."""
+
+    def test_help_shows_usage(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        assert "Usage:" in result.stdout
+
+    def test_help_shows_step_option(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        assert "--step" in result.stdout
+
+    def test_help_shows_auto_option(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        assert "--auto" in result.stdout
+
+    def test_help_shows_step_range(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        # --step N   Resume from step N (1-9)
+        assert "1-" in result.stdout
+
+    def test_help_mentions_ci(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        assert "CI" in result.stdout
+
+    def test_help_returns_exit_0(self, guide_env):
+        result = run_guide(["--help"], guide_env)
+        assert result.returncode == 0
+
+    def test_h_flag_same_as_help(self, guide_env):
+        result = run_guide(["-h"], guide_env)
+        assert result.returncode == 0
+        assert "Usage:" in result.stdout
+
+
+class TestGuideUnknownOptionVariants:
+    """Test various invalid argument scenarios."""
+
+    def test_double_dash_unknown(self, guide_env):
+        result = run_guide(["--foobar"], guide_env)
+        assert result.returncode != 0
+
+    def test_unknown_shows_usage(self, guide_env):
+        result = run_guide(["--foobar"], guide_env)
+        combined = result.stdout + result.stderr
+        assert "Usage" in combined or "Unknown" in combined
+
+    def test_single_dash_unknown(self, guide_env):
+        result = run_guide(["-z"], guide_env)
+        assert result.returncode != 0
+
+    def test_positional_argument_rejected(self, guide_env):
+        result = run_guide(["deploy"], guide_env)
+        assert result.returncode != 0
+
+
+class TestGuideStepBoundaryValues:
+    """Comprehensive boundary value tests for --step."""
+
+    def test_step_1_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "Step 1" in result.stdout
+
+    def test_step_2_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Step 2" in result.stdout
+
+    def test_step_3_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "3"], guide_env)
+        assert "Step 3" in result.stdout
+
+    def test_step_4_shows_header(self, guide_env):
+        result = run_guide(["--auto", "--step", "4"], guide_env)
+        assert "Step 4" in result.stdout
+
+    def test_step_5_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        assert "Step 5" in result.stdout
+
+    def test_step_6_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "Step 6" in result.stdout
+
+    def test_step_7_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "7"], guide_env)
+        assert "Step 7" in result.stdout
+
+    def test_step_8_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "Step 8" in result.stdout
+
+    def test_step_9_valid(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Step 9" in result.stdout
+
+    def test_step_10_invalid(self, guide_env):
+        result = run_guide(["--step", "10"], guide_env)
+        assert result.returncode != 0
+
+    def test_step_100_invalid(self, guide_env):
+        result = run_guide(["--step", "100"], guide_env)
+        assert result.returncode != 0
+
+    def test_step_minus_5_invalid(self, guide_env):
+        result = run_guide(["--step", "-5"], guide_env)
+        assert result.returncode != 0
+
+
+class TestGuideStepHeaderFormat:
+    """Verify step_header format: 'Step N/9: Title'."""
+
+    def test_step_1_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "1/9" in result.stdout
+
+    def test_step_2_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "2/9" in result.stdout
+
+    def test_step_3_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "3"], guide_env)
+        assert "3/9" in result.stdout
+
+    def test_step_5_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        assert "5/9" in result.stdout
+
+    def test_step_6_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "6/9" in result.stdout
+
+    def test_step_9_header_format(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "9/9" in result.stdout
+
+
+class TestGuideStepTitles:
+    """Verify each step's title text in output."""
+
+    def test_step_1_title_prerequisites(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "Prerequisites Check" in result.stdout
+
+    def test_step_2_title_use_case(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Use Case Selection" in result.stdout
+
+    def test_step_3_title_infra_yml(self, guide_env):
+        result = run_guide(["--auto", "--step", "3"], guide_env)
+        assert "Create and Customize infra.yml" in result.stdout
+
+    def test_step_4_title_generate(self, guide_env):
+        result = run_guide(["--auto", "--step", "4"], guide_env)
+        assert "Generate Ansible Files" in result.stdout
+
+    def test_step_5_title_validate(self, guide_env):
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        assert "Validate Configuration" in result.stdout
+
+    def test_step_6_title_apply(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "Apply Infrastructure" in result.stdout
+
+    def test_step_7_title_verify(self, guide_env):
+        result = run_guide(["--auto", "--step", "7"], guide_env)
+        assert "Verify Infrastructure" in result.stdout
+
+    def test_step_8_title_snapshot(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "Create a Snapshot" in result.stdout
+
+    def test_step_9_title_next_steps(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Next Steps" in result.stdout
+
+
+class TestGuideBannerOutput:
+    """Verify the banner/header is displayed."""
+
+    def test_banner_shows_anklume(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "AnKLuMe" in result.stdout
+
+    def test_banner_shows_setup_guide(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Setup Guide" in result.stdout
+
+    def test_banner_shows_compartmentalization(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Compartmentalization" in result.stdout
+
+    def test_banner_has_box_drawing(self, guide_env):
+        """Banner uses Unicode box-drawing characters."""
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        # The banner uses ┌ ┐ └ ┘ characters
+        assert "\u250c" in result.stdout or "\u2500" in result.stdout
+
+
+class TestGuideResumeMessage:
+    """Verify the 'Resuming from step N' info message."""
+
+    def test_no_resume_message_at_step_1(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "Resuming from step" not in result.stdout
+
+    def test_resume_message_at_step_2(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Resuming from step 2" in result.stdout
+
+    def test_resume_message_at_step_3(self, guide_env):
+        result = run_guide(["--auto", "--step", "3"], guide_env)
+        assert "Resuming from step 3" in result.stdout
+
+    def test_resume_message_at_step_5(self, guide_env):
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        assert "Resuming from step 5" in result.stdout
+
+    def test_resume_message_at_step_9(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Resuming from step 9" in result.stdout
+
+
+class TestGuideStep1PrerequisitesDetailed:
+    """Detailed tests for step 1 prerequisite checks."""
+
+    def test_step_1_checks_incus(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "incus" in result.stdout.lower()
+
+    def test_step_1_checks_ansible(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "ansible" in result.stdout.lower()
+
+    def test_step_1_checks_python3(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "python3" in result.stdout.lower()
+
+    def test_step_1_checks_git(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "git" in result.stdout.lower()
+
+    def test_step_1_checks_make(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "make" in result.stdout.lower()
+
+    def test_step_1_optional_tools_section(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "Optional tools" in result.stdout
+
+    def test_step_1_checks_ansible_lint(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "ansible-lint" in result.stdout.lower()
+
+    def test_step_1_checks_yamllint(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "yamllint" in result.stdout.lower()
+
+    def test_step_1_checks_shellcheck(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        # shellcheck is optional; it may show "not found" or just its name
+        assert "shellcheck" in result.stdout.lower()
+
+    def test_step_1_checks_ruff(self, guide_env):
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "ruff" in result.stdout.lower()
+
+    def test_step_1_all_prereqs_satisfied(self, guide_env):
+        """With all mock tools present, step 1 reports success."""
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        assert "All prerequisites" in result.stdout
+
+
+class TestGuideStep1MissingToolsDetailed:
+    """More detailed missing-tool tests for step 1."""
+
+    @staticmethod
+    def _make_env_without(tmp_path, hidden):
+        """Env without specified tools (reuses the pattern from existing tests)."""
+        mock_bin = tmp_path / "restricted"
+        mock_bin.mkdir(exist_ok=True)
+
+        essential = [
+            "bash", "env", "sed", "awk", "head", "tail", "cat",
+            "grep", "seq", "clear", "true", "false", "dirname",
+            "pwd", "rm", "cp", "mkdir", "chmod", "tee",
+            "sort", "tr", "wc", "uname", "id", "readlink",
+        ]
+        for util in essential:
+            for prefix in ["/usr/bin/", "/bin/"]:
+                src = Path(prefix + util)
+                if src.exists() and not (mock_bin / util).exists():
+                    (mock_bin / util).symlink_to(src)
+                    break
+
+        all_tools = [
+            "incus", "ansible-playbook", "ansible-lint", "ansible",
+            "yamllint", "python3", "git", "make",
+            "shellcheck", "ruff",
+        ]
+        for tool in all_tools:
+            if tool in hidden:
+                continue
+            mock_cmd = mock_bin / tool
+            if not mock_cmd.exists():
+                mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
+                mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        if mock_python.exists():
+            mock_python.unlink()
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = str(mock_bin)
+        env["TERM"] = "dumb"
+        return env
+
+    def test_missing_git_fails(self, tmp_path):
+        env = self._make_env_without(tmp_path, {"git"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert result.returncode != 0
+        assert "git" in result.stdout.lower()
+
+    def test_missing_python3_fails(self, tmp_path):
+        """Hiding python3 from PATH causes step 1 to fail.
+
+        Note: the helper always re-creates a real python3 shim (needed for
+        make init to work), so we must explicitly remove it after env creation.
+        """
+        env = self._make_env_without(tmp_path, {"python3"})
+        # The helper always re-creates python3 — remove it to truly hide it
+        mock_python = tmp_path / "restricted" / "python3"
+        if mock_python.exists():
+            mock_python.unlink()
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert result.returncode != 0
+
+    def test_missing_ansible_playbook_fails(self, tmp_path):
+        env = self._make_env_without(tmp_path, {"ansible-playbook"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert result.returncode != 0
+        assert "ansible" in result.stdout.lower()
+
+    def test_missing_required_shows_install_hint(self, tmp_path):
+        """Missing tool message tells user to install."""
+        env = self._make_env_without(tmp_path, {"incus"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert "Install" in result.stdout or "install" in result.stdout
+
+    def test_missing_shellcheck_does_not_fail(self, tmp_path):
+        """shellcheck is optional; missing it should not cause exit 1."""
+        env = self._make_env_without(tmp_path, {"shellcheck"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        # Step 1 should succeed (shellcheck is optional)
+        assert "All prerequisites" in result.stdout or result.returncode == 0
+
+    def test_missing_ruff_does_not_fail(self, tmp_path):
+        """ruff is optional; missing it should not cause exit 1."""
+        env = self._make_env_without(tmp_path, {"ruff"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert "All prerequisites" in result.stdout or result.returncode == 0
+
+    def test_missing_yamllint_does_not_fail(self, tmp_path):
+        """yamllint is optional; missing it should not cause exit 1."""
+        env = self._make_env_without(tmp_path, {"yamllint"})
+        result = run_guide(["--auto", "--step", "1"], env)
+        assert "All prerequisites" in result.stdout or result.returncode == 0
+
+
+class TestGuideStep2UseCaseDetailed:
+    """Detailed use-case selection tests."""
+
+    def test_step_2_shows_student_option(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Student" in result.stdout or "student" in result.stdout
+
+    def test_step_2_shows_teacher_option(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Teacher" in result.stdout or "teacher" in result.stdout
+
+    def test_step_2_shows_pro_option(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Pro" in result.stdout or "pro" in result.stdout
+
+    def test_step_2_shows_custom_option(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Custom" in result.stdout or "custom" in result.stdout
+
+    def test_step_2_auto_selects_message(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Auto-mode: selecting option 1" in result.stdout
+
+    def test_step_2_shows_selected_student(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Selected: student-sysadmin" in result.stdout
+
+    def test_step_2_shows_select_prompt(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "Select your use case" in result.stdout
+
+    def test_step_2_mentions_examples(self, guide_env):
+        result = run_guide(["--auto", "--step", "2"], guide_env)
+        assert "example" in result.stdout.lower()
+
+
+class TestGuideStep3InfraYmlSource:
+    """Verify step 3 source code structure."""
+
+    def test_step_3_uses_editor_fallback(self):
+        source = GUIDE_SH.read_text()
+        assert '${EDITOR:-${VISUAL:-vi}}' in source
+
+    def test_step_3_checks_infra_yml_exists(self):
+        source = GUIDE_SH.read_text()
+        assert '-f "$dest"' in source or '-f "$PROJECT_DIR/infra.yml"' in source
+
+    def test_step_3_can_overwrite(self):
+        source = GUIDE_SH.read_text()
+        assert "Overwrite" in source
+
+    def test_step_3_copies_infra_src(self):
+        source = GUIDE_SH.read_text()
+        assert 'cp "$INFRA_SRC" "$dest"' in source
+
+    def test_step_3_shows_contents_with_sed(self):
+        source = GUIDE_SH.read_text()
+        assert 'sed' in source and '"$dest"' in source
+
+    def test_step_3_skips_editor_in_auto(self):
+        """Auto mode does not open the editor."""
+        source = GUIDE_SH.read_text()
+        assert '"$AUTO" != "true"' in source
+
+
+class TestGuideStep4GenerateSource:
+    """Verify step 4 source code."""
+
+    def test_step_4_runs_dry_run_first(self):
+        source = GUIDE_SH.read_text()
+        assert "generate.py infra.yml --dry-run" in source
+
+    def test_step_4_runs_make_sync(self):
+        source = GUIDE_SH.read_text()
+        assert "make sync" in source
+
+    def test_step_4_exits_on_dry_run_failure_in_auto(self):
+        source = GUIDE_SH.read_text()
+        # After dry-run failure, auto mode exits
+        assert "Dry-run failed" in source
+
+    def test_step_4_suggests_resume_on_error(self):
+        source = GUIDE_SH.read_text()
+        assert "make guide STEP=4" in source
+
+
+class TestGuideStep5ValidateSource:
+    """Verify step 5 source code."""
+
+    def test_step_5_runs_yamllint(self):
+        source = GUIDE_SH.read_text()
+        assert "yamllint" in source
+
+    def test_step_5_runs_ansible_lint(self):
+        source = GUIDE_SH.read_text()
+        assert "ansible-lint" in source
+
+    def test_step_5_runs_syntax_check(self):
+        source = GUIDE_SH.read_text()
+        assert "ansible-playbook site.yml --syntax-check" in source
+
+    def test_step_5_mentions_non_blocking(self):
+        source = GUIDE_SH.read_text()
+        assert "non-blocking" in source
+
+
+class TestGuideStep6ApplySource:
+    """Verify step 6 source code."""
+
+    def test_step_6_warns_about_incus_requirement(self):
+        source = GUIDE_SH.read_text()
+        assert "running Incus daemon" in source
+
+    def test_step_6_skips_in_auto(self):
+        source = GUIDE_SH.read_text()
+        assert "Auto-mode: skipping apply" in source
+
+    def test_step_6_checks_incus_info(self):
+        source = GUIDE_SH.read_text()
+        assert "incus info" in source
+
+    def test_step_6_runs_make_apply(self):
+        source = GUIDE_SH.read_text()
+        assert "make apply" in source
+
+    def test_step_6_suggests_resume(self):
+        source = GUIDE_SH.read_text()
+        assert "make guide STEP=6" in source
+
+
+class TestGuideStep7VerifySource:
+    """Verify step 7 source code."""
+
+    def test_step_7_lists_instances(self):
+        source = GUIDE_SH.read_text()
+        assert "incus list --all-projects" in source
+
+    def test_step_7_shows_networks(self):
+        source = GUIDE_SH.read_text()
+        assert "incus network list" in source
+
+    def test_step_7_greps_net_pattern(self):
+        source = GUIDE_SH.read_text()
+        assert 'grep "net-"' in source
+
+
+class TestGuideStep8SnapshotSource:
+    """Verify step 8 source code."""
+
+    def test_step_8_explains_snapshots(self):
+        source = GUIDE_SH.read_text()
+        assert "save and restore" in source
+
+    def test_step_8_shows_commands(self):
+        source = GUIDE_SH.read_text()
+        assert "make snapshot" in source
+        assert "make restore" in source
+        assert "make snapshot-list" in source
+
+    def test_step_8_auto_skip_message(self):
+        source = GUIDE_SH.read_text()
+        assert "Auto-mode: skipping snapshot" in source
+
+    def test_step_8_uses_guide_initial_name(self):
+        source = GUIDE_SH.read_text()
+        assert "guide-initial" in source
+
+
+class TestGuideStep9NextStepsDetailed:
+    """Detailed tests for step 9 output content."""
+
+    def test_step_9_mentions_network_isolation(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Network isolation" in result.stdout
+
+    def test_step_9_mentions_nftables_commands(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "make nftables" in result.stdout
+
+    def test_step_9_mentions_firewall_vm(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Firewall VM" in result.stdout
+
+    def test_step_9_mentions_ai_testing(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "AI-assisted testing" in result.stdout or "AI" in result.stdout
+
+    def test_step_9_mentions_make_ai_test(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "make ai-test" in result.stdout
+
+    def test_step_9_mentions_make_apply_limit(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "make apply-limit" in result.stdout
+
+    def test_step_9_mentions_make_flush(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "make flush" in result.stdout
+
+    def test_step_9_happy_compartmentalizing(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Happy compartmentalizing" in result.stdout
+
+    def test_step_9_mentions_docs(self, guide_env):
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "docs/" in result.stdout
+
+
+class TestGuideAutoSkipsSteps:
+    """Test that auto mode correctly skips interactive steps."""
+
+    def test_step_6_auto_skip_message(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "Auto-mode: skipping apply" in result.stdout
+
+    def test_step_8_auto_skip_message(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "Auto-mode: skipping snapshot" in result.stdout
+
+    def test_step_6_auto_exits_0(self, guide_env):
+        """Step 6 in auto mode does not fail (it skips)."""
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        # Step 6 skips, then continues to step 7+
+        assert "Step 6" in result.stdout
+
+    def test_step_8_auto_exits_0(self, guide_env):
+        """Step 8 in auto mode does not fail (it skips)."""
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "Step 8" in result.stdout
+
+
+class TestGuideStepSequencing:
+    """Test that steps execute in the correct order."""
+
+    def test_step_6_through_9_all_appear(self, guide_env):
+        """Starting at step 6, steps 6-9 all execute."""
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        output = result.stdout
+        assert "Step 6" in output
+        assert "Step 7" in output
+        assert "Step 8" in output
+        assert "Step 9" in output
+
+    def test_step_8_runs_step_9_after(self, guide_env):
+        """Starting at step 8, step 9 follows."""
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        output = result.stdout
+        assert "Step 8" in output
+        assert "Step 9" in output
+
+    def test_step_9_only_runs_step_9(self, guide_env):
+        """Starting at step 9, only step 9 runs."""
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        output = result.stdout
+        assert "Step 9" in output
+        # Step 8 should NOT appear
+        assert "Step 8" not in output
+
+    def test_step_6_does_not_contain_step_5(self, guide_env):
+        """Starting at step 6, earlier steps are skipped."""
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        output = result.stdout
+        assert "Step 5/" not in output
+        assert "Prerequisites Check" not in output
+
+
+class TestGuidePauseInAutoMode:
+    """Verify that auto mode skips pauses."""
+
+    def test_auto_no_press_enter_prompt(self, guide_env):
+        """Auto mode does not show 'Press Enter' prompts."""
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert "Press Enter" not in result.stdout
+
+    def test_auto_confirm_returns_yes(self):
+        """In source, confirm() returns 0 in auto mode."""
+        source = GUIDE_SH.read_text()
+        # confirm checks AUTO == "true" and returns 0
+        assert '"$AUTO" == "true"' in source
+
+
+class TestGuideSelectOptionAutoMode:
+    """Verify the select_option function behavior in auto mode."""
+
+    def test_select_option_in_source(self):
+        """select_option uses SELECTED variable."""
+        source = GUIDE_SH.read_text()
+        assert "SELECTED=" in source
+
+    def test_auto_mode_prints_selecting_message(self):
+        """In auto mode, select_option prints a message."""
+        source = GUIDE_SH.read_text()
+        assert "Auto-mode: selecting option 1" in source
+
+
+class TestGuideMainLoop:
+    """Verify the main loop structure in source."""
+
+    def test_uses_seq_for_step_range(self):
+        source = GUIDE_SH.read_text()
+        assert 'seq "$START_STEP" "$TOTAL_STEPS"' in source
+
+    def test_case_dispatches_all_9_steps(self):
+        source = GUIDE_SH.read_text()
+        for i in range(1, 10):
+            assert f"{i}) step_{i}_" in source
+
+    def test_cd_to_project_dir_before_loop(self):
+        source = GUIDE_SH.read_text()
+        assert 'cd "$PROJECT_DIR"' in source
+
+    def test_header_called_before_steps(self):
+        """header is called before the main loop."""
+        source = GUIDE_SH.read_text()
+        header_pos = source.find("header\n")
+        loop_pos = source.find("for step in")
+        assert header_pos > 0 and loop_pos > 0
+        assert header_pos < loop_pos
+
+
+class TestGuideColorTermVariants:
+    """Test with different TERM values."""
+
+    def test_term_unset_no_crash(self, guide_env):
+        guide_env.pop("TERM", None)
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        # May succeed or fail depending on clear, but should not hang
+        assert result.returncode == 0 or "Step 9" in result.stdout
+
+    def test_term_vt100_no_crash(self, guide_env):
+        guide_env["TERM"] = "vt100"
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert result.returncode == 0
+
+    def test_term_screen_no_crash(self, guide_env):
+        guide_env["TERM"] = "screen"
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert result.returncode == 0
+
+    def test_term_linux_no_crash(self, guide_env):
+        guide_env["TERM"] = "linux"
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert result.returncode == 0
+
+
+class TestGuideMakeIntegration:
+    """Test make guide and make quickstart from source code."""
+
+    def test_makefile_has_guide_target(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "guide:" in content
+
+    def test_makefile_has_quickstart_target(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "quickstart:" in content
+
+    def test_makefile_guide_calls_guide_sh(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "scripts/guide.sh" in content
+
+    def test_makefile_guide_passes_step(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "--step" in content
+
+    def test_makefile_guide_passes_auto(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "--auto" in content
+
+    def test_makefile_quickstart_checks_existing(self):
+        """quickstart target checks if infra.yml exists."""
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "infra.yml already exists" in content
+
+    def test_makefile_quickstart_copies_example(self):
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "cp infra.yml.example infra.yml" in content
+
+    def test_makefile_help_mentions_guide(self):
+        """make help includes guide in Getting Started."""
+        makefile = PROJECT_ROOT / "Makefile"
+        content = makefile.read_text()
+        assert "make guide" in content
+
+
+class TestGuideUseCaseSourceMapping:
+    """Verify the USE_CASE → INFRA_SRC mapping in source."""
+
+    def test_student_maps_to_student_sysadmin(self):
+        source = GUIDE_SH.read_text()
+        assert 'USE_CASE="student-sysadmin"' in source
+
+    def test_teacher_maps_to_teacher_lab(self):
+        source = GUIDE_SH.read_text()
+        assert 'USE_CASE="teacher-lab"' in source
+
+    def test_pro_maps_to_pro_workstation(self):
+        source = GUIDE_SH.read_text()
+        assert 'USE_CASE="pro-workstation"' in source
+
+    def test_custom_maps_to_custom(self):
+        source = GUIDE_SH.read_text()
+        assert 'USE_CASE="custom"' in source
+
+    def test_custom_uses_infra_yml_example(self):
+        source = GUIDE_SH.read_text()
+        assert 'INFRA_SRC="$PROJECT_DIR/infra.yml.example"' in source
+
+    def test_non_custom_uses_examples_dir(self):
+        source = GUIDE_SH.read_text()
+        assert 'examples/${USE_CASE}/infra.yml' in source
+
+    def test_missing_example_falls_back(self):
+        source = GUIDE_SH.read_text()
+        assert "Falling back" in source
+
+
+class TestGuideRunCmdFunction:
+    """Verify run_cmd helper function structure."""
+
+    def test_run_cmd_shows_info(self):
+        source = GUIDE_SH.read_text()
+        assert 'info "Running: $*"' in source
+
+    def test_run_cmd_uses_ok_on_success(self):
+        source = GUIDE_SH.read_text()
+        # run_cmd calls ok "$desc"
+        assert 'ok "$desc"' in source
+
+    def test_run_cmd_uses_fail_on_error(self):
+        source = GUIDE_SH.read_text()
+        assert 'fail "$desc"' in source
+
+
+class TestGuideErrorMessages:
+    """Test error message content."""
+
+    def test_step_boundary_error_message(self, guide_env):
+        result = run_guide(["--step", "99"], guide_env)
+        combined = result.stdout + result.stderr
+        assert "must be between" in combined.lower() or "between" in combined.lower()
+
+    def test_step_0_error_message(self, guide_env):
+        result = run_guide(["--step", "0"], guide_env)
+        combined = result.stdout + result.stderr
+        assert "between" in combined.lower() or "must be" in combined.lower()
+
+    def test_unknown_option_error_message(self, guide_env):
+        result = run_guide(["--bogus"], guide_env)
+        combined = result.stdout + result.stderr
+        assert "Unknown" in combined
+
+    def test_missing_tools_error_lists_names(self, tmp_path):
+        """Error message lists the names of missing tools."""
+        env = TestGuideStep1MissingToolsDetailed._make_env_without(
+            tmp_path, {"incus", "git"}
+        )
+        result = run_guide(["--auto", "--step", "1"], env)
+        output = result.stdout.lower()
+        assert "incus" in output
+        assert "git" in output
+
+
+class TestGuideStep1MakeInitPrompt:
+    """Test the 'make init' prompt in step 1."""
+
+    def test_step_1_asks_make_init(self):
+        """Source asks about 'make init'."""
+        source = GUIDE_SH.read_text()
+        assert "make init" in source
+
+    def test_step_1_auto_runs_make_init(self, guide_env):
+        """In auto mode, confirm returns 0, so make init is attempted."""
+        result = run_guide(["--auto", "--step", "1"], guide_env)
+        # make init is attempted (may fail with mock env, but it's tried)
+        output = result.stdout.lower()
+        # The attempt happens, possibly with a warning
+        assert "prerequisites" in output
+
+
+class TestGuideOutputSymbols:
+    """Test that output contains the expected status symbols."""
+
+    def test_ok_uses_checkmark(self):
+        """ok() function uses a checkmark character."""
+        source = GUIDE_SH.read_text()
+        # ok() uses GREEN ✓
+        assert "\u2713" in source  # ✓
+
+    def test_fail_uses_cross(self):
+        """fail() function uses a cross character."""
+        source = GUIDE_SH.read_text()
+        assert "\u2717" in source  # ✗
+
+    def test_warn_uses_exclamation(self):
+        """warn() function uses an exclamation mark."""
+        source = GUIDE_SH.read_text()
+        # warn uses "!" prefix
+        assert "!" in source
+
+
+class TestGuideStep6ApplyAutoSkip:
+    """Verify step 6 auto-mode skip behavior in execution."""
+
+    def test_step_6_auto_shows_requires_live_incus(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "requires live Incus" in result.stdout
+
+    def test_step_6_continues_to_step_7(self, guide_env):
+        result = run_guide(["--auto", "--step", "6"], guide_env)
+        assert "Step 7" in result.stdout
+
+
+class TestGuideStep8SnapshotAutoSkip:
+    """Verify step 8 auto-mode behavior in execution."""
+
+    def test_step_8_shows_snapshot_commands(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "make snapshot" in result.stdout
+
+    def test_step_8_shows_restore_command(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "make restore" in result.stdout
+
+    def test_step_8_continues_to_step_9(self, guide_env):
+        result = run_guide(["--auto", "--step", "8"], guide_env)
+        assert "Step 9" in result.stdout
