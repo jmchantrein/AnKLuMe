@@ -263,3 +263,79 @@ class TestMetaContent:
         assert not errors, (
             "Missing author:\n" + "\n".join(errors)
         )
+
+
+class TestRoleDefaultRanges:
+    """Validate that default values are in sensible ranges."""
+
+    def _load_all_defaults(self):
+        """Load defaults from all roles."""
+        result = {}
+        for role in EXPECTED_ROLES:
+            defaults = ROLES_DIR / role / "defaults" / "main.yml"
+            if defaults.exists():
+                data = yaml.safe_load(defaults.read_text())
+                if isinstance(data, dict):
+                    result[role] = data
+        return result
+
+    def test_port_defaults_in_valid_range(self):
+        """Any variable ending in _port has value 1-65535."""
+        errors = []
+        for role, defaults in self._load_all_defaults().items():
+            for key, val in defaults.items():
+                if key.endswith("_port") and isinstance(val, int) and not (1 <= val <= 65535):
+                    errors.append(f"{role}.{key} = {val} (out of range)")
+        assert not errors, "Invalid port defaults:\n" + "\n".join(errors)
+
+    def test_retry_defaults_are_positive(self):
+        """Any variable with 'retries' or 'retry' has positive integer value."""
+        errors = []
+        for role, defaults in self._load_all_defaults().items():
+            for key, val in defaults.items():
+                if ("retries" in key or "retry" in key) and isinstance(val, int) and val <= 0:
+                    errors.append(f"{role}.{key} = {val} (not positive)")
+        assert not errors, "Non-positive retry defaults:\n" + "\n".join(errors)
+
+    def test_delay_defaults_are_positive(self):
+        """Any variable with 'delay' has positive integer value."""
+        errors = []
+        for role, defaults in self._load_all_defaults().items():
+            for key, val in defaults.items():
+                if "delay" in key and isinstance(val, int) and val <= 0:
+                    errors.append(f"{role}.{key} = {val} (not positive)")
+        assert not errors, "Non-positive delay defaults:\n" + "\n".join(errors)
+
+    def test_boolean_defaults_are_booleans(self):
+        """Variables ending in _enabled or _apply are actual booleans, not strings."""
+        errors = []
+        for role, defaults in self._load_all_defaults().items():
+            for key, val in defaults.items():
+                if key.endswith(("_enabled", "_apply")) and val is not None and not isinstance(val, bool):
+                    errors.append(f"{role}.{key} = {val!r} (type {type(val).__name__}, not bool)")
+        assert not errors, "Non-boolean flag defaults:\n" + "\n".join(errors)
+
+    def test_timeout_defaults_are_reasonable(self):
+        """Timeout defaults are between 1 and 3600 seconds."""
+        errors = []
+        for role, defaults in self._load_all_defaults().items():
+            for key, val in defaults.items():
+                if "timeout" in key and isinstance(val, int) and not (1 <= val <= 3600):
+                    errors.append(f"{role}.{key} = {val} (outside 1-3600)")
+        assert not errors, "Unreasonable timeout defaults:\n" + "\n".join(errors)
+
+    def test_no_namespace_collisions(self):
+        """No two unrelated roles share the same default variable name."""
+        var_to_roles = {}
+        for role, defaults in self._load_all_defaults().items():
+            for key in defaults:
+                var_to_roles.setdefault(key, []).append(role)
+        # Only flag if truly unrelated (no shared prefix)
+        collisions = []
+        for key, roles in var_to_roles.items():
+            if len(roles) > 1:
+                # Check if all roles share a common prefix (like incus_)
+                prefixes = {r.split("_")[0] for r in roles}
+                if len(prefixes) > 1:
+                    collisions.append(f"{key}: used by {', '.join(roles)}")
+        assert not collisions, "Namespace collisions:\n" + "\n".join(collisions)
