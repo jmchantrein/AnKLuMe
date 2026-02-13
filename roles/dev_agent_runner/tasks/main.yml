@@ -5,7 +5,7 @@
 # run-tests.sh) with Claude Code CLI and Agent Teams support.
 # Runs inside the container via community.general.incus connection.
 
-- name: DevAgentRunner | Install Node.js repository
+- name: DevAgentRunner | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell:
     cmd: >-
       curl -fsSL https://deb.nodesource.com/setup_{{ dev_agent_runner_node_version }}.x
@@ -46,7 +46,7 @@
     mode: "0755"
   when: dev_agent_runner_audit_hook
 
-- name: DevAgentRunner | Configure git identity
+- name: DevAgentRunner | Configure git identity  # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: "git config --global {{ item.key }} '{{ item.value }}'"
   loop:

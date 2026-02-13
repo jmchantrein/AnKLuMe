@@ -15,7 +15,7 @@
           - verify_service_file.stat.mode == '0644'
         fail_msg: "incus-socket-dir.service not deployed correctly"
 
-    - name: Verify | Check service is enabled
+    - name: Verify | Check service is enabled  # noqa: command-instead-of-module
       ansible.builtin.command:
         cmd: systemctl is-enabled incus-socket-dir.service
       register: verify_service_enabled

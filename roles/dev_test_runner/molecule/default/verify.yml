@@ -52,7 +52,7 @@
         cmd: ansible-lint --version
       changed_when: false
 
-    - name: Verify | Check git is configured
+    - name: Verify | Check git is configured  # noqa: command-instead-of-module
       ansible.builtin.command:
         cmd: git config --global user.name
       register: verify_git_name

@@ -28,7 +28,7 @@
           - "'molecule-test-snap' in (verify_snapshots | map(attribute='name') | list)"
         fail_msg: "Snapshot molecule-test-snap does not exist"
 
-    - name: Verify | Idempotency - run role again
+    - name: Verify | Idempotency - run role again  # noqa: var-naming[read-only]
       ansible.builtin.include_role:
         name: incus_snapshots
       vars:
@@ -44,7 +44,7 @@
           - not (idempotency_result is changed)
         fail_msg: "Role is not idempotent — second run produced changes"
 
-    - name: Verify | Test list action
+    - name: Verify | Test list action  # noqa: var-naming[read-only]
       ansible.builtin.include_role:
         name: incus_snapshots
       vars:
@@ -52,7 +52,7 @@
         snapshot_action: list
         inventory_hostname: molecule-test-instance
 
-    - name: Verify | Test restore action
+    - name: Verify | Test restore action  # noqa: var-naming[read-only]
       ansible.builtin.include_role:
         name: incus_snapshots
       vars:
@@ -88,7 +88,7 @@
           - "'molecule-test-snap' in verify_snap_names_restore"
         fail_msg: "Snapshot was lost after restore"
 
-    - name: Verify | Test snapshot delete action
+    - name: Verify | Test snapshot delete action  # noqa: var-naming[read-only]
       ansible.builtin.include_role:
         name: incus_snapshots
       vars:

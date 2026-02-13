@@ -203,7 +203,7 @@
     - item.key not in (incus_instance_devices | default({}))
   changed_when: true
 
-- name: IncusInstances | Restart instance if devices changed
+- name: IncusInstances | Restart instance if devices changed  # noqa: no-handler
   ansible.builtin.command:
     argv:
       - incus

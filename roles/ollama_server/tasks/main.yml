@@ -30,7 +30,7 @@
       - zstd
     state: present
 
-- name: OllamaServer | Install Ollama
+- name: OllamaServer | Install Ollama  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell:
     cmd: curl -fsSL https://ollama.com/install.sh | sh
     creates: /usr/local/bin/ollama
@@ -57,7 +57,7 @@
     state: started
     daemon_reload: true
 
-- name: OllamaServer | Wait for Ollama API to be ready
+- name: OllamaServer | Wait for Ollama API to be ready  # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: curl -sf http://localhost:11434/api/tags
   register: ollama_api_check
