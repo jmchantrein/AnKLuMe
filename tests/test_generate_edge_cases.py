@@ -1317,3 +1317,69 @@ class TestMainEdgeCases:
         assert "Validation errors" in captured.err
         # Warnings should NOT appear because we exited before get_warnings()
         assert "WARNING" not in captured.err
+
+    def test_main_dry_run_writes_nothing(self, sample_infra, tmp_path, capsys):
+        """--dry-run previews output but writes no files."""
+        from generate import main
+        infra_file = tmp_path / "infra.yml"
+        infra_file.write_text(yaml.dump(sample_infra, sort_keys=False))
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        main([str(infra_file), "--base-dir", str(out_dir), "--dry-run"])
+        captured = capsys.readouterr()
+        assert "[DRY-RUN]" in captured.out
+        assert "Would write" in captured.out
+        # No files actually written
+        assert not list(out_dir.rglob("*.yml"))
+
+    def test_main_empty_domains(self, tmp_path, capsys):
+        """Empty domains dict prints 'Nothing to generate' message."""
+        from generate import main
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {},
+        }
+        infra_file = tmp_path / "infra.yml"
+        infra_file.write_text(yaml.dump(infra, sort_keys=False))
+        main([str(infra_file), "--base-dir", str(tmp_path)])
+        captured = capsys.readouterr()
+        assert "Nothing to generate" in captured.out
+
+    def test_main_clean_orphans_deletes_unprotected(self, sample_infra, tmp_path, capsys):
+        """--clean-orphans deletes unprotected orphans but keeps protected ones."""
+        from generate import main
+        infra_file = tmp_path / "infra.yml"
+        infra_file.write_text(yaml.dump(sample_infra, sort_keys=False))
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        # First, generate files
+        main([str(infra_file), "--base-dir", str(out_dir)])
+        # Create orphan files
+        ephemeral_orphan = out_dir / "host_vars" / "temp.yml"
+        ephemeral_orphan.write_text("instance_ephemeral: true\n")
+        protected_orphan = out_dir / "host_vars" / "perm.yml"
+        protected_orphan.write_text("instance_ephemeral: false\n")
+        # Run with --clean-orphans
+        main([str(infra_file), "--base-dir", str(out_dir), "--clean-orphans"])
+        captured = capsys.readouterr()
+        assert "Deleted" in captured.out
+        assert "Skipped (protected)" in captured.out
+        # Ephemeral orphan should be deleted
+        assert not ephemeral_orphan.exists()
+        # Protected orphan should be kept
+        assert protected_orphan.exists()
+
+    def test_main_shows_orphan_report(self, sample_infra, tmp_path, capsys):
+        """Orphan files appear in the output report."""
+        from generate import main
+        infra_file = tmp_path / "infra.yml"
+        infra_file.write_text(yaml.dump(sample_infra, sort_keys=False))
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        main([str(infra_file), "--base-dir", str(out_dir)])
+        (out_dir / "host_vars" / "orphan-machine.yml").write_text("instance_name: orphan\n")
+        main([str(infra_file), "--base-dir", str(out_dir)])
+        captured = capsys.readouterr()
+        assert "Orphan files" in captured.out
+        assert "orphan-machine" in captured.out
