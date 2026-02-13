@@ -1,0 +1,9 @@
+---
+- name: Create test environment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create | No resources needed for template-only test
+      ansible.builtin.debug:
+        msg: "No Incus resources needed — testing template generation only"

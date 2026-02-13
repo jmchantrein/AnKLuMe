@@ -1,0 +1,64 @@
+---
+# DevAgentRunner | Setup Claude Code Agent Teams in sandbox container
+#
+# This role provisions a runner container (created by Phase 12's
+# run-tests.sh) with Claude Code CLI and Agent Teams support.
+# Runs inside the container via community.general.incus connection.
+
+- name: DevAgentRunner | Install Node.js repository
+  ansible.builtin.shell:
+    cmd: >-
+      curl -fsSL https://deb.nodesource.com/setup_{{ dev_agent_runner_node_version }}.x
+      | bash -
+    creates: /etc/apt/sources.list.d/nodesource.list
+  changed_when: true
+
+- name: DevAgentRunner | Install Node.js and tmux
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - tmux
+    state: present
+    update_cache: true
+
+- name: DevAgentRunner | Install Claude Code CLI
+  ansible.builtin.command:
+    cmd: npm install -g @anthropic-ai/claude-code
+  register: dev_agent_runner_npm_install
+  changed_when: "'added' in (dev_agent_runner_npm_install.stdout | default(''))"
+
+- name: DevAgentRunner | Create Claude Code settings directory
+  ansible.builtin.file:
+    path: /root/.claude
+    state: directory
+    mode: "0700"
+
+- name: DevAgentRunner | Deploy Claude Code settings
+  ansible.builtin.template:
+    src: claude-settings.json.j2
+    dest: /root/.claude/settings.json
+    mode: "0600"
+
+- name: DevAgentRunner | Deploy audit hook script
+  ansible.builtin.copy:
+    src: agent-audit-hook.sh
+    dest: /usr/local/bin/agent-audit-hook.sh
+    mode: "0755"
+  when: dev_agent_runner_audit_hook
+
+- name: DevAgentRunner | Configure git identity
+  ansible.builtin.command:
+    cmd: "git config --global {{ item.key }} '{{ item.value }}'"
+  loop:
+    - { key: "user.name", value: "{{ dev_agent_runner_git_user }}" }
+    - { key: "user.email", value: "{{ dev_agent_runner_git_email }}" }
+  changed_when: true
+
+- name: DevAgentRunner | Copy project CLAUDE.md to runner
+  ansible.builtin.copy:
+    src: "{{ dev_agent_runner_project_dir }}/CLAUDE.md"
+    dest: "{{ dev_agent_runner_project_dir }}/CLAUDE.md"
+    remote_src: true
+    mode: "0644"
+  failed_when: false
+  changed_when: false

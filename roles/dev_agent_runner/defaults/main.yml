@@ -1,0 +1,25 @@
+---
+# DevAgentRunner | Defaults for Claude Code Agent Teams runner
+#
+# Extends dev_test_runner (Phase 12) with Claude Code CLI,
+# Node.js, and Agent Teams configuration for autonomous
+# development and testing inside an Incus-in-Incus sandbox.
+
+# Node.js version (Claude Code requires >= 18)
+dev_agent_runner_node_version: "22"
+
+# Claude Code permissions mode inside the sandbox
+dev_agent_runner_permissions_mode: "bypassPermissions"
+
+# Git configuration for agent commits
+dev_agent_runner_git_user: "AnKLuMe Agent"
+dev_agent_runner_git_email: "agent@anklume.local"
+
+# Project directory inside the runner container
+dev_agent_runner_project_dir: "/root/AnKLuMe"
+
+# Agent Teams feature flag
+dev_agent_runner_enable_teams: true
+
+# Audit hook (log every tool invocation)
+dev_agent_runner_audit_hook: true

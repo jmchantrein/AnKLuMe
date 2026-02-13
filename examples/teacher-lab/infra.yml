@@ -1,0 +1,89 @@
+---
+# infra.yml — Primary Source of Truth (PSOT)
+#
+# Describes your infrastructure at a high level. After editing, run:
+#   make sync        # Generate/update Ansible files
+#   make apply       # Apply to Incus
+#
+# See docs/SPEC.md section 5 for the full format reference.
+
+# Teacher lab: admin domain + 3 student domains.
+# Each student gets an isolated network with a web server and a client.
+# Scale by copying the student domain blocks with new subnet_ids.
+
+project_name: networking-lab
+
+global:
+  base_subnet: "10.100"
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  admin:
+    description: "Teacher administration"
+    subnet_id: 0
+    ephemeral: false
+    machines:
+      lab-admin:
+        description: "Ansible controller for the lab"
+        type: lxc
+        ip: "10.100.0.10"
+        config:
+          security.nesting: "true"
+        roles:
+          - base_system
+
+  student-01:
+    description: "Student 1 lab environment"
+    subnet_id: 1
+    ephemeral: true
+    machines:
+      s01-web:
+        description: "Student 1 web server"
+        type: lxc
+        ip: "10.100.1.10"
+        roles:
+          - base_system
+      s01-client:
+        description: "Student 1 client"
+        type: lxc
+        ip: "10.100.1.11"
+        roles:
+          - base_system
+
+  student-02:
+    description: "Student 2 lab environment"
+    subnet_id: 2
+    ephemeral: true
+    machines:
+      s02-web:
+        description: "Student 2 web server"
+        type: lxc
+        ip: "10.100.2.10"
+        roles:
+          - base_system
+      s02-client:
+        description: "Student 2 client"
+        type: lxc
+        ip: "10.100.2.11"
+        roles:
+          - base_system
+
+  student-03:
+    description: "Student 3 lab environment"
+    subnet_id: 3
+    ephemeral: true
+    machines:
+      s03-web:
+        description: "Student 3 web server"
+        type: lxc
+        ip: "10.100.3.10"
+        roles:
+          - base_system
+      s03-client:
+        description: "Student 3 client"
+        type: lxc
+        ip: "10.100.3.11"
+        roles:
+          - base_system

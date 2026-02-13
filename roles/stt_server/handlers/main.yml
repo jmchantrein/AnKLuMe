@@ -1,0 +1,6 @@
+---
+- name: SttServer | Restart speaches
+  ansible.builtin.systemd:
+    name: speaches
+    state: restarted
+    daemon_reload: true

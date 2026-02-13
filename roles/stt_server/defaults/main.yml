@@ -1,0 +1,24 @@
+---
+# SttServer | Defaults for faster-whisper + Speaches STT service
+#
+# Provides an OpenAI-compatible /v1/audio/transcriptions endpoint.
+# Designed to work with Open WebUI and other clients.
+
+# Speaches server listen address (0.0.0.0 for cross-container access)
+stt_server_host: "0.0.0.0"
+
+# Speaches server listen port
+stt_server_port: 8000
+
+# Whisper model to use (downloaded on first request)
+# Options: tiny, base, small, medium, large-v3, large-v3-turbo
+stt_server_model: "large-v3-turbo"
+
+# Quantization for faster-whisper (float16, int8_float16, int8)
+stt_server_quantization: "float16"
+
+# Default language (empty = auto-detect)
+stt_server_language: ""
+
+# Enable/start the systemd service
+stt_server_enabled: true

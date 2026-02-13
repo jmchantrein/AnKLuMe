@@ -1,0 +1,182 @@
+# Quick Start Guide
+
+This guide walks you through deploying your first AnKLuMe infrastructure
+from scratch.
+
+## Prerequisites
+
+### Host machine
+
+- A Linux host (Debian, Arch, Ubuntu, Fedora)
+- [Incus](https://linuxcontainers.org/incus/docs/main/installing/) >= 6.0
+  LTS installed and initialized (`incus admin init`)
+- At least 4 GB of RAM and 20 GB of free disk space
+
+### Admin instance
+
+AnKLuMe runs entirely from inside an admin container. Create it manually
+on your host:
+
+```bash
+# Create the admin container
+incus launch images:debian/13 admin-ansible
+
+# Mount the Incus socket (required for managing other instances)
+incus config device add admin-ansible incus-socket proxy \
+  connect=unix:/var/lib/incus/unix.socket \
+  listen=unix:/var/run/incus/unix.socket \
+  bind=container \
+  security.uid=0 security.gid=0
+
+# Enable nesting (required for Incus CLI inside the container)
+incus config set admin-ansible security.nesting=true
+
+# Enter the container
+incus exec admin-ansible -- bash
+```
+
+Inside the admin container, install the required tools:
+
+```bash
+apt update && apt install -y ansible python3-pip python3-yaml git curl
+pip install --break-system-packages pyyaml pytest molecule ruff
+```
+
+## Step 1: Clone the repository
+
+```bash
+git clone https://github.com/<user>/anklume.git
+cd anklume
+```
+
+## Step 2: Install dependencies
+
+```bash
+make init
+```
+
+This installs Ansible collections and Python tools. You should see output
+ending with instructions for system packages.
+
+## Step 3: Create your infrastructure descriptor
+
+```bash
+cp infra.yml.example infra.yml
+```
+
+Edit `infra.yml` to describe your infrastructure. Here is a minimal example
+with two domains:
+
+See `infra.yml.example` for a complete template, or copy one from the
+[examples/](../examples/) directory. Key rules:
+
+- **Domain names**: lowercase alphanumeric + hyphens only
+- **Machine names**: must be globally unique across all domains
+- **subnet_id**: integer 0-254, unique per domain
+- **IPs**: must match the subnet (`<base_subnet>.<subnet_id>.X`, X = 1-253)
+- **Gateway**: `.254` is auto-assigned, do not use it for machines
+
+See [SPEC.md section 5](SPEC.md) for the full format reference.
+
+## Step 4: Generate Ansible files
+
+```bash
+make sync
+```
+
+Expected output:
+
+```
+Generating files for 2 domain(s)...
+  Written: group_vars/all.yml
+  Written: inventory/admin.yml
+  Written: group_vars/admin.yml
+  Written: host_vars/admin-ansible.yml
+  Written: inventory/lab.yml
+  Written: group_vars/lab.yml
+  Written: host_vars/lab-server.yml
+
+Done. Run `make lint` to validate.
+```
+
+This creates and updates files in `inventory/`, `group_vars/`, and
+`host_vars/`. Each file contains a `=== MANAGED ===` section that is
+overwritten on each `make sync`. You can add custom variables outside
+this section.
+
+## Step 5: Preview changes
+
+```bash
+make check
+```
+
+This runs `ansible-playbook --check --diff` to show what would change
+without actually modifying anything. Review the output to verify your
+infrastructure looks correct.
+
+## Step 6: Apply
+
+```bash
+make apply
+```
+
+This creates all networks, Incus projects, profiles, and instances
+defined in your `infra.yml`. On a fresh setup, you will see all
+resources created. On subsequent runs, only changes are applied
+(idempotent).
+
+## Step 7: Verify
+
+After `make apply` completes, verify your infrastructure:
+
+```bash
+# List all Incus instances across projects
+incus list --all-projects
+
+# Check a specific domain's network
+incus network show net-lab
+
+# Enter a container
+incus exec lab-server --project lab -- bash
+```
+
+## Ongoing workflow
+
+After your initial setup, the daily workflow is:
+
+1. Edit `infra.yml` (add domains, machines, profiles)
+2. `make sync` to regenerate Ansible files
+3. `make check` to preview changes
+4. `make apply` to converge
+
+## Useful commands
+
+| Command | Description |
+|---------|-------------|
+| `make sync` | Generate Ansible files from infra.yml |
+| `make sync-dry` | Preview generation without writing |
+| `make check` | Dry-run (--check --diff) |
+| `make apply` | Apply full infrastructure |
+| `make apply-limit G=lab` | Apply a single domain |
+| `make snapshot` | Snapshot all instances |
+| `make lint` | Run all validators |
+| `make help` | List all available targets |
+
+## Troubleshooting
+
+- **Validation errors on make sync**: The generator checks all
+  constraints (unique names, unique subnets, valid IPs) before writing.
+  Read the error message for the specific constraint that failed.
+- **Incus socket not found**: Verify the proxy device is configured with
+  `incus config device show admin-ansible`
+- **Container fails to start after reboot**: The `/var/run/incus/`
+  directory may not exist. See ADR-019 in [ARCHITECTURE.md](ARCHITECTURE.md).
+- **make apply hangs**: Check Incus is running (`systemctl status incus`)
+  and the socket is accessible (`incus list` from inside admin-ansible).
+
+## Next steps
+
+- [Lab deployment guide](lab-tp.md) for teachers
+- [GPU + LLM guide](gpu-llm.md) for GPU passthrough and Ollama
+- [Example configurations](../examples/) for ready-to-use infra.yml files
+- [Full specification](SPEC.md) for the complete format reference

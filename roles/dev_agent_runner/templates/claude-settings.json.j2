@@ -1,0 +1,32 @@
+{
+  "env": {
+{% if dev_agent_runner_enable_teams %}
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+{% endif %}
+  },
+  "permissions": {
+    "allow": [
+      "Edit",
+      "MultiEdit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(molecule *)",
+      "Bash(ansible-lint *)",
+      "Bash(yamllint *)",
+      "Bash(ruff *)",
+      "Bash(git *)",
+      "Bash(incus *)",
+      "Bash(make *)",
+      "Bash(python3 *)",
+      "Bash(pytest *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)"
+    ]
+  },
+  "defaultMode": "{{ dev_agent_runner_permissions_mode }}"
+}
