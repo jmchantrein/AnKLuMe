@@ -514,3 +514,176 @@ exit 0
         assert result.returncode == 0
         assert "NOT installed" in result.stdout
         assert "anklume" in result.stdout
+
+
+# ── Full deploy file writing ─────────────────────────────
+
+
+class TestDeployFileWriting:
+    """Test that full deploy writes rules to the destination directory."""
+
+    def test_full_deploy_creates_dest_file(self, mock_env):
+        """Full deploy writes rules to the destination directory."""
+        env, _, tmp, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        dest_dir = tmp / "nftables.d"
+        dest_file = dest_dir / "anklume-isolation.nft"
+        assert dest_file.exists()
+
+    def test_full_deploy_dest_file_has_content(self, mock_env):
+        """Deployed rules file contains nftables content."""
+        env, _, tmp, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        dest_file = tmp / "nftables.d" / "anklume-isolation.nft"
+        content = dest_file.read_text()
+        assert "inet anklume" in content
+
+    def test_full_deploy_dest_dir_created(self, mock_env):
+        """Deploy creates destination directory if it doesn't exist."""
+        env, _, tmp, script = mock_env
+        # Remove the pre-existing nftables.d dir
+        import shutil
+        dest_dir = tmp / "nftables.d"
+        if dest_dir.exists():
+            shutil.rmtree(dest_dir)
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert dest_dir.is_dir()
+
+    def test_dry_run_does_not_create_dest_file(self, mock_env):
+        """Dry-run does NOT write rules to destination."""
+        env, _, tmp, script = mock_env
+        # Remove the nftables.d dir to ensure clean state
+        import shutil
+        dest_dir = tmp / "nftables.d"
+        for f in dest_dir.glob("*"):
+            f.unlink()
+        result = run_deploy(["--dry-run"], env, script=script)
+        assert result.returncode == 0
+        # No .nft file should exist in dest_dir
+        nft_files = list(dest_dir.glob("*.nft"))
+        assert len(nft_files) == 0
+
+
+class TestDeployOutputMessages:
+    """Test output messages during deploy."""
+
+    def test_full_deploy_shows_banner(self, mock_env):
+        """Full deploy shows the AnKLuMe banner."""
+        env, _, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert "AnKLuMe nftables deployment" in result.stdout
+
+    def test_full_deploy_shows_project(self, mock_env):
+        """Full deploy shows which project the container was found in."""
+        env, _, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert "Found in project:" in result.stdout
+
+    def test_full_deploy_shows_lines_count(self, mock_env):
+        """Full deploy reports number of lines in the rules file."""
+        env, _, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert "lines" in result.stdout.lower()
+
+    def test_full_deploy_shows_syntax_ok(self, mock_env):
+        """Full deploy shows 'Syntax OK' after validation."""
+        env, _, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert "Syntax OK" in result.stdout
+
+    def test_full_deploy_shows_verify_hint(self, mock_env):
+        """Full deploy shows verification hint with nft list command."""
+        env, _, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        assert "nft list" in result.stdout
+
+    def test_dry_run_shows_rules_content_header(self, mock_env):
+        """Dry-run shows 'Rules content:' before printing rules."""
+        env, _, _, script = mock_env
+        result = run_deploy(["--dry-run"], env, script=script)
+        assert result.returncode == 0
+        assert "Rules content" in result.stdout
+
+
+class TestDeployCommandSequence:
+    """Verify the commands are called in the correct order."""
+
+    def test_validate_before_install(self, mock_env):
+        """nft -c (validate) is called before nft -f (apply)."""
+        env, log, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        nft_cmds = [c for c in cmds if c.startswith("nft")]
+        # First nft call should be validation (-c), second should be apply (-f)
+        assert len(nft_cmds) >= 2
+        assert "-c" in nft_cmds[0]
+        assert "-f" in nft_cmds[1]
+
+    def test_pull_before_validate(self, mock_env):
+        """incus file pull is called before nft validation."""
+        env, log, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        pull_idx = next(i for i, c in enumerate(cmds) if "file pull" in c)
+        nft_idx = next(i for i, c in enumerate(cmds) if c.startswith("nft"))
+        assert pull_idx < nft_idx
+
+    def test_project_lookup_before_pull(self, mock_env):
+        """Project lookup (incus info) is called before file pull."""
+        env, log, _, script = mock_env
+        result = run_deploy([], env, script=script)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        info_idx = next(i for i, c in enumerate(cmds) if "info" in c)
+        pull_idx = next(i for i, c in enumerate(cmds) if "file pull" in c)
+        assert info_idx < pull_idx
+
+
+class TestDeployContainerNotFound:
+    """Test error when container is not found in any project."""
+
+    def test_container_not_found_anywhere(self, tmp_path):
+        """Container not found in any project gives clear error."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmd.log"
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+# project list passes
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+# info fails (not in admin project)
+if [[ "$1" == "info" ]]; then exit 1; fi
+# list all-projects returns empty
+if [[ "$1" == "list" && "$2" == "--all-projects" ]]; then
+    echo '[]'
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        for cmd in ["mktemp", "rm"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy([], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
