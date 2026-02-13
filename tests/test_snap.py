@@ -183,3 +183,68 @@ class TestUsage:
         env, _ = mock_env
         result = run_snap(["bogus"], env)
         assert result.returncode != 0
+
+    def test_no_args_shows_help(self, mock_env):
+        env, _ = mock_env
+        result = run_snap([], env)
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+
+# ── edge cases ──────────────────────────────────────────────
+
+
+class TestEdgeCases:
+    def test_snapshot_name_with_dots_and_underscores(self, mock_env):
+        """Snapshot names with dots/underscores are accepted."""
+        env, log = mock_env
+        result = run_snap(["create", "admin-ansible", "snap-2026.02.13_backup"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any("snap-2026.02.13_backup" in c for c in cmds)
+
+    def test_delete_missing_snap_name(self, mock_env):
+        """Delete without snapshot name is an error."""
+        env, _ = mock_env
+        result = run_snap(["delete", "admin-ansible"], env)
+        assert result.returncode != 0
+
+    def test_self_unknown_hostname(self, mock_env):
+        """Self with unknown HOSTNAME gives an error."""
+        env, _ = mock_env
+        env["HOSTNAME"] = "nonexistent-machine"
+        result = run_snap(["create", "self", "snap1"], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+    def test_list_unknown_instance(self, mock_env):
+        """Listing snapshots for an unknown instance gives an error."""
+        env, _ = mock_env
+        result = run_snap(["list", "nonexistent"], env)
+        assert result.returncode != 0
+
+    def test_restore_unknown_instance(self, mock_env):
+        """Restoring unknown instance gives an error."""
+        env, _ = mock_env
+        result = run_snap(["restore", "nonexistent", "snap1"], env)
+        assert result.returncode != 0
+
+    def test_delete_unknown_instance(self, mock_env):
+        """Deleting snapshot of unknown instance gives an error."""
+        env, _ = mock_env
+        result = run_snap(["delete", "nonexistent", "snap1"], env)
+        assert result.returncode != 0
+
+    def test_incus_not_available(self, tmp_path):
+        """Script fails gracefully when incus binary is not found."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        # Symlink bash so subprocess can run, but incus is missing
+        bash_path = "/usr/bin/bash"
+        if not os.path.exists(bash_path):
+            bash_path = "/bin/bash"
+        (mock_bin / "bash").symlink_to(bash_path)
+        env = os.environ.copy()
+        env["PATH"] = str(mock_bin)
+        result = run_snap(["create", "test", "snap1"], env)
+        assert result.returncode != 0
