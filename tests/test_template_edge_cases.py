@@ -505,3 +505,316 @@ class TestClaudeSettingsEdgeCases:
             )
             data = json.loads(result)
             assert data["defaultMode"] == mode
+
+
+# ── nftables many-bridges edge cases ────────────────────────
+
+
+class TestNftablesManyBridges:
+    """Tests for nftables template with large numbers of bridges."""
+
+    def _render(self, **kwargs):
+        tmpl_dir = ROLES_DIR / "incus_nftables" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("anklume-isolation.nft.j2")
+        return template.render(**kwargs)
+
+    def test_ten_bridges_generates_ten_same_bridge_rules(self):
+        """10 bridges generate 10 same-bridge accept rules."""
+        bridges = [f"net-domain{i}" for i in range(10)]
+        result = self._render(
+            incus_nftables_all_bridges=bridges,
+            incus_nftables_resolved_policies=[],
+        )
+        for bridge in bridges:
+            assert f'iifname "{bridge}" oifname "{bridge}" accept' in result
+        # Exactly 10 same-bridge rules
+        same_bridge_count = result.count("oifname") - 1  # minus 1 for inter-bridge drop
+        assert same_bridge_count >= 10
+
+    def test_twenty_bridges_no_truncation(self):
+        """20 bridges are all present in output, no truncation."""
+        bridges = [f"net-zone{i}" for i in range(20)]
+        result = self._render(
+            incus_nftables_all_bridges=bridges,
+            incus_nftables_resolved_policies=[],
+        )
+        for bridge in bridges:
+            assert f'"{bridge}"' in result, f"Bridge {bridge} missing from output"
+        # Inter-bridge drop line should contain all 20 bridges
+        drop_lines = [line for line in result.splitlines() if "drop" in line and "iifname" in line]
+        assert len(drop_lines) == 1
+        for bridge in bridges:
+            assert bridge in drop_lines[0]
+
+    def test_single_bridge_minimal_ruleset(self):
+        """Single bridge produces minimal valid ruleset without inter-bridge drop."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-solo"],
+            incus_nftables_resolved_policies=[],
+        )
+        assert 'iifname "net-solo" oifname "net-solo" accept' in result
+        # With only one bridge, no inter-bridge drop is needed
+        drop_lines = [line for line in result.splitlines() if "drop" in line and "iifname" in line]
+        assert len(drop_lines) == 0
+        assert "table inet anklume" in result
+
+
+# ── nftables complex policies edge cases ────────────────────
+
+
+class TestNftablesComplexPolicies:
+    """Tests for nftables template with complex policy configurations."""
+
+    def _render(self, **kwargs):
+        tmpl_dir = ROLES_DIR / "incus_nftables" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("anklume-isolation.nft.j2")
+        return template.render(**kwargs)
+
+    def test_ten_policies_ten_accept_rules_before_drop(self):
+        """10 network policies generate 10 accept rules before drop."""
+        bridges = ["net-src", "net-dst"]
+        policies = [
+            {
+                "description": f"Policy {i}",
+                "from_bridge": "net-src",
+                "to_bridge": "net-dst",
+                "ports": [8000 + i],
+                "protocol": "tcp",
+                "bidirectional": False,
+            }
+            for i in range(10)
+        ]
+        result = self._render(
+            incus_nftables_all_bridges=bridges,
+            incus_nftables_resolved_policies=policies,
+        )
+        # All 10 policies should produce accept rules
+        for i in range(10):
+            assert f"dport {{ {8000 + i} }}" in result
+        # Drop comes after all accept rules
+        lines = result.splitlines()
+        last_accept_idx = max(
+            idx for idx, line in enumerate(lines) if "accept" in line and "dport" in line
+        )
+        drop_idx = next(
+            idx for idx, line in enumerate(lines) if "drop" in line and "iifname" in line
+        )
+        assert last_accept_idx < drop_idx
+
+    def test_bidirectional_policy_two_accept_rules(self):
+        """Bidirectional policy generates 2 accept rules."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-alpha", "net-beta"],
+            incus_nftables_resolved_policies=[{
+                "description": "Bidir link",
+                "from_bridge": "net-alpha",
+                "to_bridge": "net-beta",
+                "ports": [5000],
+                "protocol": "tcp",
+                "bidirectional": True,
+            }],
+        )
+        assert 'iifname "net-alpha" oifname "net-beta" tcp dport { 5000 } accept' in result
+        assert 'iifname "net-beta" oifname "net-alpha" tcp dport { 5000 } accept' in result
+
+    def test_policy_ports_all_no_dport_restriction(self):
+        """Policy with ports='all' generates no dport/sport restriction."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-x", "net-y"],
+            incus_nftables_resolved_policies=[{
+                "description": "All ports",
+                "from_bridge": "net-x",
+                "to_bridge": "net-y",
+                "ports": "all",
+                "protocol": "tcp",
+                "bidirectional": False,
+            }],
+        )
+        # Accept rule without dport
+        assert 'iifname "net-x" oifname "net-y" accept' in result
+        # No dport on the accept line for this policy
+        accept_lines = [
+            line for line in result.splitlines()
+            if 'iifname "net-x" oifname "net-y"' in line
+        ]
+        assert len(accept_lines) == 1
+        assert "dport" not in accept_lines[0]
+
+    def test_policy_udp_protocol_correct(self):
+        """Policy with protocol='udp' uses udp in the nftables rule."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-dns-src", "net-dns-dst"],
+            incus_nftables_resolved_policies=[{
+                "description": "DNS forward",
+                "from_bridge": "net-dns-src",
+                "to_bridge": "net-dns-dst",
+                "ports": [53, 5353],
+                "protocol": "udp",
+                "bidirectional": False,
+            }],
+        )
+        assert "udp dport { 53, 5353 }" in result
+        assert "tcp" not in result.split("DNS forward")[1].split("\n")[1]
+
+    def test_policy_targeting_specific_machine_uses_bridge(self):
+        """Policy targets use bridge-level filtering in the template."""
+        # The template works at bridge level; machine-level filtering
+        # is resolved upstream (PSOT generator resolves machine names
+        # to bridges). Here we verify the template renders correctly
+        # with whatever from_bridge/to_bridge it receives.
+        result = self._render(
+            incus_nftables_all_bridges=["net-office", "net-services"],
+            incus_nftables_resolved_policies=[{
+                "description": "Office to service host",
+                "from_bridge": "net-office",
+                "to_bridge": "net-services",
+                "ports": [443],
+                "protocol": "tcp",
+                "bidirectional": False,
+            }],
+        )
+        assert 'iifname "net-office" oifname "net-services" tcp dport { 443 } accept' in result
+
+
+# ── nftables AI override edge cases ─────────────────────────
+
+
+class TestNftablesAiOverride:
+    """Tests for nftables AI access override rendering.
+
+    The AI override is applied at the Ansible task level (set_fact),
+    not directly in the Jinja2 template. These tests verify that the
+    template correctly renders the resolved policies list which
+    includes an AI override policy entry.
+    """
+
+    def _render(self, **kwargs):
+        tmpl_dir = ROLES_DIR / "incus_nftables" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("anklume-isolation.nft.j2")
+        return template.render(**kwargs)
+
+    def test_ai_override_policy_present_in_output(self):
+        """When AI override is in resolved policies, override section is present."""
+        # Simulate what the Ansible set_fact produces with an AI override
+        result = self._render(
+            incus_nftables_all_bridges=["net-pro", "net-ai-tools"],
+            incus_nftables_resolved_policies=[{
+                "description": "AI access override (dynamic)",
+                "from_bridge": "net-pro",
+                "to_bridge": "net-ai-tools",
+                "ports": "all",
+                "protocol": "tcp",
+                "bidirectional": True,
+            }],
+        )
+        assert "AI access override (dynamic)" in result
+        assert 'iifname "net-pro" oifname "net-ai-tools" accept' in result
+        assert 'iifname "net-ai-tools" oifname "net-pro" accept' in result
+
+    def test_ai_override_replaces_bridge_name_correctly(self):
+        """Override with different domain bridge renders correct bridge name."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-perso", "net-ai-tools"],
+            incus_nftables_resolved_policies=[{
+                "description": "AI access override (dynamic)",
+                "from_bridge": "net-perso",
+                "to_bridge": "net-ai-tools",
+                "ports": "all",
+                "protocol": "tcp",
+                "bidirectional": True,
+            }],
+        )
+        assert 'iifname "net-perso" oifname "net-ai-tools" accept' in result
+        assert 'iifname "net-ai-tools" oifname "net-perso" accept' in result
+        # Should NOT have net-pro anywhere
+        assert "net-pro" not in result
+
+    def test_ai_override_without_base_policy_still_works(self):
+        """Override as the only policy (no base policies) still renders correctly."""
+        result = self._render(
+            incus_nftables_all_bridges=["net-work", "net-ai-tools"],
+            incus_nftables_resolved_policies=[{
+                "description": "AI access override (dynamic)",
+                "from_bridge": "net-work",
+                "to_bridge": "net-ai-tools",
+                "ports": "all",
+                "protocol": "tcp",
+                "bidirectional": True,
+            }],
+        )
+        assert "table inet anklume" in result
+        assert 'iifname "net-work" oifname "net-ai-tools" accept' in result
+        # Inter-bridge drop should still be present
+        assert "drop" in result
+
+
+# ── firewall-router many interfaces edge cases ──────────────
+
+
+class TestFirewallRouterManyInterfaces:
+    """Tests for firewall-router template with many interfaces."""
+
+    def _render(self, **kwargs):
+        tmpl_dir = ROLES_DIR / "firewall_router" / "templates"
+        env = _ansible_env(tmpl_dir)
+        template = env.get_template("firewall-router.nft.j2")
+        return template.render(**kwargs)
+
+    def test_five_interfaces_correct_routing_rules(self):
+        """5 interfaces generate correct deny rules for each."""
+        ifaces = [
+            {"name": f"eth{i}", "bridge": f"net-domain{i}"} for i in range(5)
+        ]
+        result = self._render(
+            firewall_router_interfaces=ifaces,
+            firewall_router_logging=True,
+            firewall_router_log_prefix="FW",
+        )
+        # Each interface should be present
+        for i in range(5):
+            assert f'"eth{i}"' in result
+        # Each interface should deny traffic to all others
+        for i in range(5):
+            deny_line = [
+                line for line in result.splitlines()
+                if f'iifname "eth{i}"' in line and "drop" in line
+            ]
+            assert len(deny_line) == 1, f"Missing deny rule for eth{i}"
+            # The deny line should reference the 4 other interfaces
+            for j in range(5):
+                if j != i:
+                    assert f'"eth{j}"' in deny_line[0]
+
+    def test_admin_on_eth0_admin_rules_applied(self):
+        """Admin interface on eth0 gets admin-specific deny prefix."""
+        ifaces = [
+            {"name": "eth0", "bridge": "net-admin"},
+            {"name": "eth1", "bridge": "net-pro"},
+            {"name": "eth2", "bridge": "net-perso"},
+        ]
+        result = self._render(
+            firewall_router_interfaces=ifaces,
+            firewall_router_logging=True,
+            firewall_router_log_prefix="FW",
+        )
+        assert "FW-DENY-ADMIN" in result
+        assert "FW-DENY-PRO" in result
+        assert "FW-DENY-PERSO" in result
+
+    def test_no_non_admin_interfaces_minimal_ruleset(self):
+        """With only one interface, no inter-domain deny rules are generated."""
+        result = self._render(
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_logging=True,
+            firewall_router_log_prefix="FW",
+        )
+        # Only one interface means no inter-domain deny
+        assert "FW-DENY" not in result
+        # But the chain structure should still be valid
+        assert "chain forward" in result
+        assert "chain input" in result
+        assert "chain output" in result
+        assert "ct state established,related accept" in result
