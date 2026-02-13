@@ -3,3 +3,6 @@
 incus_nftables_bridge_pattern: "net-"
 incus_nftables_output_path: "/opt/anklume/nftables-isolation.nft"
 incus_nftables_apply: false
+# AI access override (Phase 18a): dynamic bridge-level policy switch
+# Example: {"from_bridge": "net-pro", "to_bridge": "net-ai-tools", "ports": "all", "protocol": "tcp"}
+incus_nftables_ai_override: {}

@@ -77,55 +77,55 @@ class TestLoadInfra:
 
 
 class TestValidate:
-    def test_valid_infra(self, sample_infra):
+    def test_valid_infra(self, sample_infra):  # Matrix: DL-001
         assert validate(sample_infra) == []
 
     def test_missing_required_key(self):
         assert len(validate({"project_name": "x"})) > 0
 
-    def test_duplicate_subnet_id(self, sample_infra):
+    def test_duplicate_subnet_id(self, sample_infra):  # Matrix: DL-002
         sample_infra["domains"]["work"]["subnet_id"] = 0
         errors = validate(sample_infra)
         assert any("subnet_id 0 already used" in e for e in errors)
 
-    def test_duplicate_machine_name(self, sample_infra):
+    def test_duplicate_machine_name(self, sample_infra):  # Matrix: DL-003
         sample_infra["domains"]["work"]["machines"]["admin-ctrl"] = {"type": "lxc"}
         assert any("duplicate" in e for e in validate(sample_infra))
 
-    def test_duplicate_ip(self, sample_infra):
+    def test_duplicate_ip(self, sample_infra):  # Matrix: DL-004
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["ip"] = "10.100.0.10"
         assert any("IP 10.100.0.10 already used" in e for e in validate(sample_infra))
 
-    def test_ip_wrong_subnet(self, sample_infra):
+    def test_ip_wrong_subnet(self, sample_infra):  # Matrix: DL-005
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.1.10"
         assert any("not in subnet" in e for e in validate(sample_infra))
 
-    def test_invalid_domain_name(self, sample_infra):
+    def test_invalid_domain_name(self, sample_infra):  # Matrix: DL-006
         sample_infra["domains"]["Bad_Name!"] = sample_infra["domains"].pop("admin")
         assert any("invalid name" in e for e in validate(sample_infra))
 
-    def test_subnet_id_out_of_range(self, sample_infra):
+    def test_subnet_id_out_of_range(self, sample_infra):  # Matrix: DL-007
         sample_infra["domains"]["admin"]["subnet_id"] = 255
         assert any("0-254" in e for e in validate(sample_infra))
 
-    def test_missing_profile_reference(self, sample_infra):
+    def test_missing_profile_reference(self, sample_infra):  # Matrix: DL-008
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["profiles"] = ["nonexistent"]
         assert any("profile 'nonexistent' not defined" in e for e in validate(sample_infra))
 
-    def test_default_profile_always_allowed(self, sample_infra):
+    def test_default_profile_always_allowed(self, sample_infra):  # Matrix: DL-009
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["profiles"] = ["default"]
         assert validate(sample_infra) == []
 
-    def test_empty_domains(self, sample_infra):
+    def test_empty_domains(self, sample_infra):  # Matrix: DL-010
         sample_infra["domains"] = {}
         assert validate(sample_infra) == []
 
-    def test_ephemeral_validation_error(self, sample_infra):
+    def test_ephemeral_validation_error(self, sample_infra):  # Matrix: EL-004
         sample_infra["domains"]["admin"]["ephemeral"] = "yes"
         errors = validate(sample_infra)
         assert any("ephemeral must be a boolean" in e for e in errors)
 
-    def test_ephemeral_machine_validation_error(self, sample_infra):
+    def test_ephemeral_machine_validation_error(self, sample_infra):  # Matrix: EL-005
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ephemeral"] = "yes"
         errors = validate(sample_infra)
         assert any("ephemeral must be a boolean" in e for e in errors)
@@ -135,7 +135,7 @@ class TestValidate:
 
 
 class TestGenerate:
-    def test_creates_all_files(self, sample_infra, tmp_path):
+    def test_creates_all_files(self, sample_infra, tmp_path):  # Matrix: PG-001
         generate(sample_infra, tmp_path)
         for f in [
             "inventory/admin.yml", "inventory/work.yml",
@@ -144,13 +144,13 @@ class TestGenerate:
         ]:
             assert (tmp_path / f).exists(), f"Missing: {f}"
 
-    def test_inventory_contains_host_and_ip(self, sample_infra, tmp_path):
+    def test_inventory_contains_host_and_ip(self, sample_infra, tmp_path):  # Matrix: PG-010
         generate(sample_infra, tmp_path)
         content = (tmp_path / "inventory" / "admin.yml").read_text()
         assert "admin-ctrl" in content
         assert "10.100.0.10" in content
 
-    def test_group_vars_all(self, sample_infra, tmp_path):
+    def test_group_vars_all(self, sample_infra, tmp_path):  # Matrix: PG-006
         generate(sample_infra, tmp_path)
         content = (tmp_path / "group_vars" / "all.yml").read_text()
         assert "project_name: test-infra" in content
@@ -158,14 +158,14 @@ class TestGenerate:
         assert "psot_default_connection: community.general.incus" in content
         assert "psot_default_user: root" in content
 
-    def test_group_vars_domain_has_network(self, sample_infra, tmp_path):
+    def test_group_vars_domain_has_network(self, sample_infra, tmp_path):  # Matrix: PG-007
         generate(sample_infra, tmp_path)
         content = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "net-admin" in content
         assert "10.100.0.0/24" in content
         assert "10.100.0.254" in content
 
-    def test_host_vars_content(self, sample_infra, tmp_path):
+    def test_host_vars_content(self, sample_infra, tmp_path):  # Matrix: PG-008
         generate(sample_infra, tmp_path)
         content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
         assert "instance_type: lxc" in content
@@ -173,21 +173,21 @@ class TestGenerate:
         assert "base_system" in content
         assert "security.nesting" in content
 
-    def test_managed_markers_present(self, sample_infra, tmp_path):
+    def test_managed_markers_present(self, sample_infra, tmp_path):  # Matrix: PG-005
         generate(sample_infra, tmp_path)
         for f in tmp_path.rglob("*.yml"):
             text = f.read_text()
             assert MANAGED_BEGIN in text, f"{f.name} missing MANAGED_BEGIN"
             assert MANAGED_END in text, f"{f.name} missing MANAGED_END"
 
-    def test_idempotent(self, sample_infra, tmp_path):
+    def test_idempotent(self, sample_infra, tmp_path):  # Matrix: PG-002
         generate(sample_infra, tmp_path)
         first = {str(f.relative_to(tmp_path)): f.read_text() for f in tmp_path.rglob("*.yml")}
         generate(sample_infra, tmp_path)
         second = {str(f.relative_to(tmp_path)): f.read_text() for f in tmp_path.rglob("*.yml")}
         assert first == second
 
-    def test_preserves_user_content(self, sample_infra, tmp_path):
+    def test_preserves_user_content(self, sample_infra, tmp_path):  # Matrix: PG-003
         generate(sample_infra, tmp_path)
         gv = tmp_path / "group_vars" / "admin.yml"
         gv.write_text(gv.read_text() + "\nmy_custom_var: hello\n")
@@ -196,11 +196,11 @@ class TestGenerate:
         assert "my_custom_var: hello" in content
         assert MANAGED_BEGIN in content
 
-    def test_dry_run_creates_no_files(self, sample_infra, tmp_path):
+    def test_dry_run_creates_no_files(self, sample_infra, tmp_path):  # Matrix: PG-004
         generate(sample_infra, tmp_path, dry_run=True)
         assert not list(tmp_path.rglob("*.yml"))
 
-    def test_host_without_ip(self, sample_infra, tmp_path):
+    def test_host_without_ip(self, sample_infra, tmp_path):  # Matrix: DL-011
         del sample_infra["domains"]["work"]["machines"]["dev-ws"]["ip"]
         generate(sample_infra, tmp_path)
         inv = (tmp_path / "inventory" / "work.yml").read_text()
@@ -208,7 +208,7 @@ class TestGenerate:
         hv = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
         assert "instance_ip" not in hv
 
-    def test_domain_with_profiles(self, sample_infra, tmp_path):
+    def test_domain_with_profiles(self, sample_infra, tmp_path):  # Matrix: DL-2-003
         sample_infra["domains"]["admin"]["profiles"] = {
             "gpu-compute": {"devices": {"gpu": {"type": "gpu"}}},
         }
@@ -217,7 +217,7 @@ class TestGenerate:
         gv = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "gpu-compute" in gv
 
-    def test_host_vars_with_devices(self, sample_infra, tmp_path):
+    def test_host_vars_with_devices(self, sample_infra, tmp_path):  # Matrix: DL-2-004
         """Machine with devices declaration produces instance_devices in host_vars."""
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["devices"] = {
             "gpu": {"type": "gpu"},
@@ -237,7 +237,7 @@ class TestGenerate:
         content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
         assert "instance_devices" not in content
 
-    def test_no_connection_vars_in_group_vars(self, sample_infra, tmp_path):
+    def test_no_connection_vars_in_group_vars(self, sample_infra, tmp_path):  # Matrix: PG-009
         """ansible_connection and ansible_user must NOT appear in any group_vars file.
 
         Connection is a playbook concern, not an inventory concern. Inventory
@@ -255,7 +255,7 @@ class TestGenerate:
 
 
 class TestEphemeral:
-    def test_ephemeral_default_false(self, sample_infra, tmp_path):
+    def test_ephemeral_default_false(self, sample_infra, tmp_path):  # Matrix: EL-001
         """Domain without ephemeral -> host_vars contains instance_ephemeral: false."""
         generate(sample_infra, tmp_path)
         content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
@@ -263,7 +263,7 @@ class TestEphemeral:
         gv = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "domain_ephemeral: false" in gv
 
-    def test_ephemeral_domain_true(self, sample_infra, tmp_path):
+    def test_ephemeral_domain_true(self, sample_infra, tmp_path):  # Matrix: EL-002
         """Domain with ephemeral: true -> machines inherit instance_ephemeral: true."""
         sample_infra["domains"]["admin"]["ephemeral"] = True
         generate(sample_infra, tmp_path)
@@ -272,7 +272,7 @@ class TestEphemeral:
         gv = (tmp_path / "group_vars" / "admin.yml").read_text()
         assert "domain_ephemeral: true" in gv
 
-    def test_ephemeral_machine_override(self, sample_infra, tmp_path):
+    def test_ephemeral_machine_override(self, sample_infra, tmp_path):  # Matrix: EL-003, DL-2-001
         """Domain ephemeral: true + machine ephemeral: false -> machine gets false."""
         sample_infra["domains"]["admin"]["ephemeral"] = True
         sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ephemeral"] = False
@@ -280,7 +280,7 @@ class TestEphemeral:
         content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
         assert "instance_ephemeral: false" in content
 
-    def test_ephemeral_validation_error(self, sample_infra):
+    def test_ephemeral_validation_error(self, sample_infra):  # Matrix: EL-004
         """ephemeral: 'yes' (string) -> validation error."""
         sample_infra["domains"]["admin"]["ephemeral"] = "yes"
         errors = validate(sample_infra)
@@ -291,29 +291,29 @@ class TestEphemeral:
 
 
 class TestVMSupport:
-    def test_vm_type_accepted(self, sample_infra):
+    def test_vm_type_accepted(self, sample_infra):  # Matrix: VM-001
         """type: vm is a valid instance type."""
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
         assert validate(sample_infra) == []
 
-    def test_lxc_type_accepted(self, sample_infra):
+    def test_lxc_type_accepted(self, sample_infra):  # Matrix: VM-002
         """type: lxc is the default and valid."""
         assert validate(sample_infra) == []
 
-    def test_invalid_type_rejected(self, sample_infra):
+    def test_invalid_type_rejected(self, sample_infra):  # Matrix: VM-003
         """type: docker is not a valid instance type."""
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "docker"
         errors = validate(sample_infra)
         assert any("type must be 'lxc' or 'vm'" in e for e in errors)
 
-    def test_vm_host_vars_type(self, sample_infra, tmp_path):
+    def test_vm_host_vars_type(self, sample_infra, tmp_path):  # Matrix: VM-004
         """VM machine produces instance_type: vm in host_vars."""
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
         generate(sample_infra, tmp_path)
         content = (tmp_path / "host_vars" / "dev-ws.yml").read_text()
         assert "instance_type: vm" in content
 
-    def test_vm_and_lxc_coexist(self, sample_infra, tmp_path):
+    def test_vm_and_lxc_coexist(self, sample_infra, tmp_path):  # Matrix: VM-2-001
         """VM and LXC instances can coexist in the same domain."""
         sample_infra["domains"]["work"]["machines"]["work-vm"] = {
             "description": "VM instance",
@@ -328,7 +328,7 @@ class TestVMSupport:
         assert "instance_type: lxc" in lxc_hv
         assert "instance_type: vm" in vm_hv
 
-    def test_vm_with_config(self, sample_infra, tmp_path):
+    def test_vm_with_config(self, sample_infra, tmp_path):  # Matrix: VM-006, DL-012
         """VM with resource config generates correct host_vars."""
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "vm"
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["config"] = {
@@ -341,7 +341,7 @@ class TestVMSupport:
         assert "limits.cpu" in content
         assert "limits.memory" in content
 
-    def test_default_type_is_lxc(self, sample_infra, tmp_path):
+    def test_default_type_is_lxc(self, sample_infra, tmp_path):  # Matrix: VM-005
         """Machine without explicit type defaults to lxc."""
         del sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"]
         errors = validate(sample_infra)
@@ -368,12 +368,12 @@ class TestGPUPolicy:
             }
             machines[name] = {"type": "lxc", "ip": ip, "profiles": ["default", "gpu-profile"]}
 
-    def test_single_gpu_exclusive_ok(self, sample_infra):
+    def test_single_gpu_exclusive_ok(self, sample_infra):  # Matrix: GP-001
         """One GPU instance in exclusive mode (default) is valid."""
         self._add_gpu_machine(sample_infra, "work", "gpu-ws", "10.100.1.20")
         assert validate(sample_infra) == []
 
-    def test_multiple_gpu_exclusive_error(self, sample_infra):
+    def test_multiple_gpu_exclusive_error(self, sample_infra):  # Matrix: GP-002
         """Multiple GPU instances in exclusive mode triggers error."""
         self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
         self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
@@ -381,14 +381,14 @@ class TestGPUPolicy:
         assert any("GPU policy is 'exclusive'" in e for e in errors)
         assert any("gpu-a" in e and "gpu-b" in e for e in errors)
 
-    def test_multiple_gpu_shared_no_error(self, sample_infra):
+    def test_multiple_gpu_shared_no_error(self, sample_infra):  # Matrix: GP-003
         """Multiple GPU instances with shared policy passes validation."""
         sample_infra["global"]["gpu_policy"] = "shared"
         self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
         self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
         assert validate(sample_infra) == []
 
-    def test_shared_gpu_warning(self, sample_infra):
+    def test_shared_gpu_warning(self, sample_infra):  # Matrix: GP-004
         """Shared GPU policy emits warning when multiple instances share GPU."""
         sample_infra["global"]["gpu_policy"] = "shared"
         self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
@@ -396,30 +396,30 @@ class TestGPUPolicy:
         warnings = get_warnings(sample_infra)
         assert any("shared" in w.lower() for w in warnings)
 
-    def test_no_gpu_no_warning(self, sample_infra):
+    def test_no_gpu_no_warning(self, sample_infra):  # Matrix: GP-005
         """No GPU instances produces no warnings."""
         assert get_warnings(sample_infra) == []
 
-    def test_single_gpu_no_warning(self, sample_infra):
+    def test_single_gpu_no_warning(self, sample_infra):  # Matrix: GP-006
         """Single GPU instance produces no warning even in shared mode."""
         sample_infra["global"]["gpu_policy"] = "shared"
         self._add_gpu_machine(sample_infra, "work", "gpu-ws", "10.100.1.20")
         assert get_warnings(sample_infra) == []
 
-    def test_gpu_via_profile_device_detected(self, sample_infra):
+    def test_gpu_via_profile_device_detected(self, sample_infra):  # Matrix: GP-007, GP-2-001
         """GPU access via profile device is detected by exclusive policy."""
         self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20", via_flag=True)
         self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20", via_flag=False)
         errors = validate(sample_infra)
         assert any("GPU policy is 'exclusive'" in e for e in errors)
 
-    def test_invalid_gpu_policy(self, sample_infra):
+    def test_invalid_gpu_policy(self, sample_infra):  # Matrix: GP-008
         """Invalid gpu_policy value triggers error."""
         sample_infra["global"]["gpu_policy"] = "permissive"
         errors = validate(sample_infra)
         assert any("gpu_policy must be 'exclusive' or 'shared'" in e for e in errors)
 
-    def test_default_gpu_policy_is_exclusive(self, sample_infra):
+    def test_default_gpu_policy_is_exclusive(self, sample_infra):  # Matrix: GP-009
         """Without gpu_policy in global, default is exclusive."""
         self._add_gpu_machine(sample_infra, "admin", "gpu-a", "10.100.0.20")
         self._add_gpu_machine(sample_infra, "work", "gpu-b", "10.100.1.20")
@@ -432,21 +432,21 @@ class TestGPUPolicy:
 
 
 class TestFirewallMode:
-    def test_default_host_mode_valid(self, sample_infra):
+    def test_default_host_mode_valid(self, sample_infra):  # Matrix: FM-001
         """No firewall_mode set defaults to 'host' (valid)."""
         assert validate(sample_infra) == []
 
-    def test_host_mode_valid(self, sample_infra):
+    def test_host_mode_valid(self, sample_infra):  # Matrix: FM-002
         """Explicit firewall_mode: host is valid."""
         sample_infra["global"]["firewall_mode"] = "host"
         assert validate(sample_infra) == []
 
-    def test_vm_mode_valid(self, sample_infra):
+    def test_vm_mode_valid(self, sample_infra):  # Matrix: FM-003
         """firewall_mode: vm is valid."""
         sample_infra["global"]["firewall_mode"] = "vm"
         assert validate(sample_infra) == []
 
-    def test_invalid_mode_rejected(self, sample_infra):
+    def test_invalid_mode_rejected(self, sample_infra):  # Matrix: FM-004
         """Invalid firewall_mode triggers error."""
         sample_infra["global"]["firewall_mode"] = "container"
         errors = validate(sample_infra)
@@ -457,35 +457,35 @@ class TestFirewallMode:
 
 
 class TestFirewallVMAutoCreation:
-    def test_firewall_mode_vm_auto_creates_sys_firewall(self, sample_infra):
+    def test_firewall_mode_vm_auto_creates_sys_firewall(self, sample_infra):  # Matrix: FM-005
         """firewall_mode: vm auto-creates sys-firewall in admin domain."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
         admin_machines = sample_infra["domains"]["admin"]["machines"]
         assert "sys-firewall" in admin_machines
 
-    def test_firewall_mode_vm_auto_created_has_correct_ip(self, sample_infra):
+    def test_firewall_mode_vm_auto_created_has_correct_ip(self, sample_infra):  # Matrix: FM-006
         """Auto-created sys-firewall gets IP <base_subnet>.<admin_subnet_id>.253."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
         sys_fw = sample_infra["domains"]["admin"]["machines"]["sys-firewall"]
         assert sys_fw["ip"] == "10.100.0.253"
 
-    def test_firewall_mode_vm_auto_created_roles(self, sample_infra):
+    def test_firewall_mode_vm_auto_created_roles(self, sample_infra):  # Matrix: FM-007
         """Auto-created sys-firewall has base_system and firewall_router roles."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
         sys_fw = sample_infra["domains"]["admin"]["machines"]["sys-firewall"]
         assert sys_fw["roles"] == ["base_system", "firewall_router"]
 
-    def test_firewall_mode_vm_no_admin_domain_error(self, sample_infra):
+    def test_firewall_mode_vm_no_admin_domain_error(self, sample_infra):  # Matrix: FM-008
         """firewall_mode: vm without admin domain exits with error."""
         sample_infra["global"]["firewall_mode"] = "vm"
         del sample_infra["domains"]["admin"]
         with pytest.raises(SystemExit):
             enrich_infra(sample_infra)
 
-    def test_firewall_mode_vm_user_override_not_overwritten(self, sample_infra):
+    def test_firewall_mode_vm_user_override_not_overwritten(self, sample_infra):  # Matrix: FM-2-001
         """If user declares sys-firewall, enrich_infra does not overwrite it."""
         sample_infra["global"]["firewall_mode"] = "vm"
         sample_infra["domains"]["admin"]["machines"]["sys-firewall"] = {
@@ -505,7 +505,7 @@ class TestFirewallVMAutoCreation:
 
 
 class TestEphemeralOrphans:
-    def test_orphan_protection(self, sample_infra, tmp_path):
+    def test_orphan_protection(self, sample_infra, tmp_path):  # Matrix: PG-2-002, EL-2-002
         """Protected orphan is reported but not deleted by --clean-orphans."""
         generate(sample_infra, tmp_path)
         # Create an orphan file that has ephemeral: false (protected)
@@ -528,7 +528,7 @@ class TestEphemeralOrphans:
 
 
 class TestOrphans:
-    def test_detect_orphan_files(self, sample_infra, tmp_path):
+    def test_detect_orphan_files(self, sample_infra, tmp_path):  # Matrix: PG-2-001
         generate(sample_infra, tmp_path)
         (tmp_path / "inventory" / "old-domain.yml").write_text("orphan")
         (tmp_path / "group_vars" / "old-domain.yml").write_text("orphan")
@@ -536,11 +536,11 @@ class TestOrphans:
         orphans = detect_orphans(sample_infra, tmp_path)
         assert len(orphans) == 3
 
-    def test_no_false_positives(self, sample_infra, tmp_path):
+    def test_no_false_positives(self, sample_infra, tmp_path):  # Matrix: PG-2-004
         generate(sample_infra, tmp_path)
         assert detect_orphans(sample_infra, tmp_path) == []
 
-    def test_all_yml_not_orphan(self, sample_infra, tmp_path):
+    def test_all_yml_not_orphan(self, sample_infra, tmp_path):  # Matrix: PG-2-003
         generate(sample_infra, tmp_path)
         orphans = detect_orphans(sample_infra, tmp_path)
         assert not any("all.yml" in str(o) for o in orphans)
@@ -562,7 +562,7 @@ class TestPrivilegedPolicy:
                 return
         raise KeyError(f"Machine {machine} not found")
 
-    def test_privileged_lxc_rejected_when_vm_nested_false(self, sample_infra, monkeypatch):
+    def test_privileged_lxc_rejected_when_vm_nested_false(self, sample_infra, monkeypatch):  # Matrix: PP-001
         """Privileged LXC is an error when vm_nested=false."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -570,7 +570,7 @@ class TestPrivilegedPolicy:
         errors = validate(sample_infra)
         assert any("security.privileged=true on LXC is forbidden" in e for e in errors)
 
-    def test_privileged_lxc_allowed_when_vm_nested_true(self, sample_infra, monkeypatch):
+    def test_privileged_lxc_allowed_when_vm_nested_true(self, sample_infra, monkeypatch):  # Matrix: PP-002
         """Privileged LXC is allowed when vm_nested=true."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: True)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -578,7 +578,7 @@ class TestPrivilegedPolicy:
         errors = validate(sample_infra)
         assert not any("privileged" in e.lower() for e in errors)
 
-    def test_privileged_lxc_allowed_when_vm_nested_none(self, sample_infra, monkeypatch):
+    def test_privileged_lxc_allowed_when_vm_nested_none(self, sample_infra, monkeypatch):  # Matrix: PP-003
         """When /etc/anklume/vm_nested does not exist, no enforcement."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: None)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -586,7 +586,7 @@ class TestPrivilegedPolicy:
         errors = validate(sample_infra)
         assert not any("privileged" in e.lower() for e in errors)
 
-    def test_privileged_vm_always_allowed(self, sample_infra, monkeypatch):
+    def test_privileged_vm_always_allowed(self, sample_infra, monkeypatch):  # Matrix: PP-004
         """VMs can always have security.privileged (it's kernel-isolated)."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -595,7 +595,7 @@ class TestPrivilegedPolicy:
         errors = validate(sample_infra)
         assert not any("privileged" in e.lower() for e in errors)
 
-    def test_yolo_bypasses_privileged_error(self, sample_infra, monkeypatch):
+    def test_yolo_bypasses_privileged_error(self, sample_infra, monkeypatch):  # Matrix: PP-006, PP-2-001
         """YOLO mode turns privileged error into warning."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: True)
@@ -605,7 +605,7 @@ class TestPrivilegedPolicy:
         warnings = get_warnings(sample_infra)
         assert any("YOLO" in w for w in warnings)
 
-    def test_non_privileged_lxc_no_error(self, sample_infra, monkeypatch):
+    def test_non_privileged_lxc_no_error(self, sample_infra, monkeypatch):  # Matrix: PP-005
         """Non-privileged LXC is always fine, even with vm_nested=false."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -622,7 +622,7 @@ class TestNetworkPolicies:
     def _add_policies(self, infra, policies):
         infra["network_policies"] = policies
 
-    def test_valid_domain_to_domain_policy(self, sample_infra):
+    def test_valid_domain_to_domain_policy(self, sample_infra):  # Matrix: NP-001
         """Policy between two known domains is valid."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": [22], "protocol": "tcp"},
@@ -630,7 +630,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
 
-    def test_valid_machine_to_domain_policy(self, sample_infra):
+    def test_valid_machine_to_domain_policy(self, sample_infra):  # Matrix: NP-002
         """Policy from a machine to a domain is valid."""
         self._add_policies(sample_infra, [
             {"from": "admin-ctrl", "to": "work", "ports": [443]},
@@ -638,7 +638,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
 
-    def test_valid_host_keyword(self, sample_infra):
+    def test_valid_host_keyword(self, sample_infra):  # Matrix: NP-003
         """'host' is a valid from/to reference."""
         self._add_policies(sample_infra, [
             {"from": "host", "to": "admin", "ports": [22], "protocol": "tcp"},
@@ -646,7 +646,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
 
-    def test_valid_ports_all(self, sample_infra):
+    def test_valid_ports_all(self, sample_infra):  # Matrix: NP-004
         """ports: all is valid."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": "all"},
@@ -654,7 +654,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
 
-    def test_unknown_from_rejected(self, sample_infra):
+    def test_unknown_from_rejected(self, sample_infra):  # Matrix: NP-005
         """Unknown 'from' reference triggers error."""
         self._add_policies(sample_infra, [
             {"from": "nonexistent", "to": "admin", "ports": [22]},
@@ -662,7 +662,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("from: nonexistent" in e for e in errors)
 
-    def test_unknown_to_rejected(self, sample_infra):
+    def test_unknown_to_rejected(self, sample_infra):  # Matrix: NP-006
         """Unknown 'to' reference triggers error."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "nonexistent", "ports": [22]},
@@ -670,7 +670,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("to: nonexistent" in e for e in errors)
 
-    def test_missing_from_field(self, sample_infra):
+    def test_missing_from_field(self, sample_infra):  # Matrix: NP-007
         """Missing 'from' field triggers error."""
         self._add_policies(sample_infra, [
             {"to": "admin", "ports": [22]},
@@ -678,7 +678,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("missing 'from'" in e for e in errors)
 
-    def test_missing_to_field(self, sample_infra):
+    def test_missing_to_field(self, sample_infra):  # Matrix: NP-008
         """Missing 'to' field triggers error."""
         self._add_policies(sample_infra, [
             {"from": "admin", "ports": [22]},
@@ -686,7 +686,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("missing 'to'" in e for e in errors)
 
-    def test_invalid_port_number(self, sample_infra):
+    def test_invalid_port_number(self, sample_infra):  # Matrix: NP-009
         """Port out of range triggers error."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": [99999]},
@@ -694,7 +694,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("invalid port" in e for e in errors)
 
-    def test_invalid_port_type(self, sample_infra):
+    def test_invalid_port_type(self, sample_infra):  # Matrix: NP-010
         """Non-list non-'all' ports triggers error."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": "tcp"},
@@ -702,7 +702,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("ports must be a list or 'all'" in e for e in errors)
 
-    def test_invalid_protocol(self, sample_infra):
+    def test_invalid_protocol(self, sample_infra):  # Matrix: NP-011
         """Invalid protocol triggers error."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": [22], "protocol": "icmp"},
@@ -710,7 +710,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
 
-    def test_policies_in_group_vars_all(self, sample_infra, tmp_path):
+    def test_policies_in_group_vars_all(self, sample_infra, tmp_path):  # Matrix: NP-2-002
         """Network policies appear in group_vars/all.yml."""
         self._add_policies(sample_infra, [
             {"description": "Admin SSH", "from": "admin", "to": "work",
@@ -721,13 +721,13 @@ class TestNetworkPolicies:
         assert "network_policies" in content
         assert "Admin SSH" in content
 
-    def test_no_policies_no_key_in_all(self, sample_infra, tmp_path):
+    def test_no_policies_no_key_in_all(self, sample_infra, tmp_path):  # Matrix: NP-2-003
         """Without network_policies, the key is absent from group_vars/all.yml."""
         generate(sample_infra, tmp_path)
         content = (tmp_path / "group_vars" / "all.yml").read_text()
         assert "network_policies" not in content
 
-    def test_bidirectional_valid(self, sample_infra):
+    def test_bidirectional_valid(self, sample_infra):  # Matrix: NP-2-001
         """bidirectional: true is accepted."""
         self._add_policies(sample_infra, [
             {"from": "admin", "to": "work", "ports": "all", "bidirectional": True},
@@ -735,7 +735,7 @@ class TestNetworkPolicies:
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
 
-    def test_empty_policies_valid(self, sample_infra):
+    def test_empty_policies_valid(self, sample_infra):  # Matrix: NP-012
         """Empty network_policies list is valid."""
         self._add_policies(sample_infra, [])
         errors = validate(sample_infra)
@@ -776,7 +776,7 @@ class TestInfraDirectory:
 
         return infra_dir
 
-    def test_load_from_directory(self, sample_infra, tmp_path):
+    def test_load_from_directory(self, sample_infra, tmp_path):  # Matrix: ID-001
         """Loading from infra/ directory produces same structure as single file."""
         infra_dir = self._create_infra_dir(tmp_path, sample_infra)
         result = load_infra(infra_dir)
@@ -784,7 +784,7 @@ class TestInfraDirectory:
         assert "admin" in result["domains"]
         assert "work" in result["domains"]
 
-    def test_directory_generates_same_output(self, sample_infra, tmp_path):
+    def test_directory_generates_same_output(self, sample_infra, tmp_path):  # Matrix: ID-002
         """Directory mode and file mode produce identical generated files."""
         # Generate from single file
         out_file = tmp_path / "out_file"
@@ -809,7 +809,7 @@ class TestInfraDirectory:
         }
         assert file_outputs == dir_outputs
 
-    def test_directory_with_policies(self, sample_infra, tmp_path):
+    def test_directory_with_policies(self, sample_infra, tmp_path):  # Matrix: ID-003
         """policies.yml is merged from infra/ directory."""
         sample_infra["network_policies"] = [
             {"from": "admin", "to": "work", "ports": [22], "protocol": "tcp"},
@@ -819,35 +819,35 @@ class TestInfraDirectory:
         assert "network_policies" in result
         assert len(result["network_policies"]) == 1
 
-    def test_directory_missing_base_yml_exits(self, tmp_path):
+    def test_directory_missing_base_yml_exits(self, tmp_path):  # Matrix: ID-004
         """Missing base.yml triggers exit."""
         infra_dir = tmp_path / "infra"
         infra_dir.mkdir()
         with pytest.raises(SystemExit):
             load_infra(infra_dir)
 
-    def test_load_autodetects_file(self, sample_infra, tmp_path):
+    def test_load_autodetects_file(self, sample_infra, tmp_path):  # Matrix: ID-005
         """load_infra('infra.yml') works when file exists."""
         p = tmp_path / "infra.yml"
         p.write_text(yaml.dump(sample_infra, sort_keys=False))
         result = load_infra(p)
         assert result["project_name"] == "test-infra"
 
-    def test_load_autodetects_dir(self, sample_infra, tmp_path):
+    def test_load_autodetects_dir(self, sample_infra, tmp_path):  # Matrix: ID-006
         """load_infra('infra') works when directory exists."""
         infra_dir = self._create_infra_dir(tmp_path, sample_infra)
         # Load using the directory path directly
         result = load_infra(infra_dir)
         assert result["project_name"] == "test-infra"
 
-    def test_domains_sorted_alphabetically(self, sample_infra, tmp_path):
+    def test_domains_sorted_alphabetically(self, sample_infra, tmp_path):  # Matrix: ID-007
         """Domain files are loaded in alphabetical order."""
         infra_dir = self._create_infra_dir(tmp_path, sample_infra)
         result = load_infra(infra_dir)
         # Both admin and work should be present regardless of file order
         assert set(result["domains"]) == {"admin", "work"}
 
-    def test_empty_domains_dir(self, sample_infra, tmp_path):
+    def test_empty_domains_dir(self, sample_infra, tmp_path):  # Matrix: ID-008
         """Empty domains/ directory yields no domains."""
         infra_dir = tmp_path / "infra"
         infra_dir.mkdir()
@@ -856,3 +856,101 @@ class TestInfraDirectory:
         (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
         result = load_infra(infra_dir)
         assert result.get("domains", {}) == {}
+
+
+# -- AI access policy (Phase 18a) -------------------------------------------
+
+
+class TestAIAccessPolicy:
+    """Test AI access policy validation (Phase 18a)."""
+
+    def _make_ai_infra(self, sample_infra, policy="exclusive", default="work"):
+        """Add ai-tools domain and AI access policy to infra."""
+        sample_infra["domains"]["ai-tools"] = {
+            "description": "AI services",
+            "subnet_id": 10,
+            "machines": {
+                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10"},
+            },
+        }
+        sample_infra["global"]["ai_access_policy"] = policy
+        if default:
+            sample_infra["global"]["ai_access_default"] = default
+
+    def test_valid_exclusive_config(self, sample_infra):
+        """Exclusive AI access with valid default domain passes validation."""
+        self._make_ai_infra(sample_infra)
+        errors = validate(sample_infra)
+        assert not any("ai_access" in e for e in errors)
+
+    def test_missing_default_with_exclusive(self, sample_infra):
+        """Exclusive mode without ai_access_default is an error."""
+        self._make_ai_infra(sample_infra, default=None)
+        errors = validate(sample_infra)
+        assert any("ai_access_default is required" in e for e in errors)
+
+    def test_default_references_unknown_domain(self, sample_infra):
+        """ai_access_default referencing nonexistent domain is an error."""
+        self._make_ai_infra(sample_infra, default="nonexistent")
+        errors = validate(sample_infra)
+        assert any("not a known domain" in e for e in errors)
+
+    def test_default_cannot_be_ai_tools(self, sample_infra):
+        """ai_access_default cannot be 'ai-tools' itself."""
+        self._make_ai_infra(sample_infra, default="ai-tools")
+        errors = validate(sample_infra)
+        assert any("cannot be 'ai-tools'" in e for e in errors)
+
+    def test_multiple_ai_tools_policies_error(self, sample_infra):
+        """More than one network_policy targeting ai-tools is an error in exclusive mode."""
+        self._make_ai_infra(sample_infra)
+        sample_infra["network_policies"] = [
+            {"from": "work", "to": "ai-tools", "ports": "all"},
+            {"from": "admin", "to": "ai-tools", "ports": [8080]},
+        ]
+        errors = validate(sample_infra)
+        assert any("2 network_policies target ai-tools" in e for e in errors)
+
+    def test_auto_creation_of_policy(self, sample_infra):
+        """Exclusive mode auto-creates a network policy if none targets ai-tools."""
+        self._make_ai_infra(sample_infra)
+        enrich_infra(sample_infra)
+        policies = sample_infra.get("network_policies", [])
+        assert any(p.get("to") == "ai-tools" for p in policies)
+
+    def test_auto_creation_skipped_when_policy_exists(self, sample_infra):
+        """Auto-creation is skipped when a policy already targets ai-tools."""
+        self._make_ai_infra(sample_infra)
+        sample_infra["network_policies"] = [
+            {"from": "work", "to": "ai-tools", "ports": "all"},
+        ]
+        enrich_infra(sample_infra)
+        ai_policies = [p for p in sample_infra["network_policies"] if p.get("to") == "ai-tools"]
+        assert len(ai_policies) == 1
+
+    def test_open_mode_unchanged(self, sample_infra):
+        """Open mode (default) has no AI-specific validation."""
+        errors = validate(sample_infra)
+        assert not any("ai_access" in e for e in errors)
+
+    def test_no_ai_tools_domain_error(self, sample_infra):
+        """Exclusive mode without ai-tools domain is an error."""
+        sample_infra["global"]["ai_access_policy"] = "exclusive"
+        sample_infra["global"]["ai_access_default"] = "work"
+        errors = validate(sample_infra)
+        assert any("no 'ai-tools' domain" in e for e in errors)
+
+    def test_invalid_ai_access_policy_value(self, sample_infra):
+        """Invalid ai_access_policy value triggers error."""
+        sample_infra["global"]["ai_access_policy"] = "restricted"
+        errors = validate(sample_infra)
+        assert any("ai_access_policy must be 'exclusive' or 'open'" in e for e in errors)
+
+    def test_single_policy_targeting_ai_tools_ok(self, sample_infra):
+        """Exactly one network_policy targeting ai-tools is allowed in exclusive mode."""
+        self._make_ai_infra(sample_infra)
+        sample_infra["network_policies"] = [
+            {"from": "work", "to": "ai-tools", "ports": "all"},
+        ]
+        errors = validate(sample_infra)
+        assert not any("network_policies target ai-tools" in e for e in errors)

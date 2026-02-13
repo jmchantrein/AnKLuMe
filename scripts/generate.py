@@ -137,6 +137,12 @@ def validate(infra):
     if firewall_mode not in valid_firewall_modes:
         errors.append(f"global.firewall_mode must be 'host' or 'vm', got '{firewall_mode}'")
 
+    # AI access policy validation (Phase 18a)
+    ai_access_policy = g.get("ai_access_policy", "open")
+    valid_ai_policies = ("exclusive", "open")
+    if ai_access_policy not in valid_ai_policies:
+        errors.append(f"global.ai_access_policy must be 'exclusive' or 'open', got '{ai_access_policy}'")
+
     for dname, domain in domains.items():
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):
             errors.append(f"Domain '{dname}': invalid name (lowercase alphanumeric + hyphen)")
@@ -243,6 +249,29 @@ def validate(infra):
         if protocol is not None and protocol not in ("tcp", "udp"):
             errors.append(f"network_policies[{i}]: protocol must be 'tcp' or 'udp', got '{protocol}'")
 
+    # AI access policy exclusive-mode validation (Phase 18a)
+    if ai_access_policy == "exclusive":
+        ai_access_default = g.get("ai_access_default")
+        if ai_access_default is None:
+            errors.append("global.ai_access_default is required when ai_access_policy is 'exclusive'")
+        elif ai_access_default == "ai-tools":
+            errors.append("global.ai_access_default cannot be 'ai-tools' (must be a client domain)")
+        elif ai_access_default not in domain_names:
+            errors.append(f"global.ai_access_default '{ai_access_default}' is not a known domain")
+
+        if "ai-tools" not in domain_names:
+            errors.append("ai_access_policy is 'exclusive' but no 'ai-tools' domain exists")
+
+        ai_tools_policies = [
+            p for p in (infra.get("network_policies") or [])
+            if isinstance(p, dict) and p.get("to") == "ai-tools"
+        ]
+        if len(ai_tools_policies) > 1:
+            errors.append(
+                f"ai_access_policy is 'exclusive' but {len(ai_tools_policies)} "
+                f"network_policies target ai-tools (max 1 allowed)"
+            )
+
     return errors
 
 
@@ -293,8 +322,14 @@ def enrich_infra(infra):
     """Enrich infra dict with auto-generated resources.
 
     Called after validate() and before generate(). Mutates infra in place.
-    Currently handles: auto-creation of sys-firewall VM when firewall_mode is 'vm'.
+    Handles: auto-creation of sys-firewall VM, AI access policy enrichment.
     """
+    _enrich_firewall(infra)
+    _enrich_ai_access(infra)
+
+
+def _enrich_firewall(infra):
+    """Auto-create sys-firewall VM when firewall_mode is 'vm'."""
     g = infra.get("global", {})
     firewall_mode = g.get("firewall_mode", "host")
     if firewall_mode != "vm":
@@ -336,6 +371,37 @@ def enrich_infra(infra):
 
     print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain "
           f"(ip: {sys_fw['ip']})", file=sys.stderr)
+
+
+def _enrich_ai_access(infra):
+    """Auto-create network policy for exclusive AI access if missing."""
+    g = infra.get("global", {})
+    ai_access_policy = g.get("ai_access_policy", "open")
+    if ai_access_policy != "exclusive":
+        return
+
+    ai_access_default = g.get("ai_access_default")
+    if not ai_access_default or "ai-tools" not in (infra.get("domains") or {}):
+        return
+
+    existing_policies = infra.get("network_policies") or []
+    has_ai_policy = any(
+        isinstance(p, dict) and p.get("to") == "ai-tools"
+        for p in existing_policies
+    )
+    if has_ai_policy:
+        return
+
+    infra.setdefault("network_policies", [])
+    infra["network_policies"].append({
+        "description": f"AI access: {ai_access_default} -> ai-tools (auto-created)",
+        "from": ai_access_default,
+        "to": "ai-tools",
+        "ports": "all",
+        "bidirectional": True,
+    })
+    print(f"INFO: ai_access_policy is 'exclusive' — auto-created network policy "
+          f"from '{ai_access_default}' to 'ai-tools'", file=sys.stderr)
 
 
 def extract_all_images(infra):

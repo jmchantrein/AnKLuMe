@@ -85,6 +85,28 @@
       {{ resolved }}
   when: network_policies is defined and (network_policies | length > 0)
 
+- name: IncusNftables | Apply AI access override to resolved policies
+  ansible.builtin.set_fact:
+    incus_nftables_resolved_policies: >-
+      {% set override = incus_nftables_ai_override %}
+      {% set policies = incus_nftables_resolved_policies | default([]) %}
+      {% set new_policies = [] %}
+      {% for p in policies %}
+      {% if p.to_bridge != override.to_bridge %}
+      {% set _ = new_policies.append(p) %}
+      {% endif %}
+      {% endfor %}
+      {% set _ = new_policies.append({
+        'description': 'AI access override (dynamic)',
+        'from_bridge': override.from_bridge,
+        'to_bridge': override.to_bridge,
+        'ports': override.ports | default('all'),
+        'protocol': override.protocol | default('tcp'),
+        'bidirectional': true
+      }) %}
+      {{ new_policies }}
+  when: incus_nftables_ai_override | default({}) | length > 0
+
 - name: IncusNftables | Create output directory
   ansible.builtin.file:
     path: "{{ incus_nftables_output_path | dirname }}"
