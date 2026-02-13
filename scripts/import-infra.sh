@@ -18,8 +18,15 @@ done
 echo "=== AnKLuMe Import Infrastructure ==="
 echo "Scanning Incus state..."
 
+# Pre-flight: verify Incus daemon is accessible
+if ! incus project list --format json >/dev/null 2>&1; then
+    echo "ERROR: Cannot connect to the Incus daemon." >&2
+    echo "       Check that incus is installed and you have socket access." >&2
+    exit 1
+fi
+
 # Collect all projects
-PROJECTS=$(incus project list --format json 2>/dev/null)
+PROJECTS=$(incus project list --format json)
 if [ -z "$PROJECTS" ] || [ "$PROJECTS" = "null" ]; then
     echo "No Incus projects found."
     exit 0
