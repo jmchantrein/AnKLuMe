@@ -1,13 +1,23 @@
 # AnKLuMe 🔨
 
-[![WIP](https://img.shields.io/badge/status-WIP-yellow)](docs/ROADMAP.md)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+<!-- Badges dynamiques (mis à jour automatiquement depuis GitHub) -->
+[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
+[![License](https://img.shields.io/github/license/jmchantrein/AnKLuMe)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/commits/main)
+[![Issues](https://img.shields.io/github/issues/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/pulls)
+
+<!-- Badges statiques — stack technique -->
 [![Ansible](https://img.shields.io/badge/ansible-%3E%3D2.16-EE0000?logo=ansible&logoColor=white)](https://www.ansible.com/)
 [![Incus](https://img.shields.io/badge/incus-%3E%3D6.0%20LTS-orange)](https://linuxcontainers.org/incus/)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Molecule](https://img.shields.io/badge/molecule-tested-green)](https://molecule.readthedocs.io/)
+
+<!-- Badges statiques — quality gates (validés par la CI) -->
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
-[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
+[![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
+[![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
 
 **Isolation type QubesOS utilisant les fonctionnalités natives du noyau Linux (KVM/LXC).**
 
