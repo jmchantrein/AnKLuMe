@@ -158,6 +158,76 @@ def get_warnings(infra):
     return warnings
 
 
+def enrich_infra(infra):
+    """Enrich infra dict with auto-generated resources.
+
+    Called after validate() and before generate(). Mutates infra in place.
+    Currently handles: auto-creation of sys-firewall VM when firewall_mode is 'vm'.
+    """
+    g = infra.get("global", {})
+    firewall_mode = g.get("firewall_mode", "host")
+    if firewall_mode != "vm":
+        return
+
+    domains = infra.get("domains") or {}
+
+    # Check if sys-firewall already exists in any domain (user override)
+    for domain in domains.values():
+        for mname in (domain.get("machines") or {}):
+            if mname == "sys-firewall":
+                return
+
+    # Require admin domain
+    if "admin" not in domains:
+        print("ERROR: firewall_mode is 'vm' but no 'admin' domain exists. "
+              "Cannot auto-create sys-firewall.", file=sys.stderr)
+        sys.exit(1)
+
+    admin_domain = domains["admin"]
+    base_subnet = g.get("base_subnet", "10.100")
+    admin_subnet_id = admin_domain.get("subnet_id", 0)
+
+    sys_fw = {
+        "description": "Centralized firewall VM (auto-created by generator)",
+        "type": "vm",
+        "ip": f"{base_subnet}.{admin_subnet_id}.253",
+        "config": {
+            "limits.cpu": "2",
+            "limits.memory": "2GiB",
+        },
+        "roles": ["base_system", "firewall_router"],
+        "ephemeral": False,
+    }
+
+    if "machines" not in admin_domain or admin_domain["machines"] is None:
+        admin_domain["machines"] = {}
+    admin_domain["machines"]["sys-firewall"] = sys_fw
+
+    print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain "
+          f"(ip: {sys_fw['ip']})", file=sys.stderr)
+
+
+def extract_all_images(infra):
+    """Collect all unique OS image references from infra.yml.
+
+    Scans every machine's os_image (falling back to global.default_os_image)
+    and returns a sorted list of unique image references.
+    Used to populate incus_all_images in group_vars/all.yml for the
+    incus_images pre-download role.
+    """
+    g = infra.get("global", {})
+    default_image = g.get("default_os_image")
+    images = set()
+
+    for domain in (infra.get("domains") or {}).values():
+        for machine in (domain.get("machines") or {}).values():
+            image = machine.get("os_image", default_image)
+            if image:
+                images.add(image)
+
+    return sorted(images)
+
+
 def _managed_block(content_yaml):
     return f"{MANAGED_BEGIN}\n{MANAGED_NOTICE}\n{content_yaml.rstrip()}\n{MANAGED_END}"
 
@@ -195,12 +265,14 @@ def generate(infra, base_dir, dry_run=False):
     # Connection params stored as psot_* (informational only).
     # They must NOT be named ansible_connection / ansible_user because
     # inventory variables override play-level keywords (Ansible precedence).
+    all_images = extract_all_images(infra)
     all_vars = {k: v for k, v in {
         "project_name": infra.get("project_name"),
         "base_subnet": g.get("base_subnet", "10.100"),
         "default_os_image": g.get("default_os_image"),
         "psot_default_connection": g.get("default_connection"),
         "psot_default_user": g.get("default_user"),
+        "incus_all_images": all_images if all_images else None,
     }.items() if v is not None}
     fp, _ = _write_managed(base / "group_vars" / "all.yml", all_vars, dry_run)
     written.append(fp)
@@ -334,6 +406,8 @@ def main(argv=None):
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         sys.exit(1)
+
+    enrich_infra(infra)
 
     warnings = get_warnings(infra)
     for w in warnings:
