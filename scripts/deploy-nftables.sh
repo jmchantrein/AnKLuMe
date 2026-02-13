@@ -59,6 +59,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ── Pre-flight: verify Incus daemon is accessible ──────────
+
+if ! incus project list --format csv >/dev/null 2>&1; then
+    die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+fi
+
 # ── Find container project ──────────────────────────────────
 
 find_project() {

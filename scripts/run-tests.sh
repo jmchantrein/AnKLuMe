@@ -17,6 +17,14 @@ REPO_BRANCH="${ANKLUME_RUNNER_REPO_BRANCH:-main}"
 REPO_DIR="/root/AnKLuMe"
 MAX_WAIT=120
 
+# ── Pre-flight check ──────────────────────────────────────────────
+
+check_incus_connectivity() {
+    if ! incus project list --format csv >/dev/null 2>&1; then
+        die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+    fi
+}
+
 # ── Helper functions ──────────────────────────────────────────────
 
 ensure_nesting_profile() {
@@ -114,6 +122,7 @@ PRESEED
 cmd_create() {
     echo "=== Creating runner container: ${RUNNER_NAME} ==="
 
+    check_incus_connectivity
     ensure_nesting_profile
 
     # Launch or reuse container
@@ -135,6 +144,8 @@ cmd_create() {
 
 cmd_test() {
     local role="${1:-all}"
+
+    check_incus_connectivity
 
     # Verify runner exists
     incus info "$RUNNER_NAME" --project "$RUNNER_PROJECT" &>/dev/null \
@@ -184,6 +195,7 @@ cmd_test() {
 
 cmd_destroy() {
     echo "=== Destroying runner: ${RUNNER_NAME} ==="
+    check_incus_connectivity
     incus delete "$RUNNER_NAME" --project "$RUNNER_PROJECT" --force 2>/dev/null \
         || echo "Container ${RUNNER_NAME} not found or already removed."
 }

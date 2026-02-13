@@ -88,3 +88,19 @@
   source_commit: "db3ed90"
   files_affected: ["roles/*/tasks/main.yml"]
   prevention: "Ansible 2.19 requires explicit boolean evaluation in when:"
+
+- id: FIX-INCUS-012
+  category: incus-cli
+  problem: "Scripts using incus commands with 2>/dev/null silently do nothing when daemon is unreachable"
+  solution: "Add pre-flight connectivity check before any business logic: if ! incus project list >/dev/null 2>&1; then die; fi"
+  source_commit: "09f0670"
+  files_affected:
+    - "scripts/flush.sh"
+    - "scripts/import-infra.sh"
+    - "scripts/ai-switch.sh"
+    - "scripts/run-tests.sh"
+    - "scripts/deploy-nftables.sh"
+  prevention: "Every script whose main purpose is Incus operations must verify daemon
+    connectivity before proceeding. Never rely on 2>/dev/null || true for connection
+    errors — only use it for expected operational failures (resource already exists,
+    service already stopped, etc.)"

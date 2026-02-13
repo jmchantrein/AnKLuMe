@@ -127,6 +127,11 @@ if [[ "$DRY_RUN" == "true" ]]; then
     exit 0
 fi
 
+# --- Pre-flight: verify Incus daemon is accessible ---
+if ! incus project list --format csv >/dev/null 2>&1; then
+    die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+fi
+
 # --- Step 1: Stop GPU services in ai-tools ---
 info "Stopping GPU services in ai-tools domain..."
 # Find the AI project (default to ai-tools)
