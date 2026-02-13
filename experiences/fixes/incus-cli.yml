@@ -119,3 +119,16 @@
   prevention: "Never parse incus CSV output with cut for project names — the
     '(current)' annotation is appended to the active project name. Use
     --format json for reliable parsing of structured Incus output."
+
+- id: FIX-INCUS-014
+  category: incus-cli
+  problem: "incus commands fail with permission denied after user added to incus-admin group mid-session"
+  solution: "Use 'sg incus-admin -c \"command\"' to run with group context. Do NOT use
+    newgrp (opens interactive shell that hangs). For permanent fix, restart the
+    shell session or Claude Code."
+  source_commit: "4b4dabd"
+  files_affected: ["scripts/bootstrap.sh"]
+  prevention: "bootstrap.sh now auto-adds the user to incus-admin group. But group
+    changes only take effect on next login. In Claude Code, use sg as workaround
+    since newgrp opens an interactive sub-shell that cannot be controlled.
+    Long-term: restart Claude Code after bootstrap."
