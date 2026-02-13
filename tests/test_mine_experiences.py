@@ -388,3 +388,211 @@ class TestMainDryRun:
         assert result.returncode == 0
         # Should not create any files in fixes dir
         assert not list((tmp_path / "fixes").glob("*.yml"))
+
+
+# ── main (write mode) ──────────────────────────────────
+
+
+class TestMineWriteMode:
+    """Test main() in non-dry-run mode (actual file writing to tmp_path)."""
+
+    def test_write_mode_creates_files(self, tmp_path, monkeypatch):
+        """main() without --dry-run writes YAML files to the fixes directory."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        exp_dir = tmp_path / "exp"
+        exp_dir.mkdir()
+        last_file = tmp_path / ".last-mined-commit"
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", exp_dir)
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", last_file)
+
+        # Mock get_fix_commits to return known commits
+        fake_commits = [
+            ("a" * 40, "Fix ansible-lint violation in base_system"),
+            ("b" * 40, "Fix molecule test converge failure"),
+        ]
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: fake_commits)
+
+        # Mock get_commit_files to return files for each commit
+        def fake_files(commit_hash):
+            if commit_hash.startswith("a"):
+                return ["roles/base_system/tasks/main.yml"]
+            return ["roles/base_system/molecule/default/converge.yml"]
+
+        monkeypatch.setattr(mine_mod, "get_commit_files", fake_files)
+
+        # Run main without --dry-run
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+        mine_mod.main()
+
+        # Should have created at least one YAML file
+        yml_files = list(fixes_dir.glob("*.yml"))
+        assert len(yml_files) > 0
+
+    def test_write_mode_saves_last_mined_commit(self, tmp_path, monkeypatch):
+        """main() without --dry-run saves the last mined commit hash."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        exp_dir = tmp_path / "exp"
+        exp_dir.mkdir()
+        last_file = tmp_path / ".last-mined-commit"
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", exp_dir)
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", last_file)
+
+        fake_hash = "c" * 40
+        fake_commits = [(fake_hash, "Fix incus bridge creation bug")]
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: fake_commits)
+        monkeypatch.setattr(
+            mine_mod, "get_commit_files",
+            lambda h: ["roles/incus_networks/tasks/main.yml"],
+        )
+
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+        mine_mod.main()
+
+        assert last_file.exists()
+        assert last_file.read_text().strip() == fake_hash
+
+    def test_write_mode_appends_to_existing_file(self, tmp_path, monkeypatch):
+        """main() appends to existing category files."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        exp_dir = tmp_path / "exp"
+        exp_dir.mkdir()
+        last_file = tmp_path / ".last-mined-commit"
+
+        # Pre-create a category file
+        existing = fixes_dir / "ansible-lint.yml"
+        existing.write_text("---\n- id: EXISTING-001\n  category: ansible-lint\n")
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", exp_dir)
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", last_file)
+
+        fake_commits = [("d" * 40, "Fix lint noqa issue")]
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: fake_commits)
+        monkeypatch.setattr(
+            mine_mod, "get_commit_files",
+            lambda h: ["roles/base_system/tasks/main.yml"],
+        )
+
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+        mine_mod.main()
+
+        content = existing.read_text()
+        assert "EXISTING-001" in content
+        assert "MINED-LINT-001" in content
+
+
+# ── git failure ─────────────────────────────────────────
+
+
+class TestMineGitFailure:
+    """Test with mock git that fails (returns non-zero)."""
+
+    def test_git_failure_returns_empty_commits(self, monkeypatch):
+        """When git fails, get_fix_commits returns an empty list."""
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=128, stdout="", stderr="fatal")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        assert commits == []
+
+    def test_git_failure_commit_files_returns_empty(self, monkeypatch):
+        """When git fails, get_commit_files returns an empty list."""
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=1, stdout="", stderr="error")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        files = get_commit_files("abc1234567890")
+        assert files == []
+
+    def test_main_with_git_failure_exits_cleanly(self, tmp_path, monkeypatch):
+        """main() with failing git exits cleanly with 'No fix commits found'."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", tmp_path / "exp")
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", tmp_path / ".last")
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: [])
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+
+        # Should not raise — just print "No fix commits found."
+        mine_mod.main()
+
+
+# ── incremental with corrupted file ─────────────────────
+
+
+class TestMineIncrementalCorrupted:
+    """Test with corrupted .last-mined-commit file (invalid hash)."""
+
+    def test_corrupted_hash_used_as_since(self, tmp_path, monkeypatch):
+        """A corrupted last-mined-commit file is still read as a string."""
+        marker = tmp_path / ".last-mined-commit"
+        marker.write_text("not-a-valid-hash!!!\n")
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", marker)
+        result = load_last_mined_commit()
+        # The function reads it as-is; it does not validate the hash format
+        assert result == "not-a-valid-hash!!!"
+
+    def test_incremental_with_corrupted_file_no_crash(self, tmp_path, monkeypatch):
+        """main --incremental with corrupted last commit file does not crash."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        marker = tmp_path / ".last-mined-commit"
+        marker.write_text("ZZZZ_invalid\n")
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", tmp_path / "exp")
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", marker)
+
+        # Mock get_fix_commits to accept any since value and return empty
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: [])
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py", "--incremental"])
+
+        # Should not crash
+        mine_mod.main()
+
+
+# ── empty repository ────────────────────────────────────
+
+
+class TestMineEmptyRepo:
+    """Test with empty git repository (no commits)."""
+
+    def test_empty_repo_returns_no_commits(self, monkeypatch):
+        """get_fix_commits on an empty repo returns empty list."""
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(
+                args, returncode=128, stdout="",
+                stderr="fatal: your current branch 'main' does not have any commits yet",
+            )
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        assert commits == []
+
+    def test_empty_repo_main_exits_cleanly(self, tmp_path, monkeypatch):
+        """main() on an empty repo exits cleanly."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", tmp_path / "exp")
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", tmp_path / ".last")
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: [])
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+
+        mine_mod.main()
+        # No files should have been created
+        assert not list(fixes_dir.glob("*.yml"))

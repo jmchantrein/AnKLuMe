@@ -239,3 +239,156 @@ class TestMain:
         with pytest.raises(SystemExit) as exc_info:
             main(["--matrix", str(matrix), "--threshold", "100"])
         assert exc_info.value.code == 1
+
+
+# ── molecule verify.yml scanning ────────────────────────
+
+
+class TestMatrixMoleculeVerify:
+    """Test scanning of molecule verify.yml files for Matrix: IDs."""
+
+    def test_finds_matrix_ids_in_verify_yml(self, tmp_path, monkeypatch):
+        """scan_test_files finds Matrix: references in molecule verify.yml."""
+        # Create a fake project structure with a molecule verify.yml
+        roles_dir = tmp_path / "roles" / "test_role" / "molecule" / "default"
+        roles_dir.mkdir(parents=True)
+        verify_yml = roles_dir / "verify.yml"
+        verify_yml.write_text(
+            "---\n"
+            "# Matrix: MOL-001, MOL-002\n"
+            "- name: Verify\n"
+            "  hosts: all\n"
+            "  tasks:\n"
+            "    - name: Check service\n"
+            "      # Matrix: MOL-003\n"
+            "      ansible.builtin.command: systemctl status test\n",
+        )
+        # Also create a tests dir (even if empty)
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+        covered = scan_test_files()
+        assert "MOL-001" in covered
+        assert "MOL-002" in covered
+        assert "MOL-003" in covered
+
+    def test_no_verify_files_returns_only_test_refs(self, tmp_path, monkeypatch):
+        """scan_test_files works when no molecule verify.yml files exist."""
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        test_file = tests_dir / "test_example.py"
+        test_file.write_text("# Matrix: EX-001\ndef test_one(): pass\n")
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+        covered = scan_test_files()
+        assert "EX-001" in covered
+
+
+# ── file read error ─────────────────────────────────────
+
+
+class TestMatrixFileReadError:
+    """Test with files that cause OSError on read."""
+
+    def test_oserror_skips_file_gracefully(self, tmp_path, monkeypatch):
+        """scan_test_files skips files that raise OSError on read."""
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+
+        # Create a valid test file
+        good_file = tests_dir / "test_good.py"
+        good_file.write_text("# Matrix: GOOD-001\ndef test_ok(): pass\n")
+
+        # Create a file that will cause a read error (a directory named *.py)
+        # Instead, monkeypatch Path.read_text to fail for specific files
+        original_read_text = Path.read_text
+
+        def patched_read_text(self_path, *args, **kwargs):
+            if self_path.name == "test_bad.py":
+                raise OSError("Permission denied")
+            return original_read_text(self_path, *args, **kwargs)
+
+        bad_file = tests_dir / "test_bad.py"
+        bad_file.write_text("# Matrix: BAD-001\ndef test_bad(): pass\n")
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(Path, "read_text", patched_read_text)
+
+        covered = scan_test_files()
+        # Good file should be found, bad file should be skipped
+        assert "GOOD-001" in covered
+        assert "BAD-001" not in covered
+
+
+# ── threshold pass ──────────────────────────────────────
+
+
+class TestMatrixThresholdPass:
+    """Test with coverage above threshold → exit 0."""
+
+    def test_threshold_pass_with_full_coverage(self, tmp_path, monkeypatch):
+        """main() exits 0 when coverage meets the threshold."""
+        # Create a matrix with one cell
+        matrix = tmp_path / "test_matrix.yml"
+        matrix.write_text(yaml.dump({
+            "capabilities": {
+                "my_cap": {
+                    "depth_1": [{"id": "MY-001", "action": "A", "expected": "B"}],
+                },
+            },
+        }))
+
+        # Create a test file that covers that cell
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        test_file = tests_dir / "test_cover.py"
+        test_file.write_text("# Matrix: MY-001\ndef test_covered(): pass\n")
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+
+        # Should NOT raise SystemExit (exit 0)
+        main(["--matrix", str(matrix), "--threshold", "100"])
+
+    def test_threshold_pass_with_zero_threshold(self, tmp_path, monkeypatch):
+        """main() exits 0 with threshold=0 even if nothing is covered."""
+        matrix = tmp_path / "test_matrix.yml"
+        matrix.write_text(yaml.dump({
+            "capabilities": {
+                "cap": {
+                    "depth_1": [{"id": "ZZZ-001", "action": "A", "expected": "B"}],
+                },
+            },
+        }))
+
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+
+        # threshold=0 should always pass
+        main(["--matrix", str(matrix), "--threshold", "0"])
+
+    def test_threshold_pass_partial_coverage(self, tmp_path, monkeypatch):
+        """main() exits 0 when coverage exceeds a non-100% threshold."""
+        matrix = tmp_path / "test_matrix.yml"
+        matrix.write_text(yaml.dump({
+            "capabilities": {
+                "cap": {
+                    "depth_1": [
+                        {"id": "PC-001", "action": "A", "expected": "B"},
+                        {"id": "PC-002", "action": "C", "expected": "D"},
+                    ],
+                },
+            },
+        }))
+
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        test_file = tests_dir / "test_partial.py"
+        test_file.write_text("# Matrix: PC-001\ndef test_one(): pass\n")
+
+        monkeypatch.setattr(matrix_mod, "PROJECT_ROOT", tmp_path)
+
+        # 50% coverage, threshold 40% → should pass
+        main(["--matrix", str(matrix), "--threshold", "40"])
