@@ -26,7 +26,6 @@ from generate import (
     enrich_infra,
     extract_all_images,
     generate,
-    get_warnings,
     load_infra,
     validate,
 )
@@ -895,7 +894,7 @@ class TestPrivilegedStringBooleans:
         errors = validate(sample_infra)
         assert any("privileged" in e for e in errors)
 
-    def test_privileged_string_TRUE(self, sample_infra, monkeypatch):
+    def test_privileged_string_all_caps(self, sample_infra, monkeypatch):
         """security.privileged='TRUE' (uppercase) is detected as privileged."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
@@ -903,7 +902,7 @@ class TestPrivilegedStringBooleans:
         errors = validate(sample_infra)
         assert any("privileged" in e for e in errors)
 
-    def test_privileged_string_True(self, sample_infra, monkeypatch):
+    def test_privileged_string_capitalized(self, sample_infra, monkeypatch):
         """security.privileged='True' (capitalized) is detected as privileged."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
