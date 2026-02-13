@@ -61,9 +61,57 @@ build_context() {
     } > "$context_file"
 }
 
+search_experiences() {
+    local log_file="$1"
+    local exp_dir="${PROJECT_DIR}/experiences/fixes"
+
+    if [ ! -d "$exp_dir" ]; then
+        return 1
+    fi
+
+    # Extract key error patterns from the log
+    local errors
+    errors=$(grep -i "error\|failed\|fatal" "$log_file" 2>/dev/null | head -5) || true
+
+    if [ -z "$errors" ]; then
+        return 1
+    fi
+
+    # Search through experience files for matching patterns
+    for exp_file in "$exp_dir"/*.yml; do
+        [ -f "$exp_file" ] || continue
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            if echo "$errors" | grep -qi "$line" 2>/dev/null; then
+                ai_log "Experience match found in $(basename "$exp_file"): $line"
+                return 0
+            fi
+        done < <(python3 -c "
+import yaml, sys
+try:
+    data = yaml.safe_load(open('$exp_file'))
+    for entry in (data or []):
+        if isinstance(entry, dict) and 'problem' in entry:
+            words = entry['problem'].split()[:6]
+            print(' '.join(words))
+except Exception:
+    pass
+" 2>/dev/null)
+    done
+
+    return 1
+}
+
 attempt_fix() {
     local context_file="$1"
     local role="$2"
+    local log_file="${AI_LOG_DIR}/${_ai_session_id}-${role}-molecule.log"
+
+    # Check experiences first (faster, no LLM cost)
+    if search_experiences "$log_file"; then
+        ai_log "Known fix pattern found in experience library"
+    fi
+
     local instruction="Analyze this Molecule test failure for the '${role}' Ansible role and fix the issue."
 
     case "$AI_MODE" in
@@ -141,6 +189,7 @@ Options:
   --mode MODE    Override AI_MODE (none, local, remote, claude-code, aider)
   --dry-run      Force dry-run mode (show fixes without applying)
   --no-dry-run   Disable dry-run mode
+  --learn        After fixing, mine new experiences from this session
 
 Environment:
   ANKLUME_AI_MODE         AI backend (default: none)
@@ -162,6 +211,7 @@ USAGE
 
 main() {
     local target_role=""
+    local learn_mode="false"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -169,6 +219,7 @@ main() {
             --mode) AI_MODE="$2"; shift 2 ;;
             --dry-run) AI_DRY_RUN="true"; shift ;;
             --no-dry-run) AI_DRY_RUN="false"; shift ;;
+            --learn) learn_mode="true"; shift ;;
             -*) die "Unknown option: $1" ;;
             *) target_role="$1"; shift ;;
         esac
@@ -220,6 +271,14 @@ main() {
     ai_log "Failed: ${failed}"
     [ -n "$failed_roles" ] && ai_log "Failed roles:${failed_roles}"
     ai_log "Session log: ${_ai_log_file}"
+
+    # Mine experiences from this session if --learn was passed
+    if [ "$learn_mode" = "true" ] && [ "$failed" -eq 0 ]; then
+        ai_log "Learning: mining experiences from recent commits..."
+        python3 "$SCRIPT_DIR/mine-experiences.py" --incremental 2>&1 | while IFS= read -r line; do
+            ai_log "  $line"
+        done
+    fi
 
     # Create PR if fixes were committed and auto_pr is enabled
     if [ "$AI_MODE" != "none" ] && [ "$AI_DRY_RUN" != "true" ] && [ "$failed" -eq 0 ] && [ "$passed" -gt 0 ]; then

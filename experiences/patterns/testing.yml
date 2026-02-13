@@ -1,0 +1,134 @@
+# Testing patterns for AnKLuMe (pytest and Molecule).
+# Documents the standard test structures and conventions.
+---
+- id: PAT-TEST-001
+  category: testing
+  name: "pytest fixture for PSOT generator"
+  description: "Standard fixture providing a minimal valid infra dict"
+  example: |
+    @pytest.fixture
+    def minimal_infra():
+        return {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100", "default_os_image": "images:debian/13"},
+            "domains": {
+                "test": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "test-vm": {"type": "lxc", "ip": "10.100.0.10"}
+                    }
+                }
+            }
+        }
+  notes:
+    - "Minimal fixture avoids test coupling to full infra.yml"
+    - "Override specific fields in individual tests as needed"
+
+- id: PAT-TEST-002
+  category: testing
+  name: "pytest validation error test"
+  description: "Test that invalid input produces expected validation errors"
+  example: |
+    def test_duplicate_machine_names(minimal_infra):
+        minimal_infra["domains"]["other"] = {
+            "subnet_id": 1,
+            "machines": {"test-vm": {"type": "lxc", "ip": "10.100.1.10"}}
+        }
+        errors = validate(minimal_infra)
+        assert any("test-vm" in e for e in errors)
+  notes:
+    - "validate() returns list of error strings"
+    - "Use 'any(... in e for e in errors)' for flexible matching"
+    - "Test both positive (valid) and negative (invalid) cases"
+
+- id: PAT-TEST-003
+  category: testing
+  name: "Molecule verify with command + assert"
+  description: "Standard Molecule verify pattern for infrastructure roles"
+  example: |
+    - name: Verify | Check resource exists
+      ansible.builtin.command:
+        cmd: incus <resource> list --format json
+      register: _result
+      changed_when: false
+
+    - name: Verify | Assert resource created
+      ansible.builtin.assert:
+        that:
+          - "_result.stdout | from_json | selectattr('name', 'equalto', 'expected') | list | length > 0"
+        fail_msg: "Expected resource not found"
+  notes:
+    - "Use --format json for parseable output"
+    - "from_json + selectattr for precise assertions"
+    - "Always include fail_msg for clear error messages"
+
+- id: PAT-TEST-004
+  category: testing
+  name: "Molecule verify for provisioning roles (template-based)"
+  description: "CI-compatible verify that checks templates without live services"
+  example: |
+    - name: Verify | Check template renders correctly
+      ansible.builtin.template:
+        src: "{{ role_path }}/templates/service.j2"
+        dest: /tmp/test-output.conf
+      check_mode: true
+      register: _template_result
+
+    - name: Verify | Assert template is valid
+      ansible.builtin.assert:
+        that: not _template_result.changed
+  notes:
+    - "Template-based tests work in CI without Incus"
+    - "Validates Jinja2 rendering with test variables"
+    - "Use check_mode: true to avoid writing files"
+
+- id: PAT-TEST-005
+  category: testing
+  name: "Molecule molecule.yml configuration"
+  description: "Standard molecule.yml for infrastructure roles"
+  example: |
+    ---
+    driver:
+      name: default
+    platforms:
+      - name: instance
+    provisioner:
+      name: ansible
+      config_options:
+        defaults:
+          roles_path: "../../"
+  notes:
+    - "driver.name: default (not delegated, renamed in Molecule 25+)"
+    - "roles_path needed for cross-role dependencies"
+    - "Platform name is arbitrary for delegated/default driver"
+
+- id: PAT-TEST-006
+  category: testing
+  name: "pytest with tmp_path for file generation"
+  description: "Use tmp_path fixture for testing file generation"
+  example: |
+    def test_generate_creates_files(minimal_infra, tmp_path):
+        generate(minimal_infra, output_dir=str(tmp_path))
+        assert (tmp_path / "inventory" / "test.yml").exists()
+        content = (tmp_path / "group_vars" / "test.yml").read_text()
+        assert "net-test" in content
+  notes:
+    - "tmp_path is a pytest builtin; auto-cleaned after test"
+    - "Avoids polluting the real project directory"
+    - "Test both file existence and content"
+
+- id: PAT-TEST-007
+  category: testing
+  name: "Molecule cleanup for Incus resources"
+  description: "Cleanup tasks to remove test resources after Molecule run"
+  example: |
+    - name: Cleanup | Delete test resources
+      ansible.builtin.command:
+        cmd: incus delete {{ item }} --force
+      loop: ["test-instance"]
+      failed_when: false
+      changed_when: true
+  notes:
+    - "failed_when: false because resource may not exist"
+    - "Clean up in reverse creation order"
+    - "Delete instances before networks/projects"

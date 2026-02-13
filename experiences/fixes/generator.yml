@@ -1,0 +1,98 @@
+# PSOT generator fix patterns from AnKLuMe development.
+# Each entry documents a generator issue and its resolution.
+---
+- id: FIX-GEN-001
+  category: generator
+  problem: "ansible_connection in group_vars overrides playbook connection:local"
+  solution: "Remove ansible_connection/ansible_user from domain group_vars output"
+  source_commit: "25ac827"
+  files_affected: ["scripts/generate.py"]
+  prevention: "Connection is operational, not declarative (ADR documented)"
+
+- id: FIX-GEN-002
+  category: generator
+  problem: "gateway address .1 conflicts with some DHCP configurations"
+  solution: "Change gateway convention from .1 to .254"
+  source_commit: "02a556a"
+  files_affected: ["scripts/generate.py"]
+  prevention: "Gateway at .254 avoids DHCP range conflicts"
+
+- id: FIX-GEN-003
+  category: generator
+  problem: "orphan detection deletes protected (ephemeral:false) resources"
+  solution: "Return (filepath, is_protected) tuples; skip protected in cleanup"
+  source_commit: "02a556a"
+  files_affected: ["scripts/generate.py"]
+  prevention: "detect_orphans() checks ephemeral flag before cleanup"
+
+- id: FIX-GEN-004
+  category: generator
+  problem: "security.privileged allowed on LXC without VM isolation boundary"
+  solution: "Validate vm_nested flag; reject privileged LXC when vm_nested=false"
+  source_commit: "830100f"
+  files_affected: ["scripts/generate.py"]
+  prevention: "ADR-020 enforced in validate() function"
+
+- id: FIX-GEN-005
+  category: generator
+  problem: "multiple GPU instances allowed without explicit policy"
+  solution: "Default gpu_policy: exclusive; error if >1 GPU instance"
+  source_commit: "084494c"
+  files_affected: ["scripts/generate.py"]
+  prevention: "gpu_policy validated in generate.py (ADR-018)"
+
+- id: FIX-GEN-006
+  category: generator
+  problem: "network_policies reference invalid domain or machine names"
+  solution: "Validate from/to references against known domains/machines/host"
+  source_commit: "830100f"
+  files_affected: ["scripts/generate.py"]
+  prevention: "validate() checks all policy references exist"
+
+- id: FIX-GEN-007
+  category: generator
+  problem: "infra/ directory mode fails to merge domains correctly"
+  solution: "Load base.yml first, merge domains/*.yml sorted alphabetically"
+  source_commit: "830100f"
+  files_affected: ["scripts/generate.py"]
+  prevention: "Directory mode tested with same output as single-file mode"
+
+- id: FIX-GEN-008
+  category: generator
+  problem: "firewall_mode: vm fails when no admin domain defined"
+  solution: "Exit with error if firewall_mode=vm but admin domain missing"
+  source_commit: "08bf586"
+  files_affected: ["scripts/generate.py"]
+  prevention: "enrich_infra() validates admin domain exists for vm mode"
+
+- id: FIX-GEN-009
+  category: generator
+  problem: "type field accepts arbitrary strings without validation"
+  solution: "Validate type must be 'lxc' or 'vm' in validate()"
+  source_commit: "8345178"
+  files_affected: ["scripts/generate.py"]
+  prevention: "Strict enum validation for instance type"
+
+- id: FIX-GEN-010
+  category: generator
+  problem: "managed sections overwrite entire file on regeneration"
+  solution: "Parse file for MANAGED markers; only replace between them"
+  source_commit: "02a556a"
+  files_affected: ["scripts/generate.py"]
+  prevention: "User content outside === MANAGED === sections preserved"
+
+- id: FIX-GEN-011
+  category: generator
+  problem: "connection variables stored as psot_ prefix ignored by playbooks"
+  solution: "Store as psot_default_connection/psot_default_user in all.yml"
+  source_commit: "25ac827"
+  files_affected: ["scripts/generate.py"]
+  prevention: "Informational only; playbook sets connection explicitly"
+
+- id: FIX-GEN-012
+  category: generator
+  problem: "CI installs community.general via pip instead of ansible-galaxy"
+  solution: "Use ansible-galaxy collection install community.general"
+  source_commit: "a5f8e78"
+  files_affected: [".github/workflows/ci.yml"]
+  prevention: "Ansible collections installed via ansible-galaxy, not pip"
