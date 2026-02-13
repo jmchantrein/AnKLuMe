@@ -196,3 +196,192 @@ class TestDeployNoIncus:
         result = run_deploy([], env, cwd=tmp_path)
         assert result.returncode != 0
         assert "Cannot connect" in result.stderr
+
+
+class TestDeploySourceFlag:
+    """Test --source flag behavior for custom container name."""
+
+    def test_source_flag_sets_custom_container(self, mock_env):
+        """--source flag changes the container name used for file pull."""
+        env, log, _, script = mock_env
+        result = run_deploy(["--source", "custom-admin"], env, script=script)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        # The incus info and file pull commands should reference custom-admin
+        assert any("custom-admin" in c for c in cmds)
+        # Should NOT reference the default admin-ansible name in info/pull
+        info_cmds = [c for c in cmds if "info" in c]
+        assert all("admin-ansible" not in c for c in info_cmds)
+
+    def test_source_without_argument_gives_error(self, mock_env):
+        """--source without an argument produces an error."""
+        env, _, _, script = mock_env
+        result = run_deploy(["--source"], env, script=script)
+        assert result.returncode != 0
+        assert "--source requires" in result.stderr or "requires" in result.stderr.lower()
+
+
+class TestFindProjectFunction:
+    """Test the find_project function behavior."""
+
+    def test_container_found_in_admin_project(self, tmp_path):
+        """find_project returns 'admin' when container is in admin project."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmds.log"
+
+        rules_file = tmp_path / "mock-rules.nft"
+        rules_file.write_text("table inet anklume { chain isolation { } }\n")
+
+        # Mock incus that finds the container in admin project
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "incus $@" >> "{log_file}"
+
+# project list --format csv (pre-flight)
+if [[ "$1" == "project" && "$2" == "list" ]]; then
+    echo "default"
+    echo "admin"
+    exit 0
+fi
+
+# info with --project admin succeeds (container found in admin)
+if [[ "$1" == "info" && "$3" == "--project" && "$4" == "admin" ]]; then
+    exit 0
+fi
+
+# file pull (retrieve rules)
+if [[ "$1" == "file" && "$2" == "pull" ]]; then
+    cp "{rules_file}" "$4"
+    exit 0
+fi
+
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        # Mock nft
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text(f"""#!/usr/bin/env bash
+echo "nft $@" >> "{log_file}"
+exit 0
+""")
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+
+        # Mock python3
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        # Symlink standard tools
+        for cmd in ["mkdir", "cp", "chmod", "wc", "cat", "mktemp"]:
+            p = mock_bin / cmd
+            if not p.exists():
+                real = f"/usr/bin/{cmd}"
+                if os.path.exists(real):
+                    p.symlink_to(real)
+
+        # Create patched deploy script
+        patched_deploy = tmp_path / "deploy_patched.sh"
+        original = DEPLOY_SH.read_text()
+        patched_dest = tmp_path / "nftables.d"
+        patched_dest.mkdir()
+        patched = original.replace('/etc/nftables.d', str(patched_dest))
+        patched_deploy.write_text(patched)
+        patched_deploy.chmod(patched_deploy.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+
+        result = run_deploy([], env, script=patched_deploy)
+        assert result.returncode == 0
+        assert "Found in project: admin" in result.stdout
+
+    def test_multi_project_search_fallback(self, tmp_path):
+        """When container not in admin project, searches all projects via JSON."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmds.log"
+
+        rules_file = tmp_path / "mock-rules.nft"
+        rules_file.write_text("table inet anklume { chain isolation { } }\n")
+
+        # Mock incus: admin project lookup fails, but list --all-projects finds it
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "incus $@" >> "{log_file}"
+
+# project list --format csv (pre-flight)
+if [[ "$1" == "project" && "$2" == "list" ]]; then
+    echo "default"
+    echo "admin"
+    echo "custom"
+    exit 0
+fi
+
+# info with --project admin FAILS (container not in admin)
+if [[ "$1" == "info" && "$3" == "--project" && "$4" == "admin" ]]; then
+    exit 1
+fi
+
+# info with --project custom succeeds (for file pull validation)
+if [[ "$1" == "info" ]]; then
+    exit 0
+fi
+
+# list --all-projects --format json returns container in 'custom' project
+if [[ "$1" == "list" && "$2" == "--all-projects" ]]; then
+    echo '[{{"name": "admin-ansible", "project": "custom"}}]'
+    exit 0
+fi
+
+# file pull (retrieve rules)
+if [[ "$1" == "file" && "$2" == "pull" ]]; then
+    cp "{rules_file}" "$4"
+    exit 0
+fi
+
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        # Mock nft
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text(f"""#!/usr/bin/env bash
+echo "nft $@" >> "{log_file}"
+exit 0
+""")
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+
+        # Mock python3
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        # Symlink standard tools
+        for cmd in ["mkdir", "cp", "chmod", "wc", "cat", "mktemp"]:
+            p = mock_bin / cmd
+            if not p.exists():
+                real = f"/usr/bin/{cmd}"
+                if os.path.exists(real):
+                    p.symlink_to(real)
+
+        # Create patched deploy script
+        patched_deploy = tmp_path / "deploy_patched.sh"
+        original = DEPLOY_SH.read_text()
+        patched_dest = tmp_path / "nftables.d"
+        patched_dest.mkdir()
+        patched = original.replace('/etc/nftables.d', str(patched_dest))
+        patched_deploy.write_text(patched)
+        patched_deploy.chmod(patched_deploy.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+
+        result = run_deploy([], env, script=patched_deploy)
+        assert result.returncode == 0
+        # Should have found the container in the 'custom' project
+        assert "Found in project: custom" in result.stdout
+        cmds = read_log(log_file)
+        # Should have attempted admin project first, then fallen back
+        assert any("--project admin" in c for c in cmds)
