@@ -1,0 +1,40 @@
+---
+- name: Verify incus_images
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Can list cached images
+      ansible.builtin.command:
+        argv:
+          - incus
+          - image
+          - list
+          - --format
+          - json
+      register: verify_images_raw
+      changed_when: false
+
+    - name: Verify | Image list is valid JSON
+      ansible.builtin.set_fact:
+        verify_images: "{{ verify_images_raw.stdout | from_json }}"
+
+    - name: Verify | Image list is a list
+      ansible.builtin.assert:
+        that:
+          - verify_images is iterable
+        fail_msg: "Image list should be iterable"
+
+    - name: Verify | Idempotency - run role again with empty list
+      ansible.builtin.include_role:
+        name: incus_images
+      vars:
+        incus_all_images: []
+        incus_images_download_timeout: 600
+      register: idempotency_result
+
+    - name: Verify | Idempotency - check no changes
+      ansible.builtin.assert:
+        that:
+          - not (idempotency_result is changed)
+        fail_msg: "Role is not idempotent with empty image list"

@@ -1,0 +1,32 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    stt_server_host: "0.0.0.0"
+    stt_server_port: 8000
+    stt_server_model: "large-v3-turbo"
+    stt_server_quantization: "float16"
+    stt_server_language: ""
+    stt_server_enabled: true
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test/stt
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template speaches systemd service
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/speaches.service.j2"
+        dest: /tmp/anklume-test/stt/speaches.service
+        mode: "0644"
+
+    - name: Converge | Template with language set
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/speaches.service.j2"
+        dest: /tmp/anklume-test/stt/speaches-with-lang.service
+        mode: "0644"
+      vars:
+        stt_server_language: "fr"

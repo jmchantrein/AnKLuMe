@@ -1,0 +1,28 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    dev_agent_runner_enable_teams: true
+    dev_agent_runner_permissions_mode: "bypassPermissions"
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test/agent-runner
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template Claude Code settings
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/claude-settings.json.j2"
+        dest: /tmp/anklume-test/agent-runner/settings.json
+        mode: "0600"
+
+    - name: Converge | Template without Agent Teams
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/claude-settings.json.j2"
+        dest: /tmp/anklume-test/agent-runner/settings-no-teams.json
+        mode: "0600"
+      vars:
+        dev_agent_runner_enable_teams: false

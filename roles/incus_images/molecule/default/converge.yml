@@ -1,0 +1,29 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    incus_all_images: []
+    incus_images_download_timeout: 600
+  tasks:
+    - name: Converge | Ensure images remote exists
+      ansible.builtin.command:
+        argv:
+          - incus
+          - remote
+          - add
+          - images
+          - https://images.linuxcontainers.org
+          - --protocol
+          - simplestreams
+          - --public
+      register: converge_remote_result
+      changed_when: "'exists' not in converge_remote_result.stderr"
+      failed_when:
+        - converge_remote_result.rc != 0
+        - "'exists' not in converge_remote_result.stderr"
+
+    - name: Converge | Apply role with empty image list (read-only test)
+      ansible.builtin.include_role:
+        name: incus_images

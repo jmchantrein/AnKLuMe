@@ -1,0 +1,125 @@
+---
+- name: Verify firewall_router
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Check rules file exists
+      ansible.builtin.stat:
+        path: /tmp/anklume-test/firewall/anklume-firewall.nft
+      register: verify_rules_file
+
+    - name: Verify | Rules file exists
+      ansible.builtin.assert:
+        that:
+          - verify_rules_file.stat.exists
+          - verify_rules_file.stat.mode == '0644'
+        fail_msg: "Firewall rules file not found or wrong permissions"
+
+    - name: Verify | Read rules file content
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/firewall/anklume-firewall.nft
+      register: verify_rules_raw
+
+    - name: Verify | Decode rules content
+      ansible.builtin.set_fact:
+        verify_rules: "{{ verify_rules_raw.content | b64decode }}"
+
+    - name: Verify | Contains table inet anklume
+      ansible.builtin.assert:
+        that:
+          - "'table inet anklume' in verify_rules"
+        fail_msg: "Missing 'table inet anklume' declaration"
+
+    - name: Verify | Contains atomic table replace pattern
+      ansible.builtin.assert:
+        that:
+          - "'delete table inet anklume' in verify_rules"
+        fail_msg: "Missing atomic table replace pattern"
+
+    - name: Verify | Contains forward chain with policy drop
+      ansible.builtin.assert:
+        that:
+          - "'chain forward' in verify_rules"
+          - "'policy drop' in verify_rules"
+        fail_msg: "Missing forward chain with policy drop"
+
+    - name: Verify | Contains stateful tracking
+      ansible.builtin.assert:
+        that:
+          - "'ct state established,related accept' in verify_rules"
+          - "'ct state invalid' in verify_rules"
+        fail_msg: "Missing stateful connection tracking rules"
+
+    - name: Verify | Contains ICMP accept
+      ansible.builtin.assert:
+        that:
+          - "'meta l4proto icmp accept' in verify_rules"
+          - "'meta l4proto icmpv6 accept' in verify_rules"
+        fail_msg: "Missing ICMP accept rules"
+
+    - name: Verify | Contains inter-domain drop rules with logging
+      ansible.builtin.assert:
+        that:
+          - "'FW-DENY-ADMIN' in verify_rules"
+          - "'FW-DENY-PERSO' in verify_rules"
+          - "'FW-DENY-PRO' in verify_rules"
+        fail_msg: "Missing inter-domain deny rules with logging"
+
+    - name: Verify | Contains input chain
+      ansible.builtin.assert:
+        that:
+          - "'chain input' in verify_rules"
+          - "'FW-INPUT-DROP' in verify_rules"
+        fail_msg: "Missing input chain or input drop logging"
+
+    - name: Verify | Contains output chain
+      ansible.builtin.assert:
+        that:
+          - "'chain output' in verify_rules"
+          - "'policy accept' in verify_rules"
+        fail_msg: "Missing output chain with policy accept"
+
+    - name: Verify | Read no-logging rules
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/firewall/anklume-firewall-nolog.nft
+      register: verify_nolog_raw
+
+    - name: Verify | Decode no-logging content
+      ansible.builtin.set_fact:
+        verify_nolog: "{{ verify_nolog_raw.content | b64decode }}"
+
+    - name: Verify | No-logging variant has no log prefixes
+      ansible.builtin.assert:
+        that:
+          - "'log prefix' not in verify_nolog"
+        fail_msg: "No-logging variant should not contain log prefixes"
+
+    - name: Verify | Idempotency - re-template the file
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/firewall-router.nft.j2"
+        dest: /tmp/anklume-test/firewall/anklume-firewall.nft
+        mode: "0644"
+      vars:
+        firewall_router_logging: true
+        firewall_router_log_prefix: "FW"
+        firewall_router_interfaces:
+          - name: eth0
+            bridge: net-admin
+            subnet: "10.100.0.0/24"
+            gateway_ip: "10.100.0.254"
+          - name: eth1
+            bridge: net-perso
+            subnet: "10.100.1.0/24"
+            gateway_ip: "10.100.1.254"
+          - name: eth2
+            bridge: net-pro
+            subnet: "10.100.2.0/24"
+            gateway_ip: "10.100.2.254"
+      register: verify_idempotency
+
+    - name: Verify | Idempotency - no changes on second run
+      ansible.builtin.assert:
+        that:
+          - not (verify_idempotency is changed)
+        fail_msg: "Template is not idempotent — second run produced changes"

@@ -1,0 +1,84 @@
+---
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-yaml:
+    name: YAML lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Run yamllint
+        run: yamllint -c .yamllint.yml .
+
+  lint-ansible:
+    name: Ansible lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ansible-core ansible-lint molecule community.general pyyaml
+      - name: Run ansible-lint
+        run: ansible-lint
+
+  lint-shell:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        run: shellcheck scripts/*.sh scripts/hooks/*
+
+  lint-python:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install ruff
+      - name: Run ruff check
+        run: ruff check .
+
+  test-generator:
+    name: Generator tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install pytest pyyaml
+      - name: Run pytest
+        run: pytest tests/ -v
+
+  syntax-check:
+    name: Ansible syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install ansible-core pyyaml
+      - name: Install community.general collection
+        run: ansible-galaxy collection install community.general
+      - name: Run syntax check
+        run: ansible-playbook site.yml --syntax-check

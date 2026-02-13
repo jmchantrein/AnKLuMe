@@ -1,0 +1,41 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    firewall_router_logging: true
+    firewall_router_log_prefix: "FW"
+    firewall_router_interfaces:
+      - name: eth0
+        bridge: net-admin
+        subnet: "10.100.0.0/24"
+        gateway_ip: "10.100.0.254"
+      - name: eth1
+        bridge: net-perso
+        subnet: "10.100.1.0/24"
+        gateway_ip: "10.100.1.254"
+      - name: eth2
+        bridge: net-pro
+        subnet: "10.100.2.0/24"
+        gateway_ip: "10.100.2.254"
+  tasks:
+    - name: Converge | Create output directory
+      ansible.builtin.file:
+        path: /tmp/anklume-test/firewall
+        state: directory
+        mode: "0755"
+
+    - name: Converge | Template firewall nftables rules
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/firewall-router.nft.j2"
+        dest: /tmp/anklume-test/firewall/anklume-firewall.nft
+        mode: "0644"
+
+    - name: Converge | Template without logging
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/firewall-router.nft.j2"
+        dest: /tmp/anklume-test/firewall/anklume-firewall-nolog.nft
+        mode: "0644"
+      vars:
+        firewall_router_logging: false

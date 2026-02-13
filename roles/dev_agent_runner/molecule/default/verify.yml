@@ -1,0 +1,97 @@
+---
+- name: Verify dev_agent_runner
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify | Check settings file exists
+      ansible.builtin.stat:
+        path: /tmp/anklume-test/agent-runner/settings.json
+      register: verify_settings_file
+
+    - name: Verify | Settings file exists with correct permissions
+      ansible.builtin.assert:
+        that:
+          - verify_settings_file.stat.exists
+          - verify_settings_file.stat.mode == '0600'
+        fail_msg: "settings.json not found or wrong permissions (expected 0600)"
+
+    - name: Verify | Read settings file content
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/agent-runner/settings.json
+      register: verify_settings_raw
+
+    - name: Verify | Decode settings content
+      ansible.builtin.set_fact:
+        verify_settings: "{{ verify_settings_raw.content | b64decode }}"
+
+    - name: Verify | Settings is valid JSON
+      ansible.builtin.set_fact:
+        verify_settings_parsed: "{{ verify_settings | from_json }}"
+
+    - name: Verify | Contains Agent Teams env flag
+      ansible.builtin.assert:
+        that:
+          - "'env' in verify_settings_parsed"
+          - "verify_settings_parsed.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS == '1'"
+        fail_msg: "Missing Agent Teams environment flag"
+
+    - name: Verify | Contains permissions section
+      ansible.builtin.assert:
+        that:
+          - "'permissions' in verify_settings_parsed"
+          - "'allow' in verify_settings_parsed.permissions"
+          - "'deny' in verify_settings_parsed.permissions"
+        fail_msg: "Missing permissions section"
+
+    - name: Verify | Allow list contains expected tools
+      ansible.builtin.assert:
+        that:
+          - "'Edit' in verify_settings_parsed.permissions.allow"
+          - "'Read' in verify_settings_parsed.permissions.allow"
+          - "'Write' in verify_settings_parsed.permissions.allow"
+        fail_msg: "Allow list missing expected tools"
+
+    - name: Verify | Deny list contains safety rules
+      ansible.builtin.assert:
+        that:
+          - "'Bash(rm -rf /)' in verify_settings_parsed.permissions.deny"
+        fail_msg: "Deny list missing safety rules"
+
+    - name: Verify | Default mode is bypassPermissions
+      ansible.builtin.assert:
+        that:
+          - "verify_settings_parsed.defaultMode == 'bypassPermissions'"
+        fail_msg: "Default mode should be bypassPermissions"
+
+    - name: Verify | Read no-teams settings
+      ansible.builtin.slurp:
+        src: /tmp/anklume-test/agent-runner/settings-no-teams.json
+      register: verify_noteams_raw
+
+    - name: Verify | Decode no-teams content
+      ansible.builtin.set_fact:
+        verify_noteams: "{{ verify_noteams_raw.content | b64decode }}"
+        verify_noteams_parsed: "{{ (verify_noteams_raw.content | b64decode) | from_json }}"
+
+    - name: Verify | No-teams variant does not have Agent Teams flag
+      ansible.builtin.assert:
+        that:
+          - "'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' not in (verify_noteams_parsed.env | default({}))"
+        fail_msg: "No-teams variant should not contain Agent Teams flag"
+
+    - name: Verify | Idempotency - re-template the file
+      ansible.builtin.template:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/claude-settings.json.j2"
+        dest: /tmp/anklume-test/agent-runner/settings.json
+        mode: "0600"
+      vars:
+        dev_agent_runner_enable_teams: true
+        dev_agent_runner_permissions_mode: "bypassPermissions"
+      register: verify_idempotency
+
+    - name: Verify | Idempotency - no changes on second run
+      ansible.builtin.assert:
+        that:
+          - not (verify_idempotency is changed)
+        fail_msg: "Template is not idempotent — second run produced changes"

@@ -54,7 +54,7 @@ before phase N is complete and validated.
 
 ---
 
-## Phase 2b: Post-Deployment Hardening ✦ PRIORITY
+## Phase 2b: Post-Deployment Hardening ✅ COMPLETE
 
 **Goal**: Fix issues discovered during Phase 2 deployment
 
@@ -65,10 +65,10 @@ before phase N is complete and validated.
 - Molecule tests updated for fixes
 
 **Validation criteria**:
-- [ ] admin-ansible restarts without manual intervention
-- [ ] `ansible-playbook site.yml` idempotent after fixes
-- [ ] `make lint` passes
-- [ ] ADR-017 to ADR-019 present in ARCHITECTURE.md
+- [x] admin-ansible restarts without manual intervention
+- [x] `ansible-playbook site.yml` idempotent after fixes
+- [x] `make lint` passes
+- [x] ADR-017 to ADR-019 present in ARCHITECTURE.md
 
 ---
 
@@ -124,7 +124,7 @@ before phase N is complete and validated.
 
 ---
 
-## Phase 6: Molecule Tests
+## Phase 6: Molecule Tests ✅ COMPLETE
 
 **Goal**: Automated tests for each role
 
@@ -137,7 +137,7 @@ Phase 12 will provide proper isolation via Incus-in-Incus.
 
 ---
 
-## Phase 7: Documentation + Publication
+## Phase 7: Documentation + Publication ✅ COMPLETE
 
 **Goal**: Project usable by others
 
@@ -291,7 +291,7 @@ kernel, unlike LXC containers that share the host kernel).
 
 ---
 
-## Phase 12: Incus-in-Incus Test Environment
+## Phase 12: Incus-in-Incus Test Environment ✅ COMPLETE
 
 **Goal**: Test AnKLuMe in an isolated sandbox (AnKLuMe testing itself)
 without impacting production infrastructure.
@@ -324,10 +324,10 @@ Molecule tests execute within this nested environment.
 - [Debusine worker Incus-in-Incus](https://freexian-team.pages.debian.net/debusine/howtos/set-up-incus.html)
 
 **Validation criteria**:
-- [ ] test-runner container starts with functional Incus inside
-- [ ] `molecule test` for base_system passes in the sandbox
-- [ ] No impact on production projects/networks
-- [ ] Automatic cleanup of test resources
+- [x] test-runner container starts with functional Incus inside
+- [x] `molecule test` for base_system passes in the sandbox
+- [x] No impact on production projects/networks
+- [x] Automatic cleanup of test resources
 
 ---
 
@@ -826,6 +826,46 @@ f) **Lifecycle tooling**:
 
 ---
 
+## Phase 17: CI/CD Pipeline and Test Coverage ✅ COMPLETE
+
+**Goal**: Automated CI via GitHub Actions, complete Molecule test
+coverage for all roles.
+
+**Prerequisites**: All previous phases.
+
+**Deliverables**:
+
+a) **GitHub Actions CI workflow** (`.github/workflows/ci.yml`):
+   - Triggered on push and pull requests
+   - 6 parallel jobs: yamllint, ansible-lint, shellcheck, ruff,
+     pytest (generator), ansible syntax-check
+   - pip caching for faster runs
+   - Badge in README.md and README_FR.md
+
+b) **Molecule tests for remaining 7 roles**:
+   - `roles/stt_server/molecule/` — template test (speaches.service)
+   - `roles/firewall_router/molecule/` — template test (firewall-router.nft)
+   - `roles/incus_firewall_vm/molecule/` — infra test (multi-NIC profile)
+   - `roles/incus_images/molecule/` — infra test (image listing)
+   - `roles/lobechat/molecule/` — template test (lobechat.service)
+   - `roles/opencode_server/molecule/` — template test (service + config)
+   - `roles/dev_agent_runner/molecule/` — template test (settings.json)
+
+c) **ROADMAP cleanup**:
+   - Phase 2b, 6, 7, 12 markers corrected to ✅ COMPLETE
+   - Active ADRs updated to ADR-031
+   - Known issues cleared
+   - French ROADMAP synced (missing Phase 16 added)
+
+**Validation criteria**:
+- [x] GitHub Actions CI passes on push to main
+- [x] `make lint` + `make test-generator` run in CI
+- [x] All 18 roles have `molecule/` directories
+- [x] README.md CI badge active
+- [x] ROADMAP inconsistencies resolved
+
+---
+
 ## Current State
 
 **Completed**:
@@ -847,9 +887,10 @@ f) **Lifecycle tooling**:
 - Phase 15: Claude Code Agent Teams (autonomous dev + testing)
 
 - Phase 16: Security policy, network policies, bootstrap, AI tools domain
+- Phase 17: CI/CD pipeline + complete Molecule test coverage (18/18 roles)
 
 **Next**:
-- Phase 17+ (to be defined)
+- Phase 18+ (to be defined)
 
 **Deployed infrastructure**:
 
@@ -860,7 +901,6 @@ f) **Lifecycle tooling**:
 | pro | pro-dev | 10.100.2.10 | net-pro | Running |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
 
-**Active ADRs**: ADR-001 to ADR-019
+**Active ADRs**: ADR-001 to ADR-031
 
-**Known issues**:
-- admin-ansible requires manual intervention at restart (Phase 2b)
+**Known issues**: None
