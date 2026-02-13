@@ -2,14 +2,16 @@
 SHELL := /bin/bash
 
 # ── PSOT Generator ────────────────────────────────────────
-sync: ## Generate/update Ansible files from infra.yml
-	python3 scripts/generate.py infra.yml
+INFRA_SRC := $(if $(wildcard infra/base.yml),infra,infra.yml)
+
+sync: ## Generate/update Ansible files from infra.yml or infra/
+	python3 scripts/generate.py $(INFRA_SRC)
 
 sync-dry: ## Preview changes without writing
-	python3 scripts/generate.py infra.yml --dry-run
+	python3 scripts/generate.py $(INFRA_SRC) --dry-run
 
 sync-clean: ## Remove orphan files without confirmation
-	python3 scripts/generate.py infra.yml --clean-orphans
+	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
 
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
@@ -161,6 +163,16 @@ agent-develop: ## Autonomous development with Agent Teams (TASK="description")
 	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make agent-develop TASK=\"...\""; exit 1; }
 	@scripts/agent-develop.sh "$(TASK)"
 
+# ── Lifecycle ─────────────────────────────────────────────
+flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
+	@scripts/flush.sh $(if $(FORCE),--force)
+
+upgrade: ## Safe framework update with conflict detection
+	@scripts/upgrade.sh
+
+import-infra: ## Generate infra.yml from existing Incus state
+	@scripts/import-infra.sh $(if $(O),-o $(O))
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -191,4 +203,5 @@ help: ## Show this help
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
         ai-test ai-test-role ai-develop \
         agent-runner-setup agent-fix agent-develop \
+        flush upgrade import-infra \
         init install-hooks help

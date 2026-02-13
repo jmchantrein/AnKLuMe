@@ -1,5 +1,6 @@
 """Tests for the PSOT generator (scripts/generate.py)."""
 
+import generate as gen_mod
 import pytest
 import yaml
 from generate import (
@@ -543,3 +544,315 @@ class TestOrphans:
         generate(sample_infra, tmp_path)
         orphans = detect_orphans(sample_infra, tmp_path)
         assert not any("all.yml" in str(o) for o in orphans)
+
+
+# -- privileged LXC policy (ADR-020) ------------------------------------------
+
+
+class TestPrivilegedPolicy:
+    """Test security.privileged validation based on vm_nested context."""
+
+    def _make_privileged(self, infra, machine="admin-ctrl"):
+        """Set security.privileged: true on a machine."""
+        for domain in infra["domains"].values():
+            machines = domain.get("machines") or {}
+            if machine in machines:
+                machines[machine].setdefault("config", {})
+                machines[machine]["config"]["security.privileged"] = "true"
+                return
+        raise KeyError(f"Machine {machine} not found")
+
+    def test_privileged_lxc_rejected_when_vm_nested_false(self, sample_infra, monkeypatch):
+        """Privileged LXC is an error when vm_nested=false."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        self._make_privileged(sample_infra)
+        errors = validate(sample_infra)
+        assert any("security.privileged=true on LXC is forbidden" in e for e in errors)
+
+    def test_privileged_lxc_allowed_when_vm_nested_true(self, sample_infra, monkeypatch):
+        """Privileged LXC is allowed when vm_nested=true."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: True)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        self._make_privileged(sample_infra)
+        errors = validate(sample_infra)
+        assert not any("privileged" in e.lower() for e in errors)
+
+    def test_privileged_lxc_allowed_when_vm_nested_none(self, sample_infra, monkeypatch):
+        """When /etc/anklume/vm_nested does not exist, no enforcement."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: None)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        self._make_privileged(sample_infra)
+        errors = validate(sample_infra)
+        assert not any("privileged" in e.lower() for e in errors)
+
+    def test_privileged_vm_always_allowed(self, sample_infra, monkeypatch):
+        """VMs can always have security.privileged (it's kernel-isolated)."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["type"] = "vm"
+        self._make_privileged(sample_infra)
+        errors = validate(sample_infra)
+        assert not any("privileged" in e.lower() for e in errors)
+
+    def test_yolo_bypasses_privileged_error(self, sample_infra, monkeypatch):
+        """YOLO mode turns privileged error into warning."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: True)
+        self._make_privileged(sample_infra)
+        errors = validate(sample_infra)
+        assert not any("privileged" in e.lower() for e in errors)
+        warnings = get_warnings(sample_infra)
+        assert any("YOLO" in w for w in warnings)
+
+    def test_non_privileged_lxc_no_error(self, sample_infra, monkeypatch):
+        """Non-privileged LXC is always fine, even with vm_nested=false."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        errors = validate(sample_infra)
+        assert not any("privileged" in e.lower() for e in errors)
+
+
+# -- network policies (ADR-021) -----------------------------------------------
+
+
+class TestNetworkPolicies:
+    """Test network_policies validation and generation."""
+
+    def _add_policies(self, infra, policies):
+        infra["network_policies"] = policies
+
+    def test_valid_domain_to_domain_policy(self, sample_infra):
+        """Policy between two known domains is valid."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": [22], "protocol": "tcp"},
+        ])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+    def test_valid_machine_to_domain_policy(self, sample_infra):
+        """Policy from a machine to a domain is valid."""
+        self._add_policies(sample_infra, [
+            {"from": "admin-ctrl", "to": "work", "ports": [443]},
+        ])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+    def test_valid_host_keyword(self, sample_infra):
+        """'host' is a valid from/to reference."""
+        self._add_policies(sample_infra, [
+            {"from": "host", "to": "admin", "ports": [22], "protocol": "tcp"},
+        ])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+    def test_valid_ports_all(self, sample_infra):
+        """ports: all is valid."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": "all"},
+        ])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+    def test_unknown_from_rejected(self, sample_infra):
+        """Unknown 'from' reference triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "nonexistent", "to": "admin", "ports": [22]},
+        ])
+        errors = validate(sample_infra)
+        assert any("from: nonexistent" in e for e in errors)
+
+    def test_unknown_to_rejected(self, sample_infra):
+        """Unknown 'to' reference triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "nonexistent", "ports": [22]},
+        ])
+        errors = validate(sample_infra)
+        assert any("to: nonexistent" in e for e in errors)
+
+    def test_missing_from_field(self, sample_infra):
+        """Missing 'from' field triggers error."""
+        self._add_policies(sample_infra, [
+            {"to": "admin", "ports": [22]},
+        ])
+        errors = validate(sample_infra)
+        assert any("missing 'from'" in e for e in errors)
+
+    def test_missing_to_field(self, sample_infra):
+        """Missing 'to' field triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "ports": [22]},
+        ])
+        errors = validate(sample_infra)
+        assert any("missing 'to'" in e for e in errors)
+
+    def test_invalid_port_number(self, sample_infra):
+        """Port out of range triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": [99999]},
+        ])
+        errors = validate(sample_infra)
+        assert any("invalid port" in e for e in errors)
+
+    def test_invalid_port_type(self, sample_infra):
+        """Non-list non-'all' ports triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": "tcp"},
+        ])
+        errors = validate(sample_infra)
+        assert any("ports must be a list or 'all'" in e for e in errors)
+
+    def test_invalid_protocol(self, sample_infra):
+        """Invalid protocol triggers error."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": [22], "protocol": "icmp"},
+        ])
+        errors = validate(sample_infra)
+        assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
+
+    def test_policies_in_group_vars_all(self, sample_infra, tmp_path):
+        """Network policies appear in group_vars/all.yml."""
+        self._add_policies(sample_infra, [
+            {"description": "Admin SSH", "from": "admin", "to": "work",
+             "ports": [22], "protocol": "tcp"},
+        ])
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "network_policies" in content
+        assert "Admin SSH" in content
+
+    def test_no_policies_no_key_in_all(self, sample_infra, tmp_path):
+        """Without network_policies, the key is absent from group_vars/all.yml."""
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "network_policies" not in content
+
+    def test_bidirectional_valid(self, sample_infra):
+        """bidirectional: true is accepted."""
+        self._add_policies(sample_infra, [
+            {"from": "admin", "to": "work", "ports": "all", "bidirectional": True},
+        ])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+    def test_empty_policies_valid(self, sample_infra):
+        """Empty network_policies list is valid."""
+        self._add_policies(sample_infra, [])
+        errors = validate(sample_infra)
+        assert not any("network_policies" in e for e in errors)
+
+
+# -- infra/ directory support (ADR-030) ----------------------------------------
+
+
+class TestInfraDirectory:
+    """Test loading infra from a directory structure."""
+
+    def _create_infra_dir(self, tmp_path, sample_infra):
+        """Create infra/ directory structure from sample_infra."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        domains_dir = infra_dir / "domains"
+        domains_dir.mkdir()
+
+        # base.yml
+        base = {
+            "project_name": sample_infra["project_name"],
+            "global": sample_infra["global"],
+        }
+        (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
+
+        # domains/*.yml
+        for dname, dconfig in sample_infra.get("domains", {}).items():
+            (domains_dir / f"{dname}.yml").write_text(
+                yaml.dump({dname: dconfig}, sort_keys=False)
+            )
+
+        # policies.yml (if any)
+        if "network_policies" in sample_infra:
+            (infra_dir / "policies.yml").write_text(
+                yaml.dump({"network_policies": sample_infra["network_policies"]}, sort_keys=False)
+            )
+
+        return infra_dir
+
+    def test_load_from_directory(self, sample_infra, tmp_path):
+        """Loading from infra/ directory produces same structure as single file."""
+        infra_dir = self._create_infra_dir(tmp_path, sample_infra)
+        result = load_infra(infra_dir)
+        assert result["project_name"] == sample_infra["project_name"]
+        assert "admin" in result["domains"]
+        assert "work" in result["domains"]
+
+    def test_directory_generates_same_output(self, sample_infra, tmp_path):
+        """Directory mode and file mode produce identical generated files."""
+        # Generate from single file
+        out_file = tmp_path / "out_file"
+        out_file.mkdir()
+        generate(sample_infra, out_file)
+
+        # Generate from directory
+        infra_dir = self._create_infra_dir(tmp_path, sample_infra)
+        dir_infra = load_infra(infra_dir)
+        out_dir = tmp_path / "out_dir"
+        out_dir.mkdir()
+        generate(dir_infra, out_dir)
+
+        # Compare outputs
+        file_outputs = {
+            str(f.relative_to(out_file)): f.read_text()
+            for f in out_file.rglob("*.yml")
+        }
+        dir_outputs = {
+            str(f.relative_to(out_dir)): f.read_text()
+            for f in out_dir.rglob("*.yml")
+        }
+        assert file_outputs == dir_outputs
+
+    def test_directory_with_policies(self, sample_infra, tmp_path):
+        """policies.yml is merged from infra/ directory."""
+        sample_infra["network_policies"] = [
+            {"from": "admin", "to": "work", "ports": [22], "protocol": "tcp"},
+        ]
+        infra_dir = self._create_infra_dir(tmp_path, sample_infra)
+        result = load_infra(infra_dir)
+        assert "network_policies" in result
+        assert len(result["network_policies"]) == 1
+
+    def test_directory_missing_base_yml_exits(self, tmp_path):
+        """Missing base.yml triggers exit."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        with pytest.raises(SystemExit):
+            load_infra(infra_dir)
+
+    def test_load_autodetects_file(self, sample_infra, tmp_path):
+        """load_infra('infra.yml') works when file exists."""
+        p = tmp_path / "infra.yml"
+        p.write_text(yaml.dump(sample_infra, sort_keys=False))
+        result = load_infra(p)
+        assert result["project_name"] == "test-infra"
+
+    def test_load_autodetects_dir(self, sample_infra, tmp_path):
+        """load_infra('infra') works when directory exists."""
+        infra_dir = self._create_infra_dir(tmp_path, sample_infra)
+        # Load using the directory path directly
+        result = load_infra(infra_dir)
+        assert result["project_name"] == "test-infra"
+
+    def test_domains_sorted_alphabetically(self, sample_infra, tmp_path):
+        """Domain files are loaded in alphabetical order."""
+        infra_dir = self._create_infra_dir(tmp_path, sample_infra)
+        result = load_infra(infra_dir)
+        # Both admin and work should be present regardless of file order
+        assert set(result["domains"]) == {"admin", "work"}
+
+    def test_empty_domains_dir(self, sample_infra, tmp_path):
+        """Empty domains/ directory yields no domains."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        (infra_dir / "domains").mkdir()
+        base = {"project_name": "test", "global": sample_infra["global"]}
+        (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
+        result = load_infra(infra_dir)
+        assert result.get("domains", {}) == {}
