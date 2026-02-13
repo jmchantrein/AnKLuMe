@@ -7,7 +7,6 @@
 #
 # Input variables:
 #   - firewall_router_interfaces (list): NIC → bridge mapping
-#   - firewall_router_admin_bridge (string): admin bridge name
 #   - firewall_router_logging (bool): enable nftables logging
 #   - firewall_router_log_prefix (string): nftables log prefix
 

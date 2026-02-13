@@ -57,11 +57,11 @@
           - "'ct state invalid drop' in verify_nft_content"
         fail_msg: "Missing invalid state drop rule"
 
-    - name: Verify | Contains admin bridge accept rule
+    - name: Verify | No admin bridge accept rule (admin uses Incus socket)
       ansible.builtin.assert:
         that:
-          - "'iifname \"net-admin\" accept' in verify_nft_content"
-        fail_msg: "Missing admin bridge accept rule"
+          - "'iifname \"net-admin\" accept' not in verify_nft_content"
+        fail_msg: "Admin bridge accept rule should not exist (admin uses Incus socket)"
 
     - name: Verify | Contains same-bridge accept rules
       ansible.builtin.assert:
@@ -72,14 +72,15 @@
           - "'iifname \"net-homelab\" oifname \"net-homelab\" accept' in verify_nft_content"
         fail_msg: "Missing same-bridge accept rules"
 
-    - name: Verify | Contains non-admin inter-bridge drop rule
+    - name: Verify | Contains inter-bridge drop rule for all bridges
       ansible.builtin.assert:
         that:
           - "'drop' in verify_nft_content"
+          - "'net-admin' in verify_nft_content"
           - "'net-homelab' in verify_nft_content"
           - "'net-perso' in verify_nft_content"
           - "'net-pro' in verify_nft_content"
-        fail_msg: "Missing non-admin inter-bridge drop rule"
+        fail_msg: "Missing inter-bridge drop rule"
 
     - name: Verify | Contains atomic table replace pattern
       ansible.builtin.assert:
@@ -93,13 +94,8 @@
         dest: "{{ incus_nftables_output_path }}"
         mode: "0644"
       vars:
-        incus_nftables_admin_bridge: "net-admin"
         incus_nftables_all_bridges:
           - "net-admin"
-          - "net-homelab"
-          - "net-perso"
-          - "net-pro"
-        incus_nftables_non_admin_bridges:
           - "net-homelab"
           - "net-perso"
           - "net-pro"

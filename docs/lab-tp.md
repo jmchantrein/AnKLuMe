@@ -77,7 +77,7 @@ is blocked (when nftables rules are configured, see Phase 8 in
 This means:
 - Student 1's web server can talk to Student 1's client
 - Student 1 cannot access Student 2's containers
-- The admin domain can reach all students (for management)
+- The admin domain manages all students via the Incus socket (not the network)
 
 ## Reset between sessions
 

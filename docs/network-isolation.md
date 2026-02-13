@@ -3,8 +3,8 @@
 AnKLuMe uses nftables to enforce inter-bridge isolation on the host.
 By default, Incus bridges allow forwarding between them, meaning a
 container in one domain can reach containers in other domains. The
-`incus_nftables` role generates rules that block this cross-domain
-traffic while preserving admin access.
+`incus_nftables` role generates rules that block all cross-domain
+traffic.
 
 ## How domain isolation works
 
@@ -16,13 +16,17 @@ The nftables rules enforce:
 
 1. **Same-bridge traffic**: allowed (containers within a domain can
    communicate)
-2. **Admin to any bridge**: allowed (the admin container needs to reach
-   all domains for Ansible provisioning and monitoring)
-3. **Non-admin inter-bridge traffic**: dropped (e.g., `net-perso` cannot
-   reach `net-pro`)
-4. **Internet access**: unaffected (NAT rules from Incus are preserved)
-5. **Return traffic**: stateful tracking allows response packets back
+2. **All inter-bridge traffic**: dropped (e.g., `net-perso` cannot
+   reach `net-pro`, and `net-admin` cannot reach other domains either)
+3. **Internet access**: unaffected (NAT rules from Incus are preserved)
+4. **Return traffic**: stateful tracking allows response packets back
    through established connections
+
+The admin container does not need a network exception because it
+communicates with all instances via the Incus socket (mounted
+read/write inside the container), not via the network. Ansible uses
+the `community.general.incus` connection plugin, which calls
+`incus exec` over the socket. No IP traffic crosses bridges.
 
 ## nftables rule design
 
@@ -63,8 +67,7 @@ Incus-managed NAT and per-bridge chains without interference.
 ### Stateful tracking
 
 `ct state established,related accept` allows return traffic from established
-connections. If admin initiates a connection to another bridge, responses
-flow back correctly. Invalid packets are dropped.
+connections. Invalid packets are dropped.
 
 ## Two-step workflow
 
@@ -82,8 +85,7 @@ This runs the `incus_nftables` Ansible role, which:
 
 1. Queries `incus network list` to discover all bridges
 2. Filters for AnKLuMe bridges (names starting with `net-`)
-3. Separates the admin bridge from non-admin bridges
-4. Templates the nftables rules to `/opt/anklume/nftables-isolation.nft`
+3. Templates the nftables rules to `/opt/anklume/nftables-isolation.nft`
 
 The generated file is stored inside the admin container and can be
 reviewed before deployment.
@@ -122,7 +124,6 @@ Variables in `roles/incus_nftables/defaults/main.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `incus_nftables_admin_bridge` | `net-admin` | Bridge name for the admin domain |
 | `incus_nftables_bridge_pattern` | `net-` | Prefix used to identify AnKLuMe bridges |
 | `incus_nftables_output_path` | `/opt/anklume/nftables-isolation.nft` | Where to write the generated rules |
 | `incus_nftables_apply` | `false` | Apply rules immediately (use with caution) |
@@ -142,8 +143,11 @@ nft list table inet anklume
 incus exec perso-desktop -- ping -c1 10.100.2.10   # Should fail (pro)
 incus exec perso-desktop -- ping -c1 10.100.1.254  # Should work (own gateway)
 
-# Test admin access: from admin, reach any domain
-incus exec admin-ansible -- ping -c1 10.100.2.10   # Should work
+# Test admin isolation: admin cannot reach other domains via network
+incus exec admin-ansible -- ping -c1 10.100.2.10   # Should fail (dropped)
+
+# Verify admin can still manage instances via Incus socket
+incus exec admin-ansible -- incus list             # Should work (socket, not network)
 
 # Test internet: from any container
 incus exec perso-desktop -- ping -c1 1.1.1.1       # Should work
@@ -158,12 +162,6 @@ incus exec perso-desktop -- ping -c1 1.1.1.1       # Should work
 3. If `br_netfilter` is not loaded, bridge traffic bypasses nftables
    entirely. Load it with: `modprobe br_netfilter`
 4. Verify `net.bridge.bridge-nf-call-iptables = 1` in sysctl
-
-### Admin container cannot reach other domains
-
-1. Verify the admin bridge name matches `incus_nftables_admin_bridge`
-2. Check the generated rules: `cat /opt/anklume/nftables-isolation.nft`
-3. The admin bridge rule should appear as: `iifname "net-admin" accept`
 
 ### Internet access broken from containers
 

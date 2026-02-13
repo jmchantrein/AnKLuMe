@@ -10,12 +10,8 @@
 #   - bridge: the Incus bridge name (net-admin, net-perso, ...)
 #   - subnet: the subnet CIDR (10.100.0.0/24)
 #   - gateway_ip: the IP of this VM on that bridge (10.100.0.254)
-#   - is_admin: whether this is the admin bridge
 
 firewall_router_interfaces: []
-
-# Admin bridge name (traffic FROM admin is always allowed)
-firewall_router_admin_bridge: net-admin
 
 # Enable logging of dropped/allowed packets in nftables
 firewall_router_logging: true
