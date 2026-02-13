@@ -3,7 +3,7 @@ galaxy_info:
   role_name: dev_agent_runner
   author: AnKLuMe
   description: "Setup Claude Code Agent Teams runner container"
-  license: Apache-2.0
+  license: AGPL-3.0
   company: AnKLuMe
   min_ansible_version: "2.16"
   platforms:

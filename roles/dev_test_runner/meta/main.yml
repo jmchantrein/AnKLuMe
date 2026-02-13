@@ -4,7 +4,7 @@ galaxy_info:
   namespace: anklume
   author: AnKLuMe
   description: Provisions a container for nested Incus usage (Incus-in-Incus)
-  license: Apache-2.0
+  license: AGPL-3.0
   min_ansible_version: "2.16"
   platforms:
     - name: Debian

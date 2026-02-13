@@ -3,7 +3,7 @@ galaxy_info:
   role_name: stt_server
   author: AnKLuMe
   description: "Install faster-whisper + Speaches STT server"
-  license: Apache-2.0
+  license: AGPL-3.0
   company: AnKLuMe
   min_ansible_version: "2.16"
   platforms:

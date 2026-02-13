@@ -9,7 +9,7 @@ calmly orchestrated by you, Ansible, Incus and Molecule.
 - **Type**: Infrastructure-as-Code (not a web app, not an API)
 - **Primary language**: YAML (Ansible roles + playbooks) + Python (PSOT generator)
 - **Target audience**: sysadmins, teachers, power users
-- **License**: Apache 2.0
+- **License**: AGPL-3.0
 
 ## Non-negotiable principles
 
