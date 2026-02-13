@@ -114,10 +114,14 @@ No framework, no external templating engine.
 
 ---
 
-## ADR-011: All content in English, French translation maintained
+## ADR-011: All content in English, French translations maintained
 
 **Decision**: All code, comments, documentation, prompts in English.
-`README_FR.md` maintained as French translation of `README.md`, always in sync.
+French translations (`*_FR.md`) are maintained for all documentation files,
+always in sync with their English counterparts. This includes `README_FR.md`
+and all files in `docs/` (e.g., `quickstart_FR.md`, `SPEC_FR.md`,
+`ARCHITECTURE_FR.md`, etc.). Each French file includes a header note
+indicating that the English version is authoritative in case of divergence.
 
 ---
 
