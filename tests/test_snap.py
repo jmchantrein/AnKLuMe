@@ -341,3 +341,72 @@ class TestSnapRestoreDecline:
             ["restore", "self", "my-snap"], env, input_text="maybe\n",
         )
         assert result.returncode != 0
+
+
+# ── argument validation ─────────────────────────────────────
+
+
+class TestSnapInvalidArgs:
+    """Test error handling for invalid arguments."""
+
+    def test_missing_snapshot_name_for_restore(self, mock_env):
+        """restore without snapshot name → error."""
+        env, _ = mock_env
+        result = run_snap(["restore", "admin-ansible"], env)
+        assert result.returncode != 0
+        assert "Usage" in result.stderr
+
+    def test_missing_snapshot_name_for_delete(self, mock_env):
+        """delete without snapshot name → error."""
+        env, _ = mock_env
+        result = run_snap(["delete", "admin-ansible"], env)
+        assert result.returncode != 0
+        assert "Usage" in result.stderr
+
+    def test_unknown_subcommand(self, mock_env):
+        """Unknown subcommand → error with hint."""
+        env, _ = mock_env
+        result = run_snap(["banana"], env)
+        assert result.returncode != 0
+        assert "Unknown command" in result.stderr
+
+    def test_no_args_shows_usage(self, mock_env):
+        """No arguments → shows usage (exit 0)."""
+        env, _ = mock_env
+        result = run_snap([], env)
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+
+class TestSnapProjectResolution:
+    """Test instance-to-project resolution logic."""
+
+    def test_instance_found_in_non_default_project(self, mock_env):
+        """Instance dev-workspace found in 'work' project → correct --project flag."""
+        env, log = mock_env
+        result = run_snap(["create", "dev-workspace"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot create dev-workspace" in c and "--project work" in c
+            for c in cmds
+        )
+
+    def test_instance_not_found_gives_error(self, mock_env):
+        """Instance not in any project → clear error message."""
+        env, _ = mock_env
+        result = run_snap(["create", "nonexistent-instance"], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr
+
+    def test_self_resolves_to_hostname(self, mock_env):
+        """'self' keyword resolves to HOSTNAME env var."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(["create", "self", "test-snap"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot create admin-ansible test-snap" in c
+            for c in cmds
+        )
