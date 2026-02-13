@@ -58,46 +58,90 @@ build_context() {
         if [ -f "roles/${role}/molecule/default/verify.yml" ]; then
             cat "roles/${role}/molecule/default/verify.yml"
         fi
+        echo ""
+        echo "=== Known fix patterns (experience library) ==="
+        if [ -d "${PROJECT_DIR}/experiences/fixes" ]; then
+            for exp_file in "${PROJECT_DIR}/experiences/fixes"/*.yml; do
+                [ -f "$exp_file" ] || continue
+                echo "--- $(basename "$exp_file") ---"
+                cat "$exp_file"
+            done
+        fi
     } > "$context_file"
 }
 
 search_experiences() {
+    # Search the experience library for a matching fix pattern.
+    # Sets EXP_MATCH_SOLUTION and EXP_MATCH_PREVENTION if found.
+    # Returns 0 if match found, 1 otherwise.
     local log_file="$1"
     local exp_dir="${PROJECT_DIR}/experiences/fixes"
+
+    EXP_MATCH_SOLUTION=""
+    EXP_MATCH_PREVENTION=""
+    EXP_MATCH_ID=""
 
     if [ ! -d "$exp_dir" ]; then
         return 1
     fi
 
-    # Extract key error patterns from the log
+    # Extract key error patterns from the log (more lines, deduplicated)
     local errors
-    errors=$(grep -i "error\|failed\|fatal" "$log_file" 2>/dev/null | head -5) || true
+    errors=$(grep -i "error\|failed\|fatal\|exception\|traceback\|cannot\|unable" \
+        "$log_file" 2>/dev/null | sort -u | head -20) || true
 
     if [ -z "$errors" ]; then
         return 1
     fi
 
-    # Search through experience files for matching patterns
-    for exp_file in "$exp_dir"/*.yml; do
-        [ -f "$exp_file" ] || continue
-        while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            if echo "$errors" | grep -qi "$line" 2>/dev/null; then
-                ai_log "Experience match found in $(basename "$exp_file"): $line"
-                return 0
-            fi
-        done < <(python3 -c "
-import yaml, sys
-try:
-    data = yaml.safe_load(open('$exp_file'))
-    for entry in (data or []):
-        if isinstance(entry, dict) and 'problem' in entry:
-            words = entry['problem'].split()[:6]
-            print(' '.join(words))
-except Exception:
-    pass
-" 2>/dev/null)
-    done
+    # Search through experience files — match on problem AND solution keywords
+    local match
+    match=$(python3 -c "
+import yaml, sys, os
+
+errors = '''$errors'''.lower()
+exp_dir = '$exp_dir'
+best_score = 0
+best_entry = None
+
+for fname in sorted(os.listdir(exp_dir)):
+    if not fname.endswith('.yml'):
+        continue
+    fpath = os.path.join(exp_dir, fname)
+    try:
+        data = yaml.safe_load(open(fpath))
+    except Exception:
+        continue
+    if not isinstance(data, list):
+        continue
+    for entry in data:
+        if not isinstance(entry, dict) or 'problem' not in entry:
+            continue
+        # Score: count how many words from the problem appear in errors
+        words = entry['problem'].lower().split()
+        score = sum(1 for w in words if len(w) > 3 and w in errors)
+        if score > best_score and score >= 3:
+            best_score = score
+            best_entry = entry
+
+if best_entry:
+    eid = best_entry.get('id', 'unknown')
+    sol = best_entry.get('solution', '').replace(chr(10), ' ')
+    prev = best_entry.get('prevention', '').replace(chr(10), ' ')
+    prob = best_entry.get('problem', '')
+    print(f'{eid}|||{prob}|||{sol}|||{prev}')
+" 2>/dev/null) || true
+
+    if [ -n "$match" ]; then
+        EXP_MATCH_ID="$(echo "$match" | cut -d'|' -f1)"
+        local problem
+        problem="$(echo "$match" | cut -d'|' -f4)"
+        EXP_MATCH_SOLUTION="$(echo "$match" | cut -d'|' -f7)"
+        EXP_MATCH_PREVENTION="$(echo "$match" | cut -d'|' -f10)"
+        ai_log "Experience match: ${EXP_MATCH_ID} — ${problem}"
+        ai_log "  Known solution: ${EXP_MATCH_SOLUTION}"
+        return 0
+    fi
 
     return 1
 }
@@ -107,12 +151,26 @@ attempt_fix() {
     local role="$2"
     local log_file="${AI_LOG_DIR}/${_ai_session_id}-${role}-molecule.log"
 
+    local instruction="Analyze this Molecule test failure for the '${role}' Ansible role and fix the issue."
+
     # Check experiences first (faster, no LLM cost)
     if search_experiences "$log_file"; then
-        ai_log "Known fix pattern found in experience library"
-    fi
+        ai_log "Known fix pattern found in experience library (${EXP_MATCH_ID})"
+        # Enrich the context file with the known solution
+        {
+            echo ""
+            echo "=== KNOWN FIX FROM EXPERIENCE LIBRARY (${EXP_MATCH_ID}) ==="
+            echo "Solution: ${EXP_MATCH_SOLUTION}"
+            echo "Prevention: ${EXP_MATCH_PREVENTION}"
+            echo "Apply this known fix first. Only deviate if it clearly doesn't match."
+        } >> "$context_file"
+        instruction="A known fix exists in the experience library for this error pattern.
+Experience ID: ${EXP_MATCH_ID}
+Known solution: ${EXP_MATCH_SOLUTION}
+Prevention: ${EXP_MATCH_PREVENTION}
 
-    local instruction="Analyze this Molecule test failure for the '${role}' Ansible role and fix the issue."
+Apply this known fix to the '${role}' Ansible role. If the known fix doesn't apply exactly, adapt it to the specific context."
+    fi
 
     case "$AI_MODE" in
         none)
@@ -272,9 +330,18 @@ main() {
     [ -n "$failed_roles" ] && ai_log "Failed roles:${failed_roles}"
     ai_log "Session log: ${_ai_log_file}"
 
-    # Mine experiences from this session if --learn was passed
-    if [ "$learn_mode" = "true" ] && [ "$failed" -eq 0 ]; then
-        ai_log "Learning: mining experiences from recent commits..."
+    # Auto-learn: mine experiences after any successful fix (not just --learn)
+    # --learn forces mining even when no fixes were applied
+    local should_mine="false"
+    if [ "$learn_mode" = "true" ]; then
+        should_mine="true"
+    elif [ "$AI_MODE" != "none" ] && [ "$AI_DRY_RUN" != "true" ] && [ "$passed" -gt 0 ]; then
+        # Auto-learn when AI actually applied fixes
+        should_mine="true"
+    fi
+
+    if [ "$should_mine" = "true" ]; then
+        ai_log "Mining new experiences from recent commits..."
         python3 "$SCRIPT_DIR/mine-experiences.py" --incremental 2>&1 | while IFS= read -r line; do
             ai_log "  $line"
         done
