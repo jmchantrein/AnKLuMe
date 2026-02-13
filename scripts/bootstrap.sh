@@ -158,8 +158,17 @@ detect_fs() {
 if [ "$MODE" = "prod" ]; then
     echo "--- Production Incus configuration ---"
 
+    # Distinguish "Incus not installed" from "daemon unreachable"
+    if ! command -v incus &>/dev/null; then
+        INCUS_STATE="missing"
+    elif incus info &>/dev/null 2>&1; then
+        INCUS_STATE="ready"
+    else
+        INCUS_STATE="installed"
+    fi
+
     # Check if Incus is already initialized
-    if incus info &>/dev/null 2>&1; then
+    if [ "$INCUS_STATE" = "ready" ]; then
         echo "Incus already initialized."
         read -rp "Reconfigure? [y/N] " confirm
         if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
@@ -223,6 +232,13 @@ projects: []
 EOF
             echo "Incus configured with $FS_TYPE storage backend."
         fi
+    elif [ "$INCUS_STATE" = "installed" ]; then
+        echo "Incus is installed but the daemon is not responding."
+        echo "Attempting minimal initialization..."
+        FS_TYPE=$(detect_fs)
+        echo "Detected filesystem: $FS_TYPE"
+        incus admin init --minimal
+        echo "Incus initialized (minimal). Configure storage manually if needed."
     else
         echo "Installing Incus..."
         if command -v apt-get &>/dev/null; then
@@ -242,6 +258,10 @@ EOF
 
 elif [ "$MODE" = "dev" ]; then
     echo "--- Development Incus configuration ---"
+    if ! command -v incus &>/dev/null; then
+        echo "ERROR: Incus is not installed. Install it first, then re-run bootstrap." >&2
+        exit 1
+    fi
     if ! incus info &>/dev/null 2>&1; then
         echo "Incus not initialized. Running minimal init..."
         incus admin init --minimal
