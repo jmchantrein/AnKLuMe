@@ -864,3 +864,990 @@ class TestOrphanLifecycle:
         )
         # Files should be removed (ephemeral:true = unprotected)
         assert result.returncode == 0
+
+
+# ── Additional Pipeline Tests (no Incus needed) ────────────
+
+
+class TestVMAndLXCCoexistence:
+    """Test generate pipeline with VMs and LXC containers in the same domain."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _mixed_infra(**global_overrides):
+        return {
+            "project_name": "mixed-test",
+            "global": {
+                "base_subnet": "10.210",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                **global_overrides,
+            },
+            "domains": {
+                "hybrid": {
+                    "description": "Domain with both LXC and VM",
+                    "subnet_id": 0,
+                    "machines": {
+                        "hybrid-web": {
+                            "type": "lxc",
+                            "ip": "10.210.0.10",
+                        },
+                        "hybrid-sandbox": {
+                            "type": "vm",
+                            "ip": "10.210.0.20",
+                            "config": {
+                                "limits.cpu": "2",
+                                "limits.memory": "2GiB",
+                            },
+                        },
+                    },
+                },
+            },
+        }
+
+    def test_mixed_types_validate_ok(self, tmp_path):
+        """LXC and VM in same domain pass validation."""
+        infra = self._mixed_infra()
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_mixed_types_host_vars_instance_type(self, tmp_path):
+        """instance_type in host_vars reflects LXC vs VM correctly."""
+        infra = self._mixed_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        lxc_hv = yaml.safe_load((tmp_path / "host_vars" / "hybrid-web.yml").read_text())
+        vm_hv = yaml.safe_load((tmp_path / "host_vars" / "hybrid-sandbox.yml").read_text())
+        assert lxc_hv["instance_type"] == "lxc"
+        assert vm_hv["instance_type"] == "vm"
+
+    def test_mixed_types_share_inventory(self, tmp_path):
+        """Both LXC and VM appear in the same domain inventory file."""
+        infra = self._mixed_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        inv = yaml.safe_load((tmp_path / "inventory" / "hybrid.yml").read_text())
+        hosts = inv["all"]["children"]["hybrid"]["hosts"]
+        assert "hybrid-web" in hosts
+        assert "hybrid-sandbox" in hosts
+
+    def test_mixed_types_vm_config_in_host_vars(self, tmp_path):
+        """VM config (limits.cpu, limits.memory) appears in host_vars."""
+        infra = self._mixed_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        vm_hv = yaml.safe_load((tmp_path / "host_vars" / "hybrid-sandbox.yml").read_text())
+        assert vm_hv["instance_config"]["limits.cpu"] == "2"
+        assert vm_hv["instance_config"]["limits.memory"] == "2GiB"
+
+    def test_invalid_type_rejected(self, tmp_path):
+        """type: docker is rejected by validator."""
+        infra = self._mixed_infra()
+        infra["domains"]["hybrid"]["machines"]["hybrid-bad"] = {
+            "type": "docker",
+            "ip": "10.210.0.30",
+        }
+        errors = generate.validate(infra)
+        assert any("type must be 'lxc' or 'vm'" in e for e in errors)
+
+    def test_multi_domain_mixed_types(self, tmp_path):
+        """Multiple domains each with LXC+VM all generate correctly."""
+        infra = self._mixed_infra()
+        infra["domains"]["compute"] = {
+            "description": "Compute domain",
+            "subnet_id": 1,
+            "machines": {
+                "compute-worker": {"type": "lxc", "ip": "10.210.1.10"},
+                "compute-gpu": {"type": "vm", "ip": "10.210.1.20"},
+            },
+        }
+        errors = generate.validate(infra)
+        assert errors == []
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for host, expected_type in [
+            ("hybrid-web", "lxc"), ("hybrid-sandbox", "vm"),
+            ("compute-worker", "lxc"), ("compute-gpu", "vm"),
+        ]:
+            hv = yaml.safe_load((tmp_path / "host_vars" / f"{host}.yml").read_text())
+            assert hv["instance_type"] == expected_type, f"{host} should be {expected_type}"
+
+
+class TestEphemeralGeneration:
+    """Test ephemeral inheritance and override through the full pipeline."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _ephemeral_infra():
+        return {
+            "project_name": "ephemeral-test",
+            "global": {
+                "base_subnet": "10.211",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "persistent": {
+                    "description": "Protected domain (default ephemeral=false)",
+                    "subnet_id": 0,
+                    "machines": {
+                        "persist-srv": {"type": "lxc", "ip": "10.211.0.10"},
+                        "persist-temp": {
+                            "type": "lxc",
+                            "ip": "10.211.0.20",
+                            "ephemeral": True,
+                        },
+                    },
+                },
+                "disposable": {
+                    "description": "Ephemeral domain",
+                    "subnet_id": 1,
+                    "ephemeral": True,
+                    "machines": {
+                        "disp-box": {"type": "lxc", "ip": "10.211.1.10"},
+                        "disp-keep": {
+                            "type": "lxc",
+                            "ip": "10.211.1.20",
+                            "ephemeral": False,
+                        },
+                    },
+                },
+            },
+        }
+
+    def test_ephemeral_validates_ok(self, tmp_path):
+        """Valid ephemeral inheritance passes validation."""
+        infra = self._ephemeral_infra()
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_domain_default_false_inherited(self, tmp_path):
+        """Machine without ephemeral inherits domain default (false)."""
+        infra = self._ephemeral_infra()
+        generate.generate(infra, str(tmp_path))
+
+        hv = yaml.safe_load((tmp_path / "host_vars" / "persist-srv.yml").read_text())
+        assert hv["instance_ephemeral"] is False
+
+    def test_machine_override_true_on_protected_domain(self, tmp_path):
+        """Machine ephemeral:true overrides domain ephemeral:false."""
+        infra = self._ephemeral_infra()
+        generate.generate(infra, str(tmp_path))
+
+        hv = yaml.safe_load((tmp_path / "host_vars" / "persist-temp.yml").read_text())
+        assert hv["instance_ephemeral"] is True
+
+    def test_domain_ephemeral_true_inherited(self, tmp_path):
+        """Machine without ephemeral inherits domain ephemeral:true."""
+        infra = self._ephemeral_infra()
+        generate.generate(infra, str(tmp_path))
+
+        hv = yaml.safe_load((tmp_path / "host_vars" / "disp-box.yml").read_text())
+        assert hv["instance_ephemeral"] is True
+
+    def test_machine_override_false_on_ephemeral_domain(self, tmp_path):
+        """Machine ephemeral:false overrides domain ephemeral:true."""
+        infra = self._ephemeral_infra()
+        generate.generate(infra, str(tmp_path))
+
+        hv = yaml.safe_load((tmp_path / "host_vars" / "disp-keep.yml").read_text())
+        assert hv["instance_ephemeral"] is False
+
+    def test_group_vars_ephemeral_matches_domain(self, tmp_path):
+        """domain_ephemeral in group_vars matches infra.yml domain setting."""
+        infra = self._ephemeral_infra()
+        generate.generate(infra, str(tmp_path))
+
+        gv_persist = yaml.safe_load(
+            (tmp_path / "group_vars" / "persistent.yml").read_text(),
+        )
+        gv_disp = yaml.safe_load(
+            (tmp_path / "group_vars" / "disposable.yml").read_text(),
+        )
+        assert gv_persist["domain_ephemeral"] is False
+        assert gv_disp["domain_ephemeral"] is True
+
+    def test_invalid_ephemeral_type_rejected(self, tmp_path):
+        """Non-boolean ephemeral rejected by validator."""
+        infra = self._ephemeral_infra()
+        infra["domains"]["persistent"]["ephemeral"] = "yes"
+        errors = generate.validate(infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+    def test_invalid_machine_ephemeral_rejected(self, tmp_path):
+        """Non-boolean machine ephemeral rejected by validator."""
+        infra = self._ephemeral_infra()
+        infra["domains"]["persistent"]["machines"]["persist-srv"]["ephemeral"] = 1
+        errors = generate.validate(infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+
+class TestGPUPolicyPipeline:
+    """Test gpu_policy validation through the full pipeline."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _gpu_infra(gpu_policy="exclusive", gpu_machines=None):
+        """Build an infra with configurable GPU policy and GPU machines.
+
+        gpu_machines: list of (domain, machine_name, ip) with GPU enabled.
+        """
+        if gpu_machines is None:
+            gpu_machines = [("compute", "compute-gpu", "10.212.0.10")]
+
+        infra = {
+            "project_name": "gpu-test",
+            "global": {
+                "base_subnet": "10.212",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "gpu_policy": gpu_policy,
+            },
+            "domains": {
+                "compute": {
+                    "description": "Compute domain",
+                    "subnet_id": 0,
+                    "profiles": {
+                        "nvidia-compute": {
+                            "devices": {"gpu": {"type": "gpu", "gputype": "physical"}},
+                        },
+                    },
+                    "machines": {
+                        "compute-ctrl": {"type": "lxc", "ip": "10.212.0.5"},
+                    },
+                },
+                "research": {
+                    "description": "Research domain",
+                    "subnet_id": 1,
+                    "profiles": {
+                        "nvidia-compute": {
+                            "devices": {"gpu": {"type": "gpu", "gputype": "physical"}},
+                        },
+                    },
+                    "machines": {
+                        "research-srv": {"type": "lxc", "ip": "10.212.1.5"},
+                    },
+                },
+            },
+        }
+
+        for domain, mname, ip in gpu_machines:
+            infra["domains"][domain]["machines"][mname] = {
+                "type": "lxc",
+                "ip": ip,
+                "gpu": True,
+                "profiles": ["default", "nvidia-compute"],
+            }
+        return infra
+
+    def test_exclusive_single_gpu_ok(self, tmp_path):
+        """Exclusive policy with one GPU instance passes validation."""
+        infra = self._gpu_infra(
+            gpu_policy="exclusive",
+            gpu_machines=[("compute", "compute-gpu", "10.212.0.10")],
+        )
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_exclusive_two_gpu_error(self, tmp_path):
+        """Exclusive policy with two GPU instances is an error."""
+        infra = self._gpu_infra(
+            gpu_policy="exclusive",
+            gpu_machines=[
+                ("compute", "compute-gpu", "10.212.0.10"),
+                ("research", "research-gpu", "10.212.1.10"),
+            ],
+        )
+        errors = generate.validate(infra)
+        assert any("GPU policy is 'exclusive'" in e for e in errors)
+        assert any("2 instances have GPU access" in e for e in errors)
+
+    def test_shared_two_gpu_warning_not_error(self, tmp_path):
+        """Shared policy with two GPU instances emits warning, not error."""
+        infra = self._gpu_infra(
+            gpu_policy="shared",
+            gpu_machines=[
+                ("compute", "compute-gpu", "10.212.0.10"),
+                ("research", "research-gpu", "10.212.1.10"),
+            ],
+        )
+        errors = generate.validate(infra)
+        assert errors == []
+        warnings = generate.get_warnings(infra)
+        assert any("shared" in w.lower() for w in warnings)
+
+    def test_invalid_gpu_policy_rejected(self, tmp_path):
+        """Invalid gpu_policy value is an error."""
+        infra = self._gpu_infra(gpu_policy="hybrid")
+        errors = generate.validate(infra)
+        assert any("gpu_policy must be 'exclusive' or 'shared'" in e for e in errors)
+
+    def test_gpu_detection_via_profile(self, tmp_path):
+        """GPU detected indirectly through profile device, not gpu: true flag."""
+        infra = self._gpu_infra(gpu_policy="exclusive", gpu_machines=[])
+        # Add a machine that references a GPU profile but without gpu: true
+        infra["domains"]["compute"]["machines"]["compute-indirect"] = {
+            "type": "lxc",
+            "ip": "10.212.0.10",
+            "profiles": ["default", "nvidia-compute"],
+        }
+        # Add a second machine with gpu: true directly
+        infra["domains"]["research"]["machines"]["research-direct"] = {
+            "type": "lxc",
+            "ip": "10.212.1.10",
+            "gpu": True,
+            "profiles": ["default", "nvidia-compute"],
+        }
+        errors = generate.validate(infra)
+        assert any("GPU policy is 'exclusive'" in e for e in errors)
+
+    def test_gpu_no_instances_ok(self, tmp_path):
+        """No GPU instances with any policy passes validation."""
+        infra = self._gpu_infra(gpu_policy="exclusive", gpu_machines=[])
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_shared_gpu_generates_files(self, tmp_path):
+        """Shared GPU policy with 2 GPU machines still generates all files."""
+        infra = self._gpu_infra(
+            gpu_policy="shared",
+            gpu_machines=[
+                ("compute", "compute-gpu", "10.212.0.10"),
+                ("research", "research-gpu", "10.212.1.10"),
+            ],
+        )
+        errors = generate.validate(infra)
+        assert errors == []
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for host in ("compute-ctrl", "compute-gpu", "research-srv", "research-gpu"):
+            assert (tmp_path / "host_vars" / f"{host}.yml").exists()
+
+        gpu_hv = yaml.safe_load((tmp_path / "host_vars" / "compute-gpu.yml").read_text())
+        assert gpu_hv.get("instance_gpu") is True
+
+
+class TestProfileGeneration:
+    """Test domain profiles appear correctly in group_vars."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _profile_infra():
+        return {
+            "project_name": "profile-test",
+            "global": {
+                "base_subnet": "10.213",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "services": {
+                    "description": "Services domain",
+                    "subnet_id": 0,
+                    "profiles": {
+                        "gpu-compute": {
+                            "devices": {"gpu": {"type": "gpu", "gputype": "physical"}},
+                        },
+                        "nesting": {
+                            "config": {
+                                "security.nesting": "true",
+                                "security.syscalls.intercept.mknod": "true",
+                            },
+                        },
+                        "high-mem": {
+                            "config": {
+                                "limits.memory": "8GiB",
+                            },
+                        },
+                    },
+                    "machines": {
+                        "svc-app": {
+                            "type": "lxc",
+                            "ip": "10.213.0.10",
+                            "profiles": ["default", "high-mem"],
+                        },
+                        "svc-nested": {
+                            "type": "lxc",
+                            "ip": "10.213.0.20",
+                            "profiles": ["default", "nesting"],
+                        },
+                    },
+                },
+                "plain": {
+                    "description": "No-profile domain",
+                    "subnet_id": 1,
+                    "machines": {
+                        "plain-box": {"type": "lxc", "ip": "10.213.1.10"},
+                    },
+                },
+            },
+        }
+
+    def test_profiles_in_group_vars(self, tmp_path):
+        """Domain profiles appear in incus_profiles in group_vars."""
+        infra = self._profile_infra()
+        generate.generate(infra, str(tmp_path))
+
+        gv = yaml.safe_load((tmp_path / "group_vars" / "services.yml").read_text())
+        assert "incus_profiles" in gv
+        assert "gpu-compute" in gv["incus_profiles"]
+        assert "nesting" in gv["incus_profiles"]
+        assert "high-mem" in gv["incus_profiles"]
+
+    def test_no_profiles_no_key(self, tmp_path):
+        """Domain without profiles has no incus_profiles in group_vars."""
+        infra = self._profile_infra()
+        generate.generate(infra, str(tmp_path))
+
+        gv = yaml.safe_load((tmp_path / "group_vars" / "plain.yml").read_text())
+        assert "incus_profiles" not in gv
+
+    def test_profile_devices_preserved(self, tmp_path):
+        """Profile device config (gpu type, gputype) preserved in group_vars."""
+        infra = self._profile_infra()
+        generate.generate(infra, str(tmp_path))
+
+        gv = yaml.safe_load((tmp_path / "group_vars" / "services.yml").read_text())
+        gpu_prof = gv["incus_profiles"]["gpu-compute"]
+        assert gpu_prof["devices"]["gpu"]["type"] == "gpu"
+        assert gpu_prof["devices"]["gpu"]["gputype"] == "physical"
+
+    def test_profile_config_preserved(self, tmp_path):
+        """Profile config (nesting security) preserved in group_vars."""
+        infra = self._profile_infra()
+        generate.generate(infra, str(tmp_path))
+
+        gv = yaml.safe_load((tmp_path / "group_vars" / "services.yml").read_text())
+        nesting = gv["incus_profiles"]["nesting"]
+        assert nesting["config"]["security.nesting"] == "true"
+
+    def test_host_vars_profiles_list(self, tmp_path):
+        """Machine instance_profiles contains the assigned profiles."""
+        infra = self._profile_infra()
+        generate.generate(infra, str(tmp_path))
+
+        hv = yaml.safe_load((tmp_path / "host_vars" / "svc-app.yml").read_text())
+        assert hv["instance_profiles"] == ["default", "high-mem"]
+
+    def test_undefined_profile_rejected(self, tmp_path):
+        """Machine referencing non-existent profile is rejected."""
+        infra = self._profile_infra()
+        infra["domains"]["services"]["machines"]["svc-app"]["profiles"] = [
+            "default", "nonexistent",
+        ]
+        errors = generate.validate(infra)
+        assert any("profile 'nonexistent' not defined" in e for e in errors)
+
+
+class TestInfoDirectoryMode:
+    """Test generate with infra/ directory input."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    def test_directory_mode_generates_same_output(self, tmp_path):
+        """infra/ directory produces identical output to equivalent infra.yml."""
+        # Single-file mode
+        single_infra = {
+            "project_name": "dir-test",
+            "global": {
+                "base_subnet": "10.214",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "alpha": {
+                    "description": "Alpha domain",
+                    "subnet_id": 0,
+                    "machines": {
+                        "alpha-srv": {"type": "lxc", "ip": "10.214.0.10"},
+                    },
+                },
+                "beta": {
+                    "description": "Beta domain",
+                    "subnet_id": 1,
+                    "machines": {
+                        "beta-srv": {"type": "lxc", "ip": "10.214.1.10"},
+                    },
+                },
+            },
+            "network_policies": [
+                {"from": "alpha", "to": "beta", "ports": [80], "protocol": "tcp"},
+            ],
+        }
+
+        single_dir = tmp_path / "single"
+        single_dir.mkdir()
+        generate.generate(single_infra, str(single_dir))
+
+        # Directory mode — build infra/ structure
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        domains_dir = infra_dir / "domains"
+        domains_dir.mkdir()
+
+        base = {
+            "project_name": "dir-test",
+            "global": {
+                "base_subnet": "10.214",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+        }
+        (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
+
+        alpha_domain = {
+            "alpha": {
+                "description": "Alpha domain",
+                "subnet_id": 0,
+                "machines": {
+                    "alpha-srv": {"type": "lxc", "ip": "10.214.0.10"},
+                },
+            },
+        }
+        (domains_dir / "alpha.yml").write_text(yaml.dump(alpha_domain, sort_keys=False))
+
+        beta_domain = {
+            "beta": {
+                "description": "Beta domain",
+                "subnet_id": 1,
+                "machines": {
+                    "beta-srv": {"type": "lxc", "ip": "10.214.1.10"},
+                },
+            },
+        }
+        (domains_dir / "beta.yml").write_text(yaml.dump(beta_domain, sort_keys=False))
+
+        policies = {
+            "network_policies": [
+                {"from": "alpha", "to": "beta", "ports": [80], "protocol": "tcp"},
+            ],
+        }
+        (infra_dir / "policies.yml").write_text(yaml.dump(policies, sort_keys=False))
+
+        # Load and generate from directory
+        dir_infra = generate.load_infra(str(infra_dir))
+        dir_output = tmp_path / "from_dir"
+        dir_output.mkdir()
+        generate.generate(dir_infra, str(dir_output))
+
+        # Compare outputs
+        for subdir in ("inventory", "group_vars", "host_vars"):
+            single_sub = single_dir / subdir
+            dir_sub = dir_output / subdir
+            if single_sub.exists():
+                single_files = sorted(f.name for f in single_sub.glob("*.yml"))
+                dir_files = sorted(f.name for f in dir_sub.glob("*.yml"))
+                assert single_files == dir_files, f"{subdir}: file lists differ"
+                for fname in single_files:
+                    single_content = (single_sub / fname).read_text()
+                    dir_content = (dir_sub / fname).read_text()
+                    assert single_content == dir_content, f"{subdir}/{fname} content differs"
+
+    def test_directory_mode_load_validates(self, tmp_path):
+        """Directory-loaded infra passes validation."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        domains_dir = infra_dir / "domains"
+        domains_dir.mkdir()
+
+        base = {
+            "project_name": "dir-validate-test",
+            "global": {
+                "base_subnet": "10.215",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+        }
+        (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
+
+        dom = {"gamma": {"subnet_id": 0, "machines": {"gamma-srv": {"type": "lxc", "ip": "10.215.0.10"}}}}
+        (domains_dir / "gamma.yml").write_text(yaml.dump(dom, sort_keys=False))
+
+        infra = generate.load_infra(str(infra_dir))
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_directory_mode_merges_policies(self, tmp_path):
+        """Network policies from policies.yml are merged correctly."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        domains_dir = infra_dir / "domains"
+        domains_dir.mkdir()
+
+        base = {
+            "project_name": "dir-policy-test",
+            "global": {
+                "base_subnet": "10.216",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+        }
+        (infra_dir / "base.yml").write_text(yaml.dump(base, sort_keys=False))
+
+        for name, sid in [("web", 0), ("db", 1)]:
+            dom = {name: {"subnet_id": sid, "machines": {f"{name}-srv": {"type": "lxc", "ip": f"10.216.{sid}.10"}}}}
+            (domains_dir / f"{name}.yml").write_text(yaml.dump(dom, sort_keys=False))
+
+        policies = {
+            "network_policies": [
+                {"from": "web", "to": "db", "ports": [5432], "protocol": "tcp"},
+            ],
+        }
+        (infra_dir / "policies.yml").write_text(yaml.dump(policies, sort_keys=False))
+
+        infra = generate.load_infra(str(infra_dir))
+        assert "network_policies" in infra
+        assert len(infra["network_policies"]) == 1
+        assert infra["network_policies"][0]["from"] == "web"
+        assert infra["network_policies"][0]["to"] == "db"
+
+    def test_directory_mode_missing_base_fails(self, tmp_path):
+        """Missing base.yml in infra/ directory causes exit."""
+        infra_dir = tmp_path / "infra"
+        infra_dir.mkdir()
+        # No base.yml
+        with pytest.raises(SystemExit):
+            generate.load_infra(str(infra_dir))
+
+
+class TestMultiDomainScaling:
+    """Test with many domains to verify all files are generated correctly."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    def test_ten_domains_all_files(self, tmp_path):
+        """10 domains with one machine each generate all expected files."""
+        infra = {
+            "project_name": "scale-test",
+            "global": {
+                "base_subnet": "10.220",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {},
+        }
+        domain_names = []
+        machine_names = []
+        for i in range(10):
+            dname = f"domain-{i:02d}"
+            mname = f"host-{i:02d}"
+            domain_names.append(dname)
+            machine_names.append(mname)
+            infra["domains"][dname] = {
+                "description": f"Domain {i}",
+                "subnet_id": i,
+                "machines": {
+                    mname: {"type": "lxc", "ip": f"10.220.{i}.10"},
+                },
+            }
+
+        errors = generate.validate(infra)
+        assert errors == []
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for dname in domain_names:
+            assert (tmp_path / "inventory" / f"{dname}.yml").exists(), f"Missing inventory/{dname}.yml"
+            assert (tmp_path / "group_vars" / f"{dname}.yml").exists(), f"Missing group_vars/{dname}.yml"
+        for mname in machine_names:
+            assert (tmp_path / "host_vars" / f"{mname}.yml").exists(), f"Missing host_vars/{mname}.yml"
+        assert (tmp_path / "group_vars" / "all.yml").exists()
+
+    def test_ten_domains_unique_subnets(self, tmp_path):
+        """10 domains with unique subnets → correct network info in group_vars."""
+        infra = {
+            "project_name": "scale-subnet-test",
+            "global": {
+                "base_subnet": "10.221",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {},
+        }
+        for i in range(10):
+            dname = f"net-domain-{i:02d}"
+            infra["domains"][dname] = {
+                "subnet_id": i,
+                "machines": {
+                    f"nd-host-{i:02d}": {"type": "lxc", "ip": f"10.221.{i}.10"},
+                },
+            }
+
+        errors = generate.validate(infra)
+        assert errors == []
+        generate.generate(infra, str(tmp_path))
+
+        for i in range(10):
+            dname = f"net-domain-{i:02d}"
+            gv = yaml.safe_load((tmp_path / "group_vars" / f"{dname}.yml").read_text())
+            assert gv["incus_network"]["subnet"] == f"10.221.{i}.0/24"
+            assert gv["incus_network"]["gateway"] == f"10.221.{i}.254"
+
+    def test_ten_domains_orphan_detection(self, tmp_path):
+        """Remove 3 domains from 10 → detect exactly 3 orphaned domains."""
+        infra = {
+            "project_name": "scale-orphan-test",
+            "global": {
+                "base_subnet": "10.222",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {},
+        }
+        for i in range(10):
+            dname = f"sdom-{i:02d}"
+            infra["domains"][dname] = {
+                "subnet_id": i,
+                "ephemeral": True,
+                "machines": {
+                    f"shost-{i:02d}": {"type": "lxc", "ip": f"10.222.{i}.10"},
+                },
+            }
+
+        generate.generate(infra, str(tmp_path))
+
+        # Remove domains 7, 8, 9
+        removed = ["sdom-07", "sdom-08", "sdom-09"]
+        for dname in removed:
+            del infra["domains"][dname]
+
+        orphans = generate.detect_orphans(infra, str(tmp_path))
+        orphan_strs = [str(fp) for fp, _protected in orphans]
+        for dname in removed:
+            assert any(dname in s for s in orphan_strs), f"Missing orphan for {dname}"
+        # Remaining domains should not appear as orphans
+        for i in range(7):
+            dname = f"sdom-{i:02d}"
+            inv_orphan = any(
+                f"inventory/{dname}.yml" in s or f"inventory{Path('/').name}{dname}.yml" in s
+                for s in orphan_strs
+            )
+            assert not inv_orphan, f"{dname} should not be an orphan"
+
+
+class TestNetworkPolicyInvalidReferences:
+    """Test policies referencing non-existent domains/machines."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _policy_infra(policies):
+        return {
+            "project_name": "invalid-ref-test",
+            "global": {
+                "base_subnet": "10.223",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "web": {
+                    "subnet_id": 0,
+                    "machines": {"web-srv": {"type": "lxc", "ip": "10.223.0.10"}},
+                },
+                "db": {
+                    "subnet_id": 1,
+                    "machines": {"db-srv": {"type": "lxc", "ip": "10.223.1.10"}},
+                },
+            },
+            "network_policies": policies,
+        }
+
+    def test_nonexistent_from_domain_rejected(self, tmp_path):
+        """Policy from non-existent domain is an error."""
+        policies = [
+            {"from": "nonexistent", "to": "web", "ports": [80], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("'from: nonexistent' is not a known" in e for e in errors)
+
+    def test_nonexistent_to_domain_rejected(self, tmp_path):
+        """Policy to non-existent domain is an error."""
+        policies = [
+            {"from": "web", "to": "ghost-domain", "ports": [80], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("'to: ghost-domain' is not a known" in e for e in errors)
+
+    def test_nonexistent_machine_rejected(self, tmp_path):
+        """Policy referencing non-existent machine is an error."""
+        policies = [
+            {"from": "host", "to": "missing-machine", "ports": [22], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("'to: missing-machine' is not a known" in e for e in errors)
+
+    def test_valid_machine_reference_accepted(self, tmp_path):
+        """Policy referencing an existing machine passes validation."""
+        policies = [
+            {"from": "host", "to": "db-srv", "ports": [5432], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_invalid_port_rejected(self, tmp_path):
+        """Port out of range is an error."""
+        policies = [
+            {"from": "web", "to": "db", "ports": [99999], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("invalid port" in e for e in errors)
+
+    def test_invalid_protocol_rejected(self, tmp_path):
+        """Protocol other than tcp/udp is an error."""
+        policies = [
+            {"from": "web", "to": "db", "ports": [80], "protocol": "icmp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
+
+    def test_missing_from_field_rejected(self, tmp_path):
+        """Policy without 'from' field is an error."""
+        policies = [
+            {"to": "db", "ports": [80], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("missing 'from'" in e for e in errors)
+
+    def test_missing_to_field_rejected(self, tmp_path):
+        """Policy without 'to' field is an error."""
+        policies = [
+            {"from": "web", "ports": [80], "protocol": "tcp"},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        assert any("missing 'to'" in e for e in errors)
+
+    def test_both_from_and_to_invalid(self, tmp_path):
+        """Both from and to referencing unknowns produce two errors."""
+        policies = [
+            {"from": "ghost-a", "to": "ghost-b", "ports": [80]},
+        ]
+        infra = self._policy_infra(policies)
+        errors = generate.validate(infra)
+        from_errors = [e for e in errors if "'from: ghost-a'" in e]
+        to_errors = [e for e in errors if "'to: ghost-b'" in e]
+        assert len(from_errors) >= 1
+        assert len(to_errors) >= 1
+
+
+class TestConnectionVarsNotInOutput:
+    """Verify ansible_connection never appears in generated files (ADR-015)."""
+
+    pytestmark = []  # Override module-level skip — no Incus needed
+
+    @staticmethod
+    def _standard_infra():
+        return {
+            "project_name": "conn-test",
+            "global": {
+                "base_subnet": "10.224",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "web": {
+                    "description": "Web domain",
+                    "subnet_id": 0,
+                    "machines": {
+                        "web-front": {"type": "lxc", "ip": "10.224.0.10"},
+                        "web-back": {"type": "lxc", "ip": "10.224.0.20"},
+                    },
+                },
+                "data": {
+                    "description": "Data domain",
+                    "subnet_id": 1,
+                    "machines": {
+                        "data-db": {"type": "lxc", "ip": "10.224.1.10"},
+                    },
+                },
+            },
+        }
+
+    def test_no_ansible_connection_in_any_file(self, tmp_path):
+        """ansible_connection must never appear in generated files."""
+        infra = self._standard_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for f in tmp_path.rglob("*.yml"):
+            content = f.read_text()
+            assert "ansible_connection" not in content, (
+                f"ansible_connection found in {f.relative_to(tmp_path)}"
+            )
+
+    def test_no_ansible_user_in_any_file(self, tmp_path):
+        """ansible_user must never appear in generated files."""
+        infra = self._standard_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for f in tmp_path.rglob("*.yml"):
+            content = f.read_text()
+            assert "ansible_user" not in content, (
+                f"ansible_user found in {f.relative_to(tmp_path)}"
+            )
+
+    def test_psot_prefix_used_instead(self, tmp_path):
+        """Connection info stored with psot_ prefix in all.yml."""
+        infra = self._standard_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        all_vars = yaml.safe_load((tmp_path / "group_vars" / "all.yml").read_text())
+        assert all_vars.get("psot_default_connection") == "community.general.incus"
+        assert all_vars.get("psot_default_user") == "root"
+
+    def test_connection_not_in_host_vars(self, tmp_path):
+        """No connection-related keys in any host_vars file."""
+        infra = self._standard_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        forbidden_keys = {"ansible_connection", "ansible_user", "ansible_ssh_host"}
+        for f in (tmp_path / "host_vars").glob("*.yml"):
+            data = yaml.safe_load(f.read_text())
+            if isinstance(data, dict):
+                found = forbidden_keys & set(data)
+                assert not found, f"Forbidden keys {found} in host_vars/{f.name}"
+
+    def test_connection_not_in_group_vars(self, tmp_path):
+        """No connection-related keys in domain group_vars."""
+        infra = self._standard_infra()
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        forbidden_keys = {"ansible_connection", "ansible_user"}
+        for f in (tmp_path / "group_vars").glob("*.yml"):
+            data = yaml.safe_load(f.read_text())
+            if isinstance(data, dict):
+                found = forbidden_keys & set(data)
+                assert not found, f"Forbidden keys {found} in group_vars/{f.name}"
