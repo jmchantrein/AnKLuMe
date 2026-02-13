@@ -239,3 +239,66 @@ class TestProperties:
         generate(infra, out)
         all_yml = (out / "group_vars" / "all.yml").read_text()
         assert infra["project_name"] in all_yml, "project_name missing from all.yml"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_ephemeral_inheritance(self, infra, tmp_path_factory):
+        """Machines without explicit ephemeral inherit from domain."""
+        import yaml as _yaml
+        # Set domain ephemeral to True on first domain
+        first_domain = next(iter(infra["domains"]))
+        infra["domains"][first_domain]["ephemeral"] = True
+        out = tmp_path_factory.mktemp("eph")
+        generate(infra, out)
+        for mname in infra["domains"][first_domain].get("machines", {}):
+            hv = (out / "host_vars" / f"{mname}.yml").read_text()
+            data = _yaml.safe_load(hv)
+            assert data.get("instance_ephemeral") is True, \
+                f"{mname} should inherit ephemeral=true from domain"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_machine_ephemeral_overrides_domain(self, infra, tmp_path_factory):
+        """Machine-level ephemeral overrides domain-level."""
+        import yaml as _yaml
+        first_domain = next(iter(infra["domains"]))
+        infra["domains"][first_domain]["ephemeral"] = True
+        first_machine = next(iter(infra["domains"][first_domain]["machines"]))
+        infra["domains"][first_domain]["machines"][first_machine]["ephemeral"] = False
+        out = tmp_path_factory.mktemp("eph_override")
+        generate(infra, out)
+        hv = (out / "host_vars" / f"{first_machine}.yml").read_text()
+        data = _yaml.safe_load(hv)
+        assert data.get("instance_ephemeral") is False, \
+            f"{first_machine} should override domain ephemeral with False"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_user_content_preserved_across_generations(self, infra, tmp_path_factory):
+        """User content outside managed section is preserved on re-generation."""
+        out = tmp_path_factory.mktemp("preserve")
+        generate(infra, out)
+        first_domain = next(iter(infra["domains"]))
+        gv_file = out / "group_vars" / f"{first_domain}.yml"
+        original = gv_file.read_text()
+        user_content = "\n# User-added custom variable\nmy_custom_var: hello\n"
+        gv_file.write_text(original + user_content)
+        generate(infra, out)
+        updated = gv_file.read_text()
+        assert "my_custom_var: hello" in updated, "User content should be preserved"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_orphans_appear_after_domain_removal(self, infra, tmp_path_factory):
+        """Removing a domain from infra causes its files to become orphans."""
+        out = tmp_path_factory.mktemp("orphan")
+        generate(infra, out)
+        if len(infra["domains"]) < 2:
+            return  # Need at least 2 domains for this test
+        removed_domain = list(infra["domains"].keys())[-1]
+        removed_machines = list(infra["domains"][removed_domain].get("machines", {}).keys())
+        del infra["domains"][removed_domain]
+        orphans = detect_orphans(infra, out)
+        orphan_files = {str(f) for f, _ in orphans}
+        assert any(removed_domain in f for f in orphan_files), \
+            f"Removing {removed_domain} should create orphan files"
