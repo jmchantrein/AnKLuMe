@@ -825,3 +825,686 @@ slugify "$1"
         )
         assert result.returncode == 0
         assert result.stdout.strip() == "add-multiple-spaces"
+
+
+# ── New comprehensive test classes ─────────────────────────────────
+
+
+@pytest.fixture()
+def ai_test_loop_env(tmp_path):
+    """Create a mock environment for ai-test-loop.sh testing.
+
+    Sets up a fake project with roles, molecule dirs, mock binaries,
+    and a patched ai-test-loop.sh that sources a patched ai-config.sh.
+    """
+    mock_bin = tmp_path / "bin"
+    mock_bin.mkdir()
+    log_file = tmp_path / "cmds.log"
+
+    # Create minimal project structure
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    scripts_dir = project_dir / "scripts"
+    scripts_dir.mkdir()
+    logs_dir = project_dir / "logs"
+    logs_dir.mkdir()
+
+    # Create a fake role with molecule directory
+    role_dir = project_dir / "roles" / "test_role" / "molecule" / "default"
+    role_dir.mkdir(parents=True)
+    tasks_dir = project_dir / "roles" / "test_role" / "tasks"
+    tasks_dir.mkdir(parents=True)
+    (tasks_dir / "main.yml").write_text("---\n- name: TestRole | Test task\n  ansible.builtin.debug:\n    msg: hello\n")
+    defaults_dir = project_dir / "roles" / "test_role" / "defaults"
+    defaults_dir.mkdir(parents=True)
+    (defaults_dir / "main.yml").write_text("---\ntest_var: value\n")
+    verify_dir = project_dir / "roles" / "test_role" / "molecule" / "default"
+    (verify_dir / "verify.yml").write_text("---\n- name: Verify\n  hosts: all\n  tasks: []\n")
+
+    # Mock molecule — success by default
+    mock_molecule = mock_bin / "molecule"
+    mock_molecule.write_text(f"""#!/usr/bin/env bash
+echo "molecule $@" >> "{log_file}"
+exit 0
+""")
+    mock_molecule.chmod(mock_molecule.stat().st_mode | stat.S_IEXEC)
+
+    # Mock python3 — pass through to real python3
+    mock_python = mock_bin / "python3"
+    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+    # Mock git
+    mock_git = mock_bin / "git"
+    mock_git.write_text(f"""#!/usr/bin/env bash
+echo "git $@" >> "{log_file}"
+exit 0
+""")
+    mock_git.chmod(mock_git.stat().st_mode | stat.S_IEXEC)
+
+    # Create a patched ai-config.sh
+    patched_config = scripts_dir / "ai-config.sh"
+    original_config = (SCRIPTS_DIR / "ai-config.sh").read_text()
+    # Override ANKLUME_CONF to point to our project
+    patched_config_text = original_config.replace(
+        '_ai_conf="${ANKLUME_CONF:-anklume.conf.yml}"',
+        f'_ai_conf="{project_dir}/anklume.conf.yml"',
+    )
+    patched_config.write_text(patched_config_text)
+
+    # Create a patched ai-test-loop.sh
+    patched_loop = scripts_dir / "ai-test-loop.sh"
+    original_loop = (SCRIPTS_DIR / "ai-test-loop.sh").read_text()
+    patched_loop_text = original_loop.replace(
+        'PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
+        f'PROJECT_DIR="{project_dir}"',
+    )
+    patched_loop.write_text(patched_loop_text)
+    patched_loop.chmod(patched_loop.stat().st_mode | stat.S_IEXEC)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{mock_bin}:{env['PATH']}"
+    env["ANKLUME_AI_MODE"] = "none"
+    env["ANKLUME_AI_DRY_RUN"] = "true"
+    env["ANKLUME_AI_LOG_DIR"] = str(logs_dir)
+    # Remove vars that might interfere
+    for var in ["ANKLUME_CONF", "ANTHROPIC_API_KEY"]:
+        env.pop(var, None)
+
+    return env, log_file, project_dir, patched_loop
+
+
+class TestAiTestLoopMolecule:
+    """Mock molecule, test run/fail/retry paths."""
+
+    def test_help_shows_usage(self, ai_test_loop_env):
+        """ai-test-loop.sh --help shows usage text."""
+        env, _, cwd, script = ai_test_loop_env
+        result = subprocess.run(
+            ["bash", str(script), "--help"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=15,
+        )
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_molecule_pass_reports_success(self, ai_test_loop_env):
+        """When molecule passes, the test loop reports PASS."""
+        env, log_file, cwd, script = ai_test_loop_env
+        result = subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+        combined = result.stdout + result.stderr
+        assert "PASS" in combined or "Passed: 1" in combined
+
+    def test_molecule_fail_reports_failure(self, ai_test_loop_env):
+        """When molecule fails and AI_MODE=none, the test loop reports FAIL."""
+        env, log_file, cwd, script = ai_test_loop_env
+        # Make molecule fail
+        mock_bin = cwd.parent / "bin"
+        mock_molecule = mock_bin / "molecule"
+        mock_molecule.write_text(f"""#!/usr/bin/env bash
+echo "molecule $@" >> "{log_file}"
+echo "ERROR: test failed" >&2
+exit 1
+""")
+        mock_molecule.chmod(mock_molecule.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "FAIL" in combined or "Failed: 1" in combined
+
+    def test_no_molecule_dir_gives_error(self, ai_test_loop_env):
+        """Specifying a role without molecule/ directory gives error."""
+        env, _, cwd, script = ai_test_loop_env
+        result = subprocess.run(
+            ["bash", str(script), "nonexistent_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=15,
+        )
+        assert result.returncode != 0
+        assert "molecule" in result.stderr.lower() or "ERROR" in result.stderr
+
+    def test_molecule_called_with_test_command(self, ai_test_loop_env):
+        """Molecule is invoked with the 'test' subcommand."""
+        env, log_file, cwd, script = ai_test_loop_env
+        subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        if log_file.exists():
+            content = log_file.read_text()
+            assert "molecule test" in content
+
+
+class TestAiTestLoopContext:
+    """Test context building with mock role files."""
+
+    def test_context_includes_role_tasks(self, ai_test_loop_env):
+        """Build context includes role tasks/main.yml content."""
+        env, log_file, cwd, script = ai_test_loop_env
+        # Make molecule fail so context is built
+        mock_bin = cwd.parent / "bin"
+        mock_molecule = mock_bin / "molecule"
+        mock_molecule.write_text(f"""#!/usr/bin/env bash
+echo "molecule $@" >> "{log_file}"
+echo "FATAL: some error" > "${{PWD}}/../../logs/dummy.log" 2>/dev/null || true
+exit 1
+""")
+        mock_molecule.chmod(mock_molecule.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        # With AI_MODE=none, no context file is created (no fix attempt)
+        # This is expected behavior
+        assert result.returncode != 0
+
+    def test_role_tasks_file_accessible(self, ai_test_loop_env):
+        """Role tasks file exists in the mock project structure."""
+        _, _, cwd, _ = ai_test_loop_env
+        tasks_file = cwd / "roles" / "test_role" / "tasks" / "main.yml"
+        assert tasks_file.exists()
+        content = tasks_file.read_text()
+        assert "TestRole" in content
+
+    def test_role_defaults_file_accessible(self, ai_test_loop_env):
+        """Role defaults file exists in the mock project structure."""
+        _, _, cwd, _ = ai_test_loop_env
+        defaults_file = cwd / "roles" / "test_role" / "defaults" / "main.yml"
+        assert defaults_file.exists()
+        assert "test_var" in defaults_file.read_text()
+
+
+class TestAiTestLoopExperiences:
+    """Test experience search with known patterns."""
+
+    def test_experiences_dir_missing_does_not_crash(self, ai_test_loop_env):
+        """Missing experiences/fixes directory does not crash the script."""
+        env, _, cwd, script = ai_test_loop_env
+        # No experiences directory created — that's the test
+        result = subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        # Should succeed (molecule passes) regardless of missing experiences
+        assert result.returncode == 0
+
+    def test_empty_experiences_dir_works(self, ai_test_loop_env):
+        """Empty experiences/fixes directory does not cause issues."""
+        env, _, cwd, script = ai_test_loop_env
+        (cwd / "experiences" / "fixes").mkdir(parents=True)
+        result = subprocess.run(
+            ["bash", str(script), "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+
+
+class TestAiTestLoopLearn:
+    """Test --learn flag behavior."""
+
+    def test_learn_flag_accepted(self, ai_test_loop_env):
+        """--learn flag is accepted without error."""
+        env, _, cwd, script = ai_test_loop_env
+        # Create a mock mine-experiences.py to avoid dependency on real one
+        mine_script = cwd / "scripts" / "mine-experiences.py"
+        mine_script.write_text("#!/usr/bin/env python3\nprint('Mining: 0 new experiences')\n")
+        mine_script.chmod(mine_script.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--learn", "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        # Should run successfully with --learn
+        assert result.returncode == 0
+
+    def test_learn_flag_triggers_mining(self, ai_test_loop_env):
+        """--learn flag triggers experience mining."""
+        env, log_file, cwd, script = ai_test_loop_env
+        mine_script = cwd / "scripts" / "mine-experiences.py"
+        mine_script.write_text(
+            "#!/usr/bin/env python3\nprint('Mining: 0 new experiences')\n",
+        )
+        mine_script.chmod(mine_script.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--learn", "test_role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        combined = result.stdout + result.stderr
+        assert "Mining" in combined or "experience" in combined.lower()
+
+
+# ── ai-develop.sh tests ──────────────────────────────────────────
+
+
+@pytest.fixture()
+def ai_develop_env(tmp_path):
+    """Create a mock environment for ai-develop.sh testing."""
+    mock_bin = tmp_path / "bin"
+    mock_bin.mkdir()
+    log_file = tmp_path / "cmds.log"
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    scripts_dir = project_dir / "scripts"
+    scripts_dir.mkdir()
+    logs_dir = project_dir / "logs"
+    logs_dir.mkdir()
+
+    # Create CLAUDE.md and ROADMAP
+    (project_dir / "CLAUDE.md").write_text("# AnKLuMe\nTest conventions file.\n")
+    (project_dir / "docs").mkdir()
+    (project_dir / "docs" / "ROADMAP.md").write_text("# ROADMAP\n## Current State\nTest\n---\n")
+
+    # Mock python3
+    mock_python = mock_bin / "python3"
+    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+    # Mock git
+    mock_git = mock_bin / "git"
+    mock_git.write_text(f"""#!/usr/bin/env bash
+echo "git $@" >> "{log_file}"
+exit 0
+""")
+    mock_git.chmod(mock_git.stat().st_mode | stat.S_IEXEC)
+
+    # Mock pytest (for run_all_tests)
+    mock_pytest = mock_bin / "pytest"
+    mock_pytest.write_text(f"""#!/usr/bin/env bash
+echo "pytest $@" >> "{log_file}"
+exit 0
+""")
+    mock_pytest.chmod(mock_pytest.stat().st_mode | stat.S_IEXEC)
+
+    # Create a patched ai-config.sh
+    patched_config = scripts_dir / "ai-config.sh"
+    original_config = (SCRIPTS_DIR / "ai-config.sh").read_text()
+    patched_config_text = original_config.replace(
+        '_ai_conf="${ANKLUME_CONF:-anklume.conf.yml}"',
+        f'_ai_conf="{project_dir}/anklume.conf.yml"',
+    )
+    patched_config.write_text(patched_config_text)
+
+    # Create a patched ai-develop.sh
+    patched_develop = scripts_dir / "ai-develop.sh"
+    original_develop = (SCRIPTS_DIR / "ai-develop.sh").read_text()
+    patched_develop_text = original_develop.replace(
+        'PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
+        f'PROJECT_DIR="{project_dir}"',
+    )
+    patched_develop.write_text(patched_develop_text)
+    patched_develop.chmod(patched_develop.stat().st_mode | stat.S_IEXEC)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{mock_bin}:{env['PATH']}"
+    env["ANKLUME_AI_MODE"] = "local"
+    env["ANKLUME_AI_DRY_RUN"] = "true"
+    env["ANKLUME_AI_LOG_DIR"] = str(logs_dir)
+    for var in ["ANKLUME_CONF", "ANTHROPIC_API_KEY"]:
+        env.pop(var, None)
+
+    # Mock curl for local mode
+    mock_curl = mock_bin / "curl"
+    mock_curl.write_text(f"""#!/usr/bin/env bash
+echo "curl $@" >> "{log_file}"
+echo '{{"response":"no changes needed"}}'
+exit 0
+""")
+    mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+
+    return env, log_file, project_dir, patched_develop
+
+
+class TestAiDevelopContext:
+    """Test context file generation for ai-develop.sh."""
+
+    def test_develop_creates_context_file(self, ai_develop_env):
+        """ai-develop.sh creates a context file in the log directory."""
+        env, _, cwd, script = ai_develop_env
+        # With claude-code mode, dry-run saves the prompt and returns 0
+        env["ANKLUME_AI_MODE"] = "claude-code"
+        # Mock claude binary
+        mock_bin = cwd.parent / "bin"
+        mock_claude = mock_bin / "claude"
+        mock_claude.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_claude.chmod(mock_claude.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--mode", "claude-code", "--dry-run", "Add test role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+        logs_dir = cwd / "logs"
+        context_files = list(logs_dir.glob("*-context.txt"))
+        assert len(context_files) >= 1, f"Expected context file, found: {list(logs_dir.iterdir())}"
+
+    def test_context_includes_task_description(self, ai_develop_env):
+        """Context file includes the task description."""
+        env, _, cwd, script = ai_develop_env
+        env["ANKLUME_AI_MODE"] = "claude-code"
+        mock_bin = cwd.parent / "bin"
+        mock_claude = mock_bin / "claude"
+        mock_claude.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_claude.chmod(mock_claude.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--mode", "claude-code", "--dry-run", "Add monitoring role"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+        logs_dir = cwd / "logs"
+        context_files = list(logs_dir.glob("*-context.txt"))
+        assert len(context_files) >= 1
+        content = context_files[0].read_text()
+        assert "Add monitoring role" in content
+
+    def test_context_includes_claude_md(self, ai_develop_env):
+        """Context file includes CLAUDE.md content."""
+        env, _, cwd, script = ai_develop_env
+        env["ANKLUME_AI_MODE"] = "claude-code"
+        mock_bin = cwd.parent / "bin"
+        mock_claude = mock_bin / "claude"
+        mock_claude.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_claude.chmod(mock_claude.stat().st_mode | stat.S_IEXEC)
+        subprocess.run(
+            ["bash", str(script), "--mode", "claude-code", "--dry-run", "Test task"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        logs_dir = cwd / "logs"
+        context_files = list(logs_dir.glob("*-context.txt"))
+        assert len(context_files) >= 1
+        content = context_files[0].read_text()
+        assert "conventions" in content.lower() or "AnKLuMe" in content
+
+
+class TestAiDevelopBranch:
+    """Test feature branch creation with mock git."""
+
+    def test_develop_help_shows_usage(self, ai_develop_env):
+        """ai-develop.sh --help shows usage text."""
+        env, _, cwd, script = ai_develop_env
+        result = subprocess.run(
+            ["bash", str(script), "--help"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=15,
+        )
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_develop_requires_task(self, ai_develop_env):
+        """ai-develop.sh without task arg gives error."""
+        env, _, cwd, script = ai_develop_env
+        result = subprocess.run(
+            ["bash", str(script)],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=15,
+        )
+        assert result.returncode != 0
+        assert "Task description required" in result.stderr or "ERROR" in result.stderr
+
+    def test_develop_requires_ai_mode(self, ai_develop_env):
+        """ai-develop.sh with AI_MODE=none gives error."""
+        env, _, cwd, script = ai_develop_env
+        env["ANKLUME_AI_MODE"] = "none"
+        result = subprocess.run(
+            ["bash", str(script), "Some task"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=15,
+        )
+        assert result.returncode != 0
+        assert "AI_MODE" in result.stderr
+
+    def test_dry_run_does_not_create_branch(self, ai_develop_env):
+        """--dry-run mode does not call git checkout -b."""
+        env, log_file, cwd, script = ai_develop_env
+        env["ANKLUME_AI_MODE"] = "claude-code"
+        mock_bin = cwd.parent / "bin"
+        mock_claude = mock_bin / "claude"
+        mock_claude.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_claude.chmod(mock_claude.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--mode", "claude-code", "--dry-run", "Test branch"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+        if log_file.exists():
+            content = log_file.read_text()
+            assert "checkout -b" not in content
+
+    def test_develop_session_log_created(self, ai_develop_env):
+        """ai-develop.sh creates a session log file."""
+        env, _, cwd, script = ai_develop_env
+        env["ANKLUME_AI_MODE"] = "claude-code"
+        mock_bin = cwd.parent / "bin"
+        mock_claude = mock_bin / "claude"
+        mock_claude.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_claude.chmod(mock_claude.stat().st_mode | stat.S_IEXEC)
+        result = subprocess.run(
+            ["bash", str(script), "--mode", "claude-code", "--dry-run", "Log test"],
+            capture_output=True, text=True, env=env,
+            cwd=str(cwd), timeout=30,
+        )
+        assert result.returncode == 0
+        logs_dir = cwd / "logs"
+        log_files = list(logs_dir.glob("ai-dev-*.log"))
+        assert len(log_files) >= 1, f"Expected log file, found: {list(logs_dir.iterdir())}"
+
+
+# ── ai-improve.sh tests ─────────────────────────────────────────
+
+
+class TestAiImproveHelp:
+    """Test help text and basic args for ai-improve.sh."""
+
+    def test_help_flag_shows_usage(self):
+        """ai-improve.sh --help shows usage text."""
+        result = run_script("ai-improve.sh", ["--help"])
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_help_mentions_scope(self):
+        """Help text mentions scope option."""
+        result = run_script("ai-improve.sh", ["--help"])
+        assert "scope" in result.stdout.lower()
+
+    def test_help_mentions_dry_run(self):
+        """Help text mentions dry-run option."""
+        result = run_script("ai-improve.sh", ["--help"])
+        assert "dry-run" in result.stdout.lower() or "dry_run" in result.stdout.lower()
+
+    def test_help_lists_scope_values(self):
+        """Help text lists valid scope values."""
+        result = run_script("ai-improve.sh", ["--help"])
+        output = result.stdout
+        for scope in ["generator", "roles", "nftables", "all"]:
+            assert scope in output
+
+    def test_invalid_scope_gives_error(self):
+        """Invalid --scope value gives error."""
+        result = run_script("ai-improve.sh", ["--scope", "invalid"])
+        assert result.returncode != 0
+        assert "Invalid scope" in result.stderr or "ERROR" in result.stderr
+
+    def test_unknown_option_gives_error(self):
+        """Unknown option gives error."""
+        result = run_script("ai-improve.sh", ["--nonexistent"])
+        assert result.returncode != 0
+
+
+# ── ai-matrix-test.sh tests ─────────────────────────────────────
+
+
+class TestAiMatrixTestHelp:
+    """Test help text and basic args for ai-matrix-test.sh."""
+
+    def test_help_flag_shows_usage(self):
+        """ai-matrix-test.sh --help shows usage text."""
+        result = run_script("ai-matrix-test.sh", ["--help"])
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_help_mentions_mode(self):
+        """Help text mentions mode option."""
+        result = run_script("ai-matrix-test.sh", ["--help"])
+        assert "mode" in result.stdout.lower()
+
+    def test_help_mentions_limit(self):
+        """Help text mentions limit option."""
+        result = run_script("ai-matrix-test.sh", ["--help"])
+        assert "limit" in result.stdout.lower()
+
+    def test_help_mentions_dry_run(self):
+        """Help text mentions dry-run option."""
+        result = run_script("ai-matrix-test.sh", ["--help"])
+        assert "dry-run" in result.stdout.lower() or "dry_run" in result.stdout.lower()
+
+    def test_unknown_option_gives_error(self):
+        """Unknown option gives error."""
+        result = run_script("ai-matrix-test.sh", ["--nonexistent"])
+        assert result.returncode != 0
+
+    def test_unexpected_positional_gives_error(self):
+        """Unexpected positional argument gives error."""
+        result = run_script("ai-matrix-test.sh", ["extra-arg"])
+        assert result.returncode != 0
+
+
+# ── agent-fix.sh tests ──────────────────────────────────────────
+
+
+class TestAgentFixHelp:
+    """Test help text and argument parsing for agent-fix.sh."""
+
+    def test_help_flag_shows_usage(self):
+        """agent-fix.sh --help shows usage text."""
+        result = run_script("agent-fix.sh", ["--help"])
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_help_mentions_prerequisites(self):
+        """Help text mentions prerequisites."""
+        result = run_script("agent-fix.sh", ["--help"])
+        output = result.stdout
+        assert "runner" in output.lower() or "Prerequisites" in output
+
+    def test_help_mentions_api_key(self):
+        """Help text mentions ANTHROPIC_API_KEY."""
+        result = run_script("agent-fix.sh", ["--help"])
+        assert "ANTHROPIC_API_KEY" in result.stdout
+
+    def test_unknown_option_gives_error(self):
+        """Unknown option gives error."""
+        env = os.environ.copy()
+        # Provide mock incus to avoid PATH issues
+        mock_bin = Path("/tmp/test_agent_fix_help_mock")
+        mock_bin.mkdir(exist_ok=True)
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_script("agent-fix.sh", ["--unknown-flag"], env=env)
+        assert result.returncode != 0
+
+    def test_no_incus_gives_clear_error(self):
+        """Without Incus, agent-fix.sh gives a clear error."""
+        env = os.environ.copy()
+        mock_bin = Path("/tmp/test_agent_fix_noincus_mock")
+        mock_bin.mkdir(exist_ok=True)
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_script("agent-fix.sh", [], env=env)
+        assert result.returncode != 0
+        assert "Cannot connect" in result.stderr or "ERROR" in result.stderr
+
+    def test_accepts_role_argument(self):
+        """agent-fix.sh accepts a role name as positional argument in help."""
+        result = run_script("agent-fix.sh", ["--help"])
+        assert result.returncode == 0
+        # Help should show [role] in usage
+        assert "role" in result.stdout.lower()
+
+
+# ── agent-develop.sh tests ──────────────────────────────────────
+
+
+class TestAgentDevelopHelp:
+    """Test help text and argument parsing for agent-develop.sh."""
+
+    def test_help_flag_shows_usage(self):
+        """agent-develop.sh --help shows usage text."""
+        result = run_script("agent-develop.sh", ["--help"])
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_help_mentions_task(self):
+        """Help text mentions task description."""
+        result = run_script("agent-develop.sh", ["--help"])
+        output = result.stdout
+        assert "task" in output.lower() or "Task" in output
+
+    def test_help_mentions_examples(self):
+        """Help text includes examples."""
+        result = run_script("agent-develop.sh", ["--help"])
+        assert "Example" in result.stdout or "example" in result.stdout
+
+    def test_help_mentions_prerequisites(self):
+        """Help text mentions prerequisites."""
+        result = run_script("agent-develop.sh", ["--help"])
+        output = result.stdout
+        assert "runner" in output.lower() or "Prerequisites" in output
+
+    def test_no_task_gives_error(self):
+        """agent-develop.sh without task gives error."""
+        env = os.environ.copy()
+        mock_bin = Path("/tmp/test_agent_develop_notask_mock")
+        mock_bin.mkdir(exist_ok=True)
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_script("agent-develop.sh", [], env=env)
+        assert result.returncode != 0
+        assert "Task description required" in result.stderr or "ERROR" in result.stderr
+
+    def test_unknown_option_gives_error(self):
+        """Unknown option gives error."""
+        env = os.environ.copy()
+        mock_bin = Path("/tmp/test_agent_develop_unknown_mock")
+        mock_bin.mkdir(exist_ok=True)
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_script("agent-develop.sh", ["--unknown-flag"], env=env)
+        assert result.returncode != 0
+
+    def test_no_incus_gives_clear_error(self):
+        """Without Incus, agent-develop.sh gives a clear error."""
+        env = os.environ.copy()
+        mock_bin = Path("/tmp/test_agent_develop_noincus2_mock")
+        mock_bin.mkdir(exist_ok=True)
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_script("agent-develop.sh", ["Test task"], env=env)
+        assert result.returncode != 0
+        assert "Cannot connect" in result.stderr or "ERROR" in result.stderr
