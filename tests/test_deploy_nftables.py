@@ -385,3 +385,132 @@ exit 0
         cmds = read_log(log_file)
         # Should have attempted admin project first, then fallen back
         assert any("--project admin" in c for c in cmds)
+
+
+# ── Pull failure ──────────────────────────────────────────
+
+
+class TestDeployFilePullFailure:
+    """Test error handling when file pull from container fails."""
+
+    def test_pull_failure_gives_clear_error(self, tmp_path):
+        """When incus file pull fails, shows 'Did you run make nftables'."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmd.log"
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+# project list passes pre-flight
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+# info passes (container found)
+if [[ "$1" == "info" ]]; then exit 0; fi
+# file pull fails
+if [[ "$1" == "file" && "$2" == "pull" ]]; then
+    echo "Error: file not found" >&2
+    exit 1
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        for cmd in ["mktemp", "rm"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy([], env)
+        assert result.returncode != 0
+        assert "make nftables" in result.stderr or "Failed to pull" in result.stderr
+
+    def test_syntax_validation_failure(self, tmp_path):
+        """When nft -c -f fails, shows syntax validation error."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmd.log"
+
+        # Incus works, but nft validation fails
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "info" ]]; then exit 0; fi
+if [[ "$1" == "file" && "$2" == "pull" ]]; then
+    # Write some content to the dest file (3rd arg)
+    echo "table inet anklume {{}}" > "$3"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "-c" ]]; then
+    echo "Error: syntax error" >&2
+    exit 1
+fi
+exit 0
+""")
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        for cmd in ["mktemp", "rm", "wc"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy([], env)
+        assert result.returncode != 0
+        assert "Syntax" in result.stderr or "syntax" in result.stderr.lower()
+
+
+class TestDeployDryRunContent:
+    """Test dry-run outputs the rules content."""
+
+    def test_dry_run_prints_rules_content(self, tmp_path):
+        """--dry-run should print the rules file content."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmd.log"
+
+        rules_content = "table inet anklume { chain iso { type filter hook forward priority -1; } }"
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+if [[ "$1" == "info" ]]; then exit 0; fi
+if [[ "$1" == "file" && "$2" == "pull" ]]; then
+    echo '{rules_content}' > "$3"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+        for cmd in ["mktemp", "rm", "wc", "cat"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy(["--dry-run"], env)
+        assert result.returncode == 0
+        assert "NOT installed" in result.stdout
+        assert "anklume" in result.stdout
