@@ -470,3 +470,150 @@ class TestUpgradeRegenerationOutput:
         run_upgrade(git_workspace)
         second_content = (git_workspace / "group_vars" / "all.yml").read_text()
         assert first_content == second_content
+
+
+class TestUpgradeHelpAndUsage:
+    """Verify script existence and basic properties."""
+
+    def test_script_is_executable(self):
+        """UPGRADE_SH points to a valid, executable file."""
+        assert UPGRADE_SH.is_file(), f"{UPGRADE_SH} is not a file"
+        assert os.access(UPGRADE_SH, os.X_OK), f"{UPGRADE_SH} is not executable"
+
+    def test_unknown_flag_does_not_crash(self, git_workspace):
+        """Running with an unknown flag does not crash (script ignores args)."""
+        env = os.environ.copy()
+        result = subprocess.run(
+            ["bash", str(UPGRADE_SH), "--help"],
+            capture_output=True, text=True,
+            cwd=str(git_workspace), env=env, timeout=30,
+        )
+        # The script does not parse arguments; it runs normally
+        assert result.returncode == 0
+        assert "Upgrade complete" in result.stdout
+
+
+class TestUpgradeFrameworkFilesArray:
+    """Verify FRAMEWORK_FILES and USER_FILES arrays are complete."""
+
+    def test_framework_files_includes_all_expected(self):
+        """All expected framework files are listed in upgrade.sh."""
+        script_content = UPGRADE_SH.read_text()
+        expected = [
+            "Makefile", "site.yml", "snapshot.yml",
+            "ansible.cfg", ".ansible-lint", ".yamllint.yml", "pyproject.toml",
+        ]
+        for name in expected:
+            assert f'"{name}"' in script_content, f"{name} not in FRAMEWORK_FILES"
+
+    def test_user_files_list_complete(self):
+        """All expected user files are listed in upgrade.sh."""
+        script_content = UPGRADE_SH.read_text()
+        expected = ["infra.yml", "infra/", "anklume.conf.yml", "roles_custom/"]
+        for name in expected:
+            assert f'"{name}"' in script_content, f"{name} not in USER_FILES"
+
+
+class TestUpgradePreservesUserContent:
+    """Test that user content outside managed sections survives upgrade."""
+
+    def test_custom_variables_outside_managed_preserved(self, git_workspace):
+        """Custom vars added outside MANAGED section in group_vars survive upgrade."""
+        # First upgrade to generate files
+        run_upgrade(git_workspace)
+        gv_all = git_workspace / "group_vars" / "all.yml"
+        assert gv_all.exists()
+        # Add custom content outside managed section
+        original = gv_all.read_text()
+        custom_line = "\n# User custom variable\nmy_custom_var: keep_me\n"
+        gv_all.write_text(original + custom_line)
+        # Run upgrade again
+        run_upgrade(git_workspace)
+        updated = gv_all.read_text()
+        assert "my_custom_var: keep_me" in updated
+
+    def test_multiple_upgrades_preserve_user_content(self, git_workspace):
+        """Running upgrade 3 times preserves content outside managed sections."""
+        run_upgrade(git_workspace)
+        gv_all = git_workspace / "group_vars" / "all.yml"
+        original = gv_all.read_text()
+        custom_line = "\n# Persistent user content\npersistent_key: stable_value\n"
+        gv_all.write_text(original + custom_line)
+        # Run upgrade 3 more times
+        for _ in range(3):
+            run_upgrade(git_workspace)
+        final = gv_all.read_text()
+        assert "persistent_key: stable_value" in final
+
+    def test_host_vars_user_content_preserved(self, git_workspace):
+        """Custom content in host_vars outside managed section is preserved."""
+        run_upgrade(git_workspace)
+        hv_file = git_workspace / "host_vars" / "admin-ansible.yml"
+        assert hv_file.exists()
+        original = hv_file.read_text()
+        custom = "\n# Host-specific user override\nhost_custom: my_value\n"
+        hv_file.write_text(original + custom)
+        run_upgrade(git_workspace)
+        updated = hv_file.read_text()
+        assert "host_custom: my_value" in updated
+
+
+class TestUpgradeCleanWorkingTree:
+    """Test behavior with clean and staged working trees."""
+
+    def test_clean_tree_no_prompt(self, git_workspace):
+        """Clean working tree skips the uncommitted changes prompt."""
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        # With a clean tree, no prompt is shown
+        assert "Uncommitted changes" not in result.stdout
+        assert "Continue anyway?" not in result.stdout
+        assert "Upgrade complete" in result.stdout
+
+    def test_staged_changes_trigger_warning(self, git_workspace):
+        """Staged (but uncommitted) changes trigger the uncommitted changes warning."""
+        # Stage a change without committing
+        (git_workspace / "ansible.cfg").write_text("[defaults]\nstaged_change=true\n")
+        subprocess.run(["git", "add", "ansible.cfg"], cwd=git_workspace, capture_output=True)
+        # Run upgrade and answer 'n' to abort
+        result = run_upgrade(git_workspace, input_text="n\n")
+        assert "Uncommitted changes" in result.stdout or "Aborted" in result.stdout
+
+
+class TestUpgradeEdgeCases:
+    """Test edge cases for the upgrade script."""
+
+    def test_missing_generate_py_fails_gracefully(self, git_workspace):
+        """If scripts/generate.py is missing, upgrade reports an error."""
+        (git_workspace / "scripts" / "generate.py").unlink()
+        result = run_upgrade(git_workspace)
+        # python3 scripts/generate.py will fail since the file is missing
+        assert result.returncode != 0
+
+    def test_empty_infra_yml_fails(self, git_workspace):
+        """Empty infra.yml causes generate.py to fail during upgrade."""
+        (git_workspace / "infra.yml").write_text("")
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "empty infra"],
+            cwd=git_workspace, capture_output=True,
+        )
+        result = run_upgrade(git_workspace)
+        # generate.py will fail validation on empty/None input
+        assert result.returncode != 0
+
+    def test_site_yml_not_required_for_regen(self, git_workspace):
+        """site.yml being different does not affect regeneration."""
+        # Modify site.yml (a framework file) but commit it
+        (git_workspace / "site.yml").write_text("---\n# modified site.yml\n- hosts: all\n")
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "modify site.yml"],
+            cwd=git_workspace, capture_output=True,
+        )
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        assert "Upgrade complete" in result.stdout
+        # Regeneration still creates inventory and group_vars
+        assert (git_workspace / "inventory").exists()
+        assert (git_workspace / "group_vars").exists()
