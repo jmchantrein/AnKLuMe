@@ -8,9 +8,11 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 # ── Pre-flight: verify Incus daemon is accessible ────────────
 
-if ! incus project list --format csv >/dev/null 2>&1; then
-    die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
-fi
+check_incus() {
+    if ! incus project list --format csv >/dev/null 2>&1; then
+        die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+    fi
+}
 
 # ── Instance-to-project resolution ──────────────────────────
 
@@ -43,6 +45,7 @@ default_snap_name() { date "+snap-%Y%m%d-%H%M%S"; }
 
 cmd_create() {
     [[ $# -ge 1 ]] || die "Usage: snap.sh create <instance|self> [snap-name]"
+    check_incus
     local instance project snap_name
     instance="$(resolve_instance "$1")"
     project="$(find_project "$instance")"
@@ -53,6 +56,7 @@ cmd_create() {
 }
 
 cmd_restore() {
+    check_incus
     local force=false
     if [[ "${1:-}" == "--force" ]]; then
         force=true
@@ -83,6 +87,7 @@ cmd_restore() {
 }
 
 cmd_list() {
+    check_incus
     if [[ $# -ge 1 ]]; then
         local instance project
         instance="$(resolve_instance "$1")"
@@ -106,6 +111,7 @@ for item in data:
 }
 
 cmd_delete() {
+    check_incus
     [[ $# -ge 2 ]] || die "Usage: snap.sh delete <instance|self> <snap-name>"
     local instance project
     instance="$(resolve_instance "$1")"
