@@ -222,6 +222,26 @@ class TestContextReaders:
         result = _read_yolo()
         assert result is False or result is True  # Depends on env
 
+    def test_vm_nested_case_insensitive(self, tmp_path):
+        """vm_nested file reading is case-insensitive ('TRUE', 'True', etc.)."""
+        for val in ["true", "TRUE", "True", "tRuE"]:
+            f = tmp_path / f"vm_nested_{val}"
+            f.write_text(f"{val}\n")
+            assert f.read_text().strip().lower() == "true"
+
+    def test_vm_nested_false_values(self, tmp_path):
+        """Non-'true' values read as false."""
+        for val in ["false", "FALSE", "yes", "1", "enabled", ""]:
+            f = tmp_path / f"vm_nested_{val}"
+            f.write_text(f"{val}\n")
+            assert f.read_text().strip().lower() != "true"
+
+    def test_vm_nested_with_whitespace(self, tmp_path):
+        """Whitespace around 'true' is stripped correctly."""
+        f = tmp_path / "vm_nested_ws"
+        f.write_text("  true  \n")
+        assert f.read_text().strip().lower() == "true"
+
 
 # ── load_infra() edge cases ──────────────────────────────────────
 
@@ -297,6 +317,100 @@ class TestLoadInfraEdgeCases:
         }))
         data = load_infra(f)
         assert data["project_name"] == "autodetect"
+
+    def test_load_fallback_to_yml_suffix(self, tmp_path):
+        """load_infra('infra') finds 'infra.yml' when path has no suffix."""
+        f = tmp_path / "infra.yml"
+        f.write_text(yaml.dump({
+            "project_name": "fallback-yml",
+            "global": {"base_subnet": "10.100"},
+            "domains": {},
+        }))
+        data = load_infra(tmp_path / "infra")
+        assert data["project_name"] == "fallback-yml"
+
+    def test_load_fallback_to_directory(self, tmp_path):
+        """load_infra('infra.yml') finds 'infra/' dir when file doesn't exist."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "fallback-dir",
+            "global": {"base_subnet": "10.100"},
+        }))
+        (d / "domains").mkdir()
+        data = load_infra(tmp_path / "infra.yml")
+        assert data["project_name"] == "fallback-dir"
+
+    def test_load_nonexistent_raises(self, tmp_path):
+        """load_infra on nonexistent path raises FileNotFoundError."""
+        import pytest as _pytest
+        with _pytest.raises(FileNotFoundError):
+            load_infra(tmp_path / "no_such_file_or_dir")
+
+    def test_load_dir_without_domains_subdir(self, tmp_path):
+        """Directory mode without domains/ subdir works (empty domains)."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "no-domains",
+            "global": {"base_subnet": "10.100"},
+        }))
+        data = load_infra(d)
+        assert data["project_name"] == "no-domains"
+        assert data.get("domains", {}) == {}
+
+    def test_load_dir_duplicate_domain_warning(self, tmp_path, capsys):
+        """Duplicate domain in directory mode prints warning."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "dup",
+            "global": {"base_subnet": "10.100"},
+        }))
+        domains_dir = d / "domains"
+        domains_dir.mkdir()
+        # Two files defining the same domain "admin"
+        (domains_dir / "01-admin.yml").write_text(yaml.dump({
+            "admin": {"subnet_id": 0, "machines": {}},
+        }))
+        (domains_dir / "02-admin.yml").write_text(yaml.dump({
+            "admin": {"subnet_id": 1, "machines": {}},
+        }))
+        data = load_infra(d)
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "admin" in captured.err
+        # Second file wins (sorted alphabetically: 02 after 01)
+        assert data["domains"]["admin"]["subnet_id"] == 1
+
+    def test_load_dir_policies_without_network_policies_key(self, tmp_path):
+        """policies.yml without network_policies key does not add policies."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "no-pol",
+            "global": {"base_subnet": "10.100"},
+        }))
+        (d / "domains").mkdir()
+        (d / "policies.yml").write_text(yaml.dump({
+            "some_other_key": "value",
+        }))
+        data = load_infra(d)
+        assert "network_policies" not in data
+
+    def test_load_dir_empty_domain_file(self, tmp_path):
+        """Empty domain file in directory mode doesn't crash."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "empty-dom",
+            "global": {"base_subnet": "10.100"},
+        }))
+        domains_dir = d / "domains"
+        domains_dir.mkdir()
+        (domains_dir / "empty.yml").write_text("")
+        data = load_infra(d)
+        assert data["project_name"] == "empty-dom"
 
 
 # ── enrich_infra() ───────────────────────────────────────────────
@@ -701,3 +815,414 @@ class TestTemplateEdgeCases:
         assert "instance_devices" not in content
         assert "instance_storage_volumes" not in content
         assert "instance_roles" not in content
+
+
+# ── get_warnings() unit tests ────────────────────────────────────
+
+
+class TestGetWarnings:
+    """Unit tests for get_warnings() function."""
+
+    def test_no_warnings_for_simple_infra(self):
+        """Simple valid infra produces no warnings."""
+        from generate import get_warnings
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}},
+            },
+        }
+        assert get_warnings(infra) == []
+
+    def test_single_gpu_exclusive_no_warning(self):
+        """Single GPU instance in exclusive mode produces no warning."""
+        from generate import get_warnings
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {"m": {"type": "lxc", "gpu": True}},
+                },
+            },
+        }
+        assert get_warnings(infra) == []
+
+    def test_single_gpu_shared_no_warning(self):
+        """Single GPU instance with shared policy produces no warning."""
+        from generate import get_warnings
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100", "gpu_policy": "shared"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {"m": {"type": "lxc", "gpu": True}},
+                },
+            },
+        }
+        assert get_warnings(infra) == []
+
+    def test_empty_domains_no_warnings(self):
+        """Empty domains dict produces no warnings."""
+        from generate import get_warnings
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {},
+        }
+        assert get_warnings(infra) == []
+
+    def test_domains_none_no_warnings(self):
+        """domains: None produces no warnings."""
+        from generate import get_warnings
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": None,
+        }
+        assert get_warnings(infra) == []
+
+
+# ── _write_managed() edge cases ──────────────────────────────────
+
+
+class TestWriteManagedEdgeCases:
+    """Additional edge cases for _write_managed()."""
+
+    def test_dry_run_returns_content_without_creating(self, tmp_path):
+        """dry_run returns (filepath, content) tuple without creating file."""
+        filepath = tmp_path / "test.yml"
+        fp, content = _write_managed(filepath, {"key": "val"}, dry_run=True)
+        assert fp == filepath
+        assert "key: val" in content
+        assert not filepath.exists()
+
+    def test_update_managed_section_only(self, tmp_path):
+        """Updating replaces only the managed section, not user content."""
+        filepath = tmp_path / "test.yml"
+        _write_managed(filepath, {"old": "data"})
+        original = filepath.read_text()
+        user_block = "\n# My custom config\nmy_var: keep_me\n"
+        filepath.write_text(original + user_block)
+        _write_managed(filepath, {"new": "data"})
+        result = filepath.read_text()
+        assert "new: data" in result
+        assert "old: data" not in result
+        assert "my_var: keep_me" in result
+
+    def test_file_without_managed_prepends_block(self, tmp_path):
+        """Existing file without managed section gets block prepended."""
+        filepath = tmp_path / "existing.yml"
+        filepath.write_text("---\nmy_existing: content\n")
+        _write_managed(filepath, {"injected": "data"})
+        result = filepath.read_text()
+        assert "injected: data" in result
+        assert "my_existing: content" in result
+        # Managed block should be before user content
+        assert result.index("MANAGED BY") < result.index("my_existing")
+
+    def test_file_without_yaml_doc_marker_gets_prefix(self, tmp_path):
+        """Existing file not starting with '---' gets prefix added."""
+        filepath = tmp_path / "no-marker.yml"
+        filepath.write_text("plain_key: value\n")
+        _write_managed(filepath, {"managed": "data"})
+        result = filepath.read_text()
+        assert result.startswith("---")
+        assert "managed: data" in result
+        assert "plain_key: value" in result
+
+
+# ── _is_orphan_protected() edge cases ────────────────────────────
+
+
+class TestIsOrphanProtectedEdgeCases:
+    """Additional edge cases for orphan protection."""
+
+    def test_string_ephemeral_true(self, tmp_path):
+        """String 'true' for ephemeral is truthy, so not protected."""
+        f = tmp_path / "str.yml"
+        f.write_text("instance_ephemeral: 'true'\n")
+        # YAML string "true" is parsed as string "true", which is truthy
+        # `not data[key]` → not "true" → False (not protected)
+        assert _is_orphan_protected(f) is False
+
+    def test_yaml_list_not_protected(self, tmp_path):
+        """YAML file parsed as a list (not dict) is not protected."""
+        f = tmp_path / "list.yml"
+        f.write_text("- item1\n- item2\n")
+        assert _is_orphan_protected(f) is False
+
+    def test_integer_ephemeral_zero_is_protected(self, tmp_path):
+        """instance_ephemeral: 0 is falsy, so protected (not 0 → True)."""
+        f = tmp_path / "int.yml"
+        f.write_text("instance_ephemeral: 0\n")
+        assert _is_orphan_protected(f) is True
+
+    def test_integer_ephemeral_one_not_protected(self, tmp_path):
+        """instance_ephemeral: 1 is truthy, so not protected."""
+        f = tmp_path / "int1.yml"
+        f.write_text("instance_ephemeral: 1\n")
+        assert _is_orphan_protected(f) is False
+
+    def test_domain_ephemeral_takes_priority(self, tmp_path):
+        """domain_ephemeral checked before instance_ephemeral."""
+        f = tmp_path / "both.yml"
+        f.write_text("domain_ephemeral: true\ninstance_ephemeral: false\n")
+        # domain_ephemeral is first in the loop, so it's checked first
+        # domain_ephemeral=true → not true → False (not protected)
+        assert _is_orphan_protected(f) is False
+
+
+# ── detect_orphans() edge cases ──────────────────────────────────
+
+
+class TestDetectOrphansAdditional:
+    """Additional edge cases for detect_orphans."""
+
+    def test_all_yml_is_never_orphan(self, tmp_path):
+        """group_vars/all.yml is never reported as orphan."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {},
+        }
+        gv_dir = tmp_path / "group_vars"
+        gv_dir.mkdir(parents=True)
+        (gv_dir / "all.yml").write_text("project_name: test\n")
+        orphans = detect_orphans(infra, tmp_path)
+        assert not any("all.yml" in str(o[0]) for o in orphans)
+
+    def test_empty_host_vars_dir_no_orphans(self, tmp_path):
+        """Empty host_vars directory does not produce orphans."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {}}},
+        }
+        (tmp_path / "host_vars").mkdir(parents=True)
+        orphans = detect_orphans(infra, tmp_path)
+        assert len(orphans) == 0
+
+    def test_orphan_with_unparseable_yaml(self, tmp_path):
+        """Orphan file with unparseable YAML is not protected."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {}}},
+        }
+        hv_dir = tmp_path / "host_vars"
+        hv_dir.mkdir(parents=True)
+        (hv_dir / "broken.yml").write_text("{{bad yaml}}: [[[")
+        orphans = detect_orphans(infra, tmp_path)
+        assert len(orphans) == 1
+        assert orphans[0][1] is False  # Not protected
+
+    def test_detect_orphans_nonexistent_base_dir(self, tmp_path):
+        """detect_orphans on nonexistent base_dir returns empty list."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {}}},
+        }
+        orphans = detect_orphans(infra, tmp_path / "nonexistent")
+        assert orphans == []
+
+
+# ── extract_all_images() edge cases ──────────────────────────────
+
+
+class TestExtractImagesMore:
+    """More edge cases for extract_all_images."""
+
+    def test_empty_string_image_not_included(self):
+        """Empty string os_image is not included (falsy)."""
+        from generate import extract_all_images
+        infra = {
+            "global": {"default_os_image": ""},
+            "domains": {
+                "d": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}},
+            },
+        }
+        images = extract_all_images(infra)
+        assert images == []
+
+    def test_machine_image_overrides_default(self):
+        """Machine-level os_image overrides global default."""
+        from generate import extract_all_images
+        infra = {
+            "global": {"default_os_image": "images:debian/13"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "m": {"type": "lxc", "os_image": "images:ubuntu/24.04"},
+                    },
+                },
+            },
+        }
+        images = extract_all_images(infra)
+        assert images == ["images:ubuntu/24.04"]
+
+    def test_mixed_images_sorted(self):
+        """Multiple different images are sorted alphabetically."""
+        from generate import extract_all_images
+        infra = {
+            "global": {},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "m1": {"type": "lxc", "os_image": "images:ubuntu/24.04"},
+                        "m2": {"type": "lxc", "os_image": "images:alpine/3.20"},
+                        "m3": {"type": "lxc", "os_image": "images:debian/13"},
+                    },
+                },
+            },
+        }
+        images = extract_all_images(infra)
+        assert images == ["images:alpine/3.20", "images:debian/13", "images:ubuntu/24.04"]
+
+    def test_domains_none_returns_empty(self):
+        """domains: None returns empty image list."""
+        from generate import extract_all_images
+        infra = {"global": {"default_os_image": "images:debian/13"}, "domains": None}
+        assert extract_all_images(infra) == []
+
+
+# ── Connection variables in output ───────────────────────────────
+
+
+class TestConnectionVariables:
+    """Verify connection variables behavior in generated output."""
+
+    def test_psot_connection_in_all_yml(self, tmp_path):
+        """default_connection appears as psot_default_connection in all.yml."""
+        infra = {
+            "project_name": "test",
+            "global": {
+                "base_subnet": "10.100",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc", "ip": "10.100.0.10"}}}},
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "psot_default_connection: community.general.incus" in content
+        assert "psot_default_user: root" in content
+
+    def test_ansible_connection_never_in_output(self, tmp_path):
+        """ansible_connection and ansible_user never appear in any generated file."""
+        infra = {
+            "project_name": "test",
+            "global": {
+                "base_subnet": "10.100",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc", "ip": "10.100.0.10"}}}},
+        }
+        generate(infra, tmp_path)
+        for f in tmp_path.rglob("*.yml"):
+            text = f.read_text()
+            assert "ansible_connection:" not in text, f"ansible_connection found in {f}"
+            assert "ansible_user:" not in text, f"ansible_user found in {f}"
+
+    def test_connection_without_user(self, tmp_path):
+        """default_connection without default_user: only connection appears."""
+        infra = {
+            "project_name": "test",
+            "global": {
+                "base_subnet": "10.100",
+                "default_connection": "community.general.incus",
+            },
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc", "ip": "10.100.0.10"}}}},
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "psot_default_connection" in content
+        assert "psot_default_user" not in content
+
+    def test_neither_connection_nor_user(self, tmp_path):
+        """Neither default_connection nor default_user: neither psot_ appears."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc", "ip": "10.100.0.10"}}}},
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "psot_default_connection" not in content
+        assert "psot_default_user" not in content
+
+
+# ── enrich_infra() idempotency ───────────────────────────────────
+
+
+class TestEnrichIdempotency:
+    """Test that enrich_infra is idempotent (calling twice = same result)."""
+
+    def test_firewall_enrichment_idempotent(self):
+        """Calling enrich_infra twice doesn't duplicate sys-firewall."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
+            },
+        }
+        enrich_infra(infra)
+        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
+        enrich_infra(infra)
+        # Should still have exactly one sys-firewall, not two
+        fw_count = sum(1 for m in infra["domains"]["admin"]["machines"] if m == "sys-firewall")
+        assert fw_count == 1
+
+    def test_ai_access_enrichment_idempotent(self):
+        """Calling enrich_infra twice doesn't duplicate AI policy."""
+        infra = {
+            "global": {
+                "base_subnet": "10.100",
+                "ai_access_policy": "exclusive",
+                "ai_access_default": "pro",
+            },
+            "domains": {
+                "pro": {"subnet_id": 1, "machines": {}},
+                "ai-tools": {"subnet_id": 10, "machines": {}},
+            },
+        }
+        enrich_infra(infra)
+        count1 = len([p for p in infra.get("network_policies", []) if p.get("to") == "ai-tools"])
+        enrich_infra(infra)
+        count2 = len([p for p in infra.get("network_policies", []) if p.get("to") == "ai-tools"])
+        assert count1 == count2 == 1
+
+
+# ── Validate early return ────────────────────────────────────────
+
+
+class TestValidateEarlyReturn:
+    """Test that validation returns early on missing required keys."""
+
+    def test_missing_global_returns_two_errors(self):
+        """Missing global and domains keys returns exactly 2 errors."""
+        infra = {"project_name": "test"}
+        errors = validate(infra)
+        assert len(errors) == 2
+        assert any("global" in e for e in errors)
+        assert any("domains" in e for e in errors)
+
+    def test_missing_all_required_keys_returns_three_errors(self):
+        """Missing all 3 required keys returns exactly 3 errors."""
+        errors = validate({})
+        assert len(errors) == 3
+
+    def test_early_return_skips_domain_validation(self):
+        """Missing required keys means no domain-specific errors."""
+        infra = {"project_name": "test"}
+        errors = validate(infra)
+        # Should not contain any domain-related errors like "invalid name"
+        assert not any("subnet" in e.lower() for e in errors)
+        assert not any("ip" in e.lower() for e in errors)
