@@ -38,3 +38,22 @@
         that:
           - not (idempotency_result is changed)
         fail_msg: "Role is not idempotent with empty image list"
+
+    - name: Verify | Export defaults - run role with export disabled
+      ansible.builtin.include_role:
+        name: incus_images
+      vars:
+        incus_all_images: []
+        incus_images_download_timeout: 600
+        incus_images_export_for_nesting: false
+
+    - name: Verify | Export directory not created when disabled
+      ansible.builtin.stat:
+        path: /opt/anklume/images
+      register: verify_export_dir
+
+    - name: Verify | Assert export directory absent when disabled
+      ansible.builtin.assert:
+        that:
+          - not verify_export_dir.stat.exists
+        fail_msg: "Export directory should not exist when export is disabled"
