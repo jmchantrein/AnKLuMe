@@ -131,11 +131,29 @@ Incus — pas besoin de SSH.
 
 ## Documentation
 
+- [Guide de démarrage rapide](docs/quickstart.md)
+- [Guide de déploiement TP](docs/lab-tp.md) — pour les enseignants déployant des TPs étudiants
+- [Guide GPU + LLM](docs/gpu-llm.md) — GPU passthrough, Ollama, Open WebUI
 - [Spécification complète](docs/SPEC.md)
 - [Décisions d'architecture](docs/ARCHITECTURE.md)
 - [Feuille de route](docs/ROADMAP.md)
 - [Workflow Claude Code](docs/claude-code-workflow.md)
 - [Contribuer](CONTRIBUTING.md)
+
+## Exemples
+
+Configurations `infra.yml` prêtes à l'emploi pour les cas d'usage courants :
+
+| Exemple | Description |
+|---------|-------------|
+| [Étudiant sysadmin](examples/student-sysadmin/) | 2 domaines (admin + lab) pour étudiants sysadmin, sans GPU |
+| [TP enseignant](examples/teacher-lab/) | Admin + N domaines étudiants avec réseaux isolés et snapshots |
+| [Poste professionnel](examples/pro-workstation/) | Domaines admin, perso, pro, homelab avec GPU |
+| [Sandbox isolation](examples/sandbox-isolation/) | Isolation maximale pour tests de logiciels non fiables |
+| [Superviseur LLM](examples/llm-supervisor/) | 2 LLMs isolés + 1 superviseur pour gestion multi-LLM |
+| [Développeur](examples/developer/) | Environnement développeur AnKLuMe avec tests Incus-in-Incus |
+
+Voir [examples/README.md](examples/README.md) pour plus de détails.
 
 ## Stack technique
 

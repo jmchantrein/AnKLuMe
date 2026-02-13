@@ -1,0 +1,8 @@
+---
+# Default variables for incus_images
+# Pre-download timeout in seconds for each image copy operation
+incus_images_download_timeout: 600
+
+# List of all OS images needed across the infrastructure
+# Populated by the PSOT generator from infra.yml
+incus_all_images: []

@@ -2,14 +2,16 @@
 SHELL := /bin/bash
 
 # ── PSOT Generator ────────────────────────────────────────
-sync: ## Generate/update Ansible files from infra.yml
-	python3 scripts/generate.py infra.yml
+INFRA_SRC := $(if $(wildcard infra/base.yml),infra,infra.yml)
+
+sync: ## Generate/update Ansible files from infra.yml or infra/
+	python3 scripts/generate.py $(INFRA_SRC)
 
 sync-dry: ## Preview changes without writing
-	python3 scripts/generate.py infra.yml --dry-run
+	python3 scripts/generate.py $(INFRA_SRC) --dry-run
 
 sync-clean: ## Remove orphan files without confirmation
-	python3 scripts/generate.py infra.yml --clean-orphans
+	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
 
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
@@ -56,8 +58,21 @@ apply-base: ## Apply base_system only
 apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
+apply-images: ## Pre-download OS images to local cache
+	ansible-playbook site.yml --tags images
+
 apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
 	ansible-playbook site.yml --tags llm
+
+apply-stt: ## Apply STT role (Speaches + faster-whisper)
+	ansible-playbook site.yml --tags stt
+
+# ── nftables Isolation ───────────────────────────────────
+nftables: ## Generate nftables isolation rules
+	ansible-playbook site.yml --tags nftables
+
+nftables-deploy: ## Deploy nftables rules on host (run FROM host)
+	scripts/deploy-nftables.sh
 
 # ── Snapshots (Ansible role) ──────────────────────────────
 snapshot: ## Create snapshot of all instances (NAME=optional)
@@ -108,6 +123,56 @@ runner-create: ## Create the AnKLuMe runner container
 runner-destroy: ## Destroy the AnKLuMe runner container
 	@scripts/run-tests.sh destroy
 
+# ── AI-Assisted Testing (Phase 13) ────────────────────────
+ai-test: ## Run tests + AI-assisted fixing (AI_MODE=none|local|remote|claude-code|aider)
+	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	ANKLUME_AI_MAX_RETRIES=$(or $(MAX_RETRIES),3) \
+	scripts/ai-test-loop.sh
+
+ai-test-role: ## AI-assisted test for one role (R=role_name AI_MODE=backend)
+	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	ANKLUME_AI_MAX_RETRIES=$(or $(MAX_RETRIES),3) \
+	scripts/ai-test-loop.sh $(R)
+
+ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
+	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make ai-develop TASK=\"...\" AI_MODE=claude-code"; exit 1; }
+	ANKLUME_AI_MODE=$(or $(AI_MODE),claude-code) \
+	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
+	scripts/ai-develop.sh "$(TASK)"
+
+# ── Agent Teams (Phase 15) ────────────────────────────────
+agent-runner-setup: ## Install Claude Code + Agent Teams in runner container
+	@incus info $(or $(RUNNER),anklume) &>/dev/null || { echo "ERROR: Runner not found. Run 'make runner-create' first."; exit 1; }
+	ansible-playbook -i "$(or $(RUNNER),anklume)," -c community.general.incus \
+		--extra-vars "ansible_incus_project=$(or $(PROJECT),default)" \
+		-e "@roles/dev_agent_runner/defaults/main.yml" \
+		site.yml --tags agent-setup 2>/dev/null || \
+	incus exec $(or $(RUNNER),anklume) --project $(or $(PROJECT),default) -- bash -c "\
+		curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+		apt-get install -y nodejs tmux && \
+		npm install -g @anthropic-ai/claude-code && \
+		mkdir -p /root/.claude && \
+		echo 'Agent runner setup complete'"
+
+agent-fix: ## Autonomous test fixing with Claude Code Agent Teams (R=role)
+	@scripts/agent-fix.sh $(R)
+
+agent-develop: ## Autonomous development with Agent Teams (TASK="description")
+	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make agent-develop TASK=\"...\""; exit 1; }
+	@scripts/agent-develop.sh "$(TASK)"
+
+# ── Lifecycle ─────────────────────────────────────────────
+flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
+	@scripts/flush.sh $(if $(FORCE),--force)
+
+upgrade: ## Safe framework update with conflict detection
+	@scripts/upgrade.sh
+
+import-infra: ## Generate infra.yml from existing Incus state
+	@scripts/import-infra.sh $(if $(O),-o $(O))
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
@@ -130,8 +195,13 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit apply-llm snapshot snapshot-domain restore \
+        apply-base apply-limit apply-images apply-llm apply-stt \
+        nftables nftables-deploy \
+        snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
+        ai-test ai-test-role ai-develop \
+        agent-runner-setup agent-fix agent-develop \
+        flush upgrade import-infra \
         init install-hooks help

@@ -1,0 +1,20 @@
+---
+# FirewallRouter | Defaults for the firewall VM provisioning
+#
+# This role configures the sys-firewall VM with IP forwarding
+# and nftables rules for inter-domain isolation + logging.
+#
+# The firewall_router_interfaces variable is built by the infra
+# play from the domain bridge list. Each entry has:
+#   - name: interface name inside the VM (eth0, eth1, ...)
+#   - bridge: the Incus bridge name (net-admin, net-perso, ...)
+#   - subnet: the subnet CIDR (10.100.0.0/24)
+#   - gateway_ip: the IP of this VM on that bridge (10.100.0.254)
+
+firewall_router_interfaces: []
+
+# Enable logging of dropped/allowed packets in nftables
+firewall_router_logging: true
+
+# Log prefix for nftables rules
+firewall_router_log_prefix: "FW"

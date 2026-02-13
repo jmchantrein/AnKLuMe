@@ -1,0 +1,104 @@
+---
+# IncusNftables | Generate inter-bridge isolation rules
+#
+# Runs on the controller via connection:local.
+# Reads current Incus bridges, filters AnKLuMe bridges,
+# and generates nftables rules that isolate all domains.
+# The admin container communicates via the Incus socket,
+# not the network, so it needs no special accept rule.
+#
+# Input variables (from defaults/main.yml):
+#   - incus_nftables_bridge_pattern (string): prefix for AnKLuMe bridges
+#   - incus_nftables_output_path (string): where to write the rules
+#   - incus_nftables_apply (boolean): whether to apply rules immediately
+
+- name: IncusNftables | Read existing networks
+  ansible.builtin.command:
+    cmd: incus network list --format json
+  register: incus_nftables_networks_raw
+  changed_when: false
+  check_mode: false
+
+- name: IncusNftables | Filter AnKLuMe bridges
+  ansible.builtin.set_fact:
+    incus_nftables_all_bridges: >-
+      {{ incus_nftables_networks_raw.stdout | from_json
+         | selectattr('name', 'match', '^' ~ incus_nftables_bridge_pattern)
+         | map(attribute='name')
+         | sort
+         | list }}
+
+- name: IncusNftables | Build machine-to-domain mapping
+  ansible.builtin.set_fact:
+    incus_nftables_domain_names: >-
+      {{ incus_nftables_all_bridges
+         | map('regex_replace', '^' ~ incus_nftables_bridge_pattern, '')
+         | list }}
+
+- name: IncusNftables | Build machine-to-bridge mapping from hostvars
+  ansible.builtin.set_fact:
+    incus_nftables_machine_bridge_map: >-
+      {{ dict(
+           groups['all'] | default([])
+           | select('ne', 'localhost')
+           | map('extract', hostvars)
+           | selectattr('instance_domain', 'defined')
+           | map(attribute='instance_name')
+           | zip(
+               groups['all'] | default([])
+               | select('ne', 'localhost')
+               | map('extract', hostvars)
+               | selectattr('instance_domain', 'defined')
+               | map(attribute='instance_domain')
+               | map('regex_replace', '^(.*)$', incus_nftables_bridge_pattern ~ '\\1')
+             )
+           | list
+         ) }}
+  failed_when: false
+
+- name: IncusNftables | Resolve network policies to bridge names
+  ansible.builtin.set_fact:
+    incus_nftables_resolved_policies: >-
+      {% set resolved = [] %}
+      {% for policy in (network_policies | default([])) %}
+      {% set from_ref = policy['from'] %}
+      {% set to_ref = policy['to'] %}
+      {% if from_ref != 'host' and to_ref != 'host' %}
+      {% set pfx = incus_nftables_bridge_pattern %}
+      {% set m2b = incus_nftables_machine_bridge_map | default({}) %}
+      {% set from_bridge = (pfx ~ from_ref)
+         if from_ref in incus_nftables_domain_names
+         else m2b[from_ref] | default(pfx ~ from_ref) %}
+      {% set to_bridge = (pfx ~ to_ref)
+         if to_ref in incus_nftables_domain_names
+         else m2b[to_ref] | default(pfx ~ to_ref) %}
+      {% set _ = resolved.append({
+        'description': policy.description | default('policy ' ~ loop.index),
+        'from_bridge': from_bridge,
+        'to_bridge': to_bridge,
+        'ports': policy.ports | default('all'),
+        'protocol': policy.protocol | default('tcp'),
+        'bidirectional': policy.bidirectional | default(false)
+      }) %}
+      {% endif %}
+      {% endfor %}
+      {{ resolved }}
+  when: network_policies is defined and (network_policies | length > 0)
+
+- name: IncusNftables | Create output directory
+  ansible.builtin.file:
+    path: "{{ incus_nftables_output_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: IncusNftables | Template nftables isolation rules
+  ansible.builtin.template:
+    src: anklume-isolation.nft.j2
+    dest: "{{ incus_nftables_output_path }}"
+    mode: "0644"
+
+- name: IncusNftables | Apply nftables rules
+  ansible.builtin.command:
+    cmd: "nft -f {{ incus_nftables_output_path }}"
+  when: incus_nftables_apply | bool
+  changed_when: true

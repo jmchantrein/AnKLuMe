@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  author: AnKLuMe
+  description: Configure a firewall VM as inter-domain router
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  namespace: anklume
+  role_name: firewall_router
+dependencies: []

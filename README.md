@@ -133,11 +133,29 @@ An admin container drives everything via the Incus socket — no SSH needed.
 
 ## Documentation
 
+- [Quick start guide](docs/quickstart.md)
+- [Lab deployment guide](docs/lab-tp.md) — for teachers deploying student labs
+- [GPU + LLM guide](docs/gpu-llm.md) — GPU passthrough, Ollama, Open WebUI
 - [Full specification](docs/SPEC.md)
 - [Architecture decisions](docs/ARCHITECTURE.md)
 - [Implementation roadmap](docs/ROADMAP.md)
 - [Claude Code workflow](docs/claude-code-workflow.md)
 - [Contributing](CONTRIBUTING.md)
+
+## Examples
+
+Ready-to-use `infra.yml` configurations for common use cases:
+
+| Example | Description |
+|---------|-------------|
+| [Student sysadmin](examples/student-sysadmin/) | 2 domains (admin + lab) for sysadmin students, no GPU |
+| [Teacher lab](examples/teacher-lab/) | Admin + N student domains with isolated networks and snapshots |
+| [Pro workstation](examples/pro-workstation/) | Admin, personal, professional, homelab domains with GPU |
+| [Sandbox isolation](examples/sandbox-isolation/) | Maximum isolation for untrusted software testing |
+| [LLM supervisor](examples/llm-supervisor/) | 2 isolated LLMs + 1 supervisor for multi-LLM management |
+| [Developer](examples/developer/) | AnKLuMe developer setup with Incus-in-Incus testing |
+
+See [examples/README.md](examples/README.md) for details.
 
 ## Tech stack
 

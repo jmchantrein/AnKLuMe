@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: incus_nftables
+  namespace: anklume
+  author: AnKLuMe
+  description: "Generate nftables inter-bridge isolation rules"
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+dependencies: []

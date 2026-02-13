@@ -114,10 +114,14 @@ No framework, no external templating engine.
 
 ---
 
-## ADR-011: All content in English, French translation maintained
+## ADR-011: All content in English, French translations maintained
 
 **Decision**: All code, comments, documentation, prompts in English.
-`README_FR.md` maintained as French translation of `README.md`, always in sync.
+French translations (`*_FR.md`) are maintained for all documentation files,
+always in sync with their English counterparts. This includes `README_FR.md`
+and all files in `docs/` (e.g., `quickstart_FR.md`, `SPEC_FR.md`,
+`ARCHITECTURE_FR.md`, etc.). Each French file includes a header note
+indicating that the English version is authoritative in case of divergence.
 
 ---
 
@@ -349,3 +353,230 @@ not have the proxy device and are not affected.
 
 **Consequence:** `admin-ansible` survives restarts without manual
 intervention. The systemd service is idempotent (mkdir -p).
+
+---
+
+## ADR-020: Privileged LXC forbidden at first nesting level
+
+**Context**: LXC containers with `security.privileged: true` share the
+host kernel with elevated capabilities. This expands the attack surface
+significantly. AnKLuMe must distinguish between its primary purpose
+(infrastructure compartmentalization) and development tooling
+(Incus-in-Incus testing).
+
+**Decision**: At the first nesting level (directly under the physical
+host or under an unprivileged LXC), `security.privileged=true` is
+forbidden for LXC containers. Only VMs provide sufficient hardware
+isolation (separate kernel, IOMMU) for privileged workloads.
+
+The enforcement uses a `vm_nested` flag with automatic detection and
+propagation:
+
+1. At bootstrap, detect virtualization type via `systemd-detect-virt`
+2. Compute: `vm_nested = parent_vm_nested OR (local_type == kvm)`
+3. Store in `/etc/anklume/vm_nested` (created by parent, not child)
+4. Propagate to ALL child instances unconditionally
+5. Generator validates: if `vm_nested == false` and machine has
+   `security.privileged: true` on `type: lxc` → error
+
+Additional context files in `/etc/anklume/`:
+- `absolute_level` = parent + 1 (depth from real host)
+- `relative_level` = 0 if VM (reset), else parent + 1
+- `yolo` = bypass flag (warnings instead of errors)
+
+**Consequence**: Safe by default. Privileged containers only allowed
+inside a VM isolation boundary. The `--YOLO` flag bypasses this for
+lab/training contexts. The nesting context files enable future
+decision-making based on position in the hierarchy.
+
+---
+
+## ADR-021: Network policies — declarative cross-domain communication
+
+**Context**: Phase 8 drops all inter-domain traffic. There is no
+mechanism to selectively allow specific services to be accessed
+cross-domain. Use cases like AI services accessible from multiple
+domains require a policy system.
+
+**Decision**: Add `network_policies:` section to infra.yml. Syntax is
+a flat list of allow rules (inspired by Consul Intentions):
+
+```yaml
+network_policies:
+  - description: "..."
+    from: <domain|machine|host>
+    to: <domain|machine>
+    ports: [port1, port2] | all
+    protocol: tcp | udp
+    bidirectional: true | false
+```
+
+Default: all inter-domain traffic is DROP. Each rule adds an `accept`
+before the `drop`. The generator validates that `from`/`to` references
+known domains, machines, or the `host` keyword.
+
+**Consequence**: Enables cross-domain service access while maintaining
+isolation by default. Rules are generated into both host nftables
+(Phase 8) and firewall VM nftables (Phase 11). Auditable: each rule's
+description appears as an nftables comment.
+
+---
+
+## ADR-022: nftables priority -1 — coexist with Incus chains
+
+**Context**: Incus manages its own nftables chains at priority 0 for NAT
+and per-bridge filtering. AnKLuMe needs isolation rules that run before
+Incus chains without disabling or conflicting with them.
+
+**Decision**: Use `priority -1` in the AnKLuMe `inet anklume` table's
+forward chain. AnKLuMe and Incus nftables coexist peacefully in separate
+tables. Non-matching traffic falls through to Incus chains with
+`policy accept`.
+
+**Consequence**: No interference with Incus NAT, DHCP, or per-bridge
+rules. AnKLuMe isolation is evaluated first.
+
+---
+
+## ADR-023: Two-step nftables deployment (admin → host)
+
+**Context**: AnKLuMe runs inside the admin container (ADR-004) but
+nftables rules must be applied on the host kernel.
+
+**Decision**: Split into two steps:
+1. `make nftables` — runs inside admin container, generates rules
+2. `make nftables-deploy` — runs on the host, pulls rules from admin,
+   validates, and applies
+
+**Consequence**: The operator reviews rules before deploying. The admin
+container never needs host-level privileges. Documented exception to
+ADR-004.
+
+---
+
+## ADR-024: Firewall VM — two-role architecture
+
+**Context**: The firewall VM needs infrastructure setup (multi-NIC
+profile on the host) and provisioning (nftables inside the VM). These
+run in different playbook phases with different connection types.
+
+**Decision**: Split into two roles:
+- `incus_firewall_vm`: Infrastructure role (connection: local). Creates
+  multi-NIC profile.
+- `firewall_router`: Provisioning role (connection: incus). Configures
+  IP forwarding + nftables inside the VM.
+
+**Consequence**: Matches the two-phase architecture (ADR-006).
+
+---
+
+## ADR-025: Defense in depth — host + firewall VM modes coexist
+
+**Context**: Phase 8 provides host-level nftables isolation. Phase 11
+adds a firewall VM. Should they be mutually exclusive?
+
+**Decision**: Both modes coexist for layered security. Host nftables
+blocks direct bridge-to-bridge forwarding. The firewall VM routes
+permitted traffic and logs decisions. Even if the firewall VM is
+compromised, host rules still prevent direct inter-bridge traffic.
+
+**Consequence**: Operator can choose host-only, VM-only, or both.
+
+---
+
+## ADR-026: Admin bridge — no exception in nftables rules
+
+**Context**: The admin container communicates with all instances via
+the Incus socket (ADR-004), not the network. Ansible uses
+`community.general.incus` which calls `incus exec` over the socket.
+
+**Decision**: The admin bridge has no special accept rule in nftables.
+All domains (including admin) are treated equally for network isolation.
+`ping` from admin to other domains fails (expected).
+
+**Consequence**: Stronger isolation. Admin management traffic flows
+through the Incus socket, which is the correct and intended path.
+
+---
+
+## ADR-027: Sandbox-first Agent Teams architecture
+
+**Context**: Agent Teams with `bypassPermissions` give Claude Code
+full system access. This is dangerous on production but safe inside
+an Incus-in-Incus sandbox.
+
+**Decision**: Agent Teams ONLY run inside the Phase 12 sandbox.
+Defense in depth: OS-level isolation (Incus) + application-level
+permissions (Claude Code) + workflow-level gates (PR merge) + audit
+logging (PreToolUse hook).
+
+**Consequence**: Full autonomy inside sandbox, human approval at the
+production boundary (PR merge).
+
+---
+
+## ADR-028: Nesting context files in /etc/anklume/
+
+**Context**: Each AnKLuMe level needs to know its position in the
+nesting hierarchy for decision-making.
+
+**Decision**: Store one file per context value in `/etc/anklume/`:
+- `absolute_level` — depth from the real physical host
+- `relative_level` — depth from the nearest VM boundary (resets at VMs)
+- `vm_nested` — whether a VM exists in the parent chain
+- `yolo` — whether YOLO mode is active
+
+Files created by the **parent** at instance creation time. Propagation:
+`absolute_level = parent + 1`, `relative_level = 0 if VM else parent + 1`,
+`vm_nested = parent_vm_nested OR (type == kvm)`.
+
+**Consequence**: Trivially readable from shell, Ansible, or Python.
+No parsing dependency. Enables ADR-020 enforcement and future
+nesting-aware decisions.
+
+---
+
+## ADR-029: dev_test_runner in VM (not LXC)
+
+**Context**: Testing AnKLuMe inside AnKLuMe required privileged LXC
+containers, conflicting with ADR-020. Triple nesting caused AppArmor
+issues on Debian 13.
+
+**Decision**: The test runner (`anklume-test`) is a VM. Inside the VM,
+AnKLuMe bootstraps as on a fresh host. Tests run at level 1 and 2
+within the VM's kernel — no AppArmor interference from the host.
+
+**Consequence**: Slower boot (~30s) but hardware-isolated. Triple
+nesting eliminated. Test environment matches production exactly.
+
+---
+
+## ADR-030: infra/ directory support alongside infra.yml
+
+**Context**: A single `infra.yml` becomes unwieldy for large
+deployments (20+ domains).
+
+**Decision**: The generator accepts both formats with auto-detection:
+- `infra.yml` → single-file mode (backward compatible)
+- `infra/` → merges `base.yml` + `domains/*.yml` + `policies.yml`
+
+**Consequence**: Scales to large deployments. Git-friendly. 100%
+backward compatible.
+
+---
+
+## ADR-031: User data protection during upgrades
+
+**Context**: AnKLuMe is distributed as a git repository. Framework
+upgrades must not destroy user configuration, custom roles, or
+generated file customizations.
+
+**Decision**: Multi-layer protection:
+1. Explicit file classification: framework (overwritten), user config
+   (never touched), generated (managed sections), runtime (never touched)
+2. `roles_custom/` directory (gitignored) with priority in `roles_path`
+3. `make upgrade` with conflict detection and `.bak` creation
+4. Version marker for compatibility checking
+
+**Consequence**: Users never lose data during upgrades. Custom roles
+and configurations survive framework updates.
