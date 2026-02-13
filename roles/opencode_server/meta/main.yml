@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: opencode_server
+  description: Install and configure OpenCode as a headless AI coding server
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - trixie
+dependencies: []

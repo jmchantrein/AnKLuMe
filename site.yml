@@ -211,6 +211,30 @@
         - stt
         - provision
 
+    - name: Provisioning | Apply lobechat
+      ansible.builtin.include_role:
+        name: lobechat
+        apply:
+          tags:
+            - lobechat
+            - provision
+      when: "'lobechat' in (instance_roles | default([]))"
+      tags:
+        - lobechat
+        - provision
+
+    - name: Provisioning | Apply opencode_server
+      ansible.builtin.include_role:
+        name: opencode_server
+        apply:
+          tags:
+            - opencode
+            - provision
+      when: "'opencode_server' in (instance_roles | default([]))"
+      tags:
+        - opencode
+        - provision
+
     - name: Provisioning | Apply firewall_router
       ansible.builtin.include_role:
         name: firewall_router

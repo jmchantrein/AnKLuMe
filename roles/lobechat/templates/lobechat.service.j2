@@ -1,0 +1,17 @@
+[Unit]
+Description=LobeChat Web UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lobechat
+ExecStart=/usr/bin/node .next/standalone/server.js
+Environment="PORT={{ lobechat_port }}"
+Environment="HOSTNAME=0.0.0.0"
+Environment="OLLAMA_PROXY_URL={{ lobechat_ollama_url }}"
+Environment="ENABLED_OLLAMA=1"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

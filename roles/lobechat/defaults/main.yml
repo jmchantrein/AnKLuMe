@@ -1,0 +1,18 @@
+---
+# Default variables for lobechat
+# Override in group_vars or host_vars as needed.
+
+# Port for LobeChat to listen on
+lobechat_port: 3210
+
+# URL of the Ollama server (override in host_vars)
+lobechat_ollama_url: "http://localhost:11434"
+
+# Node.js major version to install
+lobechat_node_version: 22
+
+# LobeChat git branch or tag to deploy
+lobechat_version: "main"
+
+# Enable and start the systemd service
+lobechat_service_enabled: true
