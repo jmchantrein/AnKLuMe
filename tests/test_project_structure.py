@@ -437,3 +437,77 @@ class TestBehaviorMatrix:
                         if field not in cell:
                             errors.append(f"{cap_name}/{depth}: missing '{field}'")
         assert not errors, "Matrix cells with missing fields:\n" + "\n".join(errors)
+
+
+# ── Documentation cross-references ────────────────────────
+
+
+class TestDocsCrossReferences:
+    """Verify documentation links point to existing files."""
+
+    def test_claude_md_doc_refs_exist(self):
+        """All docs referenced in CLAUDE.md exist."""
+        claude_md = PROJECT_ROOT / "CLAUDE.md"
+        content = claude_md.read_text()
+        # Extract @docs/... references
+        refs = re.findall(r"@(docs/\S+)", content)
+        for ref in refs:
+            target = PROJECT_ROOT / ref
+            assert target.exists(), f"CLAUDE.md references missing file: {ref}"
+
+    def test_readme_doc_links_exist(self):
+        """All docs/ links in README.md point to existing files."""
+        readme = PROJECT_ROOT / "README.md"
+        content = readme.read_text()
+        # Extract (docs/...) links
+        links = re.findall(r"\(docs/([^\)]+)\)", content)
+        for link in links:
+            target = DOCS_DIR / link
+            assert target.exists(), f"README.md links to missing file: docs/{link}"
+
+    def test_french_translations_have_english_counterparts(self):
+        """All *_FR.md files have matching English counterparts."""
+        fr_files = list(DOCS_DIR.glob("*_FR.md"))
+        for fr_file in fr_files:
+            en_name = fr_file.name.replace("_FR.md", ".md")
+            en_file = DOCS_DIR / en_name
+            assert en_file.exists(), (
+                f"French translation {fr_file.name} has no English counterpart {en_name}"
+            )
+
+    def test_roadmap_has_french_translation(self):
+        """ROADMAP_FR.md exists alongside ROADMAP.md."""
+        assert (DOCS_DIR / "ROADMAP.md").exists()
+        assert (DOCS_DIR / "ROADMAP_FR.md").exists()
+
+
+class TestRoleCompleteness:
+    """Verify each role has required structural elements."""
+
+    def test_all_roles_have_tasks_main(self):
+        """Every role has tasks/main.yml."""
+        for role_dir in sorted(ROLES_DIR.iterdir()):
+            if role_dir.is_dir():
+                tasks_main = role_dir / "tasks" / "main.yml"
+                assert tasks_main.exists(), f"Role {role_dir.name} missing tasks/main.yml"
+
+    def test_all_roles_have_molecule(self):
+        """Every role has a molecule/ directory."""
+        for role_dir in sorted(ROLES_DIR.iterdir()):
+            if role_dir.is_dir():
+                mol = role_dir / "molecule"
+                assert mol.exists(), f"Role {role_dir.name} missing molecule/ directory"
+
+    def test_all_roles_have_defaults(self):
+        """Every role has defaults/main.yml (even if empty)."""
+        for role_dir in sorted(ROLES_DIR.iterdir()):
+            if role_dir.is_dir():
+                defaults = role_dir / "defaults" / "main.yml"
+                assert defaults.exists(), f"Role {role_dir.name} missing defaults/main.yml"
+
+    def test_all_roles_have_meta(self):
+        """Every role has meta/main.yml."""
+        for role_dir in sorted(ROLES_DIR.iterdir()):
+            if role_dir.is_dir():
+                meta = role_dir / "meta" / "main.yml"
+                assert meta.exists(), f"Role {role_dir.name} missing meta/main.yml"
