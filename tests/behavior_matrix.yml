@@ -553,3 +553,57 @@ capabilities:
         action: "Images + VM + LXC + different os_image per type"
         expected: "All unique images collected, sorted"
         deterministic: true
+
+  ai_access_policy:
+    description: "Exclusive AI-tools network access (Phase 18a)"
+    depth_1:
+      - id: AA-001
+        action: "Valid exclusive config with known default domain"
+        expected: "Validation passes, no ai_access errors"
+        deterministic: true
+      - id: AA-002
+        action: "Exclusive mode without ai_access_default"
+        expected: "Validation error: ai_access_default is required"
+        deterministic: true
+      - id: AA-003
+        action: "ai_access_default references unknown domain"
+        expected: "Validation error: not a known domain"
+        deterministic: true
+      - id: AA-004
+        action: "ai_access_default is 'ai-tools' itself"
+        expected: "Validation error: cannot be ai-tools"
+        deterministic: true
+      - id: AA-005
+        action: "Multiple network_policies targeting ai-tools"
+        expected: "Validation error: 2+ policies target ai-tools"
+        deterministic: true
+      - id: AA-006
+        action: "Open mode (default) no AI-specific validation"
+        expected: "No ai_access errors"
+        deterministic: true
+      - id: AA-007
+        action: "Exclusive mode without ai-tools domain"
+        expected: "Validation error: no ai-tools domain"
+        deterministic: true
+      - id: AA-008
+        action: "Invalid ai_access_policy value"
+        expected: "Validation error: must be exclusive or open"
+        deterministic: true
+      - id: AA-009
+        action: "Single policy targeting ai-tools is allowed"
+        expected: "No validation error about policy count"
+        deterministic: true
+    depth_2:
+      - id: AA-2-001
+        action: "Auto-creation of network_policy when none exists"
+        expected: "network_policy auto-created from default to ai-tools"
+        deterministic: true
+      - id: AA-2-002
+        action: "Auto-creation skipped when policy already exists"
+        expected: "Only one ai-tools policy, no duplicate"
+        deterministic: true
+    depth_3:
+      - id: AA-3-001
+        action: "Exclusive AI + GPU exclusive + firewall_mode=vm"
+        expected: "All features coexist, no interference"
+        deterministic: true

@@ -877,31 +877,31 @@ class TestAIAccessPolicy:
         if default:
             sample_infra["global"]["ai_access_default"] = default
 
-    def test_valid_exclusive_config(self, sample_infra):
+    def test_valid_exclusive_config(self, sample_infra):  # Matrix: AA-001
         """Exclusive AI access with valid default domain passes validation."""
         self._make_ai_infra(sample_infra)
         errors = validate(sample_infra)
         assert not any("ai_access" in e for e in errors)
 
-    def test_missing_default_with_exclusive(self, sample_infra):
+    def test_missing_default_with_exclusive(self, sample_infra):  # Matrix: AA-002
         """Exclusive mode without ai_access_default is an error."""
         self._make_ai_infra(sample_infra, default=None)
         errors = validate(sample_infra)
         assert any("ai_access_default is required" in e for e in errors)
 
-    def test_default_references_unknown_domain(self, sample_infra):
+    def test_default_references_unknown_domain(self, sample_infra):  # Matrix: AA-003
         """ai_access_default referencing nonexistent domain is an error."""
         self._make_ai_infra(sample_infra, default="nonexistent")
         errors = validate(sample_infra)
         assert any("not a known domain" in e for e in errors)
 
-    def test_default_cannot_be_ai_tools(self, sample_infra):
+    def test_default_cannot_be_ai_tools(self, sample_infra):  # Matrix: AA-004
         """ai_access_default cannot be 'ai-tools' itself."""
         self._make_ai_infra(sample_infra, default="ai-tools")
         errors = validate(sample_infra)
         assert any("cannot be 'ai-tools'" in e for e in errors)
 
-    def test_multiple_ai_tools_policies_error(self, sample_infra):
+    def test_multiple_ai_tools_policies_error(self, sample_infra):  # Matrix: AA-005
         """More than one network_policy targeting ai-tools is an error in exclusive mode."""
         self._make_ai_infra(sample_infra)
         sample_infra["network_policies"] = [
@@ -911,14 +911,14 @@ class TestAIAccessPolicy:
         errors = validate(sample_infra)
         assert any("2 network_policies target ai-tools" in e for e in errors)
 
-    def test_auto_creation_of_policy(self, sample_infra):
+    def test_auto_creation_of_policy(self, sample_infra):  # Matrix: AA-2-001
         """Exclusive mode auto-creates a network policy if none targets ai-tools."""
         self._make_ai_infra(sample_infra)
         enrich_infra(sample_infra)
         policies = sample_infra.get("network_policies", [])
         assert any(p.get("to") == "ai-tools" for p in policies)
 
-    def test_auto_creation_skipped_when_policy_exists(self, sample_infra):
+    def test_auto_creation_skipped_when_policy_exists(self, sample_infra):  # Matrix: AA-2-002
         """Auto-creation is skipped when a policy already targets ai-tools."""
         self._make_ai_infra(sample_infra)
         sample_infra["network_policies"] = [
@@ -928,25 +928,25 @@ class TestAIAccessPolicy:
         ai_policies = [p for p in sample_infra["network_policies"] if p.get("to") == "ai-tools"]
         assert len(ai_policies) == 1
 
-    def test_open_mode_unchanged(self, sample_infra):
+    def test_open_mode_unchanged(self, sample_infra):  # Matrix: AA-006
         """Open mode (default) has no AI-specific validation."""
         errors = validate(sample_infra)
         assert not any("ai_access" in e for e in errors)
 
-    def test_no_ai_tools_domain_error(self, sample_infra):
+    def test_no_ai_tools_domain_error(self, sample_infra):  # Matrix: AA-007
         """Exclusive mode without ai-tools domain is an error."""
         sample_infra["global"]["ai_access_policy"] = "exclusive"
         sample_infra["global"]["ai_access_default"] = "work"
         errors = validate(sample_infra)
         assert any("no 'ai-tools' domain" in e for e in errors)
 
-    def test_invalid_ai_access_policy_value(self, sample_infra):
+    def test_invalid_ai_access_policy_value(self, sample_infra):  # Matrix: AA-008
         """Invalid ai_access_policy value triggers error."""
         sample_infra["global"]["ai_access_policy"] = "restricted"
         errors = validate(sample_infra)
         assert any("ai_access_policy must be 'exclusive' or 'open'" in e for e in errors)
 
-    def test_single_policy_targeting_ai_tools_ok(self, sample_infra):
+    def test_single_policy_targeting_ai_tools_ok(self, sample_infra):  # Matrix: AA-009
         """Exactly one network_policy targeting ai-tools is allowed in exclusive mode."""
         self._make_ai_infra(sample_infra)
         sample_infra["network_policies"] = [
@@ -1342,6 +1342,27 @@ class TestDepth3Interactions:
         file_keys = {str(f.relative_to(out_file)) for f in out_file.rglob("*.yml")}
         dir_keys = {str(f.relative_to(out_dir)) for f in out_dir.rglob("*.yml")}
         assert file_keys == dir_keys
+
+    def test_ai_exclusive_gpu_firewall_vm(self, sample_infra):  # Matrix: AA-3-001
+        """Exclusive AI + GPU exclusive + firewall_mode=vm all coexist."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        sample_infra["global"]["ai_access_policy"] = "exclusive"
+        sample_infra["global"]["ai_access_default"] = "work"
+        sample_infra["domains"]["ai-tools"] = {
+            "description": "AI services",
+            "subnet_id": 10,
+            "machines": {
+                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10", "gpu": True},
+            },
+        }
+        errors = validate(sample_infra)
+        assert errors == []
+        enrich_infra(sample_infra)
+        # sys-firewall auto-created
+        assert "sys-firewall" in sample_infra["domains"]["admin"]["machines"]
+        # AI policy auto-created
+        policies = sample_infra.get("network_policies", [])
+        assert any(p.get("to") == "ai-tools" for p in policies)
 
     def test_round_trip_generation(self, sample_infra, tmp_path):  # Matrix: PG-3-001
         """Generate -> add user content -> add domain -> regenerate preserves content."""
