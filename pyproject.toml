@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "QubesOS-like isolation using native Linux kernel features, orchestrated by Ansible and Incus"
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+test = ["pytest", "pyyaml", "hypothesis"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
