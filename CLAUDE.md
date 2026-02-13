@@ -54,6 +54,9 @@ make test          # Run Molecule + pytest
 make snapshot      # Snapshot all instances
 make nftables      # Generate nftables isolation rules
 make nftables-deploy  # Deploy rules on host (run FROM host)
+make flush         # Destroy all AnKLuMe infrastructure (dev mode)
+make upgrade       # Safe framework update with conflict detection
+make import-infra  # Generate infra.yml from existing Incus state
 make help          # List all commands
 ```
 
@@ -104,3 +107,4 @@ For details, read these files with `@path`:
 - @docs/ai-testing.md — AI-assisted testing and development (Phase 13)
 - @docs/stt-service.md — Speech-to-Text service guide (Phase 14)
 - @docs/agent-teams.md — Claude Code Agent Teams guide (Phase 15)
+- @docs/decisions-log.md — Autonomous decisions pending review
