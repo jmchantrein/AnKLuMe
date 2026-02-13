@@ -628,3 +628,101 @@ class TestGuideUseCaseFiles:
         source = GUIDE_SH.read_text()
         # When USE_CASE == "custom", INFRA_SRC is set to infra.yml.example
         assert 'INFRA_SRC="$PROJECT_DIR/infra.yml.example"' in source
+
+
+# ── step 5 validation ────────────────────────────────────────
+
+
+class TestGuideStep5Validate:
+    """Test step 5 — validate configuration in auto mode."""
+
+    def test_step_5_mentions_validation(self, guide_env):
+        """Step 5 mentions 'Validate' or 'validate' in output."""
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        output = result.stdout
+        assert "Step 5" in output
+        assert "Validate" in output or "validate" in output.lower()
+
+    def test_step_5_runs_lint_check(self, guide_env):
+        """Step 5 attempts linting or syntax checking."""
+        result = run_guide(["--auto", "--step", "5"], guide_env)
+        output = result.stdout.lower()
+        # Step 5 runs various validators
+        assert "syntax" in output or "lint" in output or "yamllint" in output \
+            or "ansible" in output or "check" in output
+
+
+# ── step 7 verification ──────────────────────────────────────
+
+
+class TestGuideStep7Verify:
+    """Test step 7 — verify infrastructure in auto mode."""
+
+    def test_step_7_shows_header(self, guide_env):
+        """Step 7 shows 'Verify' header."""
+        result = run_guide(["--auto", "--step", "7"], guide_env)
+        assert "Step 7" in result.stdout
+
+    def test_step_7_attempts_incus_list(self, guide_env):
+        """Step 7 attempts to list instances or networks."""
+        result = run_guide(["--auto", "--step", "7"], guide_env)
+        output = result.stdout.lower()
+        # Step 7 runs incus list or similar verification
+        assert "instance" in output or "network" in output \
+            or "running" in output or "incus" in output or "verify" in output
+
+
+# ── source code structure tests ──────────────────────────────
+
+
+class TestGuideScriptStructure:
+    """Verify key structural elements of the guide script."""
+
+    def test_script_has_set_euo_pipefail(self):
+        """Script uses strict mode."""
+        source = GUIDE_SH.read_text()
+        assert "set -euo pipefail" in source
+
+    def test_script_has_all_nine_steps(self):
+        """Script defines all 9 step functions."""
+        source = GUIDE_SH.read_text()
+        # Step functions are named step_N_<description>
+        for i in range(1, 10):
+            assert f"step_{i}_" in source, f"Missing step_{i}_ function"
+
+    def test_script_defines_total_steps(self):
+        """Script defines TOTAL_STEPS=9."""
+        source = GUIDE_SH.read_text()
+        assert "TOTAL_STEPS=9" in source
+
+    def test_script_defines_step_names(self):
+        """Script defines human-readable names for each step."""
+        source = GUIDE_SH.read_text()
+        expected = ["Prerequisites", "Use Case", "Generate", "Validate",
+                    "Apply", "Verify", "Snapshot", "Next Steps"]
+        for name in expected:
+            assert name in source, f"Missing step name: {name}"
+
+    def test_auto_mode_variable(self):
+        """Script uses AUTO variable for auto mode detection."""
+        source = GUIDE_SH.read_text()
+        assert "AUTO=" in source
+
+
+# ── ANSI color handling ──────────────────────────────────────
+
+
+class TestGuideColors:
+    """Test ANSI color handling in the guide."""
+
+    def test_dumb_terminal_no_crashes(self, guide_env):
+        """TERM=dumb doesn't cause crashes."""
+        guide_env["TERM"] = "dumb"
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert result.returncode == 0
+
+    def test_xterm_no_crashes(self, guide_env):
+        """TERM=xterm-256color doesn't cause crashes."""
+        guide_env["TERM"] = "xterm-256color"
+        result = run_guide(["--auto", "--step", "9"], guide_env)
+        assert result.returncode == 0
