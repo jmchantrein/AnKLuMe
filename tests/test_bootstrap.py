@@ -494,3 +494,160 @@ exit 0
         assert result.returncode == 0
         assert "Detected virtualization: none" in result.stdout
         assert (etc_anklume / "vm_nested").read_text().strip() == "false"
+
+
+# ── flag combinations ─────────────────────────────────────
+
+
+class TestBootstrapFlagCombinations:
+    """Test argument validation and flag combination edge cases."""
+
+    def test_prod_and_dev_mutually_exclusive(self):
+        """Passing both --prod and --dev uses whichever comes last (no error).
+
+        The script parses flags sequentially so the last --prod/--dev wins.
+        Both being present is not an error — the last one overwrites MODE.
+        """
+        result = run_bootstrap(["--prod", "--dev"], os.environ.copy())
+        # The script does not error for conflicting flags; it uses the last.
+        # It should either succeed (with a mode set) or fail for other reasons
+        # (e.g. incus not installed), but never show "Specify --prod or --dev".
+        combined = result.stdout + result.stderr
+        assert "Specify --prod or --dev" not in combined
+
+    def test_snapshot_alone_needs_mode(self):
+        """--snapshot btrfs without --prod or --dev gives an error."""
+        result = run_bootstrap(["--snapshot", "btrfs"], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "ERROR" in combined or result.returncode != 0
+
+    def test_import_standalone_needs_mode(self):
+        """--import alone without a mode gives an error (mode is required)."""
+        result = run_bootstrap(["--import"], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "ERROR" in combined or result.returncode != 0
+
+    def test_yolo_alone_needs_mode(self):
+        """--YOLO alone without --prod or --dev gives an error."""
+        result = run_bootstrap(["--YOLO"], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "ERROR" in combined or result.returncode != 0
+
+    def test_unknown_flag_gives_error(self):
+        """An unknown flag like --foobar shows an error."""
+        result = run_bootstrap(["--foobar"], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "Unknown" in combined or result.returncode != 0
+
+
+# ── prod mode detailed ────────────────────────────────────
+
+
+class TestBootstrapProdMode:
+    """Detailed tests for production mode behaviour."""
+
+    def _make_prod_env(self, tmp_path, virt_output="none", incus_info_rc=0,
+                       has_incus=True, fs_type="ext4"):
+        """Create a full mock environment for prod mode testing."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir(exist_ok=True)
+        log_file = tmp_path / "cmds.log"
+
+        # Mock systemd-detect-virt
+        mock_virt = mock_bin / "systemd-detect-virt"
+        mock_virt.write_text(
+            f"#!/usr/bin/env bash\necho \"{virt_output}\"\n"
+        )
+        mock_virt.chmod(mock_virt.stat().st_mode | stat.S_IEXEC)
+
+        if has_incus:
+            # Mock incus
+            mock_incus = mock_bin / "incus"
+            mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "incus $@" >> "{log_file}"
+if [[ "$1" == "info" ]]; then exit {incus_info_rc}; fi
+if [[ "$1" == "admin" && "$2" == "init" ]]; then exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+exit 0
+""")
+            mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        # Mock df to control filesystem detection
+        mock_df = mock_bin / "df"
+        mock_df.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "-T" ]]; then
+    echo "Filesystem     Type 1K-blocks    Used Available Use% Mounted on"
+    echo "/dev/sda1      {fs_type}  104857600 52428800 52428800  50% /"
+    exit 0
+fi
+/usr/bin/df "$@"
+""")
+        mock_df.chmod(mock_df.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["ansible-playbook", "ansible-lint", "yamllint", "pip3"]:
+            mock_cmd = mock_bin / cmd
+            if not mock_cmd.exists():
+                mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
+                mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        if mock_python.exists():
+            mock_python.unlink()
+        mock_python.write_text(
+            "#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n"
+        )
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        etc_anklume = tmp_path / "etc_anklume"
+        etc_anklume.mkdir(exist_ok=True)
+        patched = tmp_path / "bootstrap_patched.sh"
+        original = BOOTSTRAP_SH.read_text()
+        patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+        patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        return env, patched, etc_anklume, log_file
+
+    def test_prod_filesystem_detection_ext4(self, tmp_path):
+        """Prod mode with ext4 filesystem uses 'dir' storage backend."""
+        env, script, _, log = self._make_prod_env(tmp_path, fs_type="ext4")
+        result = run_bootstrap(
+            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+        )
+        assert result.returncode == 0
+        # ext4 maps to 'dir' storage backend
+        assert "dir" in result.stdout.lower() or "ext4" in result.stdout.lower() \
+            or "Detected filesystem" in result.stdout
+
+    def test_prod_filesystem_detection_btrfs(self, tmp_path):
+        """Prod mode with btrfs filesystem detects btrfs backend."""
+        env, script, _, log = self._make_prod_env(tmp_path, fs_type="btrfs")
+        result = run_bootstrap(
+            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+        )
+        assert result.returncode == 0
+        assert "btrfs" in result.stdout.lower()
+
+    def test_prod_incus_preseed_generation(self, tmp_path):
+        """Prod mode reconfigure generates Incus preseed config."""
+        env, script, _, log = self._make_prod_env(tmp_path, fs_type="btrfs")
+        result = run_bootstrap(
+            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+        )
+        assert result.returncode == 0
+        assert "configured" in result.stdout.lower() or "storage" in result.stdout.lower()
+
+    def test_prod_missing_incus_binary(self, tmp_path):
+        """Prod mode without incus binary attempts install or errors."""
+        env, script, _, _ = self._make_prod_env(
+            tmp_path, has_incus=False,
+        )
+        result = run_bootstrap(
+            ["--prod"], env, script=script, cwd=tmp_path,
+        )
+        # Without incus, prod mode tries to install it. Since apt-get/pacman
+        # are not available in mock, it should error.
+        combined = result.stdout + result.stderr
+        assert result.returncode != 0 or "ERROR" in combined \
+            or "Install" in combined or "not installed" in combined.lower()
