@@ -181,6 +181,87 @@ If the user declares `sys-firewall` explicitly (in any domain), their
 definition takes precedence and no auto-creation occurs. If `firewall_mode`
 is `vm` but no `admin` domain exists, the generator exits with an error.
 
+### Security policy (privileged containers)
+
+The generator enforces a security policy based on nesting context:
+
+- **`security.privileged: true`** is forbidden on LXC containers when
+  `vm_nested` is `false` (i.e., no VM exists in the chain above the
+  current AnKLuMe instance). Only VMs provide sufficient hardware
+  isolation for privileged workloads.
+- The `vm_nested` flag is auto-detected at bootstrap via
+  `systemd-detect-virt` and propagated to all child instances.
+- A `--YOLO` flag bypasses this restriction (warnings instead of errors).
+
+Nesting context is stored in `/etc/anklume/` as individual files:
+- `absolute_level` — nesting depth from the real physical host
+- `relative_level` — nesting depth from the nearest VM boundary (resets to 0 at each VM)
+- `vm_nested` — `true` if a VM exists anywhere in the parent chain
+- `yolo` — `true` if YOLO mode is enabled
+
+These files are created by the **parent** when it instantiates children,
+not by the child's own bootstrap.
+
+### Network policies
+
+By default, all inter-domain traffic is dropped. The `network_policies`
+section declares selective exceptions:
+
+```yaml
+network_policies:
+  - description: "Pro domain accesses AI services"
+    from: pro                    # Source: domain name or machine name
+    to: ai-tools                 # Destination: domain name or machine name
+    ports: [3000, 8080]          # TCP/UDP ports
+    protocol: tcp                # tcp or udp
+
+  - description: "Host accesses Ollama"
+    from: host                   # Special keyword: the physical host
+    to: ai-ollama                # Specific machine
+    ports: [11434]
+    protocol: tcp
+
+  - description: "Full connectivity between dev and staging"
+    from: dev
+    to: staging
+    ports: all                   # All ports, all protocols
+    bidirectional: true          # Rules in both directions
+```
+
+Special keywords:
+- Domain name → entire subnet of that domain
+- Machine name → single IP of that machine
+- `host` → the physical host machine
+- `ports: all` → all ports and protocols
+- `bidirectional: true` → creates rules in both directions
+
+The generator validates that every `from` and `to` references a known
+domain name, machine name, or the keyword `host`. Each rule maps to an
+nftables `accept` rule before the blanket `drop`.
+
+### infra.yml as a directory
+
+For large deployments, `infra.yml` can be replaced by an `infra/`
+directory:
+
+```
+infra/
+├── base.yml                 # project_name + global settings
+├── domains/
+│   ├── admin.yml            # One file per domain
+│   ├── ai-tools.yml
+│   ├── pro.yml
+│   └── perso.yml
+└── policies.yml             # network_policies
+```
+
+The generator auto-detects the format:
+- If `infra.yml` exists → single-file mode (backward compatible)
+- If `infra/` exists → merges `base.yml` + `domains/*.yml` (sorted
+  alphabetically) + `policies.yml`
+
+Both formats produce identical output after merging.
+
 ## 6. Generator (scripts/generate.py)
 
 Reads `infra.yml` and generates/updates the Ansible file tree.
@@ -214,6 +295,20 @@ incus_network:
 2. **Existing file** → only the managed section is rewritten, rest preserved
 3. **Orphans** → listed in a report, interactive deletion proposed
 4. **Validation** → all constraints checked before writing any file
+
+### Input formats
+
+The generator accepts two input formats:
+
+- **Single file**: `scripts/generate.py infra.yml` — traditional mode
+- **Directory**: `scripts/generate.py infra/` — merges files automatically
+
+When using directory mode, the generator:
+1. Loads `infra/base.yml` (required: project_name, global)
+2. Merges all `infra/domains/*.yml` files (sorted alphabetically)
+3. Merges `infra/policies.yml` if present
+4. Validates the merged structure identically to single-file mode
+5. Error messages include the source filename for debugging
 
 ### Connection variables
 
@@ -340,13 +435,65 @@ This project follows **spec-driven, test-driven development**:
 | shellcheck | — | Shell script validation |
 | ruff | — | Python linting |
 
-## 12. Out of scope
+## 12. Bootstrap and lifecycle
 
-Managed manually or by host bootstrap scripts:
+### Bootstrap script
+
+`bootstrap.sh` initializes AnKLuMe on a new machine:
+
+```bash
+./bootstrap.sh --prod                    # Production: auto-detect FS, configure Incus
+./bootstrap.sh --dev                     # Development: minimal config
+./bootstrap.sh --prod --snapshot btrfs   # Snapshot FS before modifications
+./bootstrap.sh --YOLO                    # Bypass security restrictions
+./bootstrap.sh --import                  # Import existing Incus infrastructure
+./bootstrap.sh --help                    # Usage
+```
+
+Production mode auto-detects the filesystem (btrfs, zfs, ext4) and
+configures the Incus preseed with the optimal storage backend.
+
+### Import existing infrastructure
+
+`make import-infra` scans running Incus state and generates a matching
+`infra.yml`. The user edits the result, then runs `make sync && make apply`
+to converge idempotently.
+
+### Flush (reset to zero)
+
+`make flush` destroys all AnKLuMe infrastructure:
+- All instances, profiles, projects, and `net-*` bridges
+- Generated Ansible files (inventory/, group_vars/, host_vars/)
+- Preserves: infra.yml, roles/, scripts/, docs/
+- Requires `FORCE=true` on production (`absolute_level == 0`, `yolo != true`)
+
+### Upgrade
+
+`make upgrade` updates AnKLuMe framework files safely:
+- Pulls upstream changes
+- Detects locally modified framework files → creates `.bak`
+- Regenerates managed sections via `make sync`
+- Checks version compatibility
+
+User files (`infra.yml`, `roles_custom/`, `anklume.conf.yml`) are never
+touched during upgrade.
+
+### User customization directories
+
+- `roles_custom/` — user-created roles (gitignored, priority in roles_path)
+- `anklume.conf.yml` — user configuration (gitignored, template provided)
+- Generated files — user content outside `=== MANAGED ===` sections preserved
+
+## 13. Out of scope (managed by bootstrap or host)
+
+Managed by `bootstrap.sh` or manual host configuration:
 - NVIDIA driver installation/configuration
 - Kernel / mkinitcpio configuration
-- Incus daemon installation
-- Host nftables configuration (inter-bridge isolation, NAT)
+- Incus daemon installation and preseed (`bootstrap.sh --prod` assists)
+- Host nftables configuration (`make nftables-deploy` assists)
 - Sway/Wayland configuration for GUI forwarding
+- Filesystem snapshots for rollback (`bootstrap.sh --snapshot` assists)
 
-The AnKLuMe framework DOES NOT modify the host. It drives Incus via the socket.
+The AnKLuMe framework DOES NOT modify the host directly from Ansible.
+It drives Incus via the socket. Host-level operations use dedicated
+scripts run by the operator.

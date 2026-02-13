@@ -764,6 +764,65 @@ the production boundary (PR merge).
 
 ---
 
+## Phase 16: Security Policy, Cross-Domain Communication, and Bootstrap
+
+**Goal**: Enforce nesting security policy, enable selective cross-domain
+access, provide robust bootstrap/lifecycle tooling.
+
+**Prerequisites**: All previous phases.
+
+**Deliverables**:
+
+a) **Security policy (ADR-020)**:
+   - `vm_nested` flag auto-detection via `systemd-detect-virt`
+   - Nesting context files (`/etc/anklume/{absolute_level,relative_level,vm_nested,yolo}`)
+   - Generator validation: reject `security.privileged: true` on LXC when `vm_nested=false`
+   - YOLO bypass mode
+   - dev_test_runner migrated from LXC to VM
+
+b) **Network policies (ADR-021)**:
+   - `network_policies:` section in infra.yml (flat allow-list syntax)
+   - Generator validation of from/to references
+   - nftables rule generation (accept rules before drop)
+   - Integration with both host nftables and firewall VM modes
+
+c) **infra/ directory support**:
+   - Generator accepts `infra/` directory (base.yml + domains/*.yml + policies.yml)
+   - Auto-detection of single file vs directory
+   - Backward compatible with infra.yml
+
+d) **AI tools domain**:
+   - New `ai-tools` domain with 4 machines (ai-ollama, ai-openwebui, ai-lobechat, ai-opencode)
+   - New roles: `lobechat`, `opencode_server`
+   - Debian 12 workaround for Python 3.13 containers
+
+e) **Bootstrap script** (`bootstrap.sh`):
+   - `--prod` / `--dev` modes with Incus preseed auto-configuration
+   - `--snapshot` for pre-modification filesystem snapshots
+   - `--YOLO` mode
+   - `--import` for existing infrastructure import
+
+f) **Lifecycle tooling**:
+   - `make flush` — destroy all AnKLuMe infrastructure
+   - `make upgrade` — safe framework update with conflict detection
+   - `make import-infra` — reverse-generate infra.yml from Incus state
+   - `roles_custom/` directory for user role customization
+   - Version marker for compatibility checking
+
+**Validation criteria**:
+- [ ] `security.privileged: true` on LXC rejected when `vm_nested=false`
+- [ ] `security.privileged: true` on LXC accepted when `vm_nested=true`
+- [ ] `--YOLO` bypasses privileged restriction (warning instead of error)
+- [ ] Context files created correctly at each nesting level
+- [ ] `network_policies` rules generate correct nftables accept lines
+- [ ] `infra/` directory produces identical output to equivalent `infra.yml`
+- [ ] `bootstrap.sh --prod` configures Incus with detected FS backend
+- [ ] `make flush` destroys infrastructure, preserves user files
+- [ ] `make upgrade` preserves user files, detects conflicts
+- [ ] `make import-infra` generates valid infra.yml from running Incus
+
+---
+
 ## Current State
 
 **Completed**:
@@ -784,7 +843,8 @@ the production boundary (PR merge).
 - Phase 14: Speech-to-Text (STT) service (stt_server role)
 - Phase 15: Claude Code Agent Teams (autonomous dev + testing)
 
-**All phases complete.**
+**Next**:
+- Phase 16: Security Policy, Cross-Domain Communication, and Bootstrap
 
 **Deployed infrastructure**:
 
