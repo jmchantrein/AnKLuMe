@@ -92,7 +92,8 @@
 - id: FIX-INCUS-012
   category: incus-cli
   problem: "Scripts using incus commands with 2>/dev/null silently do nothing when daemon is unreachable"
-  solution: "Add pre-flight connectivity check before any business logic: if ! incus project list >/dev/null 2>&1; then die; fi"
+  solution: "Add pre-flight connectivity check before any business logic:
+    if ! incus project list >/dev/null 2>&1; then die; fi"
   source_commit: "09f0670"
   files_affected:
     - "scripts/flush.sh"
