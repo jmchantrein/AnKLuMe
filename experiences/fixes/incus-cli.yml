@@ -1,0 +1,90 @@
+# Incus CLI quirks and workarounds discovered during AnKLuMe development.
+# Each entry documents a CLI behavior issue and its resolution.
+---
+- id: FIX-INCUS-001
+  category: incus-cli
+  problem: "incus project set requires --property flag for project properties"
+  solution: "Use incus project set <name> --property description='...' not description='...'"
+  source_commit: "db3ed90"
+  files_affected: ["roles/incus_projects/tasks/main.yml"]
+  prevention: "Project properties (description) differ from config keys"
+
+- id: FIX-INCUS-002
+  category: incus-cli
+  problem: "incus device set fails on profile-inherited eth0 device"
+  solution: "Use 'incus config device override' then 'incus config device set'"
+  source_commit: "db3ed90"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "Profile-inherited devices must be overridden before setting"
+
+- id: FIX-INCUS-003
+  category: incus-cli
+  problem: "incus show outputs YAML, not JSON"
+  solution: "Use from_yaml filter, or use 'incus list --format json' for JSON"
+  source_commit: "231717a"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "'show' always outputs YAML; 'list --format json' for JSON"
+
+- id: FIX-INCUS-004
+  category: incus-cli
+  problem: "images: remote not configured in fresh Incus installations"
+  solution: "Run 'incus remote add images https://images.linuxcontainers.org --protocol simplestreams'"
+  source_commit: "db3ed90"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "Add images remote setup task before launching instances"
+
+- id: FIX-INCUS-005
+  category: incus-cli
+  problem: "network bridge name exceeds 15-character Linux limit"
+  solution: "Shorten bridge names; Linux interfaces limited to 15 characters"
+  source_commit: "95fce82"
+  files_affected: ["roles/incus_networks/tasks/main.yml"]
+  prevention: "Validate bridge name length in PSOT generator"
+
+- id: FIX-INCUS-006
+  category: incus-cli
+  problem: "incus exec fails on VM before incus-agent initializes"
+  solution: "Poll 'incus exec <vm> -- true' until agent responds"
+  source_commit: "8345178"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "Always wait for incus-agent after VM reaches Running state"
+
+- id: FIX-INCUS-007
+  category: incus-cli
+  problem: "proxy device fails if target directory does not exist at boot"
+  solution: "Add systemd oneshot service to create directory before proxy binds"
+  source_commit: "a23ac33"
+  files_affected: ["roles/admin_bootstrap/tasks/main.yml"]
+  prevention: "Proxy devices need target directories pre-created (ADR-019)"
+
+- id: FIX-INCUS-008
+  category: incus-cli
+  problem: "networks exist in default project even with features.networks=false"
+  solution: "Do not use --project flag for network commands (ADR-014)"
+  source_commit: "231717a"
+  files_affected: ["roles/incus_networks/tasks/main.yml"]
+  prevention: "Networks live in default project; profiles need --project"
+
+- id: FIX-INCUS-009
+  category: incus-cli
+  problem: "GPU device not active after adding to running container"
+  solution: "Restart instance after adding a new device"
+  source_commit: "0e96af1"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "Restart container when GPU device is added for first time"
+
+- id: FIX-INCUS-010
+  category: incus-cli
+  problem: "incus launch --vm needs different image variant than LXC"
+  solution: "Incus auto-selects correct variant (rootfs vs disk) from same alias"
+  source_commit: "8345178"
+  files_affected: ["roles/incus_instances/tasks/main.yml"]
+  prevention: "Same image alias works for both LXC and VM"
+
+- id: FIX-INCUS-011
+  category: incus-cli
+  problem: "when: conditionals with Incus JSON output fail on Ansible 2.19"
+  solution: "Use | length > 0 instead of bare truthiness checks"
+  source_commit: "db3ed90"
+  files_affected: ["roles/*/tasks/main.yml"]
+  prevention: "Ansible 2.19 requires explicit boolean evaluation in when:"
