@@ -109,3 +109,13 @@
     errors — only use it for expected operational failures (resource already exists,
     service already stopped, etc.). For bootstrap.sh specifically, distinguish
     'not installed' (command -v) from 'installed but daemon down' (incus info fails)."
+
+- id: FIX-INCUS-013
+  category: incus-cli
+  problem: "incus project list --format csv includes (current) marker in project name"
+  solution: "Use --format json with python3 parser instead of csv+cut for project listing"
+  source_commit: "pending"
+  files_affected: ["scripts/flush.sh"]
+  prevention: "Never parse incus CSV output with cut for project names — the
+    '(current)' annotation is appended to the active project name. Use
+    --format json for reliable parsing of structured Incus output."
