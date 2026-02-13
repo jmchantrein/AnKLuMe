@@ -339,3 +339,335 @@ class TestRoleDefaultRanges:
                 if len(prefixes) > 1:
                     collisions.append(f"{key}: used by {', '.join(roles)}")
         assert not collisions, "Namespace collisions:\n" + "\n".join(collisions)
+
+
+class TestRoleTemplates:
+    """Verify roles with templates have valid Jinja2 templates."""
+
+    ROLES_WITH_TEMPLATES = sorted([
+        "dev_agent_runner",
+        "firewall_router",
+        "incus_nftables",
+        "lobechat",
+        "opencode_server",
+        "stt_server",
+    ])
+
+    def test_templates_are_jinja2(self):
+        """All template files end in .j2."""
+        errors = []
+        for role in self.ROLES_WITH_TEMPLATES:
+            templates_dir = ROLES_DIR / role / "templates"
+            if not templates_dir.exists():
+                errors.append(f"{role}: templates/ directory missing")
+                continue
+            for tpl in templates_dir.iterdir():
+                if tpl.is_file() and not tpl.name.endswith(".j2"):
+                    errors.append(
+                        f"{role}: template '{tpl.name}' "
+                        f"does not end in .j2",
+                    )
+        assert not errors, (
+            "Non-.j2 template files:\n" + "\n".join(errors)
+        )
+
+    def test_templates_contain_variables(self):
+        """Templates reference at least one {{ variable }}."""
+        errors = []
+        for role in self.ROLES_WITH_TEMPLATES:
+            templates_dir = ROLES_DIR / role / "templates"
+            if not templates_dir.exists():
+                continue
+            for tpl in templates_dir.iterdir():
+                if not tpl.is_file():
+                    continue
+                content = tpl.read_text()
+                if "{{" not in content:
+                    errors.append(
+                        f"{role}: template '{tpl.name}' "
+                        f"contains no {{{{ variable }}}} reference",
+                    )
+        assert not errors, (
+            "Templates without variables:\n" + "\n".join(errors)
+        )
+
+    def test_templates_not_empty(self):
+        """No empty template files."""
+        errors = []
+        for role in self.ROLES_WITH_TEMPLATES:
+            templates_dir = ROLES_DIR / role / "templates"
+            if not templates_dir.exists():
+                continue
+            for tpl in templates_dir.iterdir():
+                if tpl.is_file() and tpl.stat().st_size == 0:
+                    errors.append(
+                        f"{role}: template '{tpl.name}' is empty",
+                    )
+        assert not errors, (
+            "Empty template files:\n" + "\n".join(errors)
+        )
+
+
+class TestRoleHandlers:
+    """Verify handler files are valid."""
+
+    ROLES_WITH_HANDLERS = sorted([
+        "admin_bootstrap",
+        "base_system",
+        "dev_test_runner",
+        "incus_images",
+        "incus_instances",
+        "incus_networks",
+        "incus_nftables",
+        "incus_profiles",
+        "incus_projects",
+        "lobechat",
+        "ollama_server",
+        "opencode_server",
+        "open_webui",
+        "stt_server",
+    ])
+
+    def test_handlers_are_valid_yaml(self):
+        """All handlers/main.yml parse as YAML."""
+        errors = []
+        for role in self.ROLES_WITH_HANDLERS:
+            handlers = ROLES_DIR / role / "handlers" / "main.yml"
+            if not handlers.exists():
+                errors.append(f"{role}: handlers/main.yml missing")
+                continue
+            try:
+                yaml.safe_load(handlers.read_text())
+            except yaml.YAMLError as e:
+                errors.append(f"{role}: {e}")
+        assert not errors, (
+            "Handler YAML parse errors:\n" + "\n".join(errors)
+        )
+
+    def test_handlers_not_empty(self):
+        """Handler files are not empty (at minimum ---)."""
+        errors = []
+        for role in self.ROLES_WITH_HANDLERS:
+            handlers = ROLES_DIR / role / "handlers" / "main.yml"
+            if not handlers.exists():
+                continue
+            content = handlers.read_text().strip()
+            if not content:
+                errors.append(f"{role}: handlers/main.yml is empty")
+        assert not errors, (
+            "Empty handler files:\n" + "\n".join(errors)
+        )
+
+
+class TestMoleculeConfig:
+    """Verify molecule configs for all roles."""
+
+    def test_molecule_default_exists(self):
+        """Each role has molecule/default/ directory."""
+        missing = []
+        for role in EXPECTED_ROLES:
+            mol_default = ROLES_DIR / role / "molecule" / "default"
+            if not mol_default.is_dir():
+                missing.append(role)
+        assert not missing, (
+            f"Roles missing molecule/default/: {missing}"
+        )
+
+    def test_molecule_has_converge(self):
+        """molecule/default/molecule.yml exists."""
+        missing = []
+        for role in EXPECTED_ROLES:
+            mol_yml = (
+                ROLES_DIR / role / "molecule" / "default" / "molecule.yml"
+            )
+            if not mol_yml.exists():
+                missing.append(role)
+        assert not missing, (
+            f"Roles missing molecule/default/molecule.yml: {missing}"
+        )
+
+    def test_molecule_config_valid_yaml(self):
+        """molecule.yml parses as valid YAML."""
+        errors = []
+        for role in EXPECTED_ROLES:
+            mol_yml = (
+                ROLES_DIR / role / "molecule" / "default" / "molecule.yml"
+            )
+            if not mol_yml.exists():
+                continue
+            try:
+                data = yaml.safe_load(mol_yml.read_text())
+                if data is None:
+                    errors.append(f"{role}: molecule.yml is empty/null")
+            except yaml.YAMLError as e:
+                errors.append(f"{role}: {e}")
+        assert not errors, (
+            "Molecule YAML errors:\n" + "\n".join(errors)
+        )
+
+    def test_molecule_has_verify_or_converge(self):
+        """Each role has either verify.yml or converge.yml in molecule/default/."""
+        missing = []
+        for role in EXPECTED_ROLES:
+            mol_dir = ROLES_DIR / role / "molecule" / "default"
+            if not mol_dir.is_dir():
+                continue
+            has_verify = (mol_dir / "verify.yml").exists()
+            has_converge = (mol_dir / "converge.yml").exists()
+            if not has_verify and not has_converge:
+                missing.append(role)
+        assert not missing, (
+            f"Roles without verify.yml or converge.yml: {missing}"
+        )
+
+
+class TestTasksContent:
+    """Verify task files follow project conventions."""
+
+    def test_tasks_use_fqcn(self):
+        """Task files use FQCN (ansible.builtin.xxx not just xxx)."""
+        errors = []
+        for role in EXPECTED_ROLES:
+            tasks_dir = ROLES_DIR / role / "tasks"
+            if not tasks_dir.exists():
+                continue
+            for task_file in sorted(tasks_dir.glob("*.yml")):
+                content = task_file.read_text()
+                has_fqcn = (
+                    "ansible.builtin." in content
+                    or "community.general." in content
+                )
+                if not has_fqcn:
+                    errors.append(
+                        f"{role}/{task_file.name}: "
+                        f"no FQCN module reference found",
+                    )
+        assert not errors, (
+            "Tasks without FQCN:\n" + "\n".join(errors)
+        )
+
+    def test_tasks_have_names(self):
+        """Each task has a name field (check for - name: pattern)."""
+        import re
+
+        errors = []
+        for role in EXPECTED_ROLES:
+            tasks_dir = ROLES_DIR / role / "tasks"
+            if not tasks_dir.exists():
+                continue
+            for task_file in sorted(tasks_dir.glob("*.yml")):
+                content = task_file.read_text()
+                # Find lines that look like task starts (FQCN module at
+                # task indentation) without a preceding - name: line
+                task_names = re.findall(
+                    r"^\s*- name:", content, re.MULTILINE,
+                )
+                fqcn_modules = re.findall(
+                    r"^\s+(?:ansible\.builtin|community\.general)\.\w+:",
+                    content, re.MULTILINE,
+                )
+                if fqcn_modules and not task_names:
+                    errors.append(
+                        f"{role}/{task_file.name}: has modules "
+                        f"but no task names",
+                    )
+                if task_names and len(task_names) < len(fqcn_modules):
+                    errors.append(
+                        f"{role}/{task_file.name}: "
+                        f"{len(task_names)} names but "
+                        f"{len(fqcn_modules)} module calls",
+                    )
+        assert not errors, (
+            "Tasks without names:\n" + "\n".join(errors)
+        )
+
+    def test_task_names_follow_convention(self):
+        """Task names start with RoleName | (CamelCase convention)."""
+        import re
+
+        errors = []
+        for role in EXPECTED_ROLES:
+            tasks_dir = ROLES_DIR / role / "tasks"
+            if not tasks_dir.exists():
+                continue
+            for task_file in sorted(tasks_dir.glob("*.yml")):
+                content = task_file.read_text()
+                names = re.findall(
+                    r"^\s*- name:\s+(.+)",
+                    content, re.MULTILINE,
+                )
+                for name in names:
+                    if " | " not in name:
+                        errors.append(
+                            f"{role}/{task_file.name}: "
+                            f"task name '{name}' missing ' | ' separator",
+                        )
+        assert not errors, (
+            "Task names not following RoleName | convention:\n"
+            + "\n".join(errors)
+        )
+
+
+class TestDefaultsCompleteness:
+    """Verify defaults file structure and naming."""
+
+    def test_no_duplicate_keys_in_defaults(self):
+        """No duplicate YAML keys in defaults files."""
+        import re
+
+        errors = []
+        for role in EXPECTED_ROLES:
+            defaults = ROLES_DIR / role / "defaults" / "main.yml"
+            if not defaults.exists():
+                continue
+            content = defaults.read_text()
+            # Extract top-level keys (lines starting with a word char)
+            keys = re.findall(r"^(\w+):", content, re.MULTILINE)
+            seen = {}
+            for key in keys:
+                if key in seen:
+                    errors.append(
+                        f"{role}: duplicate key '{key}' in defaults",
+                    )
+                seen[key] = True
+        assert not errors, (
+            "Duplicate keys in defaults:\n" + "\n".join(errors)
+        )
+
+    def test_defaults_keys_are_snake_case(self):
+        """All default variable names are snake_case."""
+        import re
+
+        errors = []
+        for role in EXPECTED_ROLES:
+            defaults = ROLES_DIR / role / "defaults" / "main.yml"
+            if not defaults.exists():
+                continue
+            data = yaml.safe_load(defaults.read_text())
+            if not isinstance(data, dict):
+                continue
+            for key in data:
+                if not re.match(r"^[a-z][a-z0-9_]*$", key):
+                    errors.append(
+                        f"{role}: key '{key}' is not snake_case",
+                    )
+        assert not errors, (
+            "Non-snake_case keys in defaults:\n" + "\n".join(errors)
+        )
+
+    def test_defaults_are_documented_dict(self):
+        """Top level of defaults is always a dict (not a list)."""
+        errors = []
+        for role in EXPECTED_ROLES:
+            defaults = ROLES_DIR / role / "defaults" / "main.yml"
+            if not defaults.exists():
+                continue
+            data = yaml.safe_load(defaults.read_text())
+            if not isinstance(data, dict):
+                errors.append(
+                    f"{role}: defaults top-level is "
+                    f"{type(data).__name__}, not dict",
+                )
+        assert not errors, (
+            "Defaults not dict:\n" + "\n".join(errors)
+        )
