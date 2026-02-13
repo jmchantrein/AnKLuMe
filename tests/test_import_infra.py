@@ -557,3 +557,327 @@ class TestImportOutputFileOverwrite:
         content = (cwd / "infra.imported.yml").read_text()
         assert content.startswith("#")
         assert "WARNING" in content or "Review" in content
+
+
+# ── Helper for building custom mock environments ────────
+
+
+def _build_mock_env(tmp_path, projects_json, instance_map):
+    """Build a custom mock environment.
+
+    Args:
+        tmp_path: pytest tmp_path fixture value
+        projects_json: JSON string for project list response
+        instance_map: dict mapping project name -> JSON string for instances
+
+    Returns:
+        (env, tmp_path) tuple
+    """
+    mock_bin = tmp_path / "bin"
+    mock_bin.mkdir()
+
+    proj_json = tmp_path / "proj.json"
+    proj_json.write_text(projects_json)
+
+    # Write instance JSON files
+    json_files = {}
+    for proj_name, inst_json in instance_map.items():
+        f = tmp_path / f"{proj_name}.json"
+        f.write_text(inst_json)
+        json_files[proj_name] = f
+
+    # Build incus mock script
+    script_parts = [
+        f'#!/usr/bin/env bash',
+        f'if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then',
+        f'    cat "{proj_json}"',
+        f'    exit 0',
+        f'fi',
+    ]
+    for proj_name, json_file in json_files.items():
+        script_parts.extend([
+            f'if [[ "$1" == "list" && "$*" == *"--project {proj_name}"*'
+            f' && "$*" == *"--format json"* ]]; then',
+            f'    cat "{json_file}"',
+            f'    exit 0',
+            f'fi',
+        ])
+    script_parts.append('exit 0')
+
+    mock_incus = mock_bin / "incus"
+    mock_incus.write_text("\n".join(script_parts) + "\n")
+    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+    mock_python = mock_bin / "python3"
+    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{mock_bin}:{env['PATH']}"
+    return env, tmp_path
+
+
+def _load_output_yaml(cwd):
+    """Load import output as YAML, filtering comments and WARNING lines."""
+    import yaml
+
+    content = (cwd / "infra.imported.yml").read_text()
+    yaml_content = "\n".join(
+        line for line in content.splitlines()
+        if not line.startswith("#") and not line.startswith("WARNING")
+    )
+    return yaml.safe_load(yaml_content)
+
+
+def _make_instance_json(name, itype="container", ip=None):
+    """Build a single instance JSON dict as a string-friendly dict."""
+    inst = {"name": name, "type": itype}
+    if ip:
+        inst["state"] = {
+            "network": {
+                "eth0": {
+                    "addresses": [{"family": "inet", "address": ip}],
+                },
+            },
+        }
+    else:
+        inst["state"] = {"network": None}
+    return inst
+
+
+def _make_instances_json(instances):
+    """Build a JSON string for a list of instance dicts."""
+    import json as _json
+
+    return _json.dumps(instances)
+
+
+# ── TestImportManyProjects ──────────────────────────────
+
+
+class TestImportManyProjects:
+    """Test with many projects and many instances."""
+
+    def test_five_projects_all_imported(self, tmp_path):
+        """5 projects with instances produce 5 domains in output."""
+        projects = [{"name": "default"}]
+        instance_map = {}
+        for i in range(5):
+            pname = f"proj{i}"
+            projects.append({"name": pname})
+            instance_map[pname] = _make_instances_json(
+                [_make_instance_json(f"{pname}-box", ip=f"10.100.{i}.10")]
+            )
+
+        import json as _json
+        env, cwd = _build_mock_env(tmp_path, _json.dumps(projects), instance_map)
+        result = run_import([], env, cwd=cwd)
+        assert result.returncode == 0
+
+        content = (cwd / "infra.imported.yml").read_text()
+        for i in range(5):
+            assert f"proj{i}:" in content
+            assert f"proj{i}-box:" in content
+
+    def test_subnet_ids_sequential_for_many(self, tmp_path):
+        """With 5 projects, subnet_ids go 0,1,2,3,4."""
+        projects = [{"name": "default"}]
+        instance_map = {}
+        for i in range(5):
+            pname = f"dom{i}"
+            projects.append({"name": pname})
+            instance_map[pname] = _make_instances_json(
+                [_make_instance_json(f"{pname}-srv", ip=f"10.100.{i}.10")]
+            )
+
+        import json as _json
+        env, cwd = _build_mock_env(tmp_path, _json.dumps(projects), instance_map)
+        result = run_import([], env, cwd=cwd)
+        assert result.returncode == 0
+
+        content = (cwd / "infra.imported.yml").read_text()
+        for i in range(5):
+            assert f"subnet_id: {i}" in content
+
+    def test_many_instances_per_project(self, tmp_path):
+        """Project with 5 instances produces all 5 machines in output."""
+        instances = []
+        for i in range(5):
+            instances.append(
+                _make_instance_json(f"box{i}", ip=f"10.100.0.{10 + i}")
+            )
+
+        import json as _json
+        projects = _json.dumps([{"name": "default"}, {"name": "bigproj"}])
+        instance_map = {"bigproj": _make_instances_json(instances)}
+        env, cwd = _build_mock_env(tmp_path, projects, instance_map)
+        result = run_import([], env, cwd=cwd)
+        assert result.returncode == 0
+
+        content = (cwd / "infra.imported.yml").read_text()
+        for i in range(5):
+            assert f"box{i}:" in content
+            assert f"10.100.0.{10 + i}" in content
+
+
+# ── TestImportGlobalSection ─────────────────────────────
+
+
+class TestImportGlobalSection:
+    """Verify the global section of import output."""
+
+    def test_global_has_base_subnet(self, mock_env):
+        """Output includes base_subnet: "10.100"."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        assert data["global"]["base_subnet"] == "10.100"
+
+    def test_global_has_default_os_image(self, mock_env):
+        """Output includes default_os_image: "images:debian/13"."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        assert data["global"]["default_os_image"] == "images:debian/13"
+
+    def test_project_name_is_imported(self, mock_env):
+        """Output includes project_name: imported-infra."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        assert data["project_name"] == "imported-infra"
+
+
+# ── TestImportDescriptions ──────────────────────────────
+
+
+class TestImportDescriptions:
+    """Verify description fields in import output."""
+
+    def test_domain_description_includes_project_name(self, mock_env):
+        """Domain description mentions 'Imported from Incus project X'."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        for domain_name, domain_conf in data["domains"].items():
+            assert f"Imported from Incus project {domain_name}" in domain_conf["description"]
+
+    def test_instance_description_is_imported(self, mock_env):
+        """Instance description is 'Imported instance'."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        for domain_conf in data["domains"].values():
+            for machine_conf in domain_conf["machines"].values():
+                assert machine_conf["description"] == "Imported instance"
+
+
+# ── TestImportRoles ─────────────────────────────────────
+
+
+class TestImportRoles:
+    """Verify roles assignment on imported instances."""
+
+    def test_all_instances_get_base_system_role(self, mock_env):
+        """Every imported instance has roles: [base_system]."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        for domain_conf in data["domains"].values():
+            for machine_name, machine_conf in domain_conf["machines"].items():
+                assert machine_conf["roles"] == ["base_system"], (
+                    f"Machine {machine_name} should have roles [base_system]"
+                )
+
+
+# ── TestImportSpecialCharacters ─────────────────────────
+
+
+class TestImportSpecialCharacters:
+    """Edge cases with special names."""
+
+    def test_project_name_with_hyphens(self, tmp_path):
+        """Project 'my-project' imports correctly."""
+        import json as _json
+
+        projects = _json.dumps([{"name": "default"}, {"name": "my-project"}])
+        instance_map = {
+            "my-project": _make_instances_json(
+                [_make_instance_json("my-project-srv", ip="10.100.0.10")]
+            ),
+        }
+        env, cwd = _build_mock_env(tmp_path, projects, instance_map)
+        result = run_import([], env, cwd=cwd)
+        assert result.returncode == 0
+
+        data = _load_output_yaml(cwd)
+        assert "my-project" in data["domains"]
+        assert "my-project-srv" in data["domains"]["my-project"]["machines"]
+
+    def test_instance_with_long_name(self, tmp_path):
+        """Instance with 30+ char name imported correctly."""
+        import json as _json
+
+        long_name = "a-very-long-instance-name-that-exceeds-thirty-characters"
+        assert len(long_name) > 30
+        projects = _json.dumps([{"name": "default"}, {"name": "longnames"}])
+        instance_map = {
+            "longnames": _make_instances_json(
+                [_make_instance_json(long_name, ip="10.100.0.10")]
+            ),
+        }
+        env, cwd = _build_mock_env(tmp_path, projects, instance_map)
+        result = run_import([], env, cwd=cwd)
+        assert result.returncode == 0
+
+        data = _load_output_yaml(cwd)
+        assert long_name in data["domains"]["longnames"]["machines"]
+
+
+# ── TestImportOutputFormat ──────────────────────────────
+
+
+class TestImportOutputFormat:
+    """Verify output formatting."""
+
+    def test_output_is_valid_yaml_loadable(self, mock_env):
+        """Output can be loaded as YAML (filtering out comments/WARNING)."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        assert data is not None
+        assert isinstance(data, dict)
+
+    def test_output_contains_domains_key(self, mock_env):
+        """Output YAML has 'domains' key."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        data = _load_output_yaml(cwd)
+        assert "domains" in data
+
+    def test_output_indentation_consistent(self, mock_env):
+        """Domains are indented with 2 spaces, machines with 6 spaces."""
+        env, _, cwd = mock_env
+        run_import([], env, cwd=cwd)
+        content = (cwd / "infra.imported.yml").read_text()
+        lines = content.splitlines()
+
+        found_domain = False
+        found_machine = False
+        for line in lines:
+            # Domain lines: exactly 2 spaces then name + colon (e.g. "  admin:")
+            if line.startswith("  admin:"):
+                found_domain = True
+                # Verify exactly 2 spaces of indentation
+                stripped = line.lstrip()
+                indent = len(line) - len(stripped)
+                assert indent == 2
+            # Machine lines: exactly 6 spaces then name + colon (e.g. "      admin-ctrl:")
+            if line.startswith("      admin-ctrl:"):
+                found_machine = True
+                stripped = line.lstrip()
+                indent = len(line) - len(stripped)
+                assert indent == 6
+
+        assert found_domain, "Should find domain 'admin' at 2-space indent"
+        assert found_machine, "Should find machine 'admin-ctrl' at 6-space indent"
