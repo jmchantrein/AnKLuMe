@@ -57,7 +57,7 @@ deleted=0
 
 # 1. Destroy instances in all projects
 echo "--- Destroying instances ---"
-for project in $(incus project list --format csv | cut -d, -f1); do
+for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
     for instance in $(incus list --project "$project" --format csv -c n 2>/dev/null); do
         echo "  Deleting: $instance (project: $project)"
         if incus delete "$instance" --project "$project" --force; then
@@ -70,7 +70,7 @@ done
 
 # 2. Delete non-default profiles in all projects
 echo "--- Deleting profiles ---"
-for project in $(incus project list --format csv | cut -d, -f1); do
+for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
     for profile in $(incus profile list --project "$project" --format csv -c n 2>/dev/null); do
         if [ "$profile" != "default" ]; then
             echo "  Deleting profile: $profile (project: $project)"
@@ -85,7 +85,7 @@ done
 
 # 3. Delete non-default projects
 echo "--- Deleting projects ---"
-for project in $(incus project list --format csv | cut -d, -f1); do
+for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
     if [ "$project" != "default" ]; then
         echo "  Deleting project: $project"
         if incus project delete "$project"; then
