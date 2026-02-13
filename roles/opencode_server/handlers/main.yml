@@ -1,0 +1,6 @@
+---
+- name: OpencodeServer | Restart OpenCode
+  ansible.builtin.systemd:
+    name: opencode
+    state: restarted
+    daemon_reload: true

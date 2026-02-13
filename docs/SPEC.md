@@ -343,6 +343,12 @@ declarative property of the infrastructure.
 | Role | Responsibility | Tags |
 |------|---------------|------|
 | `base_system` | Base packages, locale, timezone, user | `provision`, `base` |
+| `ollama_server` | Ollama LLM inference server | `provision`, `llm` |
+| `open_webui` | Open WebUI chat frontend | `provision`, `webui` |
+| `stt_server` | Speaches STT server (faster-whisper) | `provision`, `stt` |
+| `lobechat` | LobeChat multi-provider web UI | `provision`, `lobechat` |
+| `opencode_server` | OpenCode headless AI coding server | `provision`, `opencode` |
+| `firewall_router` | nftables routing inside firewall VM | `provision`, `firewall` |
 | (user-defined) | Application-specific setup | `provision` |
 
 ### Reconciliation pattern (all infra roles)

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama",
+      "options": {
+        "baseURL": "{{ opencode_server_ollama_url }}"
+      },
+      "models": {
+        "{{ opencode_server_model }}": {
+          "name": "{{ opencode_server_model }}"
+        }
+      }
+    }
+  }
+}

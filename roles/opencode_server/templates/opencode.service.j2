@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenCode AI Coding Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/opencode serve --port {{ opencode_server_port }} --hostname {{ opencode_server_host }}
+Environment="OPENCODE_SERVER_PASSWORD={{ opencode_server_password }}"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

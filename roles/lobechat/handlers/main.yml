@@ -1,0 +1,6 @@
+---
+- name: LobeChat | Restart LobeChat
+  ansible.builtin.systemd:
+    name: lobechat
+    state: restarted
+    daemon_reload: true
