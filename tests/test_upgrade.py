@@ -387,3 +387,86 @@ class TestUpgradeMergeConflict:
         )
         assert result.returncode != 0
         assert "Merge conflict" in result.stdout or "merge" in result.stdout.lower()
+
+
+class TestUpgradeVersionMarker:
+    """Test version marker and framework file list coverage."""
+
+    def test_framework_files_are_known(self, git_workspace):
+        """Upgrade script lists known framework files (Makefile, site.yml, etc.)."""
+        script_content = UPGRADE_SH.read_text()
+        assert "Makefile" in script_content
+        assert "site.yml" in script_content
+        assert "ansible.cfg" in script_content
+
+    def test_user_files_list_includes_infra(self, git_workspace):
+        """Upgrade script protects infra.yml and anklume.conf.yml."""
+        script_content = UPGRADE_SH.read_text()
+        assert "infra.yml" in script_content
+        assert "anklume.conf.yml" in script_content
+        assert "roles_custom/" in script_content
+
+    def test_upgrade_preserves_roles_custom(self, git_workspace):
+        """Custom roles directory is never touched by upgrade."""
+        custom_dir = git_workspace / "roles_custom"
+        custom_dir.mkdir()
+        (custom_dir / "my_role.yml").write_text("---\n# custom role\n")
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        assert (custom_dir / "my_role.yml").exists()
+        assert (custom_dir / "my_role.yml").read_text() == "---\n# custom role\n"
+
+
+class TestUpgradeMultipleFrameworkBackups:
+    """Test backup when multiple framework files are modified."""
+
+    def test_multiple_modified_files_all_backed_up(self, git_workspace):
+        """Multiple modified framework files all get .bak backups."""
+        # Modify multiple framework files (unstaged)
+        (git_workspace / "Makefile").write_text("# mod1\n")
+        (git_workspace / "ansible.cfg").write_text("# mod2\n")
+        result = run_upgrade(git_workspace, input_text="y\n")
+        assert result.returncode == 0
+        makefile_baks = list(git_workspace.glob("Makefile.bak.*"))
+        ansible_baks = list(git_workspace.glob("ansible.cfg.bak.*"))
+        assert len(makefile_baks) >= 1
+        assert len(ansible_baks) >= 1
+
+
+class TestUpgradeRegenerationOutput:
+    """Test that upgrade produces proper generated files."""
+
+    def test_inventory_created(self, git_workspace):
+        """After upgrade, inventory/ directory is created."""
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        assert (git_workspace / "inventory").exists()
+        assert (git_workspace / "inventory" / "admin.yml").exists()
+
+    def test_group_vars_created(self, git_workspace):
+        """After upgrade, group_vars/ directory is created."""
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        assert (git_workspace / "group_vars" / "all.yml").exists()
+        assert (git_workspace / "group_vars" / "admin.yml").exists()
+
+    def test_host_vars_created(self, git_workspace):
+        """After upgrade, host_vars/<machine>.yml is created."""
+        result = run_upgrade(git_workspace)
+        assert result.returncode == 0
+        assert (git_workspace / "host_vars" / "admin-ansible.yml").exists()
+
+    def test_regenerated_files_contain_managed_markers(self, git_workspace):
+        """Regenerated files contain MANAGED section markers."""
+        run_upgrade(git_workspace)
+        all_yml = (git_workspace / "group_vars" / "all.yml").read_text()
+        assert "=== MANAGED BY infra.yml ===" in all_yml
+        assert "=== END MANAGED ===" in all_yml
+
+    def test_upgrade_idempotent(self, git_workspace):
+        """Running upgrade twice produces identical output."""
+        run_upgrade(git_workspace)
+        first_content = (git_workspace / "group_vars" / "all.yml").read_text()
+        run_upgrade(git_workspace)
+        second_content = (git_workspace / "group_vars" / "all.yml").read_text()
+        assert first_content == second_content
