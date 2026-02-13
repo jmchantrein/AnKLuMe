@@ -3,11 +3,11 @@
 #
 # Runs on the controller via connection:local.
 # Reads current Incus bridges, filters AnKLuMe bridges,
-# and generates nftables rules that isolate non-admin domains
-# while allowing admin → all traffic.
+# and generates nftables rules that isolate all domains.
+# The admin container communicates via the Incus socket,
+# not the network, so it needs no special accept rule.
 #
 # Input variables (from defaults/main.yml):
-#   - incus_nftables_admin_bridge (string): admin bridge name
 #   - incus_nftables_bridge_pattern (string): prefix for AnKLuMe bridges
 #   - incus_nftables_output_path (string): where to write the rules
 #   - incus_nftables_apply (boolean): whether to apply rules immediately
@@ -26,13 +26,6 @@
          | selectattr('name', 'match', '^' ~ incus_nftables_bridge_pattern)
          | map(attribute='name')
          | sort
-         | list }}
-
-- name: IncusNftables | Identify non-admin bridges
-  ansible.builtin.set_fact:
-    incus_nftables_non_admin_bridges: >-
-      {{ incus_nftables_all_bridges
-         | reject('equalto', incus_nftables_admin_bridge)
          | list }}
 
 - name: IncusNftables | Create output directory
