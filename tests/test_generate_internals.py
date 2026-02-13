@@ -1226,3 +1226,726 @@ class TestValidateEarlyReturn:
         # Should not contain any domain-related errors like "invalid name"
         assert not any("subnet" in e.lower() for e in errors)
         assert not any("ip" in e.lower() for e in errors)
+
+
+# ── Network policy validation edge cases ──────────────────────────
+
+
+class TestNetworkPolicyValidation:
+    """Detailed tests for network_policies validation in validate()."""
+
+    def _base(self, policies, extra_domains=None):
+        domains = {
+            "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
+            "pro": {"subnet_id": 1, "machines": {"dev": {"type": "lxc", "ip": "10.100.1.10"}}},
+        }
+        if extra_domains:
+            domains.update(extra_domains)
+        return {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": domains,
+            "network_policies": policies,
+        }
+
+    def test_valid_policy_no_errors(self):
+        """A valid network policy produces no errors."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [8080], "protocol": "tcp"},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_policy_port_zero_invalid(self):
+        """Port 0 is invalid (must be 1-65535)."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [0], "protocol": "tcp"},
+        ])
+        errors = validate(infra)
+        assert any("invalid port 0" in e for e in errors)
+
+    def test_policy_port_65536_invalid(self):
+        """Port 65536 is invalid (must be 1-65535)."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [65536], "protocol": "tcp"},
+        ])
+        errors = validate(infra)
+        assert any("invalid port 65536" in e for e in errors)
+
+    def test_policy_port_negative_invalid(self):
+        """Negative port is invalid."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [-1], "protocol": "tcp"},
+        ])
+        errors = validate(infra)
+        assert any("invalid port -1" in e for e in errors)
+
+    def test_policy_ports_all_valid(self):
+        """ports: 'all' is a valid value."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": "all"},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_policy_ports_string_invalid(self):
+        """ports as a non-'all' string is invalid (must be list or 'all')."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": "8080"},
+        ])
+        errors = validate(infra)
+        assert any("ports must be a list" in e for e in errors)
+
+    def test_policy_protocol_invalid(self):
+        """Invalid protocol value is rejected."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [80], "protocol": "icmp"},
+        ])
+        errors = validate(infra)
+        assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
+
+    def test_policy_missing_from(self):
+        """Missing 'from' field is caught."""
+        infra = self._base([
+            {"to": "pro", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert any("missing 'from'" in e for e in errors)
+
+    def test_policy_missing_to(self):
+        """Missing 'to' field is caught."""
+        infra = self._base([
+            {"from": "admin", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert any("missing 'to'" in e for e in errors)
+
+    def test_policy_unknown_from_reference(self):
+        """Unknown 'from' reference is caught."""
+        infra = self._base([
+            {"from": "nonexistent", "to": "pro", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert any("nonexistent" in e and "not a known" in e for e in errors)
+
+    def test_policy_unknown_to_reference(self):
+        """Unknown 'to' reference is caught."""
+        infra = self._base([
+            {"from": "admin", "to": "nowhere", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert any("nowhere" in e and "not a known" in e for e in errors)
+
+    def test_policy_host_keyword_valid(self):
+        """'host' keyword is valid for from/to."""
+        infra = self._base([
+            {"from": "host", "to": "pro", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_policy_machine_name_valid(self):
+        """Machine name is valid for from/to."""
+        infra = self._base([
+            {"from": "ctrl", "to": "dev", "ports": [80]},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_policy_bidirectional_accepted(self):
+        """bidirectional: true is accepted without error."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": "all", "bidirectional": True},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_policy_non_dict_entry(self):
+        """Non-dict policy entry is caught."""
+        infra = self._base(["not-a-dict"])
+        errors = validate(infra)
+        assert any("must be a mapping" in e for e in errors)
+
+    def test_multiple_valid_ports(self):
+        """Multiple valid ports in a single policy accepted."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [80, 443, 8080, 11434]},
+        ])
+        errors = validate(infra)
+        assert errors == []
+
+    def test_mixed_valid_and_invalid_ports(self):
+        """Mixed valid and invalid ports: each invalid port reported."""
+        infra = self._base([
+            {"from": "admin", "to": "pro", "ports": [80, 0, 70000]},
+        ])
+        errors = validate(infra)
+        assert any("invalid port 0" in e for e in errors)
+        assert any("invalid port 70000" in e for e in errors)
+
+    def test_both_from_and_to_invalid(self):
+        """Both from and to invalid: both errors reported."""
+        infra = self._base([
+            {"from": "ghost", "to": "phantom", "ports": [80]},
+        ])
+        errors = validate(infra)
+        from_errors = [e for e in errors if "ghost" in e]
+        to_errors = [e for e in errors if "phantom" in e]
+        assert len(from_errors) >= 1
+        assert len(to_errors) >= 1
+
+
+# ── AI access policy validation detailed ──────────────────────────
+
+
+class TestAIAccessPolicyDetailed:
+    """Detailed tests for AI access policy validation and enrichment."""
+
+    def _ai_infra(self, **overrides):
+        infra = {
+            "project_name": "test",
+            "global": {
+                "base_subnet": "10.100",
+                "ai_access_policy": "exclusive",
+                "ai_access_default": "pro",
+            },
+            "domains": {
+                "pro": {"subnet_id": 1, "machines": {}},
+                "ai-tools": {"subnet_id": 10, "machines": {}},
+            },
+        }
+        infra["global"].update(overrides)
+        return infra
+
+    def test_exclusive_valid_config_passes(self):
+        """Valid exclusive AI config passes validation."""
+        infra = self._ai_infra()
+        errors = validate(infra)
+        assert errors == []
+
+    def test_exclusive_missing_default_errors(self):
+        """Exclusive without ai_access_default errors."""
+        infra = self._ai_infra()
+        del infra["global"]["ai_access_default"]
+        errors = validate(infra)
+        assert any("ai_access_default is required" in e for e in errors)
+
+    def test_exclusive_default_is_ai_tools_errors(self):
+        """ai_access_default cannot be 'ai-tools' itself."""
+        infra = self._ai_infra(ai_access_default="ai-tools")
+        errors = validate(infra)
+        assert any("cannot be 'ai-tools'" in e for e in errors)
+
+    def test_exclusive_default_unknown_domain_errors(self):
+        """ai_access_default referencing unknown domain errors."""
+        infra = self._ai_infra(ai_access_default="nonexistent")
+        errors = validate(infra)
+        assert any("nonexistent" in e and "not a known domain" in e for e in errors)
+
+    def test_exclusive_no_ai_tools_domain_errors(self):
+        """Exclusive mode without ai-tools domain errors."""
+        infra = self._ai_infra()
+        del infra["domains"]["ai-tools"]
+        errors = validate(infra)
+        assert any("no 'ai-tools' domain" in e for e in errors)
+
+    def test_exclusive_two_policies_to_ai_tools_errors(self):
+        """Two network_policies targeting ai-tools errors."""
+        infra = self._ai_infra()
+        infra["network_policies"] = [
+            {"from": "pro", "to": "ai-tools", "ports": "all"},
+            {"from": "admin", "to": "ai-tools", "ports": [8080]},
+        ]
+        infra["domains"]["admin"] = {"subnet_id": 0, "machines": {}}
+        errors = validate(infra)
+        assert any("2 network_policies target ai-tools" in e for e in errors)
+
+    def test_invalid_ai_access_policy_value(self):
+        """Invalid ai_access_policy value errors."""
+        infra = self._ai_infra(ai_access_policy="both")
+        errors = validate(infra)
+        assert any("must be 'exclusive' or 'open'" in e for e in errors)
+
+    def test_open_mode_skips_exclusive_validation(self):
+        """Open mode does not trigger exclusive-mode checks."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100", "ai_access_policy": "open"},
+            "domains": {"d": {"subnet_id": 0, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert errors == []
+
+    def test_enrichment_auto_creates_bidirectional_policy(self):
+        """Auto-created policy is bidirectional."""
+        infra = self._ai_infra()
+        enrich_infra(infra)
+        policy = next(p for p in infra["network_policies"] if p.get("to") == "ai-tools")
+        assert policy.get("bidirectional") is True
+
+    def test_enrichment_skips_when_no_ai_tools_domain(self):
+        """Enrichment no-op when ai-tools domain does not exist."""
+        infra = self._ai_infra()
+        del infra["domains"]["ai-tools"]
+        # Should not crash
+        enrich_infra(infra)
+        assert "network_policies" not in infra or not infra.get("network_policies")
+
+    def test_enrichment_skips_when_no_default(self):
+        """Enrichment no-op when ai_access_default is empty."""
+        infra = self._ai_infra()
+        infra["global"]["ai_access_default"] = ""
+        enrich_infra(infra)
+        assert "network_policies" not in infra or not infra.get("network_policies")
+
+
+# ── validate() domain-level edge cases ────────────────────────────
+
+
+class TestValidateDomainEdgeCases:
+    """Additional edge cases for domain and machine validation."""
+
+    def test_invalid_domain_name_uppercase(self):
+        """Domain name with uppercase letters errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"MyDomain": {"subnet_id": 0, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("invalid name" in e for e in errors)
+
+    def test_invalid_domain_name_underscore(self):
+        """Domain name with underscore errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"my_domain": {"subnet_id": 0, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("invalid name" in e for e in errors)
+
+    def test_invalid_domain_name_starts_with_hyphen(self):
+        """Domain name starting with hyphen errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"-bad": {"subnet_id": 0, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("invalid name" in e for e in errors)
+
+    def test_subnet_id_255_invalid(self):
+        """subnet_id 255 is out of range."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 255, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("subnet_id must be 0-254" in e for e in errors)
+
+    def test_subnet_id_negative_invalid(self):
+        """Negative subnet_id is invalid."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": -1, "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("subnet_id must be 0-254" in e for e in errors)
+
+    def test_subnet_id_string_invalid(self):
+        """String subnet_id is invalid."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": "five", "machines": {}}},
+        }
+        errors = validate(infra)
+        assert any("subnet_id must be 0-254" in e for e in errors)
+
+    def test_invalid_machine_type(self):
+        """Invalid machine type errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "docker"}}}},
+        }
+        errors = validate(infra)
+        assert any("type must be 'lxc' or 'vm'" in e for e in errors)
+
+    def test_duplicate_machine_names_across_domains(self):
+        """Machine names must be globally unique."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d1": {"subnet_id": 0, "machines": {"clash": {"type": "lxc", "ip": "10.100.0.10"}}},
+                "d2": {"subnet_id": 1, "machines": {"clash": {"type": "lxc", "ip": "10.100.1.10"}}},
+            },
+        }
+        errors = validate(infra)
+        assert any("duplicate" in e.lower() and "clash" in e for e in errors)
+
+    def test_duplicate_ips_across_domains(self):
+        """IP addresses must be globally unique."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d1": {"subnet_id": 0, "machines": {"m1": {"type": "lxc", "ip": "10.100.0.10"}}},
+                "d2": {"subnet_id": 1, "machines": {"m2": {"type": "lxc", "ip": "10.100.0.10"}}},
+            },
+        }
+        errors = validate(infra)
+        assert any("IP 10.100.0.10 already used" in e for e in errors)
+
+    def test_ip_wrong_subnet(self):
+        """IP outside declared subnet errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {"subnet_id": 5, "machines": {"m": {"type": "lxc", "ip": "10.100.9.10"}}},
+            },
+        }
+        errors = validate(infra)
+        assert any("not in subnet 10.100.5.0/24" in e for e in errors)
+
+    def test_ephemeral_non_boolean_errors(self):
+        """Non-boolean ephemeral value errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {"subnet_id": 0, "ephemeral": "yes", "machines": {}},
+            },
+        }
+        errors = validate(infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+    def test_machine_ephemeral_non_boolean_errors(self):
+        """Non-boolean machine ephemeral value errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {"subnet_id": 0, "machines": {"m": {"type": "lxc", "ephemeral": 1}}},
+            },
+        }
+        errors = validate(infra)
+        assert any("ephemeral must be a boolean" in e for e in errors)
+
+    def test_undefined_profile_reference_errors(self):
+        """Machine referencing undefined profile errors."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "profiles": {},
+                    "machines": {"m": {"type": "lxc", "profiles": ["default", "ghost"]}},
+                },
+            },
+        }
+        errors = validate(infra)
+        assert any("profile 'ghost' not defined" in e for e in errors)
+
+    def test_default_profile_always_allowed(self):
+        """'default' profile is always allowed without definition."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "profiles": {},
+                    "machines": {"m": {"type": "lxc", "profiles": ["default"]}},
+                },
+            },
+        }
+        errors = validate(infra)
+        assert errors == []
+
+
+# ── generate() comprehensive output tests ─────────────────────────
+
+
+class TestGenerateOutput:
+    """Verify the structure and content of generated files."""
+
+    def test_inventory_format(self, tmp_path):
+        """Generated inventory has correct all.children.<domain>.hosts structure."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "web": {
+                    "subnet_id": 1,
+                    "machines": {
+                        "web-app": {"type": "lxc", "ip": "10.100.1.10"},
+                        "web-db": {"type": "lxc", "ip": "10.100.1.11"},
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = yaml.safe_load((tmp_path / "inventory" / "web.yml").read_text())
+        # Remove managed markers for clean parse
+        raw = (tmp_path / "inventory" / "web.yml").read_text()
+        # Parse only the YAML data between managed markers
+        assert "web-app" in raw
+        assert "web-db" in raw
+
+    def test_group_vars_contains_network_info(self, tmp_path):
+        """group_vars/<domain>.yml contains network info."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "mydom": {"subnet_id": 42, "machines": {"m": {"type": "lxc", "ip": "10.100.42.10"}}},
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "mydom.yml").read_text()
+        assert "net-mydom" in content
+        assert "10.100.42.0/24" in content
+        assert "10.100.42.254" in content
+
+    def test_host_vars_contains_machine_info(self, tmp_path):
+        """host_vars/<machine>.yml has instance_name, type, domain."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "my-vm": {
+                            "type": "vm", "ip": "10.100.0.10",
+                            "description": "Test VM",
+                            "roles": ["base_system"],
+                        },
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "host_vars" / "my-vm.yml").read_text()
+        assert "instance_name: my-vm" in content
+        assert "instance_type: vm" in content
+        assert "instance_domain: d" in content
+        assert "instance_ip: 10.100.0.10" in content
+        assert "base_system" in content
+
+    def test_all_yml_contains_project_name(self, tmp_path):
+        """group_vars/all.yml contains project_name and base_subnet."""
+        infra = {
+            "project_name": "my-infra",
+            "global": {"base_subnet": "10.200"},
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}}},
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "project_name: my-infra" in content
+        assert "base_subnet: '10.200'" in content or 'base_subnet: "10.200"' in content
+
+    def test_generate_returns_all_written_paths(self, tmp_path):
+        """generate() returns list of all written file paths."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "a": {"subnet_id": 0, "machines": {"m1": {"type": "lxc"}}},
+                "b": {"subnet_id": 1, "machines": {"m2": {"type": "lxc"}}},
+            },
+        }
+        written = generate(infra, tmp_path)
+        # Expected: all.yml + (inventory + group_vars per domain) + host_vars per machine
+        # = 1 + 2*2 + 2 = 7
+        assert len(written) == 7
+
+    def test_multi_domain_separate_files(self, tmp_path):
+        """Each domain gets its own inventory and group_vars files."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "alpha": {"subnet_id": 0, "machines": {"a1": {"type": "lxc"}}},
+                "beta": {"subnet_id": 1, "machines": {"b1": {"type": "lxc"}}},
+                "gamma": {"subnet_id": 2, "machines": {"g1": {"type": "lxc"}}},
+            },
+        }
+        generate(infra, tmp_path)
+        for dname in ("alpha", "beta", "gamma"):
+            assert (tmp_path / "inventory" / f"{dname}.yml").exists()
+            assert (tmp_path / "group_vars" / f"{dname}.yml").exists()
+
+    def test_dry_run_returns_paths_without_files(self, tmp_path):
+        """dry_run returns paths but creates no files."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {"d": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}}},
+        }
+        written = generate(infra, tmp_path, dry_run=True)
+        assert len(written) > 0
+        for fp in written:
+            assert not fp.exists()
+
+    def test_profiles_in_group_vars(self, tmp_path):
+        """Domain profiles appear in group_vars."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "profiles": {
+                        "nvidia-compute": {
+                            "devices": {"gpu": {"type": "gpu", "gputype": "physical"}},
+                        },
+                    },
+                    "machines": {"m": {"type": "lxc"}},
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "d.yml").read_text()
+        assert "incus_profiles" in content
+        assert "nvidia-compute" in content
+
+    def test_network_policies_in_all_yml(self, tmp_path):
+        """network_policies appear in group_vars/all.yml."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "a": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}},
+            },
+            "network_policies": [
+                {"from": "host", "to": "a", "ports": "all"},
+            ],
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "network_policies" in content
+
+    def test_images_in_all_yml(self, tmp_path):
+        """incus_all_images appears in all.yml when images are defined."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100", "default_os_image": "images:debian/13"},
+            "domains": {
+                "d": {"subnet_id": 0, "machines": {"m": {"type": "lxc"}}},
+            },
+        }
+        generate(infra, tmp_path)
+        content = (tmp_path / "group_vars" / "all.yml").read_text()
+        assert "incus_all_images" in content
+        assert "images:debian/13" in content
+
+    def test_ephemeral_inheritance(self, tmp_path):
+        """Machine inherits domain ephemeral when not specified."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "d": {
+                    "subnet_id": 0,
+                    "ephemeral": True,
+                    "machines": {
+                        "inherits": {"type": "lxc"},
+                        "overrides": {"type": "lxc", "ephemeral": False},
+                    },
+                },
+            },
+        }
+        generate(infra, tmp_path)
+        inherits = (tmp_path / "host_vars" / "inherits.yml").read_text()
+        overrides = (tmp_path / "host_vars" / "overrides.yml").read_text()
+        assert "instance_ephemeral: true" in inherits
+        assert "instance_ephemeral: false" in overrides
+
+
+# ── _enrich_firewall() detailed tests ─────────────────────────────
+
+
+class TestEnrichFirewallDetailed:
+    """Additional edge cases for firewall VM enrichment."""
+
+    def test_sys_firewall_in_non_admin_domain_blocks_auto_creation(self):
+        """User-defined sys-firewall in any domain prevents auto-creation."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc"}}},
+                "other": {
+                    "subnet_id": 1,
+                    "machines": {"sys-firewall": {"type": "vm", "ip": "10.100.1.250"}},
+                },
+            },
+        }
+        enrich_infra(infra)
+        # sys-firewall should NOT be auto-created in admin since user defined it in 'other'
+        assert "sys-firewall" not in infra["domains"]["admin"]["machines"]
+
+    def test_auto_created_firewall_has_correct_roles(self):
+        """Auto-created sys-firewall has base_system and firewall_router roles."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "admin": {"subnet_id": 0, "machines": {}},
+            },
+        }
+        enrich_infra(infra)
+        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert "base_system" in fw["roles"]
+        assert "firewall_router" in fw["roles"]
+
+    def test_auto_created_firewall_not_ephemeral(self):
+        """Auto-created sys-firewall has ephemeral: false."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "admin": {"subnet_id": 0, "machines": {}},
+            },
+        }
+        enrich_infra(infra)
+        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert fw["ephemeral"] is False
+
+    def test_firewall_mode_default_is_host(self):
+        """Default firewall_mode is 'host' (no auto-creation)."""
+        infra = {
+            "global": {"base_subnet": "10.100"},
+            "domains": {"admin": {"subnet_id": 0, "machines": {}}},
+        }
+        enrich_infra(infra)
+        assert "sys-firewall" not in infra["domains"]["admin"]["machines"]
+
+    def test_firewall_custom_base_subnet(self):
+        """Auto-created sys-firewall uses custom base_subnet."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "192.168"},
+            "domains": {
+                "admin": {"subnet_id": 5, "machines": {}},
+            },
+        }
+        enrich_infra(infra)
+        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert fw["ip"] == "192.168.5.253"
+
+    def test_firewall_machines_none_creates_dict(self):
+        """When admin.machines is None, enrich creates the dict."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "admin": {"subnet_id": 0, "machines": None},
+            },
+        }
+        enrich_infra(infra)
+        assert isinstance(infra["domains"]["admin"]["machines"], dict)
+        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
