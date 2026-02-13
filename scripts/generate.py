@@ -28,10 +28,85 @@ def _yaml(data):
     return yaml.dump(data, Dumper=_Dumper, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
+def _read_vm_nested():
+    """Read /etc/anklume/vm_nested context file. Returns True/False/None."""
+    try:
+        return Path("/etc/anklume/vm_nested").read_text().strip().lower() == "true"
+    except FileNotFoundError:
+        return None
+
+
+def _read_yolo():
+    """Read /etc/anklume/yolo context file. Returns True if YOLO mode active."""
+    try:
+        return Path("/etc/anklume/yolo").read_text().strip().lower() == "true"
+    except FileNotFoundError:
+        return False
+
+
 def load_infra(path):
-    """Load infra.yml and return parsed dict."""
+    """Load infra.yml (file) or infra/ (directory) and return parsed dict.
+
+    Directory mode merges: base.yml + domains/*.yml + policies.yml.
+    Auto-detects format based on whether path is a file or directory.
+    """
+    p = Path(path)
+
+    if p.is_file():
+        with open(p) as f:
+            return yaml.safe_load(f)
+
+    if p.is_dir():
+        return _load_infra_dir(p)
+
+    # Path does not exist — try both conventions
+    yml_path = Path(str(p).removesuffix("/") + ".yml") if not str(p).endswith(".yml") else p
+    dir_path = Path(str(p).removesuffix(".yml")) if str(p).endswith(".yml") else p
+
+    if yml_path.is_file():
+        with open(yml_path) as f:
+            return yaml.safe_load(f)
+    if dir_path.is_dir():
+        return _load_infra_dir(dir_path)
+
+    # Fall back to original behavior (will raise FileNotFoundError)
     with open(path) as f:
         return yaml.safe_load(f)
+
+
+def _load_infra_dir(dirpath):
+    """Load infra/ directory: base.yml + domains/*.yml + policies.yml."""
+    dirpath = Path(dirpath)
+    base_path = dirpath / "base.yml"
+    if not base_path.exists():
+        print(f"ERROR: {base_path} not found in infra directory.", file=sys.stderr)
+        sys.exit(1)
+
+    with open(base_path) as f:
+        infra = yaml.safe_load(f) or {}
+
+    # Merge domain files
+    domains_dir = dirpath / "domains"
+    if domains_dir.is_dir():
+        infra.setdefault("domains", {})
+        for domain_file in sorted(domains_dir.glob("*.yml")):
+            with open(domain_file) as f:
+                domain_data = yaml.safe_load(f) or {}
+            for dname, dconfig in domain_data.items():
+                if dname in infra["domains"]:
+                    print(f"WARNING: Domain '{dname}' in {domain_file.name} "
+                          f"overrides existing definition.", file=sys.stderr)
+                infra["domains"][dname] = dconfig
+
+    # Merge policies
+    policies_path = dirpath / "policies.yml"
+    if policies_path.exists():
+        with open(policies_path) as f:
+            policies_data = yaml.safe_load(f) or {}
+        if "network_policies" in policies_data:
+            infra["network_policies"] = policies_data["network_policies"]
+
+    return infra
 
 
 def validate(infra):
@@ -54,6 +129,8 @@ def validate(infra):
     valid_gpu_policies = ("exclusive", "shared")
     valid_firewall_modes = ("host", "vm")
     firewall_mode = g.get("firewall_mode", "host")
+    vm_nested = _read_vm_nested()
+    yolo = _read_yolo()
 
     if gpu_policy not in valid_gpu_policies:
         errors.append(f"global.gpu_policy must be 'exclusive' or 'shared', got '{gpu_policy}'")
@@ -90,6 +167,19 @@ def validate(infra):
             if mtype not in valid_types:
                 errors.append(f"Machine '{mname}': type must be 'lxc' or 'vm', got '{mtype}'")
 
+            # Privileged LXC policy (ADR-020)
+            mconfig = machine.get("config") or {}
+            is_privileged = str(mconfig.get("security.privileged", "false")).lower() == "true"
+            if is_privileged and mtype == "lxc" and vm_nested is False:
+                if yolo:
+                    pass  # YOLO mode: privileged warnings handled in get_warnings()
+                else:
+                    errors.append(
+                        f"Machine '{mname}': security.privileged=true on LXC is forbidden "
+                        f"when vm_nested=false (no VM in parent chain). Use a VM or "
+                        f"enable --YOLO to bypass."
+                    )
+
             # Track GPU instances (direct flag or profile with gpu device)
             has_gpu = machine.get("gpu", False)
             if not has_gpu:
@@ -124,6 +214,35 @@ def validate(infra):
             f"{', '.join(gpu_instances)}. Set global.gpu_policy: shared to allow this."
         )
 
+    # Network policies validation (ADR-021)
+    domain_names = set(domains)
+    for i, policy in enumerate(infra.get("network_policies") or []):
+        if not isinstance(policy, dict):
+            errors.append(f"network_policies[{i}]: must be a mapping")
+            continue
+        for field in ("from", "to"):
+            ref = policy.get(field)
+            if ref is None:
+                errors.append(f"network_policies[{i}]: missing '{field}'")
+            elif ref != "host" and ref not in domain_names and ref not in all_machines:
+                errors.append(
+                    f"network_policies[{i}]: '{field}: {ref}' is not a known "
+                    f"domain, machine, or 'host'"
+                )
+        ports = policy.get("ports")
+        if ports is not None and ports != "all":
+            if isinstance(ports, list):
+                for port in ports:
+                    if not isinstance(port, int) or not 1 <= port <= 65535:
+                        errors.append(
+                            f"network_policies[{i}]: invalid port {port} (must be 1-65535)"
+                        )
+            else:
+                errors.append(f"network_policies[{i}]: ports must be a list or 'all'")
+        protocol = policy.get("protocol")
+        if protocol is not None and protocol not in ("tcp", "udp"):
+            errors.append(f"network_policies[{i}]: protocol must be 'tcp' or 'udp', got '{protocol}'")
+
     return errors
 
 
@@ -134,6 +253,8 @@ def get_warnings(infra):
     gpu_policy = g.get("gpu_policy", "exclusive")
     domains = infra.get("domains") or {}
     gpu_instances = []
+    yolo = _read_yolo()
+    vm_nested = _read_vm_nested()
 
     for domain in domains.values():
         domain_profiles = domain.get("profiles") or {}
@@ -148,6 +269,16 @@ def get_warnings(infra):
                             break
             if has_gpu:
                 gpu_instances.append(mname)
+
+            # YOLO mode: privileged LXC warning instead of error
+            mconfig = machine.get("config") or {}
+            is_privileged = str(mconfig.get("security.privileged", "false")).lower() == "true"
+            mtype = machine.get("type", "lxc")
+            if is_privileged and mtype == "lxc" and vm_nested is False and yolo:
+                warnings.append(
+                    f"YOLO: Machine '{mname}' has security.privileged=true on LXC "
+                    f"without VM isolation. This is unsafe for production."
+                )
 
     if len(gpu_instances) > 1 and gpu_policy == "shared":
         warnings.append(
@@ -266,6 +397,7 @@ def generate(infra, base_dir, dry_run=False):
     # They must NOT be named ansible_connection / ansible_user because
     # inventory variables override play-level keywords (Ansible precedence).
     all_images = extract_all_images(infra)
+    network_policies = infra.get("network_policies")
     all_vars = {k: v for k, v in {
         "project_name": infra.get("project_name"),
         "base_subnet": g.get("base_subnet", "10.100"),
@@ -273,6 +405,7 @@ def generate(infra, base_dir, dry_run=False):
         "psot_default_connection": g.get("default_connection"),
         "psot_default_user": g.get("default_user"),
         "incus_all_images": all_images if all_images else None,
+        "network_policies": network_policies if network_policies else None,
     }.items() if v is not None}
     fp, _ = _write_managed(base / "group_vars" / "all.yml", all_vars, dry_run)
     written.append(fp)
@@ -393,7 +526,7 @@ def _is_orphan_protected(filepath):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Generate Ansible files from infra.yml")
-    parser.add_argument("infra_file", help="Path to infra.yml")
+    parser.add_argument("infra_file", help="Path to infra.yml or infra/ directory")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     parser.add_argument("--clean-orphans", action="store_true", help="Remove orphan files")
     parser.add_argument("--base-dir", default=".", help="Output base directory")
