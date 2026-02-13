@@ -29,7 +29,9 @@ jobs:
           python-version: "3.13"
           cache: pip
       - name: Install dependencies
-        run: pip install ansible-core ansible-lint molecule community.general pyyaml
+        run: pip install ansible-core ansible-lint molecule pyyaml
+      - name: Install community.general collection
+        run: ansible-galaxy collection install community.general
       - name: Run ansible-lint
         run: ansible-lint
 
