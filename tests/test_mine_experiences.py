@@ -596,3 +596,172 @@ class TestMineEmptyRepo:
         mine_mod.main()
         # No files should have been created
         assert not list(fixes_dir.glob("*.yml"))
+
+
+# ── category mapping edge cases ─────────────────────────
+
+
+class TestMineCategoryMapping:
+    """Test commit message to category mapping for specific keywords."""
+
+    def test_fix_in_subject_maps_to_fixes_or_generator(self):
+        """Commit with 'fix' in subject categorizes correctly."""
+        # "fix" alone triggers the FIX_PATTERNS match, but categorize_commit
+        # uses CATEGORY_MAP scores. "fix" alone matches no specific category
+        # pattern, so it falls back to "generator".
+        cat = categorize_commit("fix: something broken", ["README.md"])
+        assert cat == "generator"
+
+    def test_lint_in_subject_maps_to_ansible_lint(self):
+        """Commit with 'lint' in subject → category 'ansible-lint'."""
+        cat = categorize_commit("lint: clean up noqa directives", ["roles/base/tasks/main.yml"])
+        assert cat == "ansible-lint"
+
+    def test_resolve_in_subject_matches_fix_patterns(self):
+        """Commit with 'resolve' triggers FIX_PATTERNS but categorizes based on context."""
+        assert FIX_PATTERNS.search("resolve merge conflict")
+        # Without specific keywords, resolve falls back to generator
+        cat = categorize_commit("resolve merge conflict", ["README.md"])
+        assert cat == "generator"
+
+    def test_unknown_pattern_defaults_to_generator(self):
+        """Commit with no category-matching keywords defaults to generator."""
+        cat = categorize_commit("improve performance of something", ["scripts/unknown.py"])
+        assert cat == "generator"
+
+
+# ── git log parsing edge cases ───────────────────────────
+
+
+class TestMineGitLogParsing:
+    """Test get_fix_commits with unusual git log outputs."""
+
+    def test_git_log_with_special_chars_in_subject(self, monkeypatch):
+        """Git log with quotes and special chars in subject is handled."""
+        fake_output = 'aaa1234567890abcdef1234567890abcdef12345678 Fix "broken" test\'s `output`'
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=0, stdout=fake_output, stderr="")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        assert len(commits) == 1
+        assert '"broken"' in commits[0][1]
+
+    def test_git_log_with_merge_commits(self, monkeypatch):
+        """Merge commits without fix keywords are filtered out."""
+        fake_output = (
+            "aaa0000000000000000000000000000000000000000 Merge branch 'main'\n"
+            "bbb0000000000000000000000000000000000000000 Fix lint error in base_system"
+        )
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=0, stdout=fake_output, stderr="")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        # Merge commit doesn't match FIX_PATTERNS; only the fix commit matches
+        assert len(commits) == 1
+        assert "lint" in commits[0][1]
+
+    def test_git_log_with_co_authored_by(self, monkeypatch):
+        """Commits with Co-authored-by trailers in format=%s are handled."""
+        # format=%H %s only captures subject line, not trailers
+        fake_output = "ccc0000000000000000000000000000000000000000 Fix bug co-authored with Alice"
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=0, stdout=fake_output, stderr="")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        assert len(commits) == 1
+        assert "bug" in commits[0][1]
+
+    def test_empty_commit_message_skipped(self, monkeypatch):
+        """A line with only a hash and no message is skipped gracefully."""
+        fake_output = "ddd0000000000000000000000000000000000000000"
+
+        def mock_run(args, **kwargs):
+            return subprocess.CompletedProcess(args, returncode=0, stdout=fake_output, stderr="")
+
+        monkeypatch.setattr(subprocess, "run", mock_run)
+        commits = get_fix_commits()
+        # The line has no space separator → parts has len 1 → skipped
+        assert commits == []
+
+
+# ── duplicate detection ──────────────────────────────────
+
+
+class TestMineDuplicateDetection:
+    """Test that mining twice on same commits produces no duplicates."""
+
+    def test_no_duplicate_entries_on_second_run(self, tmp_path, monkeypatch):
+        """Running mine twice on same commits → no duplicate entries."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        exp_dir = tmp_path / "exp"
+        exp_dir.mkdir()
+        last_file = tmp_path / ".last-mined-commit"
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", exp_dir)
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", last_file)
+
+        fake_commits = [("e" * 40, "Fix ansible-lint noqa in base")]
+
+        def fake_files(h):
+            return ["roles/base_system/tasks/main.yml"]
+
+        monkeypatch.setattr(mine_mod, "get_fix_commits", lambda since=None: fake_commits)
+        monkeypatch.setattr(mine_mod, "get_commit_files", fake_files)
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+
+        # First run
+        mine_mod.main()
+        yml_files = list(fixes_dir.glob("*.yml"))
+        assert len(yml_files) > 0
+        # Second run — same commits, should be skipped because source_commit is in existing_ids
+        mine_mod.main()
+        content_after_second = yml_files[0].read_text()
+
+        # Count entries: MINED-LINT-001 should appear only once
+        assert content_after_second.count("MINED-LINT-001") == 1
+
+    def test_incremental_mode_skips_already_mined(self, tmp_path, monkeypatch):
+        """Incremental mode uses last-mined-commit to skip already processed commits."""
+        fixes_dir = tmp_path / "fixes"
+        fixes_dir.mkdir()
+        exp_dir = tmp_path / "exp"
+        exp_dir.mkdir()
+        last_file = tmp_path / ".last-mined-commit"
+
+        monkeypatch.setattr(mine_mod, "FIXES_DIR", fixes_dir)
+        monkeypatch.setattr(mine_mod, "EXPERIENCES_DIR", exp_dir)
+        monkeypatch.setattr(mine_mod, "LAST_MINED_FILE", last_file)
+
+        call_log = []
+
+        def mock_get_fix_commits(since=None):
+            call_log.append(since)
+            return [("f" * 40, "Fix molecule test")]
+
+        def fake_files(h):
+            return ["roles/base_system/molecule/default/converge.yml"]
+
+        monkeypatch.setattr(mine_mod, "get_fix_commits", mock_get_fix_commits)
+        monkeypatch.setattr(mine_mod, "get_commit_files", fake_files)
+
+        # First run: writes last-mined-commit
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py"])
+        mine_mod.main()
+        assert last_file.exists()
+
+        # Second run with --incremental: should pass the saved hash as since
+        monkeypatch.setattr("sys.argv", ["mine-experiences.py", "--incremental"])
+        mine_mod.main()
+
+        # The second call should have received the saved commit hash as since
+        assert len(call_log) == 2
+        assert call_log[0] is None  # First run: no since
+        assert call_log[1] == "f" * 40  # Second run: last mined commit
