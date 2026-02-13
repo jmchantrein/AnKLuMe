@@ -611,32 +611,38 @@ fi
 
     def test_prod_filesystem_detection_ext4(self, tmp_path):
         """Prod mode with ext4 filesystem uses 'dir' storage backend."""
-        env, script, _, log = self._make_prod_env(tmp_path, fs_type="ext4")
+        # incus_info_rc=1 → "installed" branch where detect_fs runs unconditionally
+        env, script, _, log = self._make_prod_env(
+            tmp_path, fs_type="ext4", incus_info_rc=1,
+        )
         result = run_bootstrap(
-            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+            ["--prod"], env, script=script, cwd=tmp_path,
         )
         assert result.returncode == 0
-        # ext4 maps to 'dir' storage backend
-        assert "dir" in result.stdout.lower() or "ext4" in result.stdout.lower() \
-            or "Detected filesystem" in result.stdout
+        assert "Detected filesystem: dir" in result.stdout
 
     def test_prod_filesystem_detection_btrfs(self, tmp_path):
         """Prod mode with btrfs filesystem detects btrfs backend."""
-        env, script, _, log = self._make_prod_env(tmp_path, fs_type="btrfs")
+        env, script, _, log = self._make_prod_env(
+            tmp_path, fs_type="btrfs", incus_info_rc=1,
+        )
         result = run_bootstrap(
-            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+            ["--prod"], env, script=script, cwd=tmp_path,
         )
         assert result.returncode == 0
-        assert "btrfs" in result.stdout.lower()
+        assert "Detected filesystem: btrfs" in result.stdout
 
     def test_prod_incus_preseed_generation(self, tmp_path):
         """Prod mode reconfigure generates Incus preseed config."""
-        env, script, _, log = self._make_prod_env(tmp_path, fs_type="btrfs")
+        # Use "installed" branch (incus_info_rc=1) to test storage configuration output
+        env, script, _, log = self._make_prod_env(
+            tmp_path, fs_type="btrfs", incus_info_rc=1,
+        )
         result = run_bootstrap(
-            ["--prod"], env, script=script, cwd=tmp_path, input_text="y\n",
+            ["--prod"], env, script=script, cwd=tmp_path,
         )
         assert result.returncode == 0
-        assert "configured" in result.stdout.lower() or "storage" in result.stdout.lower()
+        assert "storage" in result.stdout.lower()
 
     def test_prod_missing_incus_binary(self, tmp_path):
         """Prod mode without incus binary attempts install or errors."""
@@ -651,3 +657,85 @@ fi
         combined = result.stdout + result.stderr
         assert result.returncode != 0 or "ERROR" in combined \
             or "Install" in combined or "not installed" in combined.lower()
+
+
+# ── context file content format ───────────────────────────────────
+
+
+class TestBootstrapContextFileFormat:
+    """Verify the format of context files in /etc/anklume."""
+
+    def test_context_files_are_single_values(self, mock_env):
+        """Each context file contains a single value with no extra whitespace."""
+        env, _, cwd, script, etc = mock_env
+        result = run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+
+        for name in ("absolute_level", "relative_level", "vm_nested", "yolo"):
+            f = etc / name
+            assert f.exists(), f"Missing context file: {name}"
+            content = f.read_text()
+            # Should be a single line (content + optional trailing newline)
+            lines = [l for l in content.splitlines() if l.strip()]
+            assert len(lines) == 1, f"Expected 1 line in {name}, got {len(lines)}"
+
+    def test_absolute_level_is_integer(self, mock_env):
+        """absolute_level is a parseable integer."""
+        env, _, cwd, script, etc = mock_env
+        run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        val = (etc / "absolute_level").read_text().strip()
+        assert val.isdigit(), f"absolute_level '{val}' is not a digit"
+
+    def test_relative_level_is_integer(self, mock_env):
+        """relative_level is a parseable integer."""
+        env, _, cwd, script, etc = mock_env
+        run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        val = (etc / "relative_level").read_text().strip()
+        assert val.isdigit(), f"relative_level '{val}' is not a digit"
+
+    def test_vm_nested_is_boolean_string(self, mock_env):
+        """vm_nested is either 'true' or 'false'."""
+        env, _, cwd, script, etc = mock_env
+        run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        val = (etc / "vm_nested").read_text().strip()
+        assert val in ("true", "false"), f"vm_nested '{val}' not boolean"
+
+    def test_yolo_is_boolean_string(self, mock_env):
+        """yolo is either 'true' or 'false'."""
+        env, _, cwd, script, etc = mock_env
+        run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        val = (etc / "yolo").read_text().strip()
+        assert val in ("true", "false"), f"yolo '{val}' not boolean"
+
+
+# ── output completeness ──────────────────────────────────────────
+
+
+class TestBootstrapOutputCompleteness:
+    """Verify bootstrap output covers all expected sections."""
+
+    def test_dev_mode_reports_context(self, mock_env):
+        """Dev mode reports all context values in output."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        output = result.stdout
+        # Should report nesting context
+        assert "absolute_level" in output
+        assert "vm_nested" in output
+
+    def test_dev_mode_shows_incus_status(self, mock_env):
+        """Dev mode checks and reports Incus status."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        output = result.stdout.lower()
+        assert "incus" in output
+
+    def test_prod_mode_reports_filesystem(self, mock_env):
+        """Prod mode reports detected filesystem type."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--prod"], env, script=script, cwd=cwd, input_text="n\n")
+        assert result.returncode == 0
+        output = result.stdout.lower()
+        assert "filesystem" in output or "detected" in output
