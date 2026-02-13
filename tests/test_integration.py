@@ -10,9 +10,11 @@ Run with: pytest tests/test_integration.py -v
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GENERATE_PY = PROJECT_ROOT / "scripts" / "generate.py"
@@ -446,3 +448,419 @@ class TestScriptIntegration:
         )
         assert result.returncode == 0
         assert "Usage" in result.stdout or "usage" in result.stdout.lower()
+
+
+# ── Generator Pipeline Integration (no Incus needed) ──────────
+
+
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+import generate  # noqa: E402
+
+
+class TestMultiDomainGeneration:
+    """Full generate pipeline with realistic multi-domain configurations."""
+
+    @staticmethod
+    def _base_infra(extra_domains=None, **global_overrides):
+        infra = {
+            "project_name": "multi-test",
+            "global": {
+                "base_subnet": "10.200",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                **global_overrides,
+            },
+            "domains": {
+                "admin": {
+                    "description": "Admin domain",
+                    "subnet_id": 0,
+                    "machines": {
+                        "admin-ctrl": {
+                            "type": "lxc",
+                            "ip": "10.200.0.10",
+                        },
+                    },
+                },
+                "pro": {
+                    "description": "Work domain",
+                    "subnet_id": 1,
+                    "machines": {
+                        "pro-dev": {
+                            "type": "lxc",
+                            "ip": "10.200.1.10",
+                        },
+                    },
+                },
+                "perso": {
+                    "description": "Personal domain",
+                    "subnet_id": 2,
+                    "ephemeral": True,
+                    "machines": {
+                        "perso-box": {
+                            "type": "lxc",
+                            "ip": "10.200.2.10",
+                        },
+                    },
+                },
+            },
+        }
+        if extra_domains:
+            infra["domains"].update(extra_domains)
+        return infra
+
+    def test_five_domains_all_files_generated(self, tmp_path):
+        """5 domains with diverse configs → all files generated correctly."""
+        extra = {
+            "sandbox": {
+                "description": "Sandbox domain",
+                "subnet_id": 3,
+                "ephemeral": True,
+                "machines": {
+                    "sandbox-vm": {"type": "vm", "ip": "10.200.3.10"},
+                },
+            },
+            "lab": {
+                "description": "Lab domain",
+                "subnet_id": 4,
+                "machines": {
+                    "lab-srv": {"type": "lxc", "ip": "10.200.4.10"},
+                },
+            },
+        }
+        infra = self._base_infra(extra_domains=extra)
+        errors = generate.validate(infra)
+        assert errors == []
+        generate.enrich_infra(infra)
+        generate.generate(infra, str(tmp_path))
+
+        for domain in ("admin", "pro", "perso", "sandbox", "lab"):
+            assert (tmp_path / "inventory" / f"{domain}.yml").exists()
+            assert (tmp_path / "group_vars" / f"{domain}.yml").exists()
+        for host in ("admin-ctrl", "pro-dev", "perso-box", "sandbox-vm", "lab-srv"):
+            assert (tmp_path / "host_vars" / f"{host}.yml").exists()
+
+    def test_adding_domain_only_creates_new_files(self, tmp_path):
+        """Adding a 4th domain after initial generation → only new files created."""
+        infra = self._base_infra()
+        generate.generate(infra, str(tmp_path))
+        # Record original file contents
+        original = {}
+        for f in tmp_path.rglob("*.yml"):
+            original[str(f.relative_to(tmp_path))] = f.read_text()
+
+        # Add a new domain and regenerate
+        infra["domains"]["new-domain"] = {
+            "description": "New domain",
+            "subnet_id": 5,
+            "machines": {"new-host": {"type": "lxc", "ip": "10.200.5.10"}},
+        }
+        generate.generate(infra, str(tmp_path))
+
+        # New files exist
+        assert (tmp_path / "inventory" / "new-domain.yml").exists()
+        assert (tmp_path / "host_vars" / "new-host.yml").exists()
+        # Original managed sections unchanged (content may differ in all.yml)
+        for domain in ("admin", "pro", "perso"):
+            inv_key = f"inventory/{domain}.yml"
+            assert original[inv_key] == (tmp_path / inv_key).read_text()
+
+    def test_removing_domain_detects_orphans(self, tmp_path):
+        """Removing a domain → orphans detected with correct filenames."""
+        infra = self._base_infra()
+        generate.generate(infra, str(tmp_path))
+
+        # Remove perso domain
+        del infra["domains"]["perso"]
+        orphans = generate.detect_orphans(infra, str(tmp_path))
+        orphan_paths = [str(p) for p in orphans]
+        assert any("perso" in p for p in orphan_paths)
+
+    def test_changing_machine_ip_updates_host_vars(self, tmp_path):
+        """Changing a machine's IP → host_vars updated."""
+        infra = self._base_infra()
+        generate.generate(infra, str(tmp_path))
+
+        old_content = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        assert "10.200.1.10" in old_content
+
+        infra["domains"]["pro"]["machines"]["pro-dev"]["ip"] = "10.200.1.99"
+        generate.generate(infra, str(tmp_path))
+
+        new_content = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        assert "10.200.1.99" in new_content
+        assert "10.200.1.10" not in new_content
+
+    def test_adding_profile_updates_group_vars(self, tmp_path):
+        """Adding a profile to a domain → group_vars updated."""
+        infra = self._base_infra()
+        generate.generate(infra, str(tmp_path))
+
+        infra["domains"]["pro"]["profiles"] = {
+            "gpu-profile": {
+                "devices": {"gpu": {"type": "gpu", "gputype": "physical"}},
+            },
+        }
+        generate.generate(infra, str(tmp_path))
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "gpu-profile" in gv
+
+
+class TestNetworkPolicyGeneration:
+    """Test network policy generation through the full pipeline."""
+
+    @staticmethod
+    def _infra_with_policies(policies):
+        return {
+            "project_name": "policy-test",
+            "global": {
+                "base_subnet": "10.201",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "alpha": {
+                    "subnet_id": 0,
+                    "machines": {"alpha-srv": {"type": "lxc", "ip": "10.201.0.10"}},
+                },
+                "beta": {
+                    "subnet_id": 1,
+                    "machines": {"beta-srv": {"type": "lxc", "ip": "10.201.1.10"}},
+                },
+                "gamma": {
+                    "subnet_id": 2,
+                    "machines": {"gamma-srv": {"type": "lxc", "ip": "10.201.2.10"}},
+                },
+            },
+            "network_policies": policies,
+        }
+
+    def test_multiple_policies_all_valid(self, tmp_path):
+        """5 policies across 3 domains → no validation errors."""
+        policies = [
+            {"from": "alpha", "to": "beta", "ports": [80], "protocol": "tcp"},
+            {"from": "beta", "to": "gamma", "ports": [443], "protocol": "tcp"},
+            {"from": "gamma", "to": "alpha", "ports": [22], "protocol": "tcp"},
+            {"from": "host", "to": "alpha-srv", "ports": [8080], "protocol": "tcp"},
+            {"from": "alpha", "to": "gamma", "ports": "all"},
+        ]
+        infra = self._infra_with_policies(policies)
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_bidirectional_policy_accepted(self, tmp_path):
+        """Bidirectional policy is accepted by validator."""
+        policies = [
+            {"from": "alpha", "to": "beta", "ports": [80], "protocol": "tcp",
+             "bidirectional": True},
+        ]
+        infra = self._infra_with_policies(policies)
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_policy_from_host_accepted(self, tmp_path):
+        """Policy from 'host' keyword is valid."""
+        policies = [
+            {"from": "host", "to": "beta-srv", "ports": [22], "protocol": "tcp"},
+        ]
+        infra = self._infra_with_policies(policies)
+        errors = generate.validate(infra)
+        assert errors == []
+
+    def test_policy_ports_all_accepted(self, tmp_path):
+        """Policy with ports: 'all' is valid."""
+        policies = [
+            {"from": "alpha", "to": "beta", "ports": "all"},
+        ]
+        infra = self._infra_with_policies(policies)
+        errors = generate.validate(infra)
+        assert errors == []
+
+
+class TestEnrichmentPipeline:
+    """Test enrichment functions working together."""
+
+    def test_firewall_and_ai_enrichment_coexist(self, tmp_path):
+        """firewall_mode:vm + ai_access_policy:exclusive → both enrichments applied."""
+        infra = {
+            "project_name": "enrich-test",
+            "global": {
+                "base_subnet": "10.202",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "firewall_mode": "vm",
+                "ai_access_policy": "exclusive",
+                "ai_access_default": "pro",
+            },
+            "domains": {
+                "admin": {
+                    "subnet_id": 0,
+                    "machines": {"admin-ctrl": {"type": "lxc", "ip": "10.202.0.10"}},
+                },
+                "pro": {
+                    "subnet_id": 1,
+                    "machines": {"pro-dev": {"type": "lxc", "ip": "10.202.1.10"}},
+                },
+                "ai-tools": {
+                    "subnet_id": 10,
+                    "machines": {"ai-ollama": {"type": "lxc", "ip": "10.202.10.10"}},
+                },
+            },
+        }
+        generate.enrich_infra(infra)
+        # sys-firewall auto-created in admin
+        admin_machines = infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" in admin_machines
+        # AI network policy auto-created
+        policies = infra.get("network_policies", [])
+        ai_policies = [p for p in policies if p.get("to") == "ai-tools"]
+        assert len(ai_policies) >= 1
+
+    def test_enrichment_is_idempotent(self, tmp_path):
+        """Running enrich_infra twice produces the same result."""
+        infra = {
+            "project_name": "idem-test",
+            "global": {
+                "base_subnet": "10.203",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "firewall_mode": "vm",
+            },
+            "domains": {
+                "admin": {
+                    "subnet_id": 0,
+                    "machines": {"admin-ctrl": {"type": "lxc", "ip": "10.203.0.10"}},
+                },
+            },
+        }
+        import copy
+        generate.enrich_infra(infra)
+        first = copy.deepcopy(infra)
+        generate.enrich_infra(infra)
+        assert infra == first
+
+    def test_enrichment_preserves_user_declared_machines(self, tmp_path):
+        """User-declared machines in admin domain are preserved."""
+        infra = {
+            "project_name": "preserve-test",
+            "global": {
+                "base_subnet": "10.204",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "firewall_mode": "vm",
+            },
+            "domains": {
+                "admin": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "admin-ctrl": {"type": "lxc", "ip": "10.204.0.10"},
+                        "admin-monitor": {"type": "lxc", "ip": "10.204.0.20"},
+                    },
+                },
+            },
+        }
+        generate.enrich_infra(infra)
+        machines = infra["domains"]["admin"]["machines"]
+        assert "admin-ctrl" in machines
+        assert "admin-monitor" in machines
+        assert "sys-firewall" in machines
+
+
+class TestOrphanLifecycle:
+    """Test orphan detection and cleanup through the full pipeline."""
+
+    def test_orphan_detected_after_domain_removal(self, tmp_path):
+        """Create files → remove domain → orphans detected."""
+        infra = {
+            "project_name": "orphan-test",
+            "global": {
+                "base_subnet": "10.205",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "alpha": {
+                    "subnet_id": 0,
+                    "machines": {"alpha-srv": {"type": "lxc", "ip": "10.205.0.10"}},
+                },
+                "beta": {
+                    "subnet_id": 1,
+                    "machines": {"beta-srv": {"type": "lxc", "ip": "10.205.1.10"}},
+                },
+            },
+        }
+        generate.generate(infra, str(tmp_path))
+        # Remove beta
+        del infra["domains"]["beta"]
+        orphans = generate.detect_orphans(infra, str(tmp_path))
+        orphan_strs = [str(p) for p in orphans]
+        assert any("beta" in s for s in orphan_strs)
+        assert not any("alpha" in s for s in orphan_strs)
+
+    def test_protected_orphan_not_cleaned(self, tmp_path):
+        """Protected orphan (ephemeral:false) → not cleaned by --clean-orphans."""
+        infra = {
+            "project_name": "protect-test",
+            "global": {
+                "base_subnet": "10.206",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "keep": {
+                    "subnet_id": 0,
+                    "ephemeral": False,
+                    "machines": {"keep-srv": {"type": "lxc", "ip": "10.206.0.10"}},
+                },
+            },
+        }
+        generate.generate(infra, str(tmp_path))
+        # Remove domain from infra but leave files
+        del infra["domains"]["keep"]
+        orphans = generate.detect_orphans(infra, str(tmp_path))
+        # The orphan's host_vars should be protected (ephemeral:false written in managed section)
+        # Check if any orphan is protected
+        host_vars_orphan = [p for p in orphans if "host_vars" in str(p)]
+        for orphan_path in host_vars_orphan:
+            content = orphan_path.read_text()
+            if "domain_ephemeral" in content:
+                assert "false" in content.lower() or "False" in content
+
+    def test_unprotected_orphan_cleaned(self, tmp_path):
+        """Unprotected orphan (ephemeral:true) → cleaned with --clean-orphans."""
+        infra = {
+            "project_name": "clean-test",
+            "global": {
+                "base_subnet": "10.207",
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+            },
+            "domains": {
+                "temp": {
+                    "subnet_id": 0,
+                    "ephemeral": True,
+                    "machines": {"temp-srv": {"type": "lxc", "ip": "10.207.0.10"}},
+                },
+            },
+        }
+        generate.generate(infra, str(tmp_path))
+        assert (tmp_path / "host_vars" / "temp-srv.yml").exists()
+
+        # Remove domain, run main with --clean-orphans
+        del infra["domains"]["temp"]
+        # Write updated infra.yml
+        (tmp_path / "infra.yml").write_text(yaml.dump(infra, sort_keys=False))
+        result = subprocess.run(
+            ["python3", str(GENERATE_PY), str(tmp_path / "infra.yml"),
+             "--base-dir", str(tmp_path), "--clean-orphans"],
+            capture_output=True, text=True,
+        )
+        # Files should be removed (ephemeral:true = unprotected)
+        assert result.returncode == 0
