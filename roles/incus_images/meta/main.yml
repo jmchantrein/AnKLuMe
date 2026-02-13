@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: incus_images
+  namespace: anklume
+  author: AnKLuMe
+  description: Pre-download Incus OS images to local cache
+  license: Apache-2.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: ArchLinux
+      versions:
+        - all
+dependencies: []

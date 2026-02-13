@@ -56,6 +56,9 @@ apply-base: ## Apply base_system only
 apply-limit: ## Apply a single domain (G=<group>)
 	ansible-playbook site.yml --limit $(G)
 
+apply-images: ## Pre-download OS images to local cache
+	ansible-playbook site.yml --tags images
+
 apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
 	ansible-playbook site.yml --tags llm
 
@@ -180,7 +183,8 @@ help: ## Show this help
 
 .PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
-        apply-base apply-limit apply-llm apply-stt nftables nftables-deploy \
+        apply-base apply-limit apply-images apply-llm apply-stt \
+        nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
         test test-generator test-roles test-role \
