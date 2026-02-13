@@ -27,6 +27,10 @@ def mock_env(tmp_path):
     mock_incus = mock_bin / "incus"
     mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
+if [[ "$1" == "project" && "$2" == "list" ]]; then
+    echo "default,YES,YES,YES,YES,YES,YES,Default,0"
+    exit 0
+fi
 if [[ "$1" == "list" && "$*" == *"--all-projects"* ]]; then
     echo '{FAKE_INCUS_LIST}'
     exit 0
