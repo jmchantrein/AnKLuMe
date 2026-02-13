@@ -410,3 +410,123 @@ class TestSnapProjectResolution:
             "snapshot create admin-ansible test-snap" in c
             for c in cmds
         )
+
+    def test_self_delete_resolves_hostname(self, mock_env):
+        """'self' keyword works with delete subcommand."""
+        env, log = mock_env
+        env["HOSTNAME"] = "dev-workspace"
+        result = run_snap(["delete", "self", "snap1"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot delete dev-workspace snap1 --project work" in c
+            for c in cmds
+        )
+
+    def test_self_list_resolves_hostname(self, mock_env):
+        """'self' keyword works with list subcommand."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(["list", "self"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any("admin-ansible" in c for c in cmds)
+
+
+# ── help flag variants ───────────────────────────────────────
+
+
+class TestSnapHelpVariants:
+    """Test different ways to invoke help."""
+
+    def test_dash_h(self, mock_env):
+        """-h shows usage."""
+        env, _ = mock_env
+        result = run_snap(["-h"], env)
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_double_dash_help(self, mock_env):
+        """--help shows usage."""
+        env, _ = mock_env
+        result = run_snap(["--help"], env)
+        assert result.returncode == 0
+        assert "Usage" in result.stdout
+
+    def test_help_lists_all_commands(self, mock_env):
+        """Help output lists all subcommands."""
+        env, _ = mock_env
+        result = run_snap(["help"], env)
+        for cmd in ["create", "restore", "list", "delete"]:
+            assert cmd in result.stdout
+
+
+# ── auto-generated snapshot name ─────────────────────────────
+
+
+class TestSnapAutoName:
+    """Test auto-generated snapshot name format."""
+
+    def test_auto_name_format(self, mock_env):
+        """Auto-generated name starts with 'snap-' and has date pattern."""
+        env, log = mock_env
+        result = run_snap(["create", "admin-ansible"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        # Find the snapshot create command
+        snap_cmds = [c for c in cmds if "snapshot create admin-ansible" in c]
+        assert len(snap_cmds) == 1
+        # Name should be snap-YYYYMMDD-HHMMSS
+        import re
+        assert re.search(r"snap-\d{8}-\d{6}", snap_cmds[0])
+
+
+# ── non-self restore (no warning) ────────────────────────────
+
+
+class TestSnapNonSelfRestore:
+    """Test that non-self restore doesn't show self-restore warning."""
+
+    def test_non_self_restore_no_warning(self, mock_env):
+        """Restoring a different instance doesn't show WARNING."""
+        env, log = mock_env
+        env["HOSTNAME"] = "other-machine"
+        result = run_snap(["restore", "admin-ansible", "snap1"], env)
+        assert result.returncode == 0
+        # No self-restore warning
+        assert "WARNING" not in result.stdout
+        assert "terminate" not in result.stdout.lower()
+
+    def test_non_self_restore_no_confirmation(self, mock_env):
+        """Restoring a different instance doesn't need confirmation."""
+        env, log = mock_env
+        env["HOSTNAME"] = "other-machine"
+        result = run_snap(["restore", "dev-workspace", "snap1"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any("snapshot restore dev-workspace snap1" in c for c in cmds)
+
+
+# ── create output messages ───────────────────────────────────
+
+
+class TestSnapCreateOutput:
+    """Test output messages during snapshot creation."""
+
+    def test_create_shows_instance_name(self, mock_env):
+        """Create output includes the instance name."""
+        env, _ = mock_env
+        result = run_snap(["create", "admin-ansible", "mysnap"], env)
+        assert "admin-ansible" in result.stdout
+
+    def test_create_shows_snapshot_name(self, mock_env):
+        """Create output includes the snapshot name."""
+        env, _ = mock_env
+        result = run_snap(["create", "admin-ansible", "mysnap"], env)
+        assert "mysnap" in result.stdout
+
+    def test_create_shows_project(self, mock_env):
+        """Create output includes the resolved project."""
+        env, _ = mock_env
+        result = run_snap(["create", "admin-ansible", "mysnap"], env)
+        assert "admin" in result.stdout
