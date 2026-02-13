@@ -248,3 +248,96 @@ class TestEdgeCases:
         env["PATH"] = str(mock_bin)
         result = run_snap(["create", "test", "snap1"], env)
         assert result.returncode != 0
+
+
+# ── list empty ──────────────────────────────────────────
+
+
+class TestSnapListEmpty:
+    """Test list subcommand when domain has no snapshots."""
+
+    def test_list_instance_no_snapshots(self, mock_env):
+        """List for a valid instance with no snapshots exits 0."""
+        env, log = mock_env
+        # The mock incus returns exit 0 for snapshot commands,
+        # simulating an empty snapshot list (no output).
+        result = run_snap(["list", "admin-ansible"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any("snapshot list admin-ansible" in c for c in cmds)
+
+    def test_list_instance_output_contains_header(self, mock_env):
+        """List for a valid instance outputs the instance name in header."""
+        env, _ = mock_env
+        result = run_snap(["list", "dev-workspace"], env)
+        assert result.returncode == 0
+        assert "dev-workspace" in result.stdout
+
+
+# ── restore with confirmation ───────────────────────────
+
+
+class TestSnapRestoreConfirm:
+    """Test restore with user input 'yes' → restore executes."""
+
+    def test_self_restore_confirm_yes(self, mock_env):
+        """Typing 'yes' at the self-restore prompt proceeds with restore."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(
+            ["restore", "self", "my-snap"], env, input_text="yes\n",
+        )
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot restore admin-ansible my-snap --project admin" in c
+            for c in cmds
+        )
+
+    def test_self_restore_confirm_shows_warning(self, mock_env):
+        """Restore self shows WARNING before asking for confirmation."""
+        env, _ = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(
+            ["restore", "self", "my-snap"], env, input_text="yes\n",
+        )
+        assert "WARNING" in result.stdout
+
+
+# ── restore decline ─────────────────────────────────────
+
+
+class TestSnapRestoreDecline:
+    """Test restore with user input 'no' → restore aborted."""
+
+    def test_self_restore_decline_no(self, mock_env):
+        """Typing 'no' at the self-restore prompt aborts."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(
+            ["restore", "self", "my-snap"], env, input_text="no\n",
+        )
+        assert result.returncode != 0
+        # The actual snapshot restore command should NOT appear in the log
+        cmds = read_log(log)
+        assert not any(
+            "snapshot restore admin-ansible my-snap" in c for c in cmds
+        )
+
+    def test_self_restore_decline_shows_aborted(self, mock_env):
+        """Declining self-restore prints 'Aborted'."""
+        env, _ = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(
+            ["restore", "self", "my-snap"], env, input_text="no\n",
+        )
+        assert "Aborted" in result.stderr or "Aborted" in result.stdout
+
+    def test_self_restore_decline_random_input(self, mock_env):
+        """Any input other than 'yes' aborts the self-restore."""
+        env, _ = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(
+            ["restore", "self", "my-snap"], env, input_text="maybe\n",
+        )
+        assert result.returncode != 0

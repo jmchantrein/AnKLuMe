@@ -210,3 +210,225 @@ exit 0
         assert result.returncode == 0
         output = tmp_path / "infra.imported.yml"
         assert output.exists()
+
+
+# ── instance with no network info ───────────────────────
+
+
+class TestImportInstanceNoNetwork:
+    """Test importing an instance that has empty/null network info."""
+
+    def test_instance_no_network_gets_no_ip(self, tmp_path):
+        """Instance with null network state is imported without an IP."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"nonet"}]')
+
+        nonet_json = tmp_path / "nonet.json"
+        nonet_json.write_text(
+            '[{"name":"nonet-box","type":"container",'
+            '"state":{"network":null}}]',
+        )
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project nonet"* && "$*" == *"--format json"* ]]; then
+    cat "{nonet_json}"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        assert "nonet-box:" in content
+        # No ip: line should be present for this instance
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            if "nonet-box:" in line:
+                block = "\n".join(lines[i:i + 5])
+                assert "ip:" not in block
+                break
+
+    def test_instance_empty_network_dict(self, tmp_path):
+        """Instance with empty network dict is imported without an IP."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"emptynet"}]')
+
+        emptynet_json = tmp_path / "emptynet.json"
+        emptynet_json.write_text(
+            '[{"name":"emptynet-box","type":"container",'
+            '"state":{"network":{}}}]',
+        )
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project emptynet"* && "$*" == *"--format json"* ]]; then
+    cat "{emptynet_json}"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        assert "emptynet-box:" in content
+
+
+# ── instance with no type field ─────────────────────────
+
+
+class TestImportInstanceNoType:
+    """Test importing an instance that has no 'type' field (should default to container)."""
+
+    def test_instance_no_type_defaults_to_lxc(self, tmp_path):
+        """Instance without type field defaults to lxc."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"notype"}]')
+
+        notype_json = tmp_path / "notype.json"
+        notype_json.write_text(
+            '[{"name":"notype-box",'
+            '"state":{"network":{"eth0":{"addresses":'
+            '[{"family":"inet","address":"10.100.5.10"}]}}}}]',
+        )
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project notype"* && "$*" == *"--format json"* ]]; then
+    cat "{notype_json}"
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        assert "notype-box:" in content
+        # Should default to lxc (not vm)
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            if "notype-box:" in line:
+                block = "\n".join(lines[i:i + 5])
+                assert "type: lxc" in block
+                break
+
+
+# ── project with zero instances ─────────────────────────
+
+
+class TestImportEmptyProject:
+    """Test importing a project that exists but has zero instances."""
+
+    def test_empty_project_skipped(self, tmp_path):
+        """Project with no instances produces no domain entry."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"empty-proj"}]')
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project empty-proj"* && "$*" == *"--format json"* ]]; then
+    echo '[]'
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
+
+        content = (tmp_path / "infra.imported.yml").read_text()
+        # The project should not appear as a domain since it has no instances
+        assert "empty-proj:" not in content
+
+    def test_empty_project_does_not_crash(self, tmp_path):
+        """Project returning null instances list does not crash the script."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        proj_json = tmp_path / "proj.json"
+        proj_json.write_text('[{"name":"default"},{"name":"null-proj"}]')
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
+    cat "{proj_json}"
+    exit 0
+fi
+if [[ "$1" == "list" && "$*" == *"--project null-proj"* && "$*" == *"--format json"* ]]; then
+    echo 'null'
+    exit 0
+fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_import([], env, cwd=tmp_path)
+        assert result.returncode == 0
