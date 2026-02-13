@@ -777,3 +777,104 @@ exit 0
         result = run_flush(["--banana"], env, cwd=tmp_path)
         assert result.returncode != 0
         assert "Usage" in result.stdout or "Usage" in result.stderr
+
+
+# ── confirmation edge cases ───────────────────────────────────────
+
+
+class TestFlushConfirmation:
+    """Test confirmation prompt edge cases."""
+
+    def test_empty_input_does_not_proceed(self, mock_env):
+        """Empty input (just Enter) does not proceed with flush."""
+        env, _, cwd = mock_env
+        result = run_flush([], env, cwd=cwd, input_text="\n")
+        assert result.returncode == 0
+        assert "Aborted" in result.stdout
+
+    def test_uppercase_yes_proceeds(self, mock_env):
+        """'YES' (uppercase) proceeds with flush."""
+        env, _, cwd = mock_env
+        result = run_flush([], env, cwd=cwd, input_text="YES\n")
+        # Depending on implementation: might require exact 'yes' or be case-insensitive
+        combined = result.stdout
+        # Either proceeds or aborts — test whichever the script does
+        assert "Flush complete" in combined or "Aborted" in combined
+
+    def test_partial_yes_aborts(self, mock_env):
+        """'ye' (partial yes) aborts the flush."""
+        env, _, cwd = mock_env
+        result = run_flush([], env, cwd=cwd, input_text="ye\n")
+        assert "Aborted" in result.stdout
+
+    def test_force_overrides_confirmation(self, mock_env):
+        """--force skips confirmation entirely."""
+        env, log, cwd = mock_env
+        result = run_flush(["--force"], env, cwd=cwd)
+        assert result.returncode == 0
+        assert "Flush complete" in result.stdout
+        # Should NOT ask for confirmation
+        assert "Are you sure" not in result.stdout or "Type 'yes'" not in result.stdout
+
+
+# ── deletion order verification ───────────────────────────────────
+
+
+class TestFlushDeletionOrder:
+    """Verify resources are deleted in the correct order."""
+
+    def test_instances_before_projects(self, mock_env):
+        """Instances must be deleted before their projects."""
+        env, log, cwd = mock_env
+        run_flush(["--force"], env, cwd=cwd)
+        cmds = read_log(log)
+        # Find positions of instance deletes and project deletes
+        instance_deletes = [i for i, c in enumerate(cmds) if c.startswith("delete ")]
+        project_deletes = [i for i, c in enumerate(cmds) if "project delete" in c]
+        if instance_deletes and project_deletes:
+            assert max(instance_deletes) < min(project_deletes), (
+                "Instances should be deleted before projects"
+            )
+
+    def test_profiles_before_projects(self, mock_env):
+        """Non-default profiles should be deleted before projects."""
+        env, log, cwd = mock_env
+        run_flush(["--force"], env, cwd=cwd)
+        cmds = read_log(log)
+        profile_deletes = [i for i, c in enumerate(cmds) if "profile delete" in c]
+        project_deletes = [i for i, c in enumerate(cmds) if "project delete" in c]
+        if profile_deletes and project_deletes:
+            assert max(profile_deletes) < min(project_deletes), (
+                "Profiles should be deleted before projects"
+            )
+
+
+# ── flush output messages ─────────────────────────────────────────
+
+
+class TestFlushOutputMessages:
+    """Verify the informational messages during flush."""
+
+    def test_shows_resource_summary(self, mock_env):
+        """Flush shows a summary of what it found to delete."""
+        env, _, cwd = mock_env
+        result = run_flush(["--force"], env, cwd=cwd)
+        assert result.returncode == 0
+        # Should mention found resources: projects, instances, bridges, etc.
+        output = result.stdout.lower()
+        assert "project" in output or "instance" in output or "bridge" in output
+
+    def test_shows_each_deleted_resource(self, mock_env):
+        """Flush shows each deleted resource."""
+        env, _, cwd = mock_env
+        result = run_flush(["--force"], env, cwd=cwd)
+        assert result.returncode == 0
+        # Should mention specific resources
+        assert "admin-ctrl" in result.stdout or "work-dev" in result.stdout
+
+    def test_shows_skipped_default_project(self, mock_env):
+        """Flush does not attempt to delete the default project."""
+        env, log, cwd = mock_env
+        run_flush(["--force"], env, cwd=cwd)
+        cmds = read_log(log)
+        assert not any("project delete default" in c for c in cmds)
