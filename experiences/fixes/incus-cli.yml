@@ -100,7 +100,9 @@
     - "scripts/ai-switch.sh"
     - "scripts/run-tests.sh"
     - "scripts/deploy-nftables.sh"
+    - "scripts/bootstrap.sh"
   prevention: "Every script whose main purpose is Incus operations must verify daemon
     connectivity before proceeding. Never rely on 2>/dev/null || true for connection
     errors — only use it for expected operational failures (resource already exists,
-    service already stopped, etc.)"
+    service already stopped, etc.). For bootstrap.sh specifically, distinguish
+    'not installed' (command -v) from 'installed but daemon down' (incus info fails)."
