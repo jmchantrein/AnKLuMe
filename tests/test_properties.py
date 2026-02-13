@@ -178,3 +178,64 @@ class TestProperties:
         }
         errors = validate(infra)
         assert any("invalid name" in e for e in errors)
+
+    @given(infra=valid_infra())
+    @settings(max_examples=30, deadline=10000)
+    def test_gateway_always_254(self, infra, tmp_path_factory):
+        """Every domain gateway is always .254 in the domain subnet."""
+        out = tmp_path_factory.mktemp("gw")
+        generate(infra, out)
+        for dname, dconf in infra.get("domains", {}).items():
+            gv = (out / "group_vars" / f"{dname}.yml").read_text()
+            sid = dconf["subnet_id"]
+            expected_gw = f"10.100.{sid}.254"
+            assert expected_gw in gv, f"Gateway {expected_gw} not in {dname} group_vars"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=30, deadline=10000)
+    def test_subnet_cidr_matches_domain(self, infra, tmp_path_factory):
+        """Every domain group_vars has a subnet CIDR matching base_subnet.subnet_id."""
+        out = tmp_path_factory.mktemp("cidr")
+        generate(infra, out)
+        for dname, dconf in infra.get("domains", {}).items():
+            gv = (out / "group_vars" / f"{dname}.yml").read_text()
+            sid = dconf["subnet_id"]
+            expected_subnet = f"10.100.{sid}.0/24"
+            assert expected_subnet in gv, f"Subnet {expected_subnet} not in {dname} group_vars"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=30, deadline=10000)
+    def test_instance_type_in_host_vars(self, infra, tmp_path_factory):
+        """Every machine host_vars contains instance_type matching the infra declaration."""
+        out = tmp_path_factory.mktemp("type")
+        generate(infra, out)
+        for domain in infra.get("domains", {}).values():
+            for mname, mconf in domain.get("machines", {}).items():
+                hv = (out / "host_vars" / f"{mname}.yml").read_text()
+                expected_type = mconf.get("type", "lxc")
+                assert f"instance_type: {expected_type}" in hv, \
+                    f"Expected instance_type: {expected_type} in {mname}.yml"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_no_ansible_connection_in_group_vars(self, infra, tmp_path_factory):
+        """No group_vars file contains ansible_connection (ADR-015)."""
+        out = tmp_path_factory.mktemp("conn")
+        generate(infra, out)
+        gv_dir = out / "group_vars"
+        if gv_dir.exists():
+            for f in gv_dir.glob("*.yml"):
+                text = f.read_text()
+                assert "ansible_connection:" not in text, \
+                    f"ansible_connection found in {f.name} (violates ADR-015)"
+                assert "ansible_user:" not in text, \
+                    f"ansible_user found in {f.name} (violates ADR-015)"
+
+    @given(infra=valid_infra())
+    @settings(max_examples=20, deadline=10000)
+    def test_all_yml_contains_project_name(self, infra, tmp_path_factory):
+        """group_vars/all.yml always contains the project_name."""
+        out = tmp_path_factory.mktemp("proj")
+        generate(infra, out)
+        all_yml = (out / "group_vars" / "all.yml").read_text()
+        assert infra["project_name"] in all_yml, "project_name missing from all.yml"
