@@ -22,8 +22,8 @@ kernel, with centralized logging and full nftables control inside the VM.
 │    │         sys-firewall (KVM VM)               │        │
 │    │  eth0=admin  eth1=perso  eth2=pro  eth3=hl  │        │
 │    │                                              │        │
-│    │  nftables: admin→all allowed                 │        │
-│    │            non-admin→non-admin dropped        │        │
+│    │  nftables: all inter-domain dropped            │        │
+│    │            admin uses Incus socket (not net)   │        │
 │    │            centralized logging                │        │
 │    └──────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────┘
@@ -32,7 +32,49 @@ kernel, with centralized logging and full nftables control inside the VM.
 The firewall VM has one NIC per domain bridge. It acts as a Layer 3
 router between domains, applying nftables rules on forwarded traffic.
 
-## Configuration
+## Quick start (auto-creation)
+
+The simplest way to enable the firewall VM is to set `firewall_mode: vm`
+in `infra.yml`. The PSOT generator automatically creates the `sys-firewall`
+machine in the admin domain if you have not declared one yourself:
+
+```yaml
+# infra.yml — just add firewall_mode: vm
+global:
+  base_subnet: "10.100"
+  firewall_mode: vm
+
+domains:
+  admin:
+    subnet_id: 0
+    machines:
+      admin-ansible:
+        type: lxc
+        ip: "10.100.0.10"
+        roles: [base_system]
+  # ... other domains ...
+```
+
+```bash
+make sync    # Auto-creates sys-firewall (10.100.0.253) in admin domain
+make apply   # Creates infrastructure + provisions the firewall VM
+```
+
+The generator prints an informational message when auto-creating:
+
+```
+INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain (ip: 10.100.0.253)
+```
+
+The auto-created `sys-firewall` has: type `vm`, IP `.253` in the admin
+subnet, 2 vCPU, 2 GiB memory, roles `[base_system, firewall_router]`,
+and `ephemeral: false`.
+
+To customize the firewall VM (different IP, more resources, extra roles),
+declare it explicitly in `infra.yml` and the generator will use your
+definition instead. See the manual configuration section below.
+
+## Configuration (manual)
 
 ### 1. Set firewall mode in infra.yml
 
@@ -42,9 +84,9 @@ global:
   firewall_mode: vm  # Enable firewall VM mode
 ```
 
-### 2. Declare the firewall VM
+### 2. Declare the firewall VM (optional — auto-created if omitted)
 
-Add `sys-firewall` to the admin domain with the `firewall_router` role:
+To override the defaults, add `sys-firewall` to the admin domain:
 
 ```yaml
 domains:
@@ -60,8 +102,8 @@ domains:
         type: vm
         ip: "10.100.0.253"
         config:
-          limits.cpu: "2"
-          limits.memory: "2GiB"
+          limits.cpu: "4"
+          limits.memory: "4GiB"
         roles:
           - base_system
           - firewall_router
@@ -90,13 +132,15 @@ The generated nftables rules inside the VM enforce:
 
 | Source | Destination | Action |
 |--------|------------|--------|
-| admin | any domain | ACCEPT (logged) |
-| any domain | admin | ACCEPT (established only) |
-| non-admin | non-admin | DROP (logged) |
+| any domain | different domain | DROP (logged) |
 | any | any (ICMP) | ACCEPT |
+| any | any (established) | ACCEPT |
+
+The admin domain is treated like any other domain. The admin container
+communicates with all instances via the Incus socket, not the network,
+so it does not need a network-level exception.
 
 All decisions are logged with prefixes:
-- `FW-ADMIN-FWD`: admin → other domain
 - `FW-DENY-<DOMAIN>`: blocked inter-domain traffic
 - `FW-INVALID`: invalid packet state
 - `FW-DROP`: default drop
@@ -158,7 +202,6 @@ Add a route configuration task in the `base_system` role or a custom role:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `firewall_router_admin_bridge` | `net-admin` | Admin bridge name |
 | `firewall_router_logging` | `true` | Enable nftables logging |
 | `firewall_router_log_prefix` | `FW` | Log message prefix |
 | `incus_firewall_vm_bridge_pattern` | `net-` | Bridge discovery pattern |

@@ -166,6 +166,21 @@ from accidental deletion:
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 
+### Auto-creation of sys-firewall (firewall_mode: vm)
+
+When `global.firewall_mode` is set to `vm`, the generator automatically
+creates a `sys-firewall` machine in the admin domain if one is not already
+declared. This enrichment step (`enrich_infra()`) runs after validation but
+before file generation. The auto-created machine uses:
+- type: `vm`, ip: `<base_subnet>.<admin_subnet_id>.253`
+- config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
+- roles: `[base_system, firewall_router]`
+- ephemeral: `false`
+
+If the user declares `sys-firewall` explicitly (in any domain), their
+definition takes precedence and no auto-creation occurs. If `firewall_mode`
+is `vm` but no `admin` domain exists, the generator exits with an error.
+
 ## 6. Generator (scripts/generate.py)
 
 Reads `infra.yml` and generates/updates the Ansible file tree.

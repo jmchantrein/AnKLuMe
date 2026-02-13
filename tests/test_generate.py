@@ -2,7 +2,16 @@
 
 import pytest
 import yaml
-from generate import MANAGED_BEGIN, MANAGED_END, detect_orphans, generate, get_warnings, load_infra, validate
+from generate import (
+    MANAGED_BEGIN,
+    MANAGED_END,
+    detect_orphans,
+    enrich_infra,
+    generate,
+    get_warnings,
+    load_infra,
+    validate,
+)
 
 
 @pytest.fixture()
@@ -441,6 +450,54 @@ class TestFirewallMode:
         sample_infra["global"]["firewall_mode"] = "container"
         errors = validate(sample_infra)
         assert any("firewall_mode must be 'host' or 'vm'" in e for e in errors)
+
+
+# -- firewall VM auto-creation (enrich_infra) ---------------------------------
+
+
+class TestFirewallVMAutoCreation:
+    def test_firewall_mode_vm_auto_creates_sys_firewall(self, sample_infra):
+        """firewall_mode: vm auto-creates sys-firewall in admin domain."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        enrich_infra(sample_infra)
+        admin_machines = sample_infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" in admin_machines
+
+    def test_firewall_mode_vm_auto_created_has_correct_ip(self, sample_infra):
+        """Auto-created sys-firewall gets IP <base_subnet>.<admin_subnet_id>.253."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        enrich_infra(sample_infra)
+        sys_fw = sample_infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert sys_fw["ip"] == "10.100.0.253"
+
+    def test_firewall_mode_vm_auto_created_roles(self, sample_infra):
+        """Auto-created sys-firewall has base_system and firewall_router roles."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        enrich_infra(sample_infra)
+        sys_fw = sample_infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert sys_fw["roles"] == ["base_system", "firewall_router"]
+
+    def test_firewall_mode_vm_no_admin_domain_error(self, sample_infra):
+        """firewall_mode: vm without admin domain exits with error."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        del sample_infra["domains"]["admin"]
+        with pytest.raises(SystemExit):
+            enrich_infra(sample_infra)
+
+    def test_firewall_mode_vm_user_override_not_overwritten(self, sample_infra):
+        """If user declares sys-firewall, enrich_infra does not overwrite it."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        sample_infra["domains"]["admin"]["machines"]["sys-firewall"] = {
+            "description": "My custom firewall",
+            "type": "vm",
+            "ip": "10.100.0.200",
+            "roles": ["base_system"],
+        }
+        enrich_infra(sample_infra)
+        sys_fw = sample_infra["domains"]["admin"]["machines"]["sys-firewall"]
+        # User's config should be preserved, not overwritten
+        assert sys_fw["ip"] == "10.100.0.200"
+        assert sys_fw["description"] == "My custom firewall"
 
 
 # -- orphan protection ---------------------------------------------------------
