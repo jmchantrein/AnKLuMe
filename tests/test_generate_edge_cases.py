@@ -1023,3 +1023,297 @@ class TestMultipleErrors:
         """Empty dict reports all missing required keys."""
         errors = validate({})
         assert len(errors) == 3  # project_name, global, domains
+
+
+# ── load_infra directory edge cases ─────────────────────────
+
+
+class TestLoadInfraDirectoryEdgeCases:
+    """Edge cases for load_infra with directory mode."""
+
+    def test_domains_none(self, tmp_path):
+        """domains: null in infra.yml is treated as empty dict by validate/generate."""
+        f = tmp_path / "infra.yml"
+        f.write_text(yaml.dump({
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": None,
+        }))
+        result = load_infra(f)
+        # domains is None from YAML; validate and generate handle it via `or {}`
+        assert result["domains"] is None
+        errors = validate(result)
+        # "domains" key IS present (it's None), so the required key check passes,
+        # but the `or {}` pattern in validate means it iterates over empty dict
+        assert not any("Missing required key: domains" in e for e in errors)
+
+    def test_empty_base_yml(self, tmp_path):
+        """base.yml with no content defaults to {} (plus domains from dir scan)."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text("")
+        (d / "domains").mkdir()
+        result = load_infra(d)
+        # Empty base.yml yields {}, but _load_infra_dir adds domains key
+        # via setdefault when domains/ dir exists
+        assert isinstance(result, dict)
+        assert result.get("domains") == {}
+
+    def test_empty_domain_file(self, tmp_path):
+        """domains/empty.yml with no content is skipped (safe_load returns None)."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+        }))
+        domains_dir = d / "domains"
+        domains_dir.mkdir()
+        # Write one valid domain file
+        (domains_dir / "admin.yml").write_text(yaml.dump({
+            "admin": {"subnet_id": 0, "machines": {}},
+        }))
+        # Write an empty domain file
+        (domains_dir / "empty.yml").write_text("")
+        result = load_infra(d)
+        # The empty file yields None or {}, so no domains are added from it
+        assert "admin" in result["domains"]
+        # No crash from the empty file
+        assert len(result["domains"]) == 1
+
+    def test_policies_yml_null_network_policies(self, tmp_path):
+        """policies.yml with network_policies: null does not set network_policies."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+        }))
+        (d / "domains").mkdir()
+        # policies.yml with null network_policies
+        (d / "policies.yml").write_text("network_policies: null\n")
+        result = load_infra(d)
+        # The code checks `if "network_policies" in policies_data:` and
+        # assigns the value. None is a valid value from YAML null.
+        # The key is set, but its value is None.
+        assert result.get("network_policies") is None
+
+    def test_duplicate_domain_in_dir(self, tmp_path, capsys):
+        """Two files define same domain, last wins + warning."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+        }))
+        domains_dir = d / "domains"
+        domains_dir.mkdir()
+        # Two files define the 'shared' domain — sorted alphabetically,
+        # 01-shared.yml is loaded first, then 02-shared.yml overrides it
+        (domains_dir / "01-shared.yml").write_text(yaml.dump({
+            "shared": {"subnet_id": 1, "description": "First"},
+        }))
+        (domains_dir / "02-shared.yml").write_text(yaml.dump({
+            "shared": {"subnet_id": 2, "description": "Second"},
+        }))
+        result = load_infra(d)
+        # Last file (02-shared.yml) wins
+        assert result["domains"]["shared"]["subnet_id"] == 2
+        assert result["domains"]["shared"]["description"] == "Second"
+        # Warning is printed to stderr
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "shared" in captured.err
+
+    def test_infra_dir_with_only_base_yml(self, tmp_path):
+        """No domain files, just base.yml — no domains directory."""
+        d = tmp_path / "infra"
+        d.mkdir()
+        (d / "base.yml").write_text(yaml.dump({
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+        }))
+        # No domains/ directory at all
+        result = load_infra(d)
+        assert result.get("project_name") == "test"
+        # No domains key in result (or empty)
+        assert "domains" not in result or result.get("domains") in (None, {})
+
+
+# ── validate() error branches ────────────────────────────────
+
+
+class TestValidateEdgeCases:
+    """Edge cases for validate() error branches."""
+
+    def test_missing_all_required_keys_returns_early(self):
+        """Only project_name present, returns early with missing keys."""
+        errors = validate({"project_name": "test"})
+        # Missing 'global' and 'domains'
+        assert any("Missing required key: global" in e for e in errors)
+        assert any("Missing required key: domains" in e for e in errors)
+        # Should return early before domain validation
+        assert len(errors) == 2
+
+    def test_domains_none_value(self):
+        """domains: null doesn't crash — treated as empty dict."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": None,
+        }
+        errors = validate(infra)
+        # Should not crash; None is handled by `or {}`
+        assert not any("crash" in str(e).lower() for e in errors)
+
+    def test_machines_none_in_domain(self, sample_infra):
+        """machines: null in domain doesn't crash."""
+        sample_infra["domains"]["admin"]["machines"] = None
+        # Should not crash; machines handled by `or {}`
+        errors = validate(sample_infra)
+        # No crash, possibly no machine-related errors since None -> {}
+        assert not any("NoneType" in str(e) for e in errors)
+
+    def test_machine_config_none(self, sample_infra, monkeypatch):
+        """config: null in machine doesn't crash."""
+        monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
+        monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = None
+        errors = validate(sample_infra)
+        # config=None handled by `or {}`; no privileged check issue
+        assert not any("NoneType" in str(e) for e in errors)
+
+    def test_ip_as_integer(self, sample_infra):
+        """ip: 12345 (integer) instead of string — raises AttributeError.
+
+        The validate() code calls ip.startswith() which requires a string.
+        An integer IP triggers an unhandled AttributeError. This test documents
+        the current behavior (crash on non-string IP).
+        """
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = 12345
+        with pytest.raises(AttributeError):
+            validate(sample_infra)
+
+    def test_network_policy_from_empty_string(self, sample_infra):
+        """from: '' errors as unknown domain."""
+        sample_infra["network_policies"] = [
+            {"from": "", "to": "work", "ports": [22]},
+        ]
+        errors = validate(sample_infra)
+        assert any("from:" in e and "not a known" in e for e in errors)
+
+    def test_protocol_empty_string(self, sample_infra):
+        """protocol: '' errors as invalid."""
+        sample_infra["network_policies"] = [
+            {"from": "admin", "to": "work", "ports": [22], "protocol": ""},
+        ]
+        errors = validate(sample_infra)
+        assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
+
+    def test_ai_access_default_empty_string(self, sample_infra):
+        """Empty string ai_access_default errors as unknown domain."""
+        sample_infra["global"]["ai_access_policy"] = "exclusive"
+        sample_infra["global"]["ai_access_default"] = ""
+        sample_infra["domains"]["ai-tools"] = {
+            "subnet_id": 10, "machines": {},
+        }
+        errors = validate(sample_infra)
+        # Empty string is not a known domain
+        assert any("not a known domain" in e for e in errors)
+
+    def test_gpu_profile_non_gpu_device_type(self, sample_infra):
+        """Profile with type: 'disk' not counted as GPU."""
+        sample_infra["domains"]["admin"]["profiles"] = {
+            "storage": {"devices": {"data": {"type": "disk", "path": "/data"}}},
+        }
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["profiles"] = [
+            "default", "storage",
+        ]
+        # With exclusive policy (default), should NOT trigger GPU error
+        # because a 'disk' device is not a 'gpu' device
+        errors = validate(sample_infra)
+        assert not any("GPU" in e for e in errors)
+
+
+# ── Orphan detection edge cases ──────────────────────────────
+
+
+class TestOrphanEdgeCases:
+    """Edge cases for orphan detection."""
+
+    def test_orphan_in_group_vars_only(self, sample_infra, tmp_path):
+        """Orphan in group_vars but not inventory."""
+        generate(sample_infra, tmp_path)
+        # Add an orphan only in group_vars
+        (tmp_path / "group_vars" / "old-domain.yml").write_text(
+            "domain_ephemeral: true\n"
+        )
+        orphans = detect_orphans(sample_infra, tmp_path)
+        orphan_names = [o[0].stem for o in orphans]
+        assert "old-domain" in orphan_names
+
+    def test_orphan_yaml_root_is_string(self, sample_infra, tmp_path):
+        """YAML file with just a string as root — _is_orphan_protected handles gracefully."""
+        generate(sample_infra, tmp_path)
+        orphan_file = tmp_path / "host_vars" / "weird.yml"
+        orphan_file.write_text("just a plain string\n")
+        orphans = detect_orphans(sample_infra, tmp_path)
+        orphan_dict = {o[0].stem: o[1] for o in orphans}
+        # String root is not a dict, so not protected
+        assert orphan_dict["weird"] is False
+
+    def test_orphan_with_both_ephemeral_keys(self, sample_infra, tmp_path):
+        """domain_ephemeral AND instance_ephemeral present — domain checked first."""
+        generate(sample_infra, tmp_path)
+        orphan_file = tmp_path / "host_vars" / "mixed.yml"
+        # domain_ephemeral: false (protected) comes first in iteration,
+        # instance_ephemeral: true would be not-protected
+        orphan_file.write_text(
+            "domain_ephemeral: false\ninstance_ephemeral: true\n"
+        )
+        orphans = detect_orphans(sample_infra, tmp_path)
+        orphan_dict = {o[0].stem: o[1] for o in orphans}
+        # domain_ephemeral is checked first -> protected
+        assert orphan_dict["mixed"] is True
+
+
+# ── CLI main() edge cases ────────────────────────────────────
+
+
+class TestMainEdgeCases:
+    """Edge cases for main() CLI function."""
+
+    def test_main_no_args(self):
+        """Exit with argparse error when no arguments provided."""
+        from generate import main
+        with pytest.raises(SystemExit) as exc_info:
+            main([])
+        # argparse exits with code 2 for usage errors
+        assert exc_info.value.code == 2
+
+    def test_main_clean_orphans_no_orphans(self, sample_infra, tmp_path, capsys):
+        """--clean-orphans with nothing to clean runs without error."""
+        from generate import main
+        # Write infra file
+        infra_file = tmp_path / "infra.yml"
+        infra_file.write_text(yaml.dump(sample_infra, sort_keys=False))
+        base_dir = tmp_path / "out"
+        base_dir.mkdir()
+        main([str(infra_file), "--base-dir", str(base_dir), "--clean-orphans"])
+        # Should complete without error
+        captured = capsys.readouterr()
+        assert "Generating files" in captured.out
+
+    def test_main_validate_errors_skip_warnings(self, tmp_path, capsys):
+        """Validation errors prevent warning display (sys.exit before warnings)."""
+        from generate import main
+        # Write invalid infra file — missing required keys
+        infra_file = tmp_path / "invalid.yml"
+        infra_file.write_text(yaml.dump({"project_name": "bad"}, sort_keys=False))
+        with pytest.raises(SystemExit) as exc_info:
+            main([str(infra_file), "--base-dir", str(tmp_path)])
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Validation errors" in captured.err
+        # Warnings should NOT appear because we exited before get_warnings()
+        assert "WARNING" not in captured.err
