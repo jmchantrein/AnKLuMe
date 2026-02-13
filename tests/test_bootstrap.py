@@ -241,3 +241,256 @@ class TestBootstrapNoIncus:
         assert result.returncode != 0
         assert "not installed" in result.stderr or "not installed" in result.stdout \
             or "not found" in result.stderr
+
+
+# ── snapshot flag parsing ──────────────────────────────────
+
+
+class TestBootstrapSnapshot:
+    def test_snapshot_requires_type_argument(self):
+        """--snapshot without TYPE argument gives an error."""
+        result = run_bootstrap(["--dev", "--snapshot"], os.environ.copy())
+        # --snapshot tries to shift 2 args; missing TYPE causes bash error
+        assert result.returncode != 0
+
+    def test_snapshot_btrfs_accepted(self, mock_env):
+        """--snapshot btrfs is parsed and reported."""
+        env, log, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--snapshot", "btrfs"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert "btrfs" in result.stdout
+
+    def test_snapshot_zfs_accepted(self, mock_env):
+        """--snapshot zfs is parsed and reported."""
+        env, log, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--snapshot", "zfs"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert "zfs" in result.stdout
+
+    def test_snapshot_snapper_accepted(self, mock_env):
+        """--snapshot snapper is parsed and reported."""
+        env, log, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--snapshot", "snapper"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert "snapper" in result.stdout
+
+    def test_snapshot_unknown_type_warns(self, mock_env):
+        """--snapshot with unknown type produces a warning but continues."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--snapshot", "lvm"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert "WARNING" in result.stdout
+        assert "lvm" in result.stdout
+
+
+# ── import flag parsing ────────────────────────────────────
+
+
+class TestBootstrapImport:
+    def test_import_flag_parsed(self, mock_env):
+        """--import flag is parsed and triggers import section."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--import"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        # The import section looks for scripts/import-infra.sh
+        # Since it does not exist in tmp_path, it warns
+        assert "import" in result.stdout.lower()
+
+    def test_import_without_script_warns(self, mock_env):
+        """--import warns when scripts/import-infra.sh does not exist."""
+        env, _, cwd, script, _ = mock_env
+        result = run_bootstrap(["--dev", "--import"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert "WARNING" in result.stdout or "not found" in result.stdout.lower()
+
+
+# ── YOLO flag ──────────────────────────────────────────────
+
+
+class TestBootstrapYolo:
+    def test_yolo_flag_sets_true(self, mock_env):
+        """--YOLO sets yolo=true in context files."""
+        env, _, cwd, script, etc = mock_env
+        result = run_bootstrap(["--dev", "--YOLO"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert (etc / "yolo").exists()
+        assert (etc / "yolo").read_text().strip() == "true"
+
+    def test_no_yolo_flag_sets_false(self, mock_env):
+        """Without --YOLO, yolo is false in context files."""
+        env, _, cwd, script, etc = mock_env
+        result = run_bootstrap(["--dev"], env, script=script, cwd=cwd)
+        assert result.returncode == 0
+        assert (etc / "yolo").exists()
+        assert (etc / "yolo").read_text().strip() == "false"
+
+    def test_prod_yolo_combined(self, mock_env):
+        """--prod --YOLO sets yolo=true and completes successfully."""
+        env, _, cwd, script, etc = mock_env
+        result = run_bootstrap(
+            ["--prod", "--YOLO"], env, script=script, cwd=cwd, input_text="n\n",
+        )
+        assert result.returncode == 0
+        assert (etc / "yolo").read_text().strip() == "true"
+        assert "yolo=true" in result.stdout.lower() or "yolo=True" in result.stdout
+
+
+# ── missing mode ───────────────────────────────────────────
+
+
+class TestBootstrapMissingMode:
+    def test_no_mode_gives_error(self):
+        """Running without --prod or --dev gives an error message."""
+        result = run_bootstrap([], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "ERROR" in combined or result.returncode != 0
+
+    def test_no_mode_shows_usage(self):
+        """Running without mode shows usage information."""
+        result = run_bootstrap([], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "Usage" in combined or "Specify --prod or --dev" in combined
+
+    def test_only_yolo_without_mode_errors(self):
+        """--YOLO alone (without --prod or --dev) gives an error."""
+        result = run_bootstrap(["--YOLO"], os.environ.copy())
+        combined = result.stdout + result.stderr
+        assert "ERROR" in combined or result.returncode != 0
+
+
+# ── virtualization detection ───────────────────────────────
+
+
+class TestBootstrapVirtDetection:
+    def _make_virt_env(self, tmp_path, virt_output):
+        """Create a mock env with a specific systemd-detect-virt output."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir(exist_ok=True)
+        log_file = tmp_path / "cmds.log"
+
+        mock_virt = mock_bin / "systemd-detect-virt"
+        mock_virt.write_text(f"#!/usr/bin/env bash\necho \"{virt_output}\"\n")
+        mock_virt.chmod(mock_virt.stat().st_mode | stat.S_IEXEC)
+
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "incus $@" >> "{log_file}"
+if [[ "$1" == "info" ]]; then exit 0; fi
+if [[ "$1" == "admin" && "$2" == "init" ]]; then exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["ansible-playbook", "ansible-lint", "yamllint", "pip3"]:
+            mock_cmd = mock_bin / cmd
+            mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
+            mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        etc_anklume = tmp_path / "etc_anklume"
+        etc_anklume.mkdir(exist_ok=True)
+        patched = tmp_path / "bootstrap_patched.sh"
+        original = BOOTSTRAP_SH.read_text()
+        patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+        patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        return env, patched, etc_anklume
+
+    def test_none_virt_sets_vm_nested_false(self, tmp_path):
+        """systemd-detect-virt returning 'none' sets vm_nested=false."""
+        env, script, etc = self._make_virt_env(tmp_path, "none")
+        result = run_bootstrap(["--dev"], env, script=script, cwd=tmp_path)
+        assert result.returncode == 0
+        assert (etc / "vm_nested").read_text().strip() == "false"
+
+    def test_kvm_virt_sets_vm_nested_true(self, tmp_path):
+        """systemd-detect-virt returning 'kvm' sets vm_nested=true."""
+        env, script, etc = self._make_virt_env(tmp_path, "kvm")
+        result = run_bootstrap(["--dev"], env, script=script, cwd=tmp_path)
+        assert result.returncode == 0
+        assert (etc / "vm_nested").read_text().strip() == "true"
+
+    def test_qemu_virt_sets_vm_nested_true(self, tmp_path):
+        """systemd-detect-virt returning 'qemu' sets vm_nested=true."""
+        env, script, etc = self._make_virt_env(tmp_path, "qemu")
+        result = run_bootstrap(["--dev"], env, script=script, cwd=tmp_path)
+        assert result.returncode == 0
+        assert (etc / "vm_nested").read_text().strip() == "true"
+
+    def test_lxc_virt_sets_vm_nested_false(self, tmp_path):
+        """systemd-detect-virt returning 'lxc' (not kvm/qemu) sets vm_nested=false."""
+        env, script, etc = self._make_virt_env(tmp_path, "lxc")
+        result = run_bootstrap(["--dev"], env, script=script, cwd=tmp_path)
+        assert result.returncode == 0
+        assert (etc / "vm_nested").read_text().strip() == "false"
+
+    def test_virt_type_reported_in_output(self, tmp_path):
+        """Detected virtualization type is printed in output."""
+        env, script, etc = self._make_virt_env(tmp_path, "kvm")
+        result = run_bootstrap(["--dev"], env, script=script, cwd=tmp_path)
+        assert result.returncode == 0
+        assert "Detected virtualization: kvm" in result.stdout
+
+    def test_no_systemd_detect_virt_defaults_to_none(self, tmp_path):
+        """When systemd-detect-virt is not available, default to 'none'."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir(exist_ok=True)
+        log_file = tmp_path / "cmds.log"
+
+        # No systemd-detect-virt in PATH — only incus and other mocks
+        mock_incus = mock_bin / "incus"
+        mock_incus.write_text(f"""#!/usr/bin/env bash
+echo "incus $@" >> "{log_file}"
+if [[ "$1" == "info" ]]; then exit 0; fi
+if [[ "$1" == "admin" && "$2" == "init" ]]; then exit 0; fi
+if [[ "$1" == "project" && "$2" == "list" ]]; then echo "default"; exit 0; fi
+exit 0
+""")
+        mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["ansible-playbook", "ansible-lint", "yamllint", "pip3"]:
+            mock_cmd = mock_bin / cmd
+            mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
+            mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+
+        mock_python = mock_bin / "python3"
+        mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+        mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+        etc_anklume = tmp_path / "etc_anklume"
+        etc_anklume.mkdir(exist_ok=True)
+        patched = tmp_path / "bootstrap_patched.sh"
+        original = BOOTSTRAP_SH.read_text()
+        patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+        patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
+
+        # Use a PATH that excludes systemd-detect-virt but includes our mocks
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}"
+
+        # Need bash accessible
+        bash_path = "/usr/bin/bash"
+        if not os.path.exists(bash_path):
+            bash_path = "/bin/bash"
+        (mock_bin / "bash").symlink_to(bash_path)
+
+        # Also need common utilities (cat, mkdir, etc.)
+        for util in ["cat", "mkdir", "echo", "id", "whoami", "getent", "df", "tail", "awk", "date"]:
+            for search_dir in ["/usr/bin", "/bin"]:
+                util_path = os.path.join(search_dir, util)
+                if os.path.exists(util_path):
+                    target = mock_bin / util
+                    if not target.exists():
+                        target.symlink_to(util_path)
+                    break
+
+        result = run_bootstrap(["--dev"], env, script=patched, cwd=tmp_path)
+        assert result.returncode == 0
+        assert "Detected virtualization: none" in result.stdout
+        assert (etc_anklume / "vm_nested").read_text().strip() == "false"
