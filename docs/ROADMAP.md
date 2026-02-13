@@ -866,6 +866,105 @@ c) **ROADMAP cleanup**:
 
 ---
 
+## Phase 18: Advanced Security, Testing, Onboarding & Self-Improvement ✅ COMPLETE
+
+**Goal**: Five independent sub-phases addressing security, testing,
+onboarding, self-improvement, and image sharing.
+
+### Phase 18a: Exclusive AI-Tools Network Access with VRAM Flush
+
+**Goal**: Only one domain at a time can access ai-tools. `make ai-switch
+DOMAIN=<name>` atomically switches access with GPU VRAM flush.
+
+**Deliverables**:
+- `ai_access_policy: exclusive|open` in `global:` section of infra.yml
+- `ai_access_default` and `ai_vram_flush` global fields
+- PSOT generator validation and auto-enrichment of network policies
+- `scripts/ai-switch.sh` — atomic domain switch with VRAM flush
+- `roles/incus_nftables/` extended with `incus_nftables_ai_override`
+- `make ai-switch DOMAIN=<name>` Makefile target
+- `docs/ai-switch.md` documentation
+- 11 new pytest tests for AI access policy validation
+
+**Validation criteria**:
+- [x] PSOT generator validates ai_access_policy fields
+- [x] Auto-creation of network_policy when exclusive mode and no policy
+- [x] ai-switch.sh handles stop/flush/switch/restart lifecycle
+- [x] nftables AI override integrated into template
+- [x] All 11 new tests pass
+
+### Phase 18b: LLM-Powered Exhaustive Testing (Behavior Matrix)
+
+**Goal**: Behavior matrix mapping every capability to expected reactions,
+with LLM-generated test coverage and Hypothesis property-based tests.
+
+**Deliverables**:
+- `tests/behavior_matrix.yml` — 120 cells across 11 capabilities at 3 depths
+- `scripts/matrix-coverage.py` — scans tests for matrix ID annotations
+- `scripts/ai-matrix-test.sh` — LLM-powered test generator for uncovered cells
+- `tests/test_properties.py` — 9 Hypothesis property-based tests for generator
+- Matrix ID annotations on 54 existing tests (`# Matrix: XX-NNN`)
+- CI integration: `matrix-coverage` informational job
+- `make matrix-coverage` and `make matrix-generate` targets
+
+**Validation criteria**:
+- [x] `make matrix-coverage` reports coverage (48% initial)
+- [x] Hypothesis tests pass (idempotency, no duplicate IPs, managed markers)
+- [x] Matrix IDs annotated on existing tests
+- [x] CI job added for matrix coverage
+
+### Phase 18c: Interactive Onboarding Guide
+
+**Goal**: `make guide` launches a step-by-step interactive tutorial.
+
+**Deliverables**:
+- `scripts/guide.sh` — 9-step interactive tutorial (pure Bash, ANSI colors)
+- `make guide`, `make quickstart` Makefile targets
+- Restructured `make help` with "GETTING STARTED" category
+- `docs/guide.md` documentation
+
+**Validation criteria**:
+- [x] `make guide --auto` runs as CI smoke test
+- [x] `make quickstart` copies example and provides instructions
+- [x] shellcheck clean
+
+### Phase 18d: Self-Improving Software (Experience Library + Improvement Loop)
+
+**Goal**: Persistent experience library seeded from git history, with
+spec-driven improvement loop proposing enhancements via PRs.
+
+**Deliverables**:
+- `experiences/` directory (fixes/, patterns/, decisions/)
+- `scripts/mine-experiences.py` — git history miner for fix patterns
+- `scripts/ai-improve.sh` — spec-driven improvement loop
+- `scripts/ai-test-loop.sh` extended with experience search before LLM
+- `--learn` flag for capturing new fixes to library
+- `make mine-experiences` and `make ai-improve` targets
+
+**Validation criteria**:
+- [x] Experience library populated with fix patterns, implementation patterns
+- [x] ai-test-loop.sh searches experiences before calling LLM
+- [x] mine-experiences.py processes git history incrementally
+- [x] ai-improve.sh implements full validate → context → LLM → test → PR loop
+
+### Phase 18e: Shared Image Repository Across Nesting Levels
+
+**Goal**: Pre-export OS images from host, mount into nested Incus VMs
+to avoid redundant downloads.
+
+**Deliverables**:
+- `roles/incus_images/` extended with export tasks + `incus_images_export_for_nesting`
+- `roles/dev_test_runner/` extended with import from mounted images
+- Smart timeout (`incus_images_download_timeout: 600`)
+- `make export-images` Makefile target
+
+**Validation criteria**:
+- [x] Export tasks create tar.gz files with idempotency (`creates:`)
+- [x] Import tasks load images into nested Incus from mounted directory
+- [x] Molecule tests verify export directory and defaults
+
+---
+
 ## Current State
 
 **Completed**:
@@ -885,12 +984,12 @@ c) **ROADMAP cleanup**:
 - Phase 13: LLM-assisted testing (ai-test-loop + ai-develop)
 - Phase 14: Speech-to-Text (STT) service (stt_server role)
 - Phase 15: Claude Code Agent Teams (autonomous dev + testing)
-
 - Phase 16: Security policy, network policies, bootstrap, AI tools domain
 - Phase 17: CI/CD pipeline + complete Molecule test coverage (18/18 roles)
+- Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
 
 **Next**:
-- Phase 18+ (to be defined)
+- Phase 19+ (to be defined)
 
 **Deployed infrastructure**:
 
@@ -901,6 +1000,6 @@ c) **ROADMAP cleanup**:
 | pro | pro-dev | 10.100.2.10 | net-pro | Running |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
 
-**Active ADRs**: ADR-001 to ADR-031
+**Active ADRs**: ADR-001 to ADR-035
 
 **Known issues**: None

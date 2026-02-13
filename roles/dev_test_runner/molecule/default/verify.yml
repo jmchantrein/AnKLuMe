@@ -83,3 +83,9 @@
           - list
           - community.general
       changed_when: false
+
+    - name: Verify | Check import default is false
+      ansible.builtin.assert:
+        that:
+          - not (incus_images_import_from_host | default(false))
+        fail_msg: "incus_images_import_from_host should default to false"

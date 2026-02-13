@@ -1,0 +1,555 @@
+---
+# AnKLuMe Behavior Matrix — Source of truth for expected behaviors
+# Each capability lists actions at 3 depth levels with expected reactions
+# LLM-generated tests verify each cell; coverage tracked automatically
+#
+# Depth 1: Single-feature tests (one capability in isolation)
+# Depth 2: Pairwise interaction tests (two capabilities combined)
+# Depth 3: Three-way interaction tests (complex scenarios)
+#
+# Fields:
+#   id: Unique identifier (CAPABILITY-DEPTH-NNN)
+#   action: What is done
+#   expected: What should happen
+#   deterministic: Whether the outcome is always the same (true/false)
+
+capabilities:
+  domain_lifecycle:
+    description: "Domain creation, modification, deletion"
+    depth_1:
+      - id: DL-001
+        action: "Create domain with valid subnet_id"
+        expected: "inventory/, group_vars/, host_vars/ files generated"
+        deterministic: true
+      - id: DL-002
+        action: "Duplicate subnet_id across two domains"
+        expected: "Validation error mentioning subnet_id already used"
+        deterministic: true
+      - id: DL-003
+        action: "Duplicate machine name across domains"
+        expected: "Validation error mentioning duplicate machine"
+        deterministic: true
+      - id: DL-004
+        action: "Duplicate IP across machines"
+        expected: "Validation error mentioning IP already used"
+        deterministic: true
+      - id: DL-005
+        action: "IP not in correct subnet for domain"
+        expected: "Validation error mentioning not in subnet"
+        deterministic: true
+      - id: DL-006
+        action: "Invalid domain name (uppercase, special chars)"
+        expected: "Validation error mentioning invalid name"
+        deterministic: true
+      - id: DL-007
+        action: "subnet_id out of range (255+)"
+        expected: "Validation error mentioning 0-254 range"
+        deterministic: true
+      - id: DL-008
+        action: "Reference nonexistent profile in machine"
+        expected: "Validation error mentioning profile not defined"
+        deterministic: true
+      - id: DL-009
+        action: "Reference 'default' profile (always valid)"
+        expected: "No validation error"
+        deterministic: true
+      - id: DL-010
+        action: "Empty domains list"
+        expected: "Validation passes, no files generated"
+        deterministic: true
+      - id: DL-011
+        action: "Machine without explicit IP"
+        expected: "host_vars generated without instance_ip"
+        deterministic: true
+      - id: DL-012
+        action: "Machine with config keys (limits.cpu, limits.memory)"
+        expected: "host_vars contains instance_config with those keys"
+        deterministic: true
+    depth_2:
+      - id: DL-2-001
+        action: "Domain ephemeral:true + machine ephemeral:false"
+        expected: "Machine overrides domain, instance_ephemeral: false"
+        deterministic: true
+      - id: DL-2-002
+        action: "Domain ephemeral:true + machine no ephemeral"
+        expected: "Machine inherits domain, instance_ephemeral: true"
+        deterministic: true
+      - id: DL-2-003
+        action: "Domain with profiles + machine referencing them"
+        expected: "group_vars has incus_profiles, host_vars has profiles list"
+        deterministic: true
+      - id: DL-2-004
+        action: "Machine with devices and config together"
+        expected: "host_vars contains both instance_devices and instance_config"
+        deterministic: true
+      - id: DL-2-005
+        action: "Two domains with same machines but different subnets"
+        expected: "Both domains generate correct files, no collision"
+        deterministic: true
+    depth_3:
+      - id: DL-3-001
+        action: "Domain + VM + GPU + firewall_mode=vm"
+        expected: "sys-firewall auto-created, VM host_vars correct, GPU tracked"
+        deterministic: true
+      - id: DL-3-002
+        action: "3 domains, profiles, ephemeral mix, network_policies"
+        expected: "All files generated, policies in all.yml, ephemeral correct"
+        deterministic: true
+
+  psot_generator:
+    description: "Managed sections, idempotency, orphan detection"
+    depth_1:
+      - id: PG-001
+        action: "Generate files for valid infra"
+        expected: "All inventory, group_vars, host_vars files created"
+        deterministic: true
+      - id: PG-002
+        action: "Run generate twice on same infra"
+        expected: "Second run produces identical output (idempotent)"
+        deterministic: true
+      - id: PG-003
+        action: "Add custom content outside managed section"
+        expected: "Custom content preserved after regeneration"
+        deterministic: true
+      - id: PG-004
+        action: "Dry-run mode"
+        expected: "No files created on disk"
+        deterministic: true
+      - id: PG-005
+        action: "Managed markers present in all generated files"
+        expected: "Every .yml file has MANAGED_BEGIN and MANAGED_END"
+        deterministic: true
+      - id: PG-006
+        action: "group_vars/all.yml contains project-level vars"
+        expected: "project_name, base_subnet, psot_default_connection present"
+        deterministic: true
+      - id: PG-007
+        action: "group_vars/domain.yml contains network config"
+        expected: "net-<domain>, subnet CIDR, gateway present"
+        deterministic: true
+      - id: PG-008
+        action: "host_vars contains instance metadata"
+        expected: "instance_type, instance_ip, instance_roles present"
+        deterministic: true
+      - id: PG-009
+        action: "No ansible_connection in group_vars (ADR-015)"
+        expected: "ansible_connection and ansible_user absent from all group_vars"
+        deterministic: true
+      - id: PG-010
+        action: "Inventory contains host and IP"
+        expected: "Host listed under domain group with ansible_host"
+        deterministic: true
+    depth_2:
+      - id: PG-2-001
+        action: "Generate, add orphan files, detect orphans"
+        expected: "Orphan files detected, correct count returned"
+        deterministic: true
+      - id: PG-2-002
+        action: "Orphan with ephemeral:false (protected)"
+        expected: "Orphan reported as protected, not deleted by clean"
+        deterministic: true
+      - id: PG-2-003
+        action: "all.yml never detected as orphan"
+        expected: "detect_orphans excludes all.yml"
+        deterministic: true
+      - id: PG-2-004
+        action: "Generate + immediately detect orphans"
+        expected: "Zero orphans found (no false positives)"
+        deterministic: true
+    depth_3:
+      - id: PG-3-001
+        action: "Generate + modify user content + add domain + regenerate"
+        expected: "User content preserved, new domain files created"
+        deterministic: true
+      - id: PG-3-002
+        action: "Orphan protection + clean-orphans + ephemeral mix"
+        expected: "Protected orphans kept, ephemeral orphans deleted"
+        deterministic: true
+
+  gpu_policy:
+    description: "GPU access policy: exclusive, shared, detection"
+    depth_1:
+      - id: GP-001
+        action: "Single GPU instance, exclusive mode (default)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: GP-002
+        action: "Two GPU instances, exclusive mode"
+        expected: "Validation error listing both GPU instances"
+        deterministic: true
+      - id: GP-003
+        action: "Two GPU instances, shared mode"
+        expected: "Validation passes, warning emitted"
+        deterministic: true
+      - id: GP-004
+        action: "Shared GPU warning message"
+        expected: "get_warnings returns shared GPU warning"
+        deterministic: true
+      - id: GP-005
+        action: "No GPU instances"
+        expected: "No warnings, no errors"
+        deterministic: true
+      - id: GP-006
+        action: "Single GPU in shared mode"
+        expected: "No warning (only one instance)"
+        deterministic: true
+      - id: GP-007
+        action: "GPU via profile device (not flag)"
+        expected: "GPU detected via profile device scan"
+        deterministic: true
+      - id: GP-008
+        action: "Invalid gpu_policy value"
+        expected: "Validation error about gpu_policy"
+        deterministic: true
+      - id: GP-009
+        action: "Default gpu_policy is exclusive"
+        expected: "Two GPU instances error without explicit policy"
+        deterministic: true
+    depth_2:
+      - id: GP-2-001
+        action: "GPU via flag + GPU via profile in same infra"
+        expected: "Both detected, exclusive mode errors"
+        deterministic: true
+      - id: GP-2-002
+        action: "GPU instance + firewall_mode=vm"
+        expected: "Both validated independently"
+        deterministic: true
+      - id: GP-2-003
+        action: "Shared GPU + network_policies"
+        expected: "Warning for GPU, policies validated correctly"
+        deterministic: true
+    depth_3:
+      - id: GP-3-001
+        action: "Two GPU instances + shared mode + ephemeral override"
+        expected: "Warning for GPU, ephemeral correctly resolved"
+        deterministic: true
+
+  network_policies:
+    description: "Cross-domain communication rules"
+    depth_1:
+      - id: NP-001
+        action: "Valid domain-to-domain policy"
+        expected: "No validation errors"
+        deterministic: true
+      - id: NP-002
+        action: "Valid machine-to-domain policy"
+        expected: "No validation errors"
+        deterministic: true
+      - id: NP-003
+        action: "Valid 'host' keyword in from"
+        expected: "No validation errors"
+        deterministic: true
+      - id: NP-004
+        action: "ports: all"
+        expected: "No validation errors"
+        deterministic: true
+      - id: NP-005
+        action: "Unknown 'from' reference"
+        expected: "Validation error about unknown from"
+        deterministic: true
+      - id: NP-006
+        action: "Unknown 'to' reference"
+        expected: "Validation error about unknown to"
+        deterministic: true
+      - id: NP-007
+        action: "Missing 'from' field"
+        expected: "Validation error about missing from"
+        deterministic: true
+      - id: NP-008
+        action: "Missing 'to' field"
+        expected: "Validation error about missing to"
+        deterministic: true
+      - id: NP-009
+        action: "Invalid port number (>65535)"
+        expected: "Validation error about invalid port"
+        deterministic: true
+      - id: NP-010
+        action: "Invalid ports type (not list, not 'all')"
+        expected: "Validation error about ports format"
+        deterministic: true
+      - id: NP-011
+        action: "Invalid protocol (not tcp/udp)"
+        expected: "Validation error about protocol"
+        deterministic: true
+      - id: NP-012
+        action: "Empty policies list"
+        expected: "No validation errors"
+        deterministic: true
+    depth_2:
+      - id: NP-2-001
+        action: "bidirectional: true policy"
+        expected: "Policy accepted, no errors"
+        deterministic: true
+      - id: NP-2-002
+        action: "Policies present in group_vars/all.yml"
+        expected: "network_policies key in all.yml with rule details"
+        deterministic: true
+      - id: NP-2-003
+        action: "No policies -> no key in all.yml"
+        expected: "network_policies absent from all.yml"
+        deterministic: true
+      - id: NP-2-004
+        action: "Policy between domain and machine within it"
+        expected: "Valid (intra-domain policy accepted)"
+        deterministic: true
+    depth_3:
+      - id: NP-3-001
+        action: "Multiple policies + firewall_mode=vm + GPU shared"
+        expected: "All validated independently, no interference"
+        deterministic: true
+
+  vm_support:
+    description: "LXC and VM instance types"
+    depth_1:
+      - id: VM-001
+        action: "type: vm is accepted"
+        expected: "Validation passes"
+        deterministic: true
+      - id: VM-002
+        action: "type: lxc is accepted"
+        expected: "Validation passes"
+        deterministic: true
+      - id: VM-003
+        action: "Invalid type (docker)"
+        expected: "Validation error about type"
+        deterministic: true
+      - id: VM-004
+        action: "VM produces instance_type: vm in host_vars"
+        expected: "host_vars contains instance_type: vm"
+        deterministic: true
+      - id: VM-005
+        action: "Default type is lxc"
+        expected: "Machine without type gets instance_type: lxc"
+        deterministic: true
+      - id: VM-006
+        action: "VM with resource config"
+        expected: "host_vars has limits.cpu, limits.memory"
+        deterministic: true
+    depth_2:
+      - id: VM-2-001
+        action: "VM and LXC coexist in same domain"
+        expected: "Both generated correctly with their types"
+        deterministic: true
+      - id: VM-2-002
+        action: "VM with profiles"
+        expected: "VM host_vars references profiles correctly"
+        deterministic: true
+    depth_3:
+      - id: VM-3-001
+        action: "VM + GPU + firewall_mode=vm"
+        expected: "VM created, GPU tracked, sys-firewall auto-created"
+        deterministic: true
+
+  privileged_policy:
+    description: "Privileged LXC security based on vm_nested context"
+    depth_1:
+      - id: PP-001
+        action: "Privileged LXC when vm_nested=false"
+        expected: "Validation error about privileged forbidden"
+        deterministic: true
+      - id: PP-002
+        action: "Privileged LXC when vm_nested=true"
+        expected: "No validation error"
+        deterministic: true
+      - id: PP-003
+        action: "Privileged LXC when vm_nested=None (file missing)"
+        expected: "No enforcement (no error)"
+        deterministic: true
+      - id: PP-004
+        action: "Privileged VM (always allowed)"
+        expected: "No validation error regardless of vm_nested"
+        deterministic: true
+      - id: PP-005
+        action: "Non-privileged LXC with vm_nested=false"
+        expected: "No error (only privileged triggers)"
+        deterministic: true
+      - id: PP-006
+        action: "YOLO bypasses privileged error"
+        expected: "No error, warning about YOLO emitted"
+        deterministic: true
+    depth_2:
+      - id: PP-2-001
+        action: "Privileged LXC + YOLO + vm_nested=false"
+        expected: "Warning in get_warnings, no error in validate"
+        deterministic: true
+      - id: PP-2-002
+        action: "Privileged VM + vm_nested=false"
+        expected: "VM always allowed, no error"
+        deterministic: true
+    depth_3:
+      - id: PP-3-001
+        action: "Privileged LXC + GPU + exclusive policy + vm_nested=false"
+        expected: "Privileged error (GPU policy independent)"
+        deterministic: true
+
+  firewall_modes:
+    description: "Host and VM firewall mode, auto-creation"
+    depth_1:
+      - id: FM-001
+        action: "Default mode (no firewall_mode set)"
+        expected: "Defaults to host mode, validation passes"
+        deterministic: true
+      - id: FM-002
+        action: "Explicit firewall_mode: host"
+        expected: "Validation passes"
+        deterministic: true
+      - id: FM-003
+        action: "firewall_mode: vm"
+        expected: "Validation passes"
+        deterministic: true
+      - id: FM-004
+        action: "Invalid firewall_mode"
+        expected: "Validation error about mode"
+        deterministic: true
+      - id: FM-005
+        action: "firewall_mode: vm auto-creates sys-firewall"
+        expected: "sys-firewall machine added to admin domain"
+        deterministic: true
+      - id: FM-006
+        action: "Auto-created sys-firewall has correct IP"
+        expected: "IP is base_subnet.admin_subnet_id.253"
+        deterministic: true
+      - id: FM-007
+        action: "Auto-created sys-firewall has correct roles"
+        expected: "roles: [base_system, firewall_router]"
+        deterministic: true
+      - id: FM-008
+        action: "firewall_mode: vm without admin domain"
+        expected: "SystemExit error"
+        deterministic: true
+    depth_2:
+      - id: FM-2-001
+        action: "User-declared sys-firewall not overwritten"
+        expected: "User IP and description preserved"
+        deterministic: true
+      - id: FM-2-002
+        action: "firewall_mode: vm + network_policies"
+        expected: "Both validated independently"
+        deterministic: true
+    depth_3:
+      - id: FM-3-001
+        action: "firewall_mode: vm + GPU + privileged VM"
+        expected: "All features coexist, sys-firewall created"
+        deterministic: true
+
+  infra_directory:
+    description: "infra/ directory support (ADR-030)"
+    depth_1:
+      - id: ID-001
+        action: "Load from infra/ directory"
+        expected: "Same structure as single file"
+        deterministic: true
+      - id: ID-002
+        action: "Directory and file produce identical output"
+        expected: "Generated files byte-identical"
+        deterministic: true
+      - id: ID-003
+        action: "policies.yml merged from directory"
+        expected: "network_policies present in result"
+        deterministic: true
+      - id: ID-004
+        action: "Missing base.yml exits with error"
+        expected: "SystemExit"
+        deterministic: true
+      - id: ID-005
+        action: "Auto-detect file format"
+        expected: "load_infra works with .yml extension"
+        deterministic: true
+      - id: ID-006
+        action: "Auto-detect directory format"
+        expected: "load_infra works with directory path"
+        deterministic: true
+      - id: ID-007
+        action: "Domains sorted alphabetically"
+        expected: "All domains loaded regardless of file order"
+        deterministic: true
+      - id: ID-008
+        action: "Empty domains/ directory"
+        expected: "No domains in result"
+        deterministic: true
+    depth_2:
+      - id: ID-2-001
+        action: "Directory + network_policies + domains"
+        expected: "All merged correctly"
+        deterministic: true
+      - id: ID-2-002
+        action: "Directory + firewall_mode=vm"
+        expected: "Auto-creation works with directory format"
+        deterministic: true
+    depth_3:
+      - id: ID-3-001
+        action: "Directory + policies + GPU + firewall_mode=vm"
+        expected: "All features work identically to single file"
+        deterministic: true
+
+  ephemeral_lifecycle:
+    description: "Ephemeral flag inheritance and protection"
+    depth_1:
+      - id: EL-001
+        action: "Domain without ephemeral (default false)"
+        expected: "domain_ephemeral: false, instance_ephemeral: false"
+        deterministic: true
+      - id: EL-002
+        action: "Domain with ephemeral: true"
+        expected: "domain_ephemeral: true, machines inherit true"
+        deterministic: true
+      - id: EL-003
+        action: "Machine override ephemeral: false on ephemeral domain"
+        expected: "instance_ephemeral: false despite domain true"
+        deterministic: true
+      - id: EL-004
+        action: "Invalid ephemeral value (string 'yes')"
+        expected: "Validation error about boolean type"
+        deterministic: true
+      - id: EL-005
+        action: "Invalid ephemeral on machine"
+        expected: "Validation error about boolean type"
+        deterministic: true
+    depth_2:
+      - id: EL-2-001
+        action: "Ephemeral domain + orphan detection"
+        expected: "Ephemeral orphans are unprotected"
+        deterministic: true
+      - id: EL-2-002
+        action: "Protected orphan + clean-orphans"
+        expected: "Protected orphan skipped, unprotected deleted"
+        deterministic: true
+    depth_3:
+      - id: EL-3-001
+        action: "Mixed ephemeral + GPU + network_policies"
+        expected: "All features independent, ephemeral correct"
+        deterministic: true
+
+  image_management:
+    description: "OS image extraction and references"
+    depth_1:
+      - id: IM-001
+        action: "Extract images from infra with default_os_image"
+        expected: "Default image in incus_all_images list"
+        deterministic: true
+      - id: IM-002
+        action: "Machine with custom os_image"
+        expected: "Custom image in extracted list"
+        deterministic: true
+      - id: IM-003
+        action: "Multiple machines, same image"
+        expected: "Deduplicated list (one entry)"
+        deterministic: true
+      - id: IM-004
+        action: "No images defined"
+        expected: "Empty list, no incus_all_images in all.yml"
+        deterministic: true
+    depth_2:
+      - id: IM-2-001
+        action: "Mix of default and custom images"
+        expected: "Both in sorted list"
+        deterministic: true
+      - id: IM-2-002
+        action: "Images in group_vars/all.yml"
+        expected: "incus_all_images key present with image list"
+        deterministic: true
+    depth_3:
+      - id: IM-3-001
+        action: "Images + VM + LXC + different os_image per type"
+        expected: "All unique images collected, sorted"
+        deterministic: true

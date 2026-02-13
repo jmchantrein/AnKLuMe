@@ -1,0 +1,108 @@
+# Ansible role structure conventions for AnKLuMe.
+# Documents the standard layout and naming patterns.
+---
+- id: PAT-ROLE-001
+  category: role-structure
+  name: "Infrastructure role layout"
+  description: "Standard directory structure for Incus infrastructure roles"
+  example: |
+    roles/<role_name>/
+    ├── defaults/main.yml     # Default variables (role-prefixed)
+    ├── tasks/main.yml        # Tasks following reconciliation pattern
+    ├── meta/main.yml         # Galaxy metadata (namespace, author, license)
+    ├── molecule/
+    │   └── default/
+    │       ├── molecule.yml  # Driver: default, roles_path: ../../
+    │       ├── converge.yml  # Setup test fixtures + run role
+    │       ├── verify.yml    # Assert expected state
+    │       └── cleanup.yml   # Tear down test fixtures
+    └── templates/            # Jinja2 templates (if needed)
+  notes:
+    - "Infrastructure roles use connection: local and target localhost"
+    - "Molecule scenarios need roles_path for cross-role dependencies"
+
+- id: PAT-ROLE-002
+  category: role-structure
+  name: "Provisioning role layout"
+  description: "Standard directory structure for instance provisioning roles"
+  example: |
+    roles/<role_name>/
+    ├── defaults/main.yml     # Default variables
+    ├── tasks/main.yml        # Installation + configuration tasks
+    ├── handlers/main.yml     # Service restart handlers (if applicable)
+    ├── meta/main.yml         # Galaxy metadata
+    ├── molecule/
+    │   └── default/
+    │       ├── molecule.yml  # Driver: default
+    │       ├── converge.yml  # Run role with test variables
+    │       └── verify.yml    # Assert service/config state
+    └── templates/            # systemd units, config files
+  notes:
+    - "Provisioning roles connect via community.general.incus"
+    - "CI molecule tests verify templates, not live services"
+
+- id: PAT-ROLE-003
+  category: role-structure
+  name: "Task naming convention"
+  description: "All task names follow RoleName | Description pattern"
+  example: |
+    - name: IncusNetworks | Create domain bridge
+    - name: OllamaServer | Check GPU access
+    - name: BaseSystem | Install base packages
+  notes:
+    - "RoleName in PascalCase (IncusNetworks, not incus_networks)"
+    - "Description starts with initial capital"
+    - "Concise but descriptive"
+
+- id: PAT-ROLE-004
+  category: role-structure
+  name: "Variable naming convention"
+  description: "Role-internal variables prefixed with role name"
+  example: |
+    # defaults/main.yml
+    incus_networks_bridge_pattern: "net-"
+    incus_instances_lxc_retries: 30
+    ollama_server_port: 11434
+  notes:
+    - "Prefix prevents variable name collisions between roles"
+    - "Use snake_case for all variable names"
+    - "PSOT variables use different prefix (incus_network, instance_type)"
+
+- id: PAT-ROLE-005
+  category: role-structure
+  name: "Meta main.yml required fields"
+  description: "Galaxy metadata required for ansible-lint and Molecule"
+  example: |
+    ---
+    galaxy_info:
+      namespace: anklume
+      role_name: <role_name>
+      author: AnKLuMe
+      license: AGPL-3.0
+      min_ansible_version: "2.16"
+    dependencies: []
+  notes:
+    - "namespace: anklume required for Molecule role resolution"
+    - "author and license required by ansible-lint galaxy schema"
+
+- id: PAT-ROLE-006
+  category: role-structure
+  name: "Idempotent command tasks"
+  description: "Command tasks must be idempotent with explicit changed_when"
+  example: |
+    - name: RoleName | Check if resource exists
+      ansible.builtin.command:
+        cmd: incus info {{ resource_name }}
+      register: _check_result
+      changed_when: false
+      failed_when: false
+
+    - name: RoleName | Create resource if missing
+      ansible.builtin.command:
+        cmd: incus create {{ resource_name }}
+      when: _check_result.rc != 0
+      changed_when: true
+  notes:
+    - "Read operations: changed_when: false"
+    - "Write operations: changed_when: true (or conditional)"
+    - "Use failed_when: false for checks that may fail legitimately"

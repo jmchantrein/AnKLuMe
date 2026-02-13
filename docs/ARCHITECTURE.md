@@ -580,3 +580,115 @@ generated file customizations.
 
 **Consequence**: Users never lose data during upgrades. Custom roles
 and configurations survive framework updates.
+
+---
+
+## ADR-032: Exclusive AI-tools network access with VRAM flush
+
+**Context**: Multiple domains could access ai-tools simultaneously,
+creating a risk of cross-domain data leakage through GPU VRAM. Consumer
+GPUs lack SR-IOV, so VRAM is shared across all processes using the GPU.
+
+**Decision**: Add `ai_access_policy: exclusive` mode to infra.yml.
+When enabled, only one domain at a time can access ai-tools. Switching
+domains via `scripts/ai-switch.sh` atomically:
+1. Stops GPU services (ollama, speaches)
+2. Flushes VRAM (kills GPU processes, attempts nvidia-smi --gpu-reset)
+3. Updates nftables rules (replaces source bridge in accept rule)
+4. Restarts GPU services
+5. Records state in `/opt/anklume/ai-access-current`
+
+The PSOT generator validates:
+- `ai_access_default` must reference a known domain (not ai-tools)
+- An `ai-tools` domain must exist when exclusive mode is active
+- At most one network_policy can target ai-tools as destination
+- Auto-creates a network_policy from `ai_access_default` to ai-tools
+  if none exists
+
+The nftables role supports an `incus_nftables_ai_override` variable
+for dynamic rule replacement without modifying infra.yml.
+
+**Consequence**: VRAM isolation enforced at the operational level.
+Cross-domain data leakage through GPU memory prevented by flushing
+between domain switches.
+
+---
+
+## ADR-033: Behavior matrix for exhaustive testing
+
+**Context**: Manual test coverage tracking is error-prone. The project
+needs a systematic way to map capabilities to expected behaviors and
+track which cells are covered by tests.
+
+**Decision**: Maintain a YAML behavior matrix (`tests/behavior_matrix.yml`)
+with three depth levels per capability:
+- Depth 1: single-feature tests (e.g., "create domain with valid subnet_id")
+- Depth 2: pairwise interactions (e.g., "domain ephemeral + machine override")
+- Depth 3: three-way interactions (e.g., "domain + VM + GPU + firewall_mode")
+
+Each cell has a unique ID (e.g., `DL-001`). Tests reference their matrix
+cell via `# Matrix: DL-001` comments. `scripts/matrix-coverage.py` scans
+test files and reports coverage per capability and depth level.
+
+Complement the matrix with Hypothesis property-based tests
+(`tests/test_properties.py`) for generator invariants: idempotency,
+no duplicate IPs, managed markers present, orphan detection consistency.
+
+**Consequence**: Coverage is measurable and auditable. LLM test
+generators can target uncovered cells. Property-based tests discover
+edge cases missed by manual tests.
+
+---
+
+## ADR-034: Experience library for self-improvement
+
+**Context**: Fix patterns are lost after each debugging session.
+The same errors are re-diagnosed from scratch each time they occur.
+
+**Decision**: Maintain a persistent experience library (`experiences/`)
+committed to git, with three categories:
+- `fixes/` — error patterns and their solutions (extracted from git history)
+- `patterns/` — reusable implementation patterns (reconciliation, role structure)
+- `decisions/` — promoted architectural decisions with rationale
+
+`scripts/mine-experiences.py` extracts fix patterns from git history
+by scanning fix/lint/resolve commits and extracting file changes and
+error patterns.
+
+The AI test loop (`ai-test-loop.sh`) searches the experience library
+before calling an LLM backend. If a matching fix pattern is found, it
+is applied directly (faster, no LLM cost). New successful fixes are
+added to the library via the `--learn` flag.
+
+`scripts/ai-improve.sh` implements a spec-driven improvement loop:
+validate → build context → LLM analysis → sandbox test → commit/discard.
+
+**Consequence**: Institutional knowledge persists across sessions.
+Repeated errors are fixed instantly from the library. The improvement
+loop enables continuous spec-implementation convergence.
+
+---
+
+## ADR-035: Shared image cache across nesting levels
+
+**Context**: Each Incus daemon (host and nested) downloads OS images
+independently from the internet. The dev_test_runner VM (Phase 12)
+re-downloads all images, wasting bandwidth and time.
+
+**Decision**: Pre-export images from the host Incus to a shared
+directory, mount it read-only into nested VMs, and import locally.
+
+Flow:
+1. Host: `incus image export <alias> /opt/anklume/images/` (via
+   `incus_images` role with `incus_images_export_for_nesting: true`)
+2. VM: disk device mounts `/opt/anklume/images` → `/mnt/host-images`
+   (read-only)
+3. Nested Incus: `incus image import /mnt/host-images/<file>.tar.gz`
+   (via `dev_test_runner` role)
+
+Why not mount host filesystem directly: breaks isolation.
+Why not use host as Incus remote: requires network + TLS + auth setup.
+
+**Consequence**: No internet access needed for nested Incus image
+downloads. Faster sandbox bootstrap. Read-only mount preserves
+isolation.

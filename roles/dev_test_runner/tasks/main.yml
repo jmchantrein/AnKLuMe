@@ -144,3 +144,22 @@
 - name: DevTestRunner | Verify nesting
   ansible.builtin.include_tasks:
     file: verify_nesting.yml
+
+# ── Import pre-exported images from host ────────────────────────
+
+- name: DevTestRunner | Import pre-exported images into nested Incus
+  ansible.builtin.command:
+    argv:
+      - incus
+      - image
+      - import
+      - "/mnt/host-images/{{ item | replace(':', '_') | replace('/', '-') }}.tar.gz"
+      - --alias
+      - "{{ item.split(':')[-1] }}"
+  loop: "{{ incus_all_images | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when: incus_images_import_from_host | default(false)
+  register: incus_images_nested_import
+  changed_when: incus_images_nested_import.rc == 0
+  failed_when: false
