@@ -6,3 +6,7 @@ incus_images_download_timeout: 600
 # List of all OS images needed across the infrastructure
 # Populated by the PSOT generator from infra.yml
 incus_all_images: []
+
+# Export images to a shared directory for nested Incus instances
+# When true, downloaded images are exported to /opt/anklume/images/
+incus_images_export_for_nesting: false

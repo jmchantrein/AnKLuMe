@@ -43,3 +43,28 @@
   register: incus_images_download_result
   changed_when: incus_images_download_result is not skipped
   timeout: "{{ incus_images_download_timeout }}"
+
+# ── Export images for nested sharing ───────────────────────────
+
+- name: IncusImages | Create image export directory
+  ansible.builtin.file:
+    path: /opt/anklume/images
+    state: directory
+    mode: "0755"
+  when: incus_images_export_for_nesting | default(false)
+
+- name: IncusImages | Export images for nested sharing
+  ansible.builtin.command:
+    argv:
+      - incus
+      - image
+      - export
+      - "{{ item.split(':')[-1] }}"
+      - "/opt/anklume/images/{{ item | replace(':', '_') | replace('/', '-') }}"
+    creates: "/opt/anklume/images/{{ item | replace(':', '_') | replace('/', '-') }}.tar.gz"
+  loop: "{{ incus_all_images | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when: incus_images_export_for_nesting | default(false)
+  register: incus_images_export_result
+  changed_when: incus_images_export_result is not skipped and incus_images_export_result.rc == 0
