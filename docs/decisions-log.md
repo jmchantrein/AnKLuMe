@@ -150,3 +150,31 @@ appropriate phase tables.
 **Rationale**: SPEC.md must accurately reflect the actual codebase.
 
 **Status**: pending review
+
+---
+
+## D-044: PSOT coherence — consume instance_profiles and instance_storage_volumes
+
+**Problem**: The PSOT generator writes `instance_profiles` (list of
+profile names) and `instance_storage_volumes` (dict of volume configs)
+to host_vars, but the `incus_instances` role never consumed them.
+Profiles declared in infra.yml were silently ignored. Storage volumes
+were declared but never created.
+
+**Choice**: Extend `incus_instances` rather than creating new roles.
+- Profiles: pass `--profile` flags at `incus launch` time + reconcile
+  existing instances via `incus profile assign`
+- Volumes: create with `incus storage volume create`, set size, attach
+  as disk devices to instances
+- Default pool configurable via `incus_instances_default_pool`
+
+**Alternatives considered**:
+- Separate `incus_storage` role: rejected (KISS — volumes are
+  semantically tied to instances, same pattern as instance_devices)
+- Separate `incus_profile_assign` role: rejected (profile assignment
+  is part of instance lifecycle, not profile management)
+
+**Rationale**: The PSOT model requires that every generated variable
+has a consumer. Dead variables create false expectations for users.
+
+**Status**: pending review
