@@ -274,7 +274,9 @@ complex, not all Incus versions support labels well.
 (list snapshots to find golden images), and works with all Incus storage
 backends. No external state needed.
 
-**Status**: pending review
+**Status**: validated
+
+---
 
 ## D-049: File transfer via pipe — no intermediate disk write
 
@@ -296,7 +298,7 @@ within the Incus socket model (ADR-004). No temp files, no network
 needed, no volume management. Works across projects since each side
 specifies its own `--project` flag.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -326,4 +328,4 @@ feature that handles auto-destruction at the daemon level — no
 external cleanup needed. Reading the default image from `infra.yml`
 keeps the PSOT model consistent.
 
-**Status**: pending review
+**Status**: validated
