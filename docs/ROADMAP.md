@@ -1008,11 +1008,11 @@ QubesOS-style visual domain isolation in the terminal.
 **Dependencies**: `pip install tmuxp libtmux`
 
 **Validation criteria**:
-- [ ] `make console` generates and launches tmux session from infra.yml
-- [ ] Each domain has its own window with correct panes
-- [ ] Per-pane background colors match domain trust level
-- [ ] Pane border labels show domain and machine name
-- [ ] Session survives disconnection and reconnection
+- [x] `make console` generates and launches tmux session from infra.yml
+- [x] Each domain has its own window with correct panes
+- [x] Per-pane background colors match domain trust level
+- [x] Pane border labels show domain and machine name
+- [x] Session survives disconnection and reconnection
 
 ### Phase 19b: Local Telemetry (`make telemetry-*`)
 

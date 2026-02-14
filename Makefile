@@ -13,6 +13,10 @@ sync-dry: ## Preview changes without writing
 sync-clean: ## Remove orphan files without confirmation
 	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
 
+# ── Console (Phase 19a) ───────────────────────────────────
+console: ## Launch tmux console with domain-colored panes
+	python3 scripts/console.py $(if $(KILL),--kill) $(if $(DRY_RUN),--dry-run)
+
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
 
@@ -236,7 +240,7 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
-.PHONY: sync sync-dry sync-clean lint lint-yaml lint-ansible lint-shell \
+.PHONY: sync sync-dry sync-clean console lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         export-images \
