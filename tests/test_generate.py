@@ -130,6 +130,27 @@ class TestValidate:
         errors = validate(sample_infra)
         assert any("ephemeral must be a boolean" in e for e in errors)
 
+    def test_trust_level_valid(self, sample_infra):
+        """Valid trust_level values are accepted."""
+        for trust_level in ("admin", "trusted", "semi-trusted", "untrusted", "disposable"):
+            test_infra = sample_infra.copy()
+            test_infra["domains"]["admin"]["trust_level"] = trust_level
+            errors = validate(test_infra)
+            assert not any("trust_level" in e for e in errors)
+
+    def test_trust_level_invalid(self, sample_infra):
+        """Invalid trust_level value triggers error."""
+        sample_infra["domains"]["admin"]["trust_level"] = "bogus"
+        errors = validate(sample_infra)
+        assert any("trust_level must be one of" in e for e in errors)
+        assert any("bogus" in e for e in errors)
+
+    def test_trust_level_omitted(self, sample_infra):
+        """Omitted trust_level is valid (it's optional)."""
+        # sample_infra has no trust_level by default
+        errors = validate(sample_infra)
+        assert not any("trust_level" in e for e in errors)
+
 
 # -- generate ------------------------------------------------------------------
 
@@ -249,6 +270,20 @@ class TestGenerate:
             content = f.read_text()
             assert "ansible_connection" not in content, f"{f.name} contains ansible_connection"
             assert "ansible_user" not in content, f"{f.name} contains ansible_user"
+
+    def test_trust_level_propagated(self, sample_infra, tmp_path):
+        """Domain with trust_level generates domain_trust_level in group_vars."""
+        sample_infra["domains"]["admin"]["trust_level"] = "untrusted"
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "group_vars" / "admin.yml").read_text()
+        assert "domain_trust_level: untrusted" in content
+
+    def test_trust_level_omitted_not_in_group_vars(self, sample_infra, tmp_path):
+        """Domain without trust_level does not have domain_trust_level in group_vars."""
+        # sample_infra has no trust_level by default
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "group_vars" / "admin.yml").read_text()
+        assert "domain_trust_level" not in content
 
 
 # -- ephemeral -----------------------------------------------------------------

@@ -121,6 +121,7 @@ domains:
     description: "What this domain is for"
     subnet_id: <0-254>               # Must be unique across all domains
     ephemeral: false                  # Optional (default: false). See below.
+    trust_level: admin                # Optional: admin|trusted|semi-trusted|untrusted|disposable
     profiles:                         # Optional: extra Incus profiles
       <profile-name>:
         devices: { ... }
@@ -160,6 +161,28 @@ from accidental deletion:
   skips them.
 - `ephemeral: true`: the resource can be freely created and destroyed.
 
+### Trust levels
+
+The optional `trust_level` field indicates the security posture and
+isolation requirements of a domain. This is primarily used by the
+console generator (Phase 19a) for visual domain identification via
+color-coding (QubesOS-style), but may also inform future access
+control and policy decisions.
+
+Valid values:
+- **`admin`**: Administrative domain with full system access (blue)
+- **`trusted`**: Production workloads, personal data (green)
+- **`semi-trusted`**: Development, testing, low-risk browsing (yellow)
+- **`untrusted`**: Untrusted software, risky browsing (red)
+- **`disposable`**: Ephemeral sandboxes, one-time tasks (magenta)
+
+If omitted, no trust level is assigned and the domain has no specific
+color coding in the console.
+
+The generator propagates `trust_level` to `domain_trust_level` in
+`group_vars/<domain>.yml`. Roles and tools can read this variable to
+adapt behavior based on domain trust posture.
+
 ### Validation constraints
 
 - Domain names: unique, alphanumeric + hyphen
@@ -168,6 +191,7 @@ from accidental deletion:
 - IPs: globally unique, must be within the correct subnet
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
+- `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
 - `ai_access_policy`: must be `exclusive` or `open`
 - When `ai_access_policy: exclusive`:
   - `ai_access_default` is required and must reference a known domain
