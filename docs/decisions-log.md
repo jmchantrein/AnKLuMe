@@ -206,7 +206,7 @@ projects. plotext renders directly in the terminal with no dependencies
 beyond pip. The file-existence check for enabled state has negligible
 overhead.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -229,7 +229,7 @@ with any Python version, and produces a usable (if less detailed) call
 graph. pyan3 is tried first so users with compatible versions get the
 better output.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -248,4 +248,4 @@ rules (which are already enforced in CI).
 value when ansible-lint already covers Ansible variable validation.
 KISS principle.
 
-**Status**: pending review
+**Status**: validated
