@@ -76,10 +76,11 @@ fi
 
 # --- Validate domain exists (quick YAML check) ---
 domain_exists() {
-    python3 -c "
+    python3 - "$INFRA_SRC" "$1" <<'PYEOF'
 import sys, yaml
 from pathlib import Path
-p = Path('$INFRA_SRC')
+p = Path(sys.argv[1])
+target = sys.argv[2]
 if p.is_file():
     data = yaml.safe_load(p.read_text())
 elif p.is_dir():
@@ -90,9 +91,11 @@ elif p.is_dir():
         data.setdefault('domains', {})
         for f in sorted(dd.glob('*.yml')):
             data['domains'].update(yaml.safe_load(f.read_text()) or {})
+else:
+    sys.exit(1)
 domains = (data.get('domains') or {}).keys()
-sys.exit(0 if '$1' in domains else 1)
-"
+sys.exit(0 if target in domains else 1)
+PYEOF
 }
 
 domain_exists "$DOMAIN" || die "Domain '$DOMAIN' not found in $INFRA_SRC"
