@@ -111,6 +111,26 @@ incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJ
 
 echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
 
+# Validate content — ensure rules only modify the expected AnKLuMe table
+# If this check blocks a legitimate use case, review the validation logic in
+# scripts/deploy-nftables.sh lines below, or adjust the nftables template in
+# roles/incus_nftables/templates/anklume-isolation.nft.j2
+echo "Validating nftables content..."
+if grep -qE '^\s*table\s' "$TMPFILE"; then
+    NON_ANKLUME_TABLES=$(grep -E '^\s*table\s' "$TMPFILE" | grep -cv 'inet anklume' || true)
+    if [[ "$NON_ANKLUME_TABLES" -gt 0 ]]; then
+        echo "Offending lines:" >&2
+        grep -nE '^\s*table\s' "$TMPFILE" | grep -v 'inet anklume' >&2
+        die "Rules contain unexpected table definitions (expected only 'table inet anklume'). See scripts/deploy-nftables.sh content validation."
+    fi
+fi
+# Reject dangerous patterns that should never appear in isolation rules
+if grep -qiE '(flush ruleset|delete table inet filter|drop.*input.*policy)' "$TMPFILE"; then
+    echo "Offending lines:" >&2
+    grep -niE '(flush ruleset|delete table inet filter|drop.*input.*policy)' "$TMPFILE" >&2
+    die "Rules contain dangerous patterns (flush ruleset, delete inet filter, or input drop policy). See scripts/deploy-nftables.sh content validation."
+fi
+
 # Validate syntax
 echo "Validating nftables syntax..."
 nft -c -f "$TMPFILE" || die "Syntax validation failed"

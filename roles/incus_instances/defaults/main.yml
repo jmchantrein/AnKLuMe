@@ -24,3 +24,6 @@ incus_instances_vm_retries_with_download: 150
 # After VM status is Running, wait for incus-agent to become responsive
 incus_instances_vm_agent_retries: 30
 incus_instances_vm_agent_delay: 2
+
+# Default storage pool for instance_storage_volumes
+incus_instances_default_pool: "default"
