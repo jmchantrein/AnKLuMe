@@ -35,7 +35,7 @@ heredocs + `sys.argv` for parameter passing. Alternatives considered:
 expansion inside the Python code. `sys.argv` provides clean parameter
 passing without any interpolation.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -51,7 +51,7 @@ write to temp file then push — adds cleanup complexity.
 **Rationale**: stdin piping is the simplest secure pattern, no temp
 files, no process list exposure.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -69,7 +69,7 @@ policy`).
 **Rationale**: Defense in depth — the deploy script runs on the host
 and should not blindly trust container output.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -87,7 +87,7 @@ responsibility.
 **Rationale**: Simple, defensive, catches any edge case where
 enrichment introduces conflicts.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -102,7 +102,7 @@ sections) happens to contain `=== MANAGED ===` text, it gets corrupted.
 **Rationale**: Defensive — managed markers should appear exactly once
 per file, but user content is unpredictable.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -117,7 +117,7 @@ Alternative: manual escaping — fragile and incomplete.
 
 **Rationale**: `yaml.dump()` handles all edge cases correctly by design.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -133,7 +133,7 @@ template the CLAUDE.md — but it's a user file, not a role responsibility.
 **Rationale**: The role should verify prerequisites, not create user
 content. The repo should be cloned first (which includes CLAUDE.md).
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -149,7 +149,7 @@ appropriate phase tables.
 
 **Rationale**: SPEC.md must accurately reflect the actual codebase.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
