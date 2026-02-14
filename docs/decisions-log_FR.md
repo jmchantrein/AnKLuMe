@@ -487,3 +487,118 @@ fichier JSONL dans `logs/`. Le hook est optionnel mais active par defaut.
 Le format JSONL permet un filtrage et une analyse faciles.
 
 ---
+
+## Audit de securite (Phase post-18)
+
+### D-036 : Injection de commande -- patron heredoc + sys.argv
+
+**Probleme** : Plusieurs scripts shell (`ai-switch.sh`, `ai-config.sh`,
+`ai-test-loop.sh`) interpolaient des variables shell directement dans du
+code Python inline, permettant l'injection de commandes via des valeurs
+`infra.yml` forgees.
+
+**Decision** : Remplacer tous les `python3 -c "..."` par des heredocs
+`python3 - "$arg" <<'PYEOF'` + `sys.argv` pour le passage de parametres.
+
+**Justification** : Les heredocs avec delimiteur entre guillemets simples
+empechent l'expansion shell dans le code Python. `sys.argv` fournit un
+passage de parametres propre sans interpolation.
+
+**Statut** : en attente de revue
+
+### D-037 : Injection de credentials via stdin au lieu d'echo
+
+**Probleme** : `agent-fix.sh` et `agent-develop.sh` utilisaient
+`echo 'export ANTHROPIC_API_KEY=...'` qui expose la cle dans `ps aux`.
+
+**Decision** : Remplacer par `printf ... | incus file push - <path>`
+pour passer la cle via stdin (n'apparait jamais dans la liste des processus).
+
+**Justification** : Le piping stdin est le patron securise le plus simple,
+pas de fichiers temporaires, pas d'exposition dans la liste des processus.
+
+**Statut** : en attente de revue
+
+### D-038 : Validation du contenu nftables avant deploiement
+
+**Probleme** : `deploy-nftables.sh` recuperait les regles du container admin
+et les appliquait sans verifier le contenu. Un container admin compromis
+pouvait injecter des regles nftables arbitraires.
+
+**Decision** : Ajouter deux verifications avant la validation syntaxique :
+(1) verifier que toutes les definitions `table` sont `inet anklume` uniquement,
+(2) rejeter les patrons dangereux (`flush ruleset`, `delete table inet filter`,
+`drop input policy`).
+
+**Justification** : Defense en profondeur -- le script de deploiement
+s'execute sur l'hote et ne doit pas faire confiance aveuglement aux sorties
+du container.
+
+**Statut** : en attente de revue
+
+### D-039 : Re-validation post-enrichissement dans generate.py
+
+**Probleme** : `enrich_infra()` (creation auto de sys-firewall, politiques
+reseau) s'execute apres `validate()`. Les ressources auto-creees pouvaient
+introduire des collisions d'IP ou des references invalides non detectees
+par la validation initiale.
+
+**Decision** : Ajouter un second appel `validate()` apres `enrich_infra()`.
+
+**Justification** : Simple, defensif, capture tout cas limite ou
+l'enrichissement introduit des conflits.
+
+**Statut** : en attente de revue
+
+### D-040 : MANAGED_RE.sub count=1
+
+**Probleme** : `re.sub()` sans `count=1` remplace TOUTES les occurrences
+du patron de marqueur gere. Si le contenu utilisateur (hors sections gerees)
+contient du texte `=== MANAGED ===`, il est corrompu.
+
+**Decision** : Ajouter `count=1` pour ne remplacer que la premiere occurrence.
+
+**Justification** : Defensif -- les marqueurs geres ne doivent apparaitre
+qu'une seule fois par fichier, mais le contenu utilisateur est imprevisible.
+
+**Statut** : en attente de revue
+
+### D-041 : Serialisation YAML securisee dans mine-experiences.py
+
+**Probleme** : `format_entries()` construisait du YAML via concatenation
+de f-strings, ce qui pouvait produire du YAML invalide si les messages
+de commit contenaient des caracteres speciaux (deux-points, guillemets,
+retours a la ligne).
+
+**Decision** : Remplacer par `yaml.dump()` pour la serialisation securisee.
+
+**Justification** : `yaml.dump()` gere correctement tous les cas limites
+par conception.
+
+**Statut** : en attente de revue
+
+### D-042 : dev_agent_runner CLAUDE.md -- verifier l'existence au lieu d'auto-copie
+
+**Probleme** : Le role avait une tache `copy` avec `src` pointant vers le
+meme chemin que `dest` dans le container -- effectivement un no-op qui
+pouvait echouer si le fichier n'existait pas encore.
+
+**Decision** : Remplacer par `stat` + avertissement `debug`. Le role doit
+verifier les prerequis, pas creer du contenu utilisateur.
+
+**Justification** : Le depot doit etre clone en premier (ce qui inclut
+CLAUDE.md). Le role verifie la condition, il ne la cree pas.
+
+**Statut** : en attente de revue
+
+### D-043 : Nettoyage de la table des roles dans SPEC.md
+
+**Probleme** : SPEC.md referençait un role `incus_storage` inexistant et
+manquait 6 roles ajoutes dans les phases ulterieures.
+
+**Decision** : Supprimer le role fantome, ajouter tous les roles manquants
+aux tables de phase appropriees.
+
+**Justification** : SPEC.md doit refleter fidelement la base de code reelle.
+
+**Statut** : en attente de revue

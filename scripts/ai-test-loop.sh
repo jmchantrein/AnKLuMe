@@ -95,12 +95,16 @@ search_experiences() {
     fi
 
     # Search through experience files — match on problem AND solution keywords
+    local errors_file
+    errors_file="$(mktemp)"
+    printf '%s' "$errors" > "$errors_file"
+
     local match
-    match=$(python3 -c "
+    match=$(python3 - "$exp_dir" "$errors_file" <<'PYEOF' 2>/dev/null) || true
 import yaml, sys, os
 
-errors = '''$errors'''.lower()
-exp_dir = '$exp_dir'
+errors = open(sys.argv[2]).read().lower()
+exp_dir = sys.argv[1]
 best_score = 0
 best_entry = None
 
@@ -117,7 +121,6 @@ for fname in sorted(os.listdir(exp_dir)):
     for entry in data:
         if not isinstance(entry, dict) or 'problem' not in entry:
             continue
-        # Score: count how many words from the problem appear in errors
         words = entry['problem'].lower().split()
         score = sum(1 for w in words if len(w) > 3 and w in errors)
         if score > best_score and score >= 3:
@@ -130,7 +133,8 @@ if best_entry:
     prev = best_entry.get('prevention', '').replace(chr(10), ' ')
     prob = best_entry.get('problem', '')
     print(f'{eid}|||{prob}|||{sol}|||{prev}')
-" 2>/dev/null) || true
+PYEOF
+    rm -f "$errors_file"
 
     if [ -n "$match" ]; then
         EXP_MATCH_ID="$(echo "$match" | cut -d'|' -f1)"

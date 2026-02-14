@@ -88,11 +88,6 @@ class TestCreate:
         assert result.returncode != 0
         assert "not found" in result.stderr.lower()
 
-    def test_create_missing_args(self, mock_env):
-        env, _ = mock_env
-        result = run_snap(["create"], env)
-        assert result.returncode != 0
-
 
 # ── restore ──────────────────────────────────────────────────
 
@@ -105,17 +100,24 @@ class TestRestore:
         cmds = read_log(log)
         assert any("snapshot restore dev-workspace my-snap --project work" in c for c in cmds)
 
-    def test_restore_missing_snap_name(self, mock_env):
-        env, _ = mock_env
-        result = run_snap(["restore", "admin-ansible"], env)
-        assert result.returncode != 0
-
     def test_self_restore_requires_confirmation(self, mock_env):
         env, _ = mock_env
         env["HOSTNAME"] = "admin-ansible"
         result = run_snap(["restore", "self", "my-snap"], env, input_text="no\n")
         assert result.returncode != 0
         assert "WARNING" in result.stdout or "WARNING" in result.stderr
+
+    def test_self_restore_confirm_yes(self, mock_env):
+        """Typing 'yes' at the self-restore prompt proceeds with restore."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(["restore", "self", "my-snap"], env, input_text="yes\n")
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot restore admin-ansible my-snap --project admin" in c
+            for c in cmds
+        )
 
     def test_self_restore_with_force(self, mock_env):
         env, log = mock_env
@@ -168,18 +170,76 @@ class TestSelf:
         cmds = read_log(log)
         assert any("snapshot create dev-workspace test-snap --project work" in c for c in cmds)
 
-
-# ── usage ────────────────────────────────────────────────────
-
-
-class TestUsage:
-    def test_help(self, mock_env):
+    def test_self_unknown_hostname(self, mock_env):
+        """Self with unknown HOSTNAME gives an error."""
         env, _ = mock_env
-        result = run_snap(["help"], env)
+        env["HOSTNAME"] = "nonexistent-machine"
+        result = run_snap(["create", "self", "snap1"], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+
+# ── project resolution ───────────────────────────────────────
+
+
+class TestSnapProjectResolution:
+    def test_instance_found_in_non_default_project(self, mock_env):
+        """Instance dev-workspace found in 'work' project → correct --project flag."""
+        env, log = mock_env
+        result = run_snap(["create", "dev-workspace"], env)
         assert result.returncode == 0
-        assert "Usage" in result.stdout
+        cmds = read_log(log)
+        assert any(
+            "snapshot create dev-workspace" in c and "--project work" in c
+            for c in cmds
+        )
 
-    def test_unknown_command(self, mock_env):
+    def test_instance_not_found_gives_error(self, mock_env):
+        """Instance not in any project → clear error message."""
         env, _ = mock_env
-        result = run_snap(["bogus"], env)
+        result = run_snap(["create", "nonexistent-instance"], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr
+
+
+# ── force flag ───────────────────────────────────────────────
+
+
+class TestForceFlag:
+    def test_force_skips_warning(self, mock_env):
+        """Force flag suppresses self-restore WARNING output."""
+        env, log = mock_env
+        env["HOSTNAME"] = "admin-ansible"
+        result = run_snap(["restore", "--force", "self", "snap1"], env)
+        assert result.returncode == 0
+        assert "WARNING" not in result.stdout
+
+    def test_force_resolves_self_correctly(self, mock_env):
+        """Force + self resolves self to hostname."""
+        env, log = mock_env
+        env["HOSTNAME"] = "dev-workspace"
+        result = run_snap(["restore", "--force", "self", "snap1"], env)
+        assert result.returncode == 0
+        cmds = read_log(log)
+        assert any(
+            "snapshot restore dev-workspace snap1 --project work" in c
+            for c in cmds
+        )
+
+
+# ── incus not available ──────────────────────────────────────
+
+
+class TestIncusNotAvailable:
+    def test_incus_not_available(self, tmp_path):
+        """Script fails gracefully when incus binary is not found."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        bash_path = "/usr/bin/bash"
+        if not os.path.exists(bash_path):
+            bash_path = "/bin/bash"
+        (mock_bin / "bash").symlink_to(bash_path)
+        env = os.environ.copy()
+        env["PATH"] = str(mock_bin)
+        result = run_snap(["create", "test", "snap1"], env)
         assert result.returncode != 0

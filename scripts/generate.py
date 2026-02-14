@@ -437,7 +437,7 @@ def _write_managed(filepath, content_dict, dry_run=False):
     if filepath.exists():
         existing = filepath.read_text()
         if MANAGED_RE.search(existing):
-            new_content = MANAGED_RE.sub(block, existing)
+            new_content = MANAGED_RE.sub(block, existing, count=1)
         else:
             prefix = "" if existing.startswith("---") else "---\n"
             new_content = f"{prefix}{block}\n\n{existing}"
@@ -607,6 +607,14 @@ def main(argv=None):
         sys.exit(1)
 
     enrich_infra(infra)
+
+    # Re-validate after enrichment to catch IP collisions from auto-created resources
+    post_errors = validate(infra)
+    if post_errors:
+        print("Post-enrichment validation errors:", file=sys.stderr)
+        for e in post_errors:
+            print(f"  - {e}", file=sys.stderr)
+        sys.exit(1)
 
     warnings = get_warnings(infra)
     for w in warnings:

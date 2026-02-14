@@ -965,6 +965,276 @@ to avoid redundant downloads.
 
 ---
 
+## Phase 19: Terminal UX and Observability
+
+**Goal**: Professional terminal UX with domain-colored tmux sessions,
+local telemetry, and static code analysis tooling.
+
+**Prerequisites**: All previous phases.
+
+### Phase 19a: tmux Console (`make console`)
+
+**Goal**: Auto-generate a tmux session from `infra.yml` with
+QubesOS-style visual domain isolation in the terminal.
+
+**Architecture**:
+```
+┌─────────────────────────────────────────────────────┐
+│ tmux session "anklume"                               │
+│ ┌─────────────┐ ┌──────────┐ ┌──────────────────┐  │
+│ │ pane bg:blue │ │ bg:green │ │ bg:yellow        │  │
+│ │ admin-ansible│ │ pro-dev  │ │ perso-desktop    │  │
+│ │ incus exec...│ │          │ │                  │  │
+│ └─────────────┘ └──────────┘ └──────────────────┘  │
+│ [0:admin]  [1:pro]  [2:perso]  [3:homelab]          │
+└─────────────────────────────────────────────────────┘
+```
+
+**Deliverables**:
+- `scripts/console.py` — generates tmuxp YAML or drives libtmux
+  directly from `infra.yml`. One window per domain, one pane per
+  machine. Per-pane background color by trust level. Pane border
+  labels show `[domain] machine-name`.
+- Colors set server-side via `select-pane -P 'bg=...'` — containers
+  cannot spoof their visual identity (same security model as QubesOS
+  colored borders drawn by dom0).
+- Trust level colors: blue (admin), green (trusted), yellow
+  (semi-trusted), red (untrusted), magenta (disposable).
+  Configurable via `infra.yml` domain-level `trust_level:` field
+  or auto-assigned.
+- `make console` Makefile target.
+- Supports reconnection: `tmux attach -t anklume`.
+
+**Dependencies**: `pip install tmuxp libtmux`
+
+**Validation criteria**:
+- [ ] `make console` generates and launches tmux session from infra.yml
+- [ ] Each domain has its own window with correct panes
+- [ ] Per-pane background colors match domain trust level
+- [ ] Pane border labels show domain and machine name
+- [ ] Session survives disconnection and reconnection
+
+### Phase 19b: Local Telemetry (`make telemetry-*`)
+
+**Goal**: Opt-in, local-only usage analytics to understand usage
+patterns. Data never leaves the machine.
+
+**Deliverables**:
+- Makefile wrapper logging each target invocation to
+  `~/.anklume/telemetry/usage.jsonl` (append-only JSON Lines).
+- Logged fields: timestamp (UTC), make target, domain argument (if
+  any), duration in seconds, exit code. NO usernames, hostnames,
+  IPs, secrets, or file contents.
+- `make telemetry-on` / `make telemetry-off` (default: disabled)
+- `make telemetry-status` — show state + event count
+- `make telemetry-clear` — delete all data
+- `make telemetry-report` — terminal charts via plotext (Python)
+- Optional: `make telemetry-report-html` — static HTML with Chart.js
+
+**Privacy guarantees**:
+- **Default: disabled** (opt-in model)
+- **Local-only**: data in `~/.anklume/telemetry/`, no network calls
+- **Inspectable**: user can `cat` the JSONL file at any time
+- **Deletable**: `make telemetry-clear` removes everything
+
+**Dependencies**: `pip install plotext` (for terminal charts)
+
+**Validation criteria**:
+- [ ] Default is disabled; `make telemetry-on` enables
+- [ ] JSONL file contains only the specified fields
+- [ ] `make telemetry-report` produces readable terminal charts
+- [ ] No network calls (verified by strace or audit)
+
+### Phase 19c: Static Code Analysis (`make code-graph`)
+
+**Goal**: Dead code detection, call graphs, and dependency
+visualization across Python, YAML (Ansible), and Shell.
+
+**Deliverables**:
+- `make dead-code` — runs vulture (Python) + ShellCheck unused
+  vars (bash) + little-timmy (Ansible unused variables)
+- `make call-graph` — generates call graph via pyan (Python) +
+  callGraph (bash). Output: GraphViz DOT + SVG.
+- `make dep-graph` — module dependency graph via pydeps (Python).
+  Output: SVG.
+- `make code-graph` — runs all three above.
+- CI integration: `dead-code` as informational job.
+
+**Dependencies**: `pip install vulture pyan3 pydeps`, `apt install
+graphviz`, little-timmy for Ansible.
+
+**Validation criteria**:
+- [ ] `make dead-code` reports findings (may have false positives)
+- [ ] `make call-graph` produces readable SVG
+- [ ] `make dep-graph` produces module dependency SVG
+- [ ] CI job added (informational, non-blocking)
+
+---
+
+## Phase 20: Native Incus Features and QubesOS Parity
+
+**Goal**: Leverage native Incus features to close the gap with
+QubesOS user-facing functionality.
+
+**Prerequisites**: All previous phases.
+
+### Phase 20a: Disposable Instances
+
+**Goal**: On-demand, auto-destroyed instances using Incus native
+`--ephemeral` flag.
+
+**Deliverables**:
+- `scripts/disp.sh` — launches an ephemeral instance from a base
+  image, optionally runs a command, instance auto-destroyed on stop.
+- `make disp IMAGE=debian/13 [CMD=bash] [DOMAIN=sandbox]`
+- Instance name auto-generated: `disp-<timestamp>`.
+- Uses `incus launch <image> <name> --ephemeral [-e]`.
+- Optional: `--console` flag to attach immediately.
+
+**Validation criteria**:
+- [ ] `make disp` creates an ephemeral instance
+- [ ] Instance is auto-destroyed on stop
+- [ ] Custom command runs and instance exits cleanly
+
+### Phase 20b: Golden Images and Templates
+
+**Goal**: CoW-based instance derivation for efficient instance
+creation and centralized updates.
+
+**Deliverables**:
+- `make golden-create NAME=<name>` — provisions an instance with
+  roles, stops it, creates a snapshot named `pristine`.
+- `make golden-derive TEMPLATE=<name> INSTANCE=<new>` — creates
+  a new instance from the golden image snapshot using `incus copy`
+  (CoW on ZFS/Btrfs, full copy on dir backend).
+- `make golden-publish TEMPLATE=<name> ALIAS=<alias>` — publishes
+  as a reusable Incus image via `incus publish`.
+- Documentation of profile propagation: modifying a profile
+  automatically updates all instances using it (native Incus
+  behavior).
+
+**Validation criteria**:
+- [ ] `incus copy` uses CoW on ZFS/Btrfs (verified by disk usage)
+- [ ] Derived instances boot and are functional
+- [ ] Published images can be used in `infra.yml` as `os_image`
+
+### Phase 20c: Inter-Container Services via MCP
+
+**Goal**: Controlled service exposure between containers using
+MCP (Model Context Protocol) over Incus proxy devices.
+
+**Architecture**:
+```
+container-work                host              container-vault
+  [MCP client]  ◄── unix ──► [proxy] ◄── unix ──► [MCP server]
+  tools/call: sign_file                           gpg --sign
+```
+
+**Deliverables**:
+- MCP server template (Python) for common services: file signing,
+  clipboard get/set, file transfer accept/provide.
+- MCP client library for AnKLuMe containers.
+- Incus proxy device automation: `infra.yml` `services:` section
+  declares which containers expose which MCP tools, and which
+  containers can access them.
+- Policy engine: admin container validates service access based
+  on `infra.yml` declarations.
+- Only `initialize`, `tools/list`, `tools/call` from MCP spec —
+  no prompts, resources, sampling.
+
+**Why MCP (not custom JSON-RPC)**:
+- Standard protocol maintained by Anthropic + community
+- SDKs in Python, Go, Rust, TypeScript (no ad-hoc maintenance)
+- Native capability discovery (`tools/list`)
+- AI agents can use the same MCP endpoints directly
+- Lightweight over local Unix sockets (~0.8ms latency, ~18MB RAM)
+
+**Dependencies**: `pip install mcp` (Python SDK)
+
+**Validation criteria**:
+- [ ] MCP server runs in container, accessible via proxy device
+- [ ] MCP client in another container can call tools
+- [ ] Policy engine blocks unauthorized access
+- [ ] AI agents can interact with container services via MCP
+
+### Phase 20d: File Transfer and Backup
+
+**Goal**: Controlled file transfer between containers and encrypted
+backup/restore.
+
+**Deliverables**:
+- `make file-copy SRC=<instance>:<path> DST=<instance>:<path>` —
+  wraps `incus file pull ... | incus file push ...` pipe.
+  Policy check against `infra.yml` service declarations.
+- `make backup [I=<instance>] [GPG_RECIPIENT=<id>]` — wraps
+  `incus export` with optional GPG encryption.
+- `make restore-backup FILE=<backup.tar.gz> [NAME=<new-name>]` —
+  wraps `incus import`.
+- Shared volumes for bulk transfers between containers
+  (`incus storage volume attach` to multiple instances).
+
+**Validation criteria**:
+- [ ] File copy between instances works via pipe
+- [ ] Encrypted backup created and restorable
+- [ ] Cross-machine migration via `incus copy local: remote:`
+
+### Phase 20e: Tor Gateway and sys-print
+
+**Goal**: Network service containers for Tor anonymization and
+print management.
+
+**Deliverables**:
+- **Tor gateway**: domain `tor-gateway` with container running Tor
+  as transparent proxy. `network_policies` route traffic from
+  selected domains through the gateway.
+- **sys-print**: dedicated CUPS container.
+  - USB printers: Incus `usb` device passthrough
+    (`vendorid`/`productid`).
+  - Network printers (WiFi/Ethernet): macvlan NIC profile gives
+    `sys-print` access to the physical LAN. Other domains access
+    `sys-print` via IPP (port 631) through `network_policies`.
+- Example `infra.yml` configurations for both.
+- `make apply-print` and `make apply-tor` targets.
+
+**Validation criteria**:
+- [ ] Tor gateway routes traffic transparently
+- [ ] CUPS container serves USB and network printers
+- [ ] Network policies control which domains can print
+- [ ] Other domains cannot access the physical LAN directly
+
+---
+
+## Phase 21: Desktop Integration (optional)
+
+**Goal**: Visual desktop integration for users running AnKLuMe on
+a workstation with a graphical environment.
+
+**Prerequisites**: Phase 19a (tmux console).
+
+**Deliverables**:
+- **Terminal background coloring**: per-domain colors via tmux
+  server-side pane styles. Colors controlled by the host (not the
+  container) — same security model as QubesOS dom0 borders.
+- **Wayland clipboard forwarding**: controlled clipboard sharing
+  between domains via MCP tools (`clipboard_get`, `clipboard_set`)
+  over proxy devices. Requires explicit user action (no auto-sync).
+- **Desktop environment hints**: integration scripts for Sway
+  (`app_id` matching), KDE Plasma, and GNOME to color window
+  borders by domain. Uses `incus exec` wrapper that sets
+  environment variables before launching GUI apps.
+- **Web dashboard** (future): Flask/FastAPI + htmx for visual
+  domain status, network policies, GPU allocation, instance
+  management. Read-only by default, admin actions require
+  confirmation.
+
+**Validation criteria**:
+- [ ] tmux pane colors reflect domain trust level
+- [ ] Clipboard transfer requires explicit action
+- [ ] At least one desktop environment integration works
+- [ ] Web dashboard shows live infrastructure state
+
+---
+
 ## Current State
 
 **Completed**:
@@ -989,7 +1259,9 @@ to avoid redundant downloads.
 - Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
 
 **Next**:
-- Phase 19+ (to be defined)
+- Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
+- Phase 20: Native Incus Features and QubesOS Parity
+- Phase 21: Desktop Integration (optional)
 
 **Deployed infrastructure**:
 
