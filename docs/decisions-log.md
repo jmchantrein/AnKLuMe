@@ -178,3 +178,74 @@ were declared but never created.
 has a consumer. Dead variables create false expectations for users.
 
 **Status**: validated
+
+---
+
+## D-045: Local telemetry — plotext for charts, ~/.anklume/ for data
+
+**Problem**: Phase 19b requires local-only usage analytics. Need to
+choose a data location, chart library, and integration strategy.
+
+**Choice**: Store data in `~/.anklume/telemetry/` (consistent with
+user-specific state), use plotext for terminal charts (pure Python,
+no browser needed), and use a Makefile `define` wrapper to instrument
+key targets with minimal overhead. When telemetry is disabled (default),
+the wrapper checks for a file's existence and runs the command directly
+with zero overhead.
+
+**Alternatives considered**:
+(a) Store in project directory — rejected (user data should not be
+committed to git, and different users on the same machine would collide).
+(b) Use matplotlib — rejected (requires display backend, overkill for
+terminal output).
+(c) Separate shell script wrapper — rejected (Makefile `define` is
+simpler and avoids an extra file).
+
+**Rationale**: `~/.anklume/` is user-scoped and persistent across
+projects. plotext renders directly in the terminal with no dependencies
+beyond pip. The file-existence check for enabled state has negligible
+overhead.
+
+**Status**: pending review
+
+---
+
+## D-046: AST-based call graph fallback for pyan3 incompatibility
+
+**Problem**: pyan3 (the recommended call graph generator) crashes with
+Python 3.13 due to a `CallGraphVisitor.__init__()` argument conflict.
+The ROADMAP specifies pyan3 as the tool for `make call-graph`.
+
+**Choice**: Implement a two-tier strategy: try pyan3 first (best output
+quality), fall back to a custom AST-based call graph generator using
+Python's built-in `ast` module. The fallback parses function definitions
+and call expressions to build a DOT graph. Alternatives considered:
+(a) wait for pyan3 fix — blocks delivery,
+(b) use a different tool (code2flow, etc.) — adds another dependency,
+(c) skip call-graph entirely — loses a spec deliverable.
+
+**Rationale**: The AST fallback uses only the standard library, works
+with any Python version, and produces a usable (if less detailed) call
+graph. pyan3 is tried first so users with compatible versions get the
+better output.
+
+**Status**: pending review
+
+---
+
+## D-047: little-timmy skipped for Ansible unused variable detection
+
+**Problem**: The ROADMAP mentions little-timmy for Ansible unused
+variable detection, but it is not readily available as a standard pip
+package and has limited community adoption.
+
+**Choice**: Skip little-timmy and focus on vulture (Python) and
+shellcheck SC2034 (Shell) for dead code detection. Document the
+decision. Ansible unused variables can be caught by ansible-lint
+rules (which are already enforced in CI).
+
+**Rationale**: Adding a niche, hard-to-install tool provides marginal
+value when ansible-lint already covers Ansible variable validation.
+KISS principle.
+
+**Status**: pending review

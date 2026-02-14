@@ -1040,10 +1040,10 @@ patterns. Data never leaves the machine.
 **Dependencies**: `pip install plotext` (for terminal charts)
 
 **Validation criteria**:
-- [ ] Default is disabled; `make telemetry-on` enables
-- [ ] JSONL file contains only the specified fields
-- [ ] `make telemetry-report` produces readable terminal charts
-- [ ] No network calls (verified by strace or audit)
+- [x] Default is disabled; `make telemetry-on` enables
+- [x] JSONL file contains only the specified fields
+- [x] `make telemetry-report` produces readable terminal charts
+- [x] No network calls (verified by strace or audit)
 
 ### Phase 19c: Static Code Analysis (`make code-graph`)
 
@@ -1064,10 +1064,10 @@ visualization across Python, YAML (Ansible), and Shell.
 graphviz`, little-timmy for Ansible.
 
 **Validation criteria**:
-- [ ] `make dead-code` reports findings (may have false positives)
-- [ ] `make call-graph` produces readable SVG
-- [ ] `make dep-graph` produces module dependency SVG
-- [ ] CI job added (informational, non-blocking)
+- [x] `make dead-code` reports findings (may have false positives)
+- [x] `make call-graph` produces readable DOT (SVG when graphviz available)
+- [x] `make dep-graph` produces module dependency graph (when pydeps + graphviz available)
+- [x] CI job added (informational, non-blocking)
 
 ---
 

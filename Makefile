@@ -5,13 +5,46 @@ SHELL := /bin/bash
 INFRA_SRC := $(if $(wildcard infra/base.yml),infra,infra.yml)
 
 sync: ## Generate/update Ansible files from infra.yml or infra/
-	python3 scripts/generate.py $(INFRA_SRC)
+	$(call tele_wrap,sync,python3 scripts/generate.py $(INFRA_SRC))
 
 sync-dry: ## Preview changes without writing
 	python3 scripts/generate.py $(INFRA_SRC) --dry-run
 
 sync-clean: ## Remove orphan files without confirmation
 	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
+
+# ── Telemetry (Phase 19b) ────────────────────────────────
+# Shell function to wrap a command with telemetry logging.
+# Usage in recipes: $(call tele_wrap,<target>,<command>)
+# If telemetry is disabled (no ~/.anklume/telemetry/enabled), runs the command directly.
+define tele_wrap
+	@if [ -f "$$HOME/.anklume/telemetry/enabled" ]; then \
+		_start=$$(date +%s); \
+		$(2); _rc=$$?; \
+		_end=$$(date +%s); \
+		_dur=$$(( _end - _start )); \
+		python3 scripts/telemetry.py log --target "$(1)" --duration "$$_dur" --exit-code "$$_rc" \
+			$(if $(G),--domain "$(G)") 2>/dev/null || true; \
+		exit $$_rc; \
+	else \
+		$(2); \
+	fi
+endef
+
+telemetry-on: ## Enable local telemetry (opt-in, local-only)
+	@python3 scripts/telemetry.py on
+
+telemetry-off: ## Disable local telemetry
+	@python3 scripts/telemetry.py off
+
+telemetry-status: ## Show telemetry state and event count
+	@python3 scripts/telemetry.py status
+
+telemetry-clear: ## Delete all telemetry data
+	@python3 scripts/telemetry.py clear
+
+telemetry-report: ## Terminal charts of usage patterns
+	@python3 scripts/telemetry.py report
 
 # ── Console (Phase 19a) ───────────────────────────────────
 console: ## Launch tmux console with domain-colored panes
@@ -48,19 +81,19 @@ syntax: ## Syntax check only
 
 # ── Apply ─────────────────────────────────────────────────
 apply: ## Apply full infrastructure + provisioning
-	ansible-playbook site.yml
+	$(call tele_wrap,apply,ansible-playbook site.yml)
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
-	ansible-playbook site.yml --tags infra
+	$(call tele_wrap,apply-infra,ansible-playbook site.yml --tags infra)
 
 apply-provision: ## Apply provisioning only (packages, services)
-	ansible-playbook site.yml --tags provision
+	$(call tele_wrap,apply-provision,ansible-playbook site.yml --tags provision)
 
 apply-base: ## Apply base_system only
 	ansible-playbook site.yml --tags base
 
 apply-limit: ## Apply a single domain (G=<group>)
-	ansible-playbook site.yml --limit $(G)
+	$(call tele_wrap,apply-limit,ansible-playbook site.yml --limit $(G))
 
 apply-images: ## Pre-download OS images to local cache
 	ansible-playbook site.yml --tags images
@@ -107,7 +140,7 @@ snapshot-list: ## List snapshots for all instances
 test: test-generator test-roles ## Run all tests
 
 test-generator: ## Run generator pytest tests
-	python3 -m pytest tests/ -v
+	$(call tele_wrap,test-generator,python3 -m pytest tests/ -v)
 
 test-roles: ## Run Molecule tests for all roles
 	@for role in roles/*/; do \
@@ -190,6 +223,19 @@ agent-develop: ## Autonomous development with Agent Teams (TASK="description")
 	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make agent-develop TASK=\"...\""; exit 1; }
 	@scripts/agent-develop.sh "$(TASK)"
 
+# ── Code Analysis (Phase 19c) ────────────────────────
+dead-code: ## Run dead code detection (vulture + shellcheck)
+	@scripts/code-analysis.sh dead-code
+
+call-graph: ## Generate Python call graph (DOT + SVG in reports/)
+	@scripts/code-analysis.sh call-graph
+
+dep-graph: ## Generate module dependency graph (SVG in reports/)
+	@scripts/code-analysis.sh dep-graph
+
+code-graph: ## Run all static code analysis tools
+	@scripts/code-analysis.sh all
+
 # ── Lifecycle ─────────────────────────────────────────────
 flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
 	@scripts/flush.sh $(if $(FORCE),--force)
@@ -254,4 +300,6 @@ help: ## Show this help
         agent-runner-setup agent-fix agent-develop \
         flush upgrade import-infra \
         matrix-coverage matrix-generate \
+        telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
+        dead-code call-graph dep-graph code-graph \
         guide quickstart init install-hooks help
