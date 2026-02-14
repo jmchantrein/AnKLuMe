@@ -608,6 +608,14 @@ def main(argv=None):
 
     enrich_infra(infra)
 
+    # Re-validate after enrichment to catch IP collisions from auto-created resources
+    post_errors = validate(infra)
+    if post_errors:
+        print("Post-enrichment validation errors:", file=sys.stderr)
+        for e in post_errors:
+            print(f"  - {e}", file=sys.stderr)
+        sys.exit(1)
+
     warnings = get_warnings(infra)
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
