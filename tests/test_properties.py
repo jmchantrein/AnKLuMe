@@ -296,7 +296,7 @@ class TestProperties:
         if len(infra["domains"]) < 2:
             return  # Need at least 2 domains for this test
         removed_domain = list(infra["domains"].keys())[-1]
-        removed_machines = list(infra["domains"][removed_domain].get("machines", {}).keys())
+        list(infra["domains"][removed_domain].get("machines", {}).keys())
         del infra["domains"][removed_domain]
         orphans = detect_orphans(infra, out)
         orphan_files = {str(f) for f, _ in orphans}

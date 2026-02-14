@@ -1692,7 +1692,7 @@ class TestGenerateOutput:
             },
         }
         generate(infra, tmp_path)
-        content = yaml.safe_load((tmp_path / "inventory" / "web.yml").read_text())
+        yaml.safe_load((tmp_path / "inventory" / "web.yml").read_text())
         # Remove managed markers for clean parse
         raw = (tmp_path / "inventory" / "web.yml").read_text()
         # Parse only the YAML data between managed markers

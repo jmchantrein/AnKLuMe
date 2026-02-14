@@ -206,7 +206,7 @@ class TestExampleContent:
         """All IPs within an example are unique."""
         infra = load_infra(str(example_path))
         seen = {}
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:
@@ -474,7 +474,7 @@ class TestExampleMachineDetails:
     def test_machine_types_valid(self, example_path):
         """Machine type must be 'lxc' or 'vm'."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 mtype = machine.get("type", "lxc")
                 assert mtype in ("lxc", "vm"), (
@@ -489,7 +489,7 @@ class TestExampleMachineDetails:
     def test_all_machines_have_ip(self, example_path):
         """Every machine in examples should have a static IP."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 assert "ip" in machine, (
                     f"Machine '{mname}' missing IP in {example_path}"
@@ -504,7 +504,7 @@ class TestExampleMachineDetails:
         """Each machine's IP must be within its domain's subnet."""
         infra = load_infra(str(example_path))
         bs = infra["global"]["base_subnet"]
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             sid = domain.get("subnet_id")
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
@@ -523,7 +523,7 @@ class TestExampleMachineDetails:
     def test_ip_host_part_valid(self, example_path):
         """The host part of each IP must be 1-253 (not 0, 254, 255)."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:
@@ -541,7 +541,7 @@ class TestExampleMachineDetails:
     def test_all_machines_have_roles(self, example_path):
         """Every machine should declare at least one role."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 roles = machine.get("roles") or []
                 assert len(roles) >= 1, (
@@ -556,7 +556,7 @@ class TestExampleMachineDetails:
     def test_all_machines_include_base_system(self, example_path):
         """Every machine should include the 'base_system' role."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 roles = machine.get("roles") or []
                 assert "base_system" in roles, (
@@ -571,7 +571,7 @@ class TestExampleMachineDetails:
     def test_machine_descriptions_are_strings(self, example_path):
         """Machine descriptions must be strings if present."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 desc = machine.get("description")
                 if desc is not None:
@@ -587,7 +587,7 @@ class TestExampleMachineDetails:
     def test_machine_ephemeral_is_boolean_if_present(self, example_path):
         """Machine-level ephemeral must be boolean if declared."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 eph = machine.get("ephemeral")
                 if eph is not None:
@@ -603,7 +603,7 @@ class TestExampleMachineDetails:
     def test_machine_config_is_dict_if_present(self, example_path):
         """Machine config must be a dict if declared."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 cfg = machine.get("config")
                 if cfg is not None:
@@ -637,7 +637,7 @@ class TestExampleMachineDetails:
     def test_gpu_machines_have_gpu_profile(self, example_path):
         """Machines with gpu:true should reference a GPU profile."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             domain_profiles = domain.get("profiles") or {}
             for mname, machine in (domain.get("machines") or {}).items():
                 if machine.get("gpu", False):
@@ -680,7 +680,7 @@ class TestExampleProfileDetails:
     def test_gpu_profiles_have_devices(self, example_path):
         """GPU profiles must contain a devices section with a gpu device."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for pname, profile in (domain.get("profiles") or {}).items():
                 devices = profile.get("devices") or {}
                 gpu_devices = [d for d in devices.values() if d.get("type") == "gpu"]
@@ -773,16 +773,15 @@ class TestExampleNetworkPolicies:
         infra = load_infra(str(example_path))
         for i, policy in enumerate(infra.get("network_policies") or []):
             ports = policy.get("ports")
-            if ports is not None:
-                if ports != "all":
-                    assert isinstance(ports, list), (
-                        f"network_policies[{i}] ports not list in {example_path}"
+            if ports is not None and ports != "all":
+                assert isinstance(ports, list), (
+                    f"network_policies[{i}] ports not list in {example_path}"
+                )
+                for port in ports:
+                    assert isinstance(port, int) and 1 <= port <= 65535, (
+                        f"network_policies[{i}] invalid port {port} "
+                        f"in {example_path}"
                     )
-                    for port in ports:
-                        assert isinstance(port, int) and 1 <= port <= 65535, (
-                            f"network_policies[{i}] invalid port {port} "
-                            f"in {example_path}"
-                        )
 
     @pytest.mark.parametrize(
         "example_path",
@@ -921,7 +920,7 @@ class TestExampleGatewayConvention:
     def test_no_machine_uses_gateway_ip(self, example_path):
         """No machine should use .254 (reserved for gateway)."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:
@@ -938,7 +937,7 @@ class TestExampleGatewayConvention:
     def test_no_machine_uses_network_address(self, example_path):
         """No machine should use .0 (network address)."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:
@@ -955,7 +954,7 @@ class TestExampleGatewayConvention:
     def test_no_machine_uses_broadcast(self, example_path):
         """No machine should use .255 (broadcast address)."""
         infra = load_infra(str(example_path))
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:
@@ -1009,8 +1008,8 @@ class TestExampleGeneratedContentDetails:
     )
     def test_domain_group_vars_contain_incus_network(self, example_path, tmp_path):
         """group_vars/<domain>.yml must contain incus_network."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1031,8 +1030,8 @@ class TestExampleGeneratedContentDetails:
     )
     def test_domain_group_vars_network_name_format(self, example_path, tmp_path):
         """Network name must be 'net-<domain>'."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1050,8 +1049,8 @@ class TestExampleGeneratedContentDetails:
     )
     def test_domain_group_vars_gateway_ends_254(self, example_path, tmp_path):
         """Gateway must end with .254."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1070,12 +1069,12 @@ class TestExampleGeneratedContentDetails:
     )
     def test_host_vars_contain_instance_name(self, example_path, tmp_path):
         """host_vars/<machine>.yml must contain instance_name."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname in (domain.get("machines") or {}):
                 hv = yaml.safe_load(
                     (tmp_path / "host_vars" / f"{mname}.yml").read_text()
@@ -1091,8 +1090,8 @@ class TestExampleGeneratedContentDetails:
     )
     def test_host_vars_contain_instance_domain(self, example_path, tmp_path):
         """host_vars/<machine>.yml must contain instance_domain."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1112,12 +1111,12 @@ class TestExampleGeneratedContentDetails:
     )
     def test_host_vars_contain_instance_type(self, example_path, tmp_path):
         """host_vars/<machine>.yml must contain instance_type."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 hv = yaml.safe_load(
                     (tmp_path / "host_vars" / f"{mname}.yml").read_text()
@@ -1134,8 +1133,8 @@ class TestExampleGeneratedContentDetails:
     )
     def test_inventory_contains_domain_group(self, example_path, tmp_path):
         """inventory/<domain>.yml must contain the domain as an Ansible group."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1162,8 +1161,8 @@ class TestExampleIdempotency:
     )
     def test_generation_idempotent(self, example_path, tmp_path):
         """Running generate twice produces identical output."""
+
         from generate import enrich_infra, generate
-        import copy
         infra1 = load_infra(str(example_path))
         enrich_infra(infra1)
         generate(infra1, tmp_path)
@@ -1313,9 +1312,9 @@ class TestExampleEnrichment:
         """Enrichment should not remove existing domains."""
         from generate import enrich_infra
         infra = load_infra(str(example_path))
-        original_domains = set((infra.get("domains") or {}))
+        original_domains = set(infra.get("domains") or {})
         enrich_infra(infra)
-        enriched_domains = set((infra.get("domains") or {}))
+        enriched_domains = set(infra.get("domains") or {})
         assert original_domains.issubset(enriched_domains), (
             f"Enrichment removed domains in {example_path}"
         )
@@ -1659,7 +1658,7 @@ class TestLlmSupervisorExample:
 
     def test_all_domains_not_ephemeral(self):
         infra = self._load()
-        for dname, domain in infra["domains"].items():
+        for _dname, domain in infra["domains"].items():
             assert domain.get("ephemeral", False) is False
 
 
@@ -1795,8 +1794,8 @@ class TestExampleGeneratedDomainVarsContent:
     )
     def test_domain_name_matches_in_group_vars(self, example_path, tmp_path):
         """group_vars/<domain>.yml must have domain_name matching the domain."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1813,8 +1812,8 @@ class TestExampleGeneratedDomainVarsContent:
     )
     def test_incus_project_matches_domain(self, example_path, tmp_path):
         """group_vars/<domain>.yml must have incus_project matching domain name."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1831,8 +1830,8 @@ class TestExampleGeneratedDomainVarsContent:
     )
     def test_subnet_id_matches_in_group_vars(self, example_path, tmp_path):
         """group_vars/<domain>.yml must have correct subnet_id."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1849,8 +1848,8 @@ class TestExampleGeneratedDomainVarsContent:
     )
     def test_subnet_in_network_matches_domain(self, example_path, tmp_path):
         """incus_network.subnet must match base_subnet.subnet_id.0/24."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1874,12 +1873,12 @@ class TestExampleHostVarsDetails:
     )
     def test_instance_ip_matches(self, example_path, tmp_path):
         """host_vars/<machine>.yml instance_ip must match infra.yml."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 hv = yaml.safe_load(
                     (tmp_path / "host_vars" / f"{mname}.yml").read_text()
@@ -1894,12 +1893,12 @@ class TestExampleHostVarsDetails:
     )
     def test_instance_roles_matches(self, example_path, tmp_path):
         """host_vars/<machine>.yml instance_roles must match infra.yml."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 hv = yaml.safe_load(
                     (tmp_path / "host_vars" / f"{mname}.yml").read_text()
@@ -1914,12 +1913,12 @@ class TestExampleHostVarsDetails:
     )
     def test_instance_gpu_matches(self, example_path, tmp_path):
         """host_vars/<machine>.yml instance_gpu must match infra.yml gpu flag."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 hv = yaml.safe_load(
                     (tmp_path / "host_vars" / f"{mname}.yml").read_text()
@@ -1938,8 +1937,8 @@ class TestExampleInventoryDetails:
     )
     def test_inventory_hosts_match_machines(self, example_path, tmp_path):
         """Inventory must list all machines of its domain as hosts."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -1960,8 +1959,8 @@ class TestExampleInventoryDetails:
     )
     def test_inventory_ansible_host_matches_ip(self, example_path, tmp_path):
         """Inventory ansible_host must match machine IP."""
-        from generate import enrich_infra, generate
         import yaml
+        from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
@@ -2013,7 +2012,7 @@ class TestExampleIPv4Format:
         import re
         infra = load_infra(str(example_path))
         ipv4_re = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-        for dname, domain in (infra.get("domains") or {}).items():
+        for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 ip = machine.get("ip")
                 if ip:

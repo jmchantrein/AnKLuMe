@@ -1016,8 +1016,8 @@ class TestAiSwitchExecutionSequence:
         log_content = log_file.read_text()
         lines = log_content.strip().split("\n")
         # Find first systemctl stop and first nvidia-smi
-        first_stop = next((i for i, l in enumerate(lines) if "systemctl stop" in l), None)
-        first_nvidia = next((i for i, l in enumerate(lines) if "nvidia-smi" in l), None)
+        first_stop = next((i for i, ln in enumerate(lines) if "systemctl stop" in ln), None)
+        first_nvidia = next((i for i, ln in enumerate(lines) if "nvidia-smi" in ln), None)
         assert first_stop is not None, "Expected systemctl stop in log"
         assert first_nvidia is not None, "Expected nvidia-smi in log"
         assert first_stop < first_nvidia, "stop should come before flush"
@@ -1029,8 +1029,8 @@ class TestAiSwitchExecutionSequence:
         assert result.returncode == 0
         log_content = log_file.read_text()
         lines = log_content.strip().split("\n")
-        first_nvidia = next((i for i, l in enumerate(lines) if "nvidia-smi" in l), None)
-        first_ansible = next((i for i, l in enumerate(lines) if "ansible-playbook" in l), None)
+        first_nvidia = next((i for i, ln in enumerate(lines) if "nvidia-smi" in ln), None)
+        first_ansible = next((i for i, ln in enumerate(lines) if "ansible-playbook" in ln), None)
         assert first_nvidia is not None, "Expected nvidia-smi in log"
         assert first_ansible is not None, "Expected ansible-playbook in log"
         assert first_nvidia < first_ansible, "flush should come before nftables"
@@ -1042,9 +1042,9 @@ class TestAiSwitchExecutionSequence:
         assert result.returncode == 0
         log_content = log_file.read_text()
         lines = log_content.strip().split("\n")
-        first_ansible = next((i for i, l in enumerate(lines) if "ansible-playbook" in l), None)
+        first_ansible = next((i for i, ln in enumerate(lines) if "ansible-playbook" in ln), None)
         # Find systemctl start AFTER the ansible call
-        start_lines = [i for i, l in enumerate(lines) if "systemctl start" in l]
+        start_lines = [i for i, ln in enumerate(lines) if "systemctl start" in ln]
         assert first_ansible is not None, "Expected ansible-playbook in log"
         assert len(start_lines) > 0, "Expected systemctl start in log"
         assert start_lines[-1] > first_ansible, "restart should come after nftables"
@@ -1056,7 +1056,7 @@ class TestAiSwitchExecutionSequence:
         assert result.returncode == 0
         log_content = log_file.read_text()
         lines = log_content.strip().split("\n")
-        first_incus = next((i for i, l in enumerate(lines) if l.startswith("incus ")), None)
+        first_incus = next((i for i, ln in enumerate(lines) if ln.startswith("incus ")), None)
         assert first_incus is not None
         assert "project list" in lines[first_incus]
 
@@ -1482,7 +1482,7 @@ class TestAiSwitchMultipleCycles:
             run_switch(["--domain", domain], env, cwd, script=script)
         log_file = cwd / "logs" / "ai-switch.log"
         content = log_file.read_text()
-        entries = [l for l in content.strip().split("\n") if l.strip()]
+        entries = [ln for ln in content.strip().split("\n") if ln.strip()]
         assert len(entries) == 3
 
     def test_switch_back_and_forth(self, switch_env):

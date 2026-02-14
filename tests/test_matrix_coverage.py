@@ -1267,8 +1267,8 @@ class TestRealMatrixIntegration:
         """All IDs across the entire real matrix should be unique."""
         cells, all_ids = load_matrix()
         total_ids = []
-        for cap_name, depths in cells.items():
-            for depth_name, ids in depths.items():
+        for _cap_name, depths in cells.items():
+            for _depth_name, ids in depths.items():
                 total_ids.extend(ids)
         assert len(total_ids) == len(set(total_ids)), "Global duplicate IDs found"
 
@@ -1291,7 +1291,7 @@ class TestRealMatrixIntegration:
         }
         for cap_name, expected_prefix in prefix_map.items():
             if cap_name in cells:
-                for depth_name, ids in cells[cap_name].items():
+                for _depth_name, ids in cells[cap_name].items():
                     for cell_id in ids:
                         assert cell_id.startswith(expected_prefix + "-"), (
                             f"ID {cell_id} in {cap_name} doesn't start with {expected_prefix}-"

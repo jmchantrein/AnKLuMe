@@ -377,7 +377,7 @@ class TestMatrixCoverageCells:
         """Action and expected fields must be non-empty strings."""
         data = self._load_matrix_data()
         capabilities = data.get("capabilities") or {}
-        for cap_key, cap in capabilities.items():
+        for _cap_key, cap in capabilities.items():
             for depth in ("depth_1", "depth_2", "depth_3"):
                 for item in cap.get(depth) or []:
                     cell_id = item.get("id", "?")
