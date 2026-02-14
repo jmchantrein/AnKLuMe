@@ -87,6 +87,17 @@ jobs:
       - name: Check matrix coverage
         run: python3 scripts/matrix-coverage.py --threshold 0
 
+  dead-code:
+    name: Dead code detection
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install vulture
+        run: pip install vulture
+      - name: Run dead code detection
+        run: scripts/code-analysis.sh dead-code
+
   syntax-check:
     name: Ansible syntax check
     runs-on: ubuntu-latest
