@@ -588,19 +588,19 @@ def _build_mock_env(tmp_path, projects_json, instance_map):
 
     # Build incus mock script
     script_parts = [
-        f'#!/usr/bin/env bash',
-        f'if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then',
+        '#!/usr/bin/env bash',
+        'if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then',
         f'    cat "{proj_json}"',
-        f'    exit 0',
-        f'fi',
+        '    exit 0',
+        'fi',
     ]
     for proj_name, json_file in json_files.items():
         script_parts.extend([
             f'if [[ "$1" == "list" && "$*" == *"--project {proj_name}"*'
             f' && "$*" == *"--format json"* ]]; then',
             f'    cat "{json_file}"',
-            f'    exit 0',
-            f'fi',
+            '    exit 0',
+            'fi',
         ])
     script_parts.append('exit 0')
 

@@ -11,9 +11,12 @@ Complements test_roles.py with edge cases not covered by basic rendering tests:
 
 import json
 import re
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 try:
     from jinja2 import Environment, FileSystemLoader
@@ -824,12 +827,6 @@ class TestFirewallRouterManyInterfaces:
 # Tests below exercise scripts/generate.py functions through
 # unusual YAML structures, boundary values, and special content.
 
-import sys
-import tempfile
-from pathlib import Path
-
-import yaml
-
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -1462,7 +1459,7 @@ class TestNftablesSpecialBridgeNames:
             incus_nftables_all_bridges=["net-a", "net-b"],
             incus_nftables_resolved_policies=[],
         )
-        drop_lines = [l for l in result.splitlines() if "drop" in l and "iifname" in l]
+        drop_lines = [ln for ln in result.splitlines() if "drop" in ln and "iifname" in ln]
         assert len(drop_lines) == 1
         assert '"net-a"' in drop_lines[0]
         assert '"net-b"' in drop_lines[0]
@@ -1482,10 +1479,10 @@ class TestNftablesSpecialBridgeNames:
         )
         lines = result.splitlines()
         policy_accept_idx = next(
-            i for i, l in enumerate(lines) if "dport { 80 }" in l
+            i for i, ln in enumerate(lines) if "dport { 80 }" in ln
         )
         drop_idx = next(
-            i for i, l in enumerate(lines) if "drop" in l and "iifname" in l and "oifname" in l
+            i for i, ln in enumerate(lines) if "drop" in ln and "iifname" in ln and "oifname" in ln
         )
         assert policy_accept_idx < drop_idx
 
@@ -2220,8 +2217,8 @@ class TestNftablesRuleCount:
                 "bidirectional": False,
             }],
         )
-        accept_lines = [l for l in result.splitlines()
-                       if 'iifname "net-a" oifname "net-b"' in l and "accept" in l]
+        accept_lines = [ln for ln in result.splitlines()
+                       if 'iifname "net-a" oifname "net-b"' in ln and "accept" in ln]
         assert len(accept_lines) == 1
 
     def test_bidir_generates_two_accepts(self):
@@ -2237,10 +2234,10 @@ class TestNftablesRuleCount:
                 "bidirectional": True,
             }],
         )
-        accept_ab = [l for l in result.splitlines()
-                    if 'iifname "net-a" oifname "net-b"' in l and "accept" in l]
-        accept_ba = [l for l in result.splitlines()
-                    if 'iifname "net-b" oifname "net-a"' in l and "accept" in l]
+        accept_ab = [ln for ln in result.splitlines()
+                    if 'iifname "net-a" oifname "net-b"' in ln and "accept" in ln]
+        accept_ba = [ln for ln in result.splitlines()
+                    if 'iifname "net-b" oifname "net-a"' in ln and "accept" in ln]
         assert len(accept_ab) == 1
         assert len(accept_ba) == 1
 
@@ -2261,8 +2258,8 @@ class TestNftablesRuleCount:
             incus_nftables_all_bridges=["net-a", "net-b"],
             incus_nftables_resolved_policies=policies,
         )
-        accept_lines = [l for l in result.splitlines()
-                       if "dport" in l and "accept" in l]
+        accept_lines = [ln for ln in result.splitlines()
+                       if "dport" in ln and "accept" in ln]
         assert len(accept_lines) == 5
 
     def test_mixed_bidir_and_non_bidir(self):
@@ -2289,8 +2286,8 @@ class TestNftablesRuleCount:
             ],
         )
         # 1 for non-bidir + 2 for bidir = 3 total accept lines with dport
-        accept_lines = [l for l in result.splitlines()
-                       if "dport" in l and "accept" in l]
+        accept_lines = [ln for ln in result.splitlines()
+                       if "dport" in ln and "accept" in ln]
         assert len(accept_lines) == 3
 
 
@@ -2314,7 +2311,7 @@ class TestFirewallRouterChainPolicies:
             firewall_router_log_prefix="FW",
         )
         # Find the forward chain line
-        forward_lines = [l for l in result.splitlines() if "chain forward" in l]
+        forward_lines = [ln for ln in result.splitlines() if "chain forward" in ln]
         assert len(forward_lines) == 1
         # Policy should be on the next line
         idx = result.splitlines().index(forward_lines[0])
@@ -2329,7 +2326,7 @@ class TestFirewallRouterChainPolicies:
             firewall_router_log_prefix="FW",
         )
         lines = result.splitlines()
-        input_idx = next(i for i, l in enumerate(lines) if "chain input" in l)
+        input_idx = next(i for i, ln in enumerate(lines) if "chain input" in ln)
         assert "policy drop" in lines[input_idx + 1]
 
     def test_output_policy_accept(self):
@@ -2340,7 +2337,7 @@ class TestFirewallRouterChainPolicies:
             firewall_router_log_prefix="FW",
         )
         lines = result.splitlines()
-        output_idx = next(i for i, l in enumerate(lines) if "chain output" in l)
+        output_idx = next(i for i, ln in enumerate(lines) if "chain output" in ln)
         assert "policy accept" in lines[output_idx + 1]
 
     def test_atomic_replacement_header(self):
@@ -3073,7 +3070,7 @@ class TestPSOTManagedBlockContent:
         block = _managed_block("key: value\n\n\n")
         # Should not have multiple newlines before END marker
         lines = block.split("\n")
-        end_idx = next(i for i, l in enumerate(lines) if MANAGED_END in l)
+        end_idx = next(i for i, ln in enumerate(lines) if MANAGED_END in ln)
         # Line before END should have content (not be blank)
         assert lines[end_idx - 1].strip() != ""
 
