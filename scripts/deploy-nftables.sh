@@ -111,6 +111,19 @@ incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJ
 
 echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
 
+# Validate content — ensure rules only modify the expected AnKLuMe table
+echo "Validating nftables content..."
+if grep -qE '^\s*table\s' "$TMPFILE"; then
+    NON_ANKLUME_TABLES=$(grep -E '^\s*table\s' "$TMPFILE" | grep -cv 'inet anklume' || true)
+    if [[ "$NON_ANKLUME_TABLES" -gt 0 ]]; then
+        die "Rules contain unexpected table definitions (expected only 'table inet anklume')"
+    fi
+fi
+# Reject dangerous patterns that should never appear in isolation rules
+if grep -qiE '(flush ruleset|delete table inet filter|drop.*input.*policy)' "$TMPFILE"; then
+    die "Rules contain dangerous patterns (flush ruleset, delete inet filter, or input drop policy)"
+fi
+
 # Validate syntax
 echo "Validating nftables syntax..."
 nft -c -f "$TMPFILE" || die "Syntax validation failed"
