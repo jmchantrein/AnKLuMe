@@ -1516,7 +1516,7 @@ class TestAiSwitchDomainValidation:
     def test_domain_exists_uses_python3(self):
         """domain_exists() calls python3 for YAML parsing."""
         content = AI_SWITCH_SH.read_text()
-        assert "python3 -c" in content
+        assert "python3 -" in content
 
     def test_domain_exists_imports_yaml(self):
         """domain_exists() imports yaml module."""
