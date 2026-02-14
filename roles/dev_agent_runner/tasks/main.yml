@@ -54,11 +54,12 @@
     - { key: "user.email", value: "{{ dev_agent_runner_git_email }}" }
   changed_when: true
 
-- name: DevAgentRunner | Copy project CLAUDE.md to runner
-  ansible.builtin.copy:
-    src: "{{ dev_agent_runner_project_dir }}/CLAUDE.md"
-    dest: "{{ dev_agent_runner_project_dir }}/CLAUDE.md"
-    remote_src: true
-    mode: "0644"
-  failed_when: false
-  changed_when: false
+- name: DevAgentRunner | Verify CLAUDE.md exists in project
+  ansible.builtin.stat:
+    path: "{{ dev_agent_runner_project_dir }}/CLAUDE.md"
+  register: dev_agent_runner_claude_md
+
+- name: DevAgentRunner | Warn if CLAUDE.md missing
+  ansible.builtin.debug:
+    msg: "WARNING: CLAUDE.md not found at {{ dev_agent_runner_project_dir }}/CLAUDE.md — clone the repo first"
+  when: not dev_agent_runner_claude_md.stat.exists
