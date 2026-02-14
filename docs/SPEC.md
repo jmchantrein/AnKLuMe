@@ -344,8 +344,11 @@ declarative property of the infrastructure.
 | `incus_networks` | Create/reconcile bridges | `networks`, `infra` |
 | `incus_projects` | Create/reconcile projects + default profile | `projects`, `infra` |
 | `incus_profiles` | Create extra profiles (GPU, nesting) | `profiles`, `infra` |
-| `incus_storage` | Create dedicated storage volumes | `storage`, `infra` |
 | `incus_instances` | Create/manage LXC + VM instances | `instances`, `infra` |
+| `incus_nftables` | Generate inter-bridge isolation rules | `nftables`, `infra` |
+| `incus_firewall_vm` | Multi-NIC profile for firewall VM | `firewall`, `infra` |
+| `incus_images` | Pre-download OS images to cache | `images`, `infra` |
+| `incus_nesting` | Nesting context propagation | `nesting`, `infra` |
 
 ### Phase 2: Provisioning (connection: community.general.incus)
 
@@ -358,6 +361,8 @@ declarative property of the infrastructure.
 | `lobechat` | LobeChat multi-provider web UI | `provision`, `lobechat` |
 | `opencode_server` | OpenCode headless AI coding server | `provision`, `opencode` |
 | `firewall_router` | nftables routing inside firewall VM | `provision`, `firewall` |
+| `dev_test_runner` | Incus-in-Incus sandbox provisioning | `provision`, `test` |
+| `dev_agent_runner` | Claude Code Agent Teams setup | `provision`, `agent-setup` |
 | (user-defined) | Application-specific setup | `provision` |
 
 ### Reconciliation pattern (all infra roles)
