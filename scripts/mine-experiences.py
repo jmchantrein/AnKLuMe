@@ -161,23 +161,14 @@ def save_last_mined_commit(commit_hash: str) -> None:
 
 
 def format_entries(entries: list[dict], category: str) -> str:
-    """Format entries as YAML for appending to a category file."""
-    lines = [f"# Mined entries for {category}"]
-    for entry in entries:
-        lines.append("")
-        entry_id = entry.get("id", "MINED")
-        lines.append(f"- id: {entry_id}")
-        lines.append(f"  category: {entry['category']}")
-        problem = entry["problem"].replace('"', '\\"')
-        lines.append(f'  problem: "{problem}"')
-        solution = entry["solution"].replace('"', '\\"')
-        lines.append(f'  solution: "{solution}"')
-        lines.append(f'  source_commit: "{entry["source_commit"]}"')
-        files_str = ", ".join(f'"{f}"' for f in entry["files_affected"])
-        lines.append(f"  files_affected: [{files_str}]")
-        prevention = entry["prevention"].replace('"', '\\"')
-        lines.append(f'  prevention: "{prevention}"')
-    return "\n".join(lines) + "\n"
+    """Format entries as YAML using safe serialization."""
+    header = f"# Mined entries for {category}\n"
+    return header + yaml.dump(
+        entries,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    )
 
 
 def main() -> None:
