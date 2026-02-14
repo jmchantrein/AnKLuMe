@@ -160,6 +160,14 @@ def validate(infra):
         if domain_eph is not None and not isinstance(domain_eph, bool):
             errors.append(f"Domain '{dname}': ephemeral must be a boolean, got {type(domain_eph).__name__}")
 
+        valid_trust_levels = ("admin", "trusted", "semi-trusted", "untrusted", "disposable")
+        trust_level = domain.get("trust_level")
+        if trust_level is not None and trust_level not in valid_trust_levels:
+            errors.append(
+                f"Domain '{dname}': trust_level must be one of "
+                f"{valid_trust_levels}, got '{trust_level}'"
+            )
+
         domain_profiles = domain.get("profiles") or {}
         domain_profile_names = set(domain_profiles)
         for mname, machine in (domain.get("machines") or {}).items():
@@ -495,6 +503,7 @@ def generate(infra, base_dir, dry_run=False):
             "domain_name": dname,
             "domain_description": domain.get("description", ""),
             "domain_ephemeral": domain_ephemeral,
+            "domain_trust_level": domain.get("trust_level"),
             "incus_project": dname,
             "incus_network": {"name": f"net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
             "subnet_id": sid,
