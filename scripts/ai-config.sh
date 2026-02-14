@@ -23,18 +23,18 @@ _yaml_get() {
     # Usage: _yaml_get "ai.mode" "default_value"
     local key_path="$1"
     local default="${2:-}"
-    python3 -c "
+    python3 - "$_ai_conf" "$key_path" "$default" <<'PYEOF' 2>/dev/null
 import yaml, sys
 try:
-    c = yaml.safe_load(open('${_ai_conf}'))
-    keys = '${key_path}'.split('.')
+    c = yaml.safe_load(open(sys.argv[1]))
+    keys = sys.argv[2].split('.')
     v = c
     for k in keys:
         v = v[k]
     print(v)
 except Exception:
-    print('${default}')
-" 2>/dev/null
+    print(sys.argv[3])
+PYEOF
 }
 
 if [ -f "$_ai_conf" ]; then
@@ -130,10 +130,18 @@ Start with --- and +++ lines. No explanations before or after the diff."
     local response_file="${AI_LOG_DIR}/${_ai_session_id}-response.patch"
 
     ai_log "Querying Ollama (${AI_OLLAMA_MODEL})..."
-    if ! curl -sf "${AI_OLLAMA_URL}/api/generate" \
-        -d "$(python3 -c "import json; print(json.dumps({'model':'${AI_OLLAMA_MODEL}','prompt':open('${context_file}').read(),'stream':False}))")" \
-        | python3 -c "import json,sys; print(json.load(sys.stdin)['response'])" \
-        > "$response_file" 2>/dev/null; then
+    if ! python3 - "$AI_OLLAMA_URL" "$AI_OLLAMA_MODEL" "$context_file" "$response_file" <<'PYEOF' 2>/dev/null; then
+import json, sys, urllib.request
+url = sys.argv[1] + "/api/generate"
+model = sys.argv[2]
+prompt = open(sys.argv[3]).read()
+payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
+req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+resp = urllib.request.urlopen(req)
+result = json.loads(resp.read())
+with open(sys.argv[4], "w") as f:
+    f.write(result["response"])
+PYEOF
         ai_log "ERROR: Ollama query failed"
         return 1
     fi
@@ -205,23 +213,33 @@ Respond ONLY with a unified diff (patch format). No explanations."
     local response_file="${AI_LOG_DIR}/${_ai_session_id}-response.patch"
 
     ai_log "Querying Claude API..."
-    local payload
-    payload="$(python3 -c "
-import json
-print(json.dumps({
-    'model': 'claude-sonnet-4-5-20250929',
-    'max_tokens': 4096,
-    'messages': [{'role': 'user', 'content': '''${prompt}'''}]
-}))
-")"
+    # Use Python with proper argument passing to avoid exposing API key in ps
+    local prompt_file="${AI_LOG_DIR}/${_ai_session_id}-remote-prompt.txt"
+    printf '%s' "$prompt" > "$prompt_file"
 
-    if ! curl -sf "https://api.anthropic.com/v1/messages" \
-        -H "x-api-key: ${AI_ANTHROPIC_KEY}" \
-        -H "anthropic-version: 2023-06-01" \
-        -H "content-type: application/json" \
-        -d "$payload" \
-        | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['content'][0]['text'])" \
-        > "$response_file" 2>/dev/null; then
+    if ! python3 - "$AI_ANTHROPIC_KEY" "$prompt_file" "$response_file" <<'PYEOF' 2>/dev/null; then
+import json, sys, urllib.request
+api_key = sys.argv[1]
+prompt = open(sys.argv[2]).read()
+payload = json.dumps({
+    "model": "claude-sonnet-4-5-20250929",
+    "max_tokens": 4096,
+    "messages": [{"role": "user", "content": prompt}]
+}).encode()
+req = urllib.request.Request(
+    "https://api.anthropic.com/v1/messages",
+    data=payload,
+    headers={
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    },
+)
+resp = urllib.request.urlopen(req)
+result = json.loads(resp.read())
+with open(sys.argv[3], "w") as f:
+    f.write(result["content"][0]["text"])
+PYEOF
         ai_log "ERROR: Claude API query failed"
         return 1
     fi
