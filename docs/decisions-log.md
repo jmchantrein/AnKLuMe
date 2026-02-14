@@ -177,4 +177,4 @@ were declared but never created.
 **Rationale**: The PSOT model requires that every generated variable
 has a consumer. Dead variables create false expectations for users.
 
-**Status**: pending review
+**Status**: validated
