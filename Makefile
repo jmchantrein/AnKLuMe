@@ -223,6 +223,16 @@ agent-develop: ## Autonomous development with Agent Teams (TASK="description")
 	@test -n "$(TASK)" || { echo "ERROR: TASK required. Usage: make agent-develop TASK=\"...\""; exit 1; }
 	@scripts/agent-develop.sh "$(TASK)"
 
+# ── File Transfer and Backup (Phase 20d) ────────────────
+file-copy: ## Copy file between instances (SRC=instance:/path DST=instance:/path)
+	scripts/transfer.sh copy $(SRC) $(DST)
+
+backup: ## Backup an instance (I=<instance> [GPG=<recipient>] [O=<dir>])
+	scripts/transfer.sh backup $(if $(GPG),--gpg-recipient $(GPG)) $(if $(O),--output $(O)) $(I)
+
+restore-backup: ## Restore instance from backup (FILE=<backup> [NAME=<name>] [PROJECT=<project>])
+	scripts/transfer.sh restore $(if $(NAME),--name $(NAME)) $(if $(PROJECT),--project $(PROJECT)) $(FILE)
+
 # ── Code Analysis (Phase 19c) ────────────────────────
 dead-code: ## Run dead code detection (vulture + shellcheck)
 	@scripts/code-analysis.sh dead-code
@@ -235,6 +245,28 @@ dep-graph: ## Generate module dependency graph (SVG in reports/)
 
 code-graph: ## Run all static code analysis tools
 	@scripts/code-analysis.sh all
+
+# ── Disposable Instances (Phase 20a) ────────────────────
+disp: ## Launch disposable ephemeral instance (IMAGE=... CMD=... DOMAIN=... VM=1)
+	scripts/disp.sh $(if $(IMAGE),--image $(IMAGE)) $(if $(DOMAIN),--domain $(DOMAIN)) $(if $(CMD),--cmd "$(CMD)") $(if $(VM),--vm)
+
+# ── Golden Images (Phase 20b) ───────────────────────────
+golden-create: ## Create golden image from instance (NAME=<instance> [PROJECT=<project>])
+	@test -n "$(NAME)" || { echo "ERROR: NAME required. Usage: make golden-create NAME=<instance>"; exit 1; }
+	scripts/golden.sh create $(NAME) $(if $(PROJECT),--project $(PROJECT))
+
+golden-derive: ## Derive instance from golden image (TEMPLATE=<name> INSTANCE=<new> [PROJECT=<project>])
+	@test -n "$(TEMPLATE)" || { echo "ERROR: TEMPLATE required."; exit 1; }
+	@test -n "$(INSTANCE)" || { echo "ERROR: INSTANCE required."; exit 1; }
+	scripts/golden.sh derive $(TEMPLATE) $(INSTANCE) $(if $(PROJECT),--project $(PROJECT))
+
+golden-publish: ## Publish golden image as Incus image (TEMPLATE=<name> ALIAS=<alias> [PROJECT=<project>])
+	@test -n "$(TEMPLATE)" || { echo "ERROR: TEMPLATE required."; exit 1; }
+	@test -n "$(ALIAS)" || { echo "ERROR: ALIAS required."; exit 1; }
+	scripts/golden.sh publish $(TEMPLATE) $(ALIAS) $(if $(PROJECT),--project $(PROJECT))
+
+golden-list: ## List golden images (instances with 'pristine' snapshot)
+	@scripts/golden.sh list $(if $(PROJECT),--project $(PROJECT))
 
 # ── Lifecycle ─────────────────────────────────────────────
 flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
@@ -301,5 +333,8 @@ help: ## Show this help
         flush upgrade import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
+        file-copy backup restore-backup \
+        disp \
+        golden-create golden-derive golden-publish golden-list \
         dead-code call-graph dep-graph code-graph \
         guide quickstart init install-hooks help

@@ -249,3 +249,81 @@ value when ansible-lint already covers Ansible variable validation.
 KISS principle.
 
 **Status**: validated
+
+---
+
+## D-048: Golden images use 'pristine' snapshot convention
+
+**Problem**: Phase 20b requires golden image management. Need a
+convention to identify which instances are golden images and a strategy
+for the create/derive/publish workflow.
+
+**Choice**: Use a fixed snapshot name `pristine` as the marker for
+golden images. An instance is a golden image if and only if it has a
+snapshot named `pristine`. The `create` command stops the instance and
+creates/replaces this snapshot. `derive` uses `incus copy <name>/pristine`
+for CoW cloning. `publish` uses `incus publish <name>/pristine`.
+
+**Alternatives considered**:
+(a) Use instance metadata/labels — requires Incus API calls, more
+complex, not all Incus versions support labels well.
+(b) Separate tracking file — adds state outside Incus, can get stale.
+(c) Any snapshot name — no reliable way to identify golden images.
+
+**Rationale**: The `pristine` snapshot convention is simple, discoverable
+(list snapshots to find golden images), and works with all Incus storage
+backends. No external state needed.
+
+**Status**: pending review
+
+## D-049: File transfer via pipe — no intermediate disk write
+
+**Problem**: Phase 20d requires file transfer between instances. The
+implementation must choose how to move data between containers that
+may be in different Incus projects.
+
+**Choice**: Use `incus file pull SRC - | incus file push - DST` pipe
+pattern. The file content streams through the admin container's stdout
+without being written to disk. Alternatives considered:
+(a) `incus file pull` to temp file then `incus file push` — wastes
+disk space and requires cleanup,
+(b) shared volume mount — requires instance restart and volume setup,
+(c) network transfer via scp/rsync — requires network access between
+domains which is blocked by nftables isolation.
+
+**Rationale**: The pipe pattern is the simplest approach that works
+within the Incus socket model (ADR-004). No temp files, no network
+needed, no volume management. Works across projects since each side
+specifies its own `--project` flag.
+
+**Status**: pending review
+
+---
+
+## D-050: Disposable instances — shell script with Incus --ephemeral
+
+**Problem**: Phase 20a requires on-demand, auto-destroyed instances.
+Need to decide whether to use an Ansible role, a Python script, or a
+shell script for the implementation.
+
+**Choice**: Implement as a standalone shell script (`scripts/disp.sh`)
+wrapping `incus launch --ephemeral`. The script reads the default OS
+image from `infra.yml` via a Python one-liner (heredoc + sys.argv
+pattern for safety), generates timestamped names (`disp-YYYYMMDD-HHMMSS`),
+and supports multiple modes: interactive shell, command execution,
+console attach, and background launch.
+
+**Alternatives considered**:
+(a) Ansible role — rejected (disposable instances are imperative
+one-shot operations, same rationale as ADR-013 for snapshots),
+(b) Python script — rejected (shell is simpler for wrapping CLI
+commands, matches snap.sh precedent),
+(c) Incus alias — rejected (too limited for multi-mode behavior).
+
+**Rationale**: Shell script follows the snap.sh precedent (ADR-013)
+for imperative operations. The `--ephemeral` flag is a native Incus
+feature that handles auto-destruction at the daemon level — no
+external cleanup needed. Reading the default image from `infra.yml`
+keeps the PSOT model consistent.
+
+**Status**: pending review

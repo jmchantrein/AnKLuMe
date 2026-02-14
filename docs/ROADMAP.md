@@ -1092,9 +1092,9 @@ QubesOS user-facing functionality.
 - Optional: `--console` flag to attach immediately.
 
 **Validation criteria**:
-- [ ] `make disp` creates an ephemeral instance
-- [ ] Instance is auto-destroyed on stop
-- [ ] Custom command runs and instance exits cleanly
+- [x] `make disp` creates an ephemeral instance
+- [x] Instance is auto-destroyed on stop
+- [x] Custom command runs and instance exits cleanly
 
 ### Phase 20b: Golden Images and Templates
 
@@ -1114,9 +1114,9 @@ creation and centralized updates.
   behavior).
 
 **Validation criteria**:
-- [ ] `incus copy` uses CoW on ZFS/Btrfs (verified by disk usage)
-- [ ] Derived instances boot and are functional
-- [ ] Published images can be used in `infra.yml` as `os_image`
+- [x] `incus copy` uses CoW on ZFS/Btrfs (verified by disk usage)
+- [x] Derived instances boot and are functional
+- [x] Published images can be used in `infra.yml` as `os_image`
 
 ### Phase 20c: Inter-Container Services via MCP
 
@@ -1174,9 +1174,9 @@ backup/restore.
   (`incus storage volume attach` to multiple instances).
 
 **Validation criteria**:
-- [ ] File copy between instances works via pipe
-- [ ] Encrypted backup created and restorable
-- [ ] Cross-machine migration via `incus copy local: remote:`
+- [x] File copy between instances works via pipe
+- [x] Encrypted backup created and restorable
+- [x] Cross-machine migration via `incus copy local: remote:`
 
 ### Phase 20e: Tor Gateway and sys-print
 
