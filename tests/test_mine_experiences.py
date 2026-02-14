@@ -258,7 +258,7 @@ class TestFormatEntries:
         assert "Missing author field" in result
 
     def test_escapes_quotes_in_problem(self):
-        """format_entries escapes double quotes in strings."""
+        """format_entries handles double quotes in strings via yaml.dump."""
         entries = [{
             "id": "FIX-001",
             "category": "test",
@@ -269,10 +269,10 @@ class TestFormatEntries:
             "prevention": "None",
         }]
         result = format_entries(entries, "test")
-        assert '\\"broken\\"' in result
+        assert '"broken"' in result
 
     def test_multiple_files_affected(self):
-        """format_entries lists multiple files in brackets."""
+        """format_entries lists multiple files as YAML sequence."""
         entries = [{
             "id": "FIX-001",
             "category": "test",
@@ -283,9 +283,9 @@ class TestFormatEntries:
             "prevention": "None",
         }]
         result = format_entries(entries, "test")
-        assert '"a.yml"' in result
-        assert '"b.yml"' in result
-        assert '"c.yml"' in result
+        assert "a.yml" in result
+        assert "b.yml" in result
+        assert "c.yml" in result
 
 
 # ── get_fix_commits (git log parsing) ─────────────────────────
