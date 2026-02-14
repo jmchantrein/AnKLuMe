@@ -437,7 +437,7 @@ def _write_managed(filepath, content_dict, dry_run=False):
     if filepath.exists():
         existing = filepath.read_text()
         if MANAGED_RE.search(existing):
-            new_content = MANAGED_RE.sub(block, existing)
+            new_content = MANAGED_RE.sub(block, existing, count=1)
         else:
             prefix = "" if existing.startswith("---") else "---\n"
             new_content = f"{prefix}{block}\n\n{existing}"
