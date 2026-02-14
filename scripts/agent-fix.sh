@@ -53,8 +53,10 @@ inject_api_key() {
         die "ANTHROPIC_API_KEY not set. Required for Claude Code Agent Teams."
     fi
 
-    incus exec "$RUNNER_NAME" --project "$RUNNER_PROJECT" -- \
-        bash -c "echo 'export ANTHROPIC_API_KEY=${api_key}' > /root/.anthropic_key"
+    # Push key via stdin to avoid exposure in process list
+    printf 'export ANTHROPIC_API_KEY=%s\n' "$api_key" \
+        | incus file push - "${RUNNER_NAME}/root/.anthropic_key" --project "$RUNNER_PROJECT"
+    incus exec "$RUNNER_NAME" --project "$RUNNER_PROJECT" -- chmod 600 /root/.anthropic_key
     log "API key injected"
 }
 
