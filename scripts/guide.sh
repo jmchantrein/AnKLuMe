@@ -300,6 +300,11 @@ step_3_infra_yml() {
     sed 's/^/    /' "$dest"
     echo -e "${RESET}"
 
+    echo ""
+    warn "Pitfall: Content between '=== MANAGED ===' markers is overwritten"
+    info "  by 'make sync'. Add your customizations BELOW the managed section."
+    warn "Pitfall: Each machine IP must be globally unique across all domains."
+
     if [[ "$AUTO" != "true" ]]; then
         if confirm "Open infra.yml in your editor?"; then
             local editor="${EDITOR:-${VISUAL:-vi}}"
@@ -330,6 +335,9 @@ step_4_generate() {
         exit 1
     fi
 
+    echo ""
+    warn "Pitfall: Follow the workflow: edit -> sync -> lint -> apply."
+    info "  Skipping 'make sync' means Ansible files won't match infra.yml."
     echo ""
     if confirm "Apply changes (make sync)?"; then
         echo ""
@@ -392,6 +400,21 @@ step_6_apply() {
     echo "  as defined in infra.yml."
     echo ""
     warn "Requires a running Incus daemon with admin access."
+    echo ""
+
+    # Pitfall check: verify inventory exists before apply
+    if [[ ! -d "$PROJECT_DIR/inventory" ]] || ! ls "$PROJECT_DIR/inventory"/*.yml >/dev/null 2>&1; then
+        warn "Pitfall: No inventory files found. Run 'make sync' first!"
+        info "  Without generated files, Ansible has no hosts to configure."
+        if [[ "$AUTO" == "true" ]]; then
+            exit 1
+        fi
+        pause
+        return
+    fi
+
+    warn "Pitfall: After adding a domain, also run 'make nftables &&"
+    info "  make nftables-deploy' to ensure network isolation."
     echo ""
 
     if [[ "$AUTO" == "true" ]]; then
