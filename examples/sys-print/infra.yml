@@ -1,0 +1,89 @@
+---
+# infra.yml — Primary Source of Truth (PSOT)
+#
+# Describes your infrastructure at a high level. After editing, run:
+#   make sync        # Generate/update Ansible files
+#   make apply       # Apply to Incus
+#
+# See docs/SPEC.md section 5 for the full format reference.
+
+# Print service example: dedicated CUPS container with USB printer
+# passthrough and network printer access via macvlan.
+
+project_name: sys-print-example
+
+global:
+  base_subnet: "10.100"
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  admin:
+    description: "Administration and orchestration"
+    subnet_id: 0
+    trust_level: admin
+    machines:
+      admin-ansible:
+        description: "Ansible controller"
+        type: lxc
+        ip: "10.100.0.10"
+        config:
+          security.nesting: "true"
+        roles:
+          - base_system
+
+  print-service:
+    description: "Dedicated print service domain"
+    subnet_id: 7
+    trust_level: trusted
+    machines:
+      sys-print:
+        description: "CUPS print server"
+        type: lxc
+        ip: "10.100.7.10"
+        roles:
+          - base_system
+
+  pro:
+    description: "Professional workstation domain"
+    subnet_id: 2
+    trust_level: trusted
+    machines:
+      pro-dev:
+        description: "Development workstation"
+        type: lxc
+        ip: "10.100.2.10"
+        roles:
+          - base_system
+
+  perso:
+    description: "Personal domain"
+    subnet_id: 1
+    trust_level: semi-trusted
+    machines:
+      perso-desktop:
+        description: "Personal desktop"
+        type: lxc
+        ip: "10.100.1.10"
+        roles:
+          - base_system
+
+# Allow pro and perso domains to access CUPS via IPP (port 631).
+# After `make apply`, run:
+#   make apply-print I=sys-print
+# to install CUPS, then add printers:
+#   scripts/sys-print.sh add-usb sys-print --vendor 04b8 --product 0005
+#   scripts/sys-print.sh add-network sys-print --nic-parent enp3s0
+network_policies:
+  - description: "Pro domain prints via CUPS"
+    from: pro
+    to: print-service
+    ports: [631]
+    protocol: tcp
+
+  - description: "Perso domain prints via CUPS"
+    from: perso
+    to: print-service
+    ports: [631]
+    protocol: tcp
