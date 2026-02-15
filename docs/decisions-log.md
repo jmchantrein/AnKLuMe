@@ -406,3 +406,83 @@ pytest-bdd has ~1.5k GitHub stars and active maintenance. Adding
 separate runner configuration needed.
 
 **Status**: pending review
+
+---
+
+## D-054: Dashboard uses stdlib http.server, no Flask
+
+**Problem**: Phase 21 requires a web dashboard. The ROADMAP mentions
+Flask/FastAPI + htmx. Need to decide on the framework.
+
+**Choice**: Use Python's `http.server` (stdlib) with htmx loaded from
+CDN. No Flask or FastAPI dependency.
+
+**Alternatives considered**:
+(a) Flask — adds a pip dependency for what is essentially a read-only
+status page with a few JSON endpoints. Flask would be warranted for a
+multi-page app with forms and authentication, but the dashboard is
+read-only and has 4 endpoints.
+(b) FastAPI — even heavier (requires uvicorn + pydantic), overkill
+for this use case.
+(c) Streamlit — heavy dependency, not suitable for deployment.
+
+**Rationale**: The dashboard is a single-file script with 4 endpoints.
+stdlib `http.server` handles this trivially. htmx (loaded from CDN)
+provides reactive auto-refresh without writing JavaScript. No pip
+install needed to run the dashboard. This follows the project's
+principle of minimizing external dependencies.
+
+**Status**: pending review
+
+---
+
+## D-055: Clipboard bridging via incus file push/pull
+
+**Problem**: Phase 21 requires controlled clipboard sharing between
+host and containers. Need to decide the transport mechanism.
+
+**Choice**: Use `incus file push/pull` to transfer clipboard content
+to/from `/tmp/anklume-clipboard` in containers. Host-side clipboard
+access via `wl-copy`/`wl-paste` (Wayland) or `xclip`/`xsel` (X11)
+with auto-detection.
+
+**Alternatives considered**:
+(a) MCP clipboard tools (Phase 20c) — requires MCP server running in
+the container, adds setup complexity for a simple copy/paste.
+(b) Custom Wayland protocol integration — complex, non-portable,
+requires understanding Wayland compositor internals.
+(c) Shared volume mount — requires instance restart, breaks isolation
+model.
+
+**Rationale**: `incus file push/pull` works out of the box with any
+container, requires no setup, no running daemon, and no network access.
+It's the simplest mechanism that preserves the explicit-action security
+model. Compatible with MCP clipboard tools (same file path).
+
+**Status**: pending review
+
+---
+
+## D-056: Desktop config as Python generator, not static configs
+
+**Problem**: Phase 21 requires desktop environment integration for
+Sway, foot terminal, and .desktop entries. Need to decide between
+static config files or a generator script.
+
+**Choice**: A generator script (`scripts/desktop_config.py`) that reads
+`infra.yml` and outputs environment-specific configs. Generates Sway
+rules, foot profiles, and .desktop files into a `desktop/` directory.
+
+**Alternatives considered**:
+(a) Static config files — would not adapt to user's infra.yml, require
+manual editing per deployment.
+(b) Ansible role — overkill for generating a few text files, and desktop
+config is host-side (not container-side).
+(c) Template files — would need a separate rendering step.
+
+**Rationale**: The generator reads trust levels and machine names from
+infra.yml, ensuring desktop configs always match the actual infrastructure.
+Output to `desktop/` (gitignored) lets users copy what they need. Same
+pattern as `scripts/console.py` (reads infra.yml, generates output).
+
+**Status**: pending review

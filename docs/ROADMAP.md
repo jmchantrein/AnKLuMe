@@ -1204,7 +1204,7 @@ print management.
 
 ---
 
-## Phase 21: Desktop Integration (optional)
+## Phase 21: Desktop Integration ✅ COMPLETE
 
 **Goal**: Visual desktop integration for users running AnKLuMe on
 a workstation with a graphical environment.
@@ -1213,25 +1213,31 @@ a workstation with a graphical environment.
 
 **Deliverables**:
 - **Terminal background coloring**: per-domain colors via tmux
-  server-side pane styles. Colors controlled by the host (not the
-  container) — same security model as QubesOS dom0 borders.
-- **Wayland clipboard forwarding**: controlled clipboard sharing
-  between domains via MCP tools (`clipboard_get`, `clipboard_set`)
-  over proxy devices. Requires explicit user action (no auto-sync).
-- **Desktop environment hints**: integration scripts for Sway
-  (`app_id` matching), KDE Plasma, and GNOME to color window
-  borders by domain. Uses `incus exec` wrapper that sets
-  environment variables before launching GUI apps.
-- **Web dashboard** (future): Flask/FastAPI + htmx for visual
-  domain status, network policies, GPU allocation, instance
-  management. Read-only by default, admin actions require
-  confirmation.
+  server-side pane styles (Phase 19a). Colors controlled by the host
+  (not the container) — same security model as QubesOS dom0 borders.
+- **Clipboard forwarding**: controlled clipboard sharing between host
+  and containers via `scripts/clipboard.sh`. Uses `incus file push/pull`
+  with `wl-copy`/`wl-paste` (Wayland) or `xclip`/`xsel` (X11).
+  Requires explicit user action (no auto-sync).
+- **Domain-exec wrapper**: `scripts/domain-exec.sh` launches commands
+  with `ANKLUME_DOMAIN`, `ANKLUME_TRUST_LEVEL` environment variables.
+  `--terminal` mode opens a colored terminal window (foot, alacritty,
+  xterm).
+- **Desktop environment config generator**: `scripts/desktop_config.py`
+  reads `infra.yml` and generates Sway/i3 window rules, foot terminal
+  profiles, and `.desktop` entry files.
+- **Web dashboard**: `scripts/dashboard.py` — read-only web dashboard
+  using stdlib `http.server` + htmx (CDN). Shows live instance status,
+  networks, and network policies with auto-refresh.
+- **Documentation**: `docs/desktop-integration.md` + French translation.
+- **Tests**: `tests/test_desktop.py` — 14 tests covering desktop-config
+  generator, dashboard rendering, and script argument parsing.
 
 **Validation criteria**:
-- [ ] tmux pane colors reflect domain trust level
-- [ ] Clipboard transfer requires explicit action
-- [ ] At least one desktop environment integration works
-- [ ] Web dashboard shows live infrastructure state
+- [x] tmux pane colors reflect domain trust level (Phase 19a)
+- [x] Clipboard transfer requires explicit action
+- [x] At least one desktop environment integration works (Sway)
+- [x] Web dashboard shows live infrastructure state
 
 ---
 
@@ -1449,10 +1455,10 @@ def check_isolation(sandbox):
 - Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
 - Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
 - Phase 20: Native Incus Features and QubesOS Parity (20a-20e)
+- Phase 21: Desktop Integration (clipboard, Sway, dashboard)
 
 **Next**:
-- Phase 21: Desktop Integration (optional)
-- Phase 22: End-to-End Scenario Testing (BDD)
+- Phase 22: End-to-End Scenario Testing (BDD) — in progress
 
 **Deployed infrastructure**:
 
