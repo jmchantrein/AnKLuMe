@@ -1,0 +1,49 @@
+# Pitfall database for AnKLuMe scenario testing.
+# Maps bad-practice scenarios to guide.sh steps and warning messages.
+# Used by scripts/guide.sh to display proactive warnings.
+---
+pitfalls:
+  - id: apply-without-sync
+    scenario: bad_practices/apply_without_sync.feature
+    guide_step: 6
+    warning: >
+      Always run 'make sync' before 'make apply'. Without generated
+      inventory files, Ansible has no hosts to configure.
+    check: |
+      test -d inventory && ls inventory/*.yml >/dev/null 2>&1
+
+  - id: duplicate-ips
+    scenario: bad_practices/duplicate_ips.feature
+    guide_step: 3
+    warning: >
+      Each machine IP must be globally unique across all domains.
+      The generator will reject duplicate IPs at 'make sync' time.
+
+  - id: flush-without-force
+    scenario: bad_practices/delete_protected_instance.feature
+    guide_step: 6
+    warning: >
+      Protected instances (ephemeral: false) require FORCE=true to
+      flush on production systems. This prevents accidental data loss.
+
+  - id: edit-managed-sections
+    scenario: bad_practices/edit_managed_sections.feature
+    guide_step: 3
+    warning: >
+      Content between '=== MANAGED ===' markers is overwritten by
+      'make sync'. Add your customizations BELOW the managed section.
+
+  - id: forget-nftables-deploy
+    scenario: bad_practices/forget_nftables_deploy.feature
+    guide_step: 6
+    warning: >
+      After adding a new domain, regenerate and deploy nftables rules
+      with 'make nftables && make nftables-deploy' to ensure network
+      isolation for the new bridge.
+
+  - id: wrong-operation-order
+    scenario: bad_practices/wrong_operation_order.feature
+    guide_step: 4
+    warning: >
+      Follow the workflow: edit infra.yml -> make sync -> make lint ->
+      make apply. Skipping 'make sync' means Ansible files are stale.
