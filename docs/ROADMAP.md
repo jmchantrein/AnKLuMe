@@ -1235,6 +1235,196 @@ a workstation with a graphical environment.
 
 ---
 
+## Phase 22: End-to-End Scenario Testing (BDD)
+
+**Goal**: Human-readable acceptance scenarios testing complete user
+workflows against real Incus infrastructure, covering both best
+practices and failure modes. Scenarios feed back into the interactive
+guide (Phase 18c) to steer users toward correct usage.
+
+**Prerequisites**: Phase 12 (sandbox), Phase 18c (guide).
+
+**Principles**:
+- **On-demand only** — not in CI, launched explicitly by the developer
+  via `make scenario-test`. Long execution time is acceptable (sandbox
+  runs independently).
+- **Gherkin format** — `.feature` files using `Given/When/Then` syntax,
+  readable by non-developers. Runner: `pytest-bdd`.
+- **Two scenario categories**:
+  - **Best practices**: validate recommended workflows, serve as living
+    documentation of how to use AnKLuMe correctly.
+  - **Bad practices**: verify that AnKLuMe catches mistakes early with
+    clear error messages and guides the user toward the correct approach.
+    No silent failures, no partial state left behind.
+- **Latency-optimized**: scenarios pre-cache images at the start via
+  the shared image repository (Phase 18e), reuse infrastructure across
+  steps within a scenario.
+- **Guide feedback loop**: pitfalls discovered by bad-practice scenarios
+  feed back into `scripts/guide.sh` as proactive warnings at the
+  relevant step.
+
+**Architecture**:
+```
+scenarios/                          # Gherkin feature files
+├── best_practices/
+│   ├── pro_workstation_setup.feature
+│   ├── student_lab_deploy.feature
+│   ├── snapshot_restore_cycle.feature
+│   ├── network_isolation_verify.feature
+│   └── golden_image_workflow.feature
+├── bad_practices/
+│   ├── apply_without_sync.feature
+│   ├── duplicate_ips.feature
+│   ├── delete_protected_instance.feature
+│   ├── invalid_network_policy.feature
+│   └── wrong_operation_order.feature
+└── conftest.py                     # Step definitions + fixtures
+
+scripts/guide.sh                    # Enhanced with pitfall warnings
+                                    # sourced from bad_practice scenarios
+```
+
+**Example scenarios**:
+
+```gherkin
+# scenarios/best_practices/pro_workstation_setup.feature
+Feature: Pro workstation setup
+  An admin deploys a pro/perso infrastructure with network isolation
+
+  Background:
+    Given a clean sandbox environment
+    And images are pre-cached via shared repository
+
+  Scenario: Full deployment with isolation verified
+    Given infra.yml from "examples/pro-workstation.infra.yml"
+    When I run "make sync"
+    Then exit code is 0
+    And inventory files exist for all domains
+
+    When I run "make apply"
+    Then all declared instances are running
+    And each instance has the correct static IP
+
+    Then intra-domain connectivity works
+    But inter-domain connectivity is blocked
+    And internet access works from all instances
+
+  Scenario: Snapshot and restore round-trip
+    Given a running pro-workstation infrastructure
+    When I create snapshot "before-change" on "pro-dev"
+    And I modify a file inside "pro-dev"
+    And I restore snapshot "before-change" on "pro-dev"
+    Then the file modification is reverted
+```
+
+```gherkin
+# scenarios/bad_practices/apply_without_sync.feature
+Feature: Apply without sync
+  AnKLuMe must detect and guide the user when steps are skipped
+
+  Scenario: No inventory files exist
+    Given infra.yml exists but no inventory files
+    When I run "make apply"
+    Then exit code is non-zero
+    And stderr contains guidance to run "make sync" first
+    And no Incus resources were created
+
+  Scenario: Stale inventory after infra.yml change
+    Given a deployed infrastructure
+    When I add a new domain to infra.yml without running sync
+    And I run "make apply"
+    Then the new domain is not deployed
+    And output warns about potential drift
+```
+
+**Deliverables**:
+
+a) **Scenario files** (`scenarios/`):
+   - 5+ best-practice scenarios covering key user workflows:
+     pro workstation, student lab, snapshot cycle, network isolation,
+     golden images, MCP services, disposable instances
+   - 5+ bad-practice scenarios covering common mistakes:
+     apply without sync, duplicate IPs/subnets, delete protected
+     resources, invalid network policies, wrong operation order,
+     missing prerequisites, editing managed sections, forgetting
+     nftables-deploy after adding domain, flush without FORCE on
+     production
+   - Each scenario is self-contained and idempotent
+   - Scenarios annotated with behavior matrix IDs (`# Matrix: XX-NNN`)
+     to increase matrix coverage via E2E paths
+
+b) **Test runner** (`scenarios/conftest.py`):
+   - pytest-bdd step definitions for common steps (`Given`, `When`, `Then`)
+   - Fixtures for sandbox lifecycle (create/destroy)
+   - Image pre-caching at session start
+   - Structured logging of failures (JSON report)
+   - Timeout handling for long operations
+
+c) **Guide integration** (`scripts/guide.sh`):
+   - Each bad-practice scenario that reveals a pitfall adds a
+     corresponding check/warning in the guide at the relevant step
+   - Example: "apply without sync" → guide step 6 checks for
+     inventory files before running apply
+   - Pitfall database: `scenarios/pitfalls.yml` maps scenarios to
+     guide steps and warning messages
+
+d) **Makefile targets**:
+   ```makefile
+   scenario-test:        ## Run all E2E scenarios in sandbox (slow, on-demand)
+   scenario-test-best:   ## Run best-practice scenarios only
+   scenario-test-bad:    ## Run bad-practice scenarios only
+   scenario-list:        ## List all available scenarios
+   ```
+
+e) **Documentation**:
+   - `docs/scenario-testing.md` — how to write and run scenarios
+   - `docs/scenario-testing_FR.md` — French translation
+   - Best-practice scenarios referenced from user-facing docs
+
+**Dependencies**: `pip install pytest-bdd`
+
+**Step definitions pattern**:
+```python
+# scenarios/conftest.py
+from pytest_bdd import given, when, then, scenarios
+import subprocess
+
+@given("a clean sandbox environment")
+def clean_sandbox(sandbox):
+    sandbox.reset()
+
+@given('infra.yml from "<example>"')
+def load_infra(sandbox, example):
+    sandbox.copy_infra(f"examples/{example}")
+
+@when('I run "<command>"')
+def run_command(sandbox, command):
+    sandbox.last_result = sandbox.exec(command)
+
+@then("exit code is 0")
+def check_success(sandbox):
+    assert sandbox.last_result.returncode == 0
+
+@then("inter-domain connectivity is blocked")
+def check_isolation(sandbox):
+    for src, dst in sandbox.cross_domain_pairs():
+        result = sandbox.exec(
+            f"incus exec {src} -- ping -c1 -W1 {dst.ip}"
+        )
+        assert result.returncode != 0, f"{src} can reach {dst}"
+```
+
+**Validation criteria**:
+- [ ] `make scenario-test` runs all scenarios in sandbox
+- [ ] Best-practice scenarios pass on clean deployment
+- [ ] Bad-practice scenarios verify error detection and guidance
+- [ ] Guide enhanced with pitfall warnings from bad-practice scenarios
+- [ ] Failure reports logged in structured format for debugging
+- [ ] Scenarios use pre-cached images (no redundant downloads)
+- [ ] Scenarios annotated with behavior matrix IDs where applicable
+
+---
+
 ## Current State
 
 **Completed**:
@@ -1257,11 +1447,12 @@ a workstation with a graphical environment.
 - Phase 16: Security policy, network policies, bootstrap, AI tools domain
 - Phase 17: CI/CD pipeline + complete Molecule test coverage (18/18 roles)
 - Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
+- Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
+- Phase 20: Native Incus Features and QubesOS Parity (20a-20e)
 
 **Next**:
-- Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
-- Phase 20: Native Incus Features and QubesOS Parity
 - Phase 21: Desktop Integration (optional)
+- Phase 22: End-to-End Scenario Testing (BDD)
 
 **Deployed infrastructure**:
 
