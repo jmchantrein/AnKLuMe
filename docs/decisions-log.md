@@ -359,7 +359,7 @@ acceptable — AnKLuMe already requires pip packages (pyyaml, pytest,
 libtmux). The stdio transport maps naturally to `incus exec` and Incus
 proxy devices.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -383,5 +383,26 @@ as shell scripts, declarative infrastructure as Ansible roles. Config files
 are pushed via `incus file push` from heredocs or printf, avoiding nested
 quoting issues. The `find_project()` pattern with stdin-piped JSON ensures
 safe parameter passing (heredoc + sys.argv pattern from D-036).
+
+**Status**: validated
+
+---
+
+## D-053: pytest-bdd over behave for scenario testing
+
+**Problem**: Phase 22 requires a BDD framework for Gherkin `.feature`
+files. The two main Python options are pytest-bdd and behave.
+
+**Choice**: Use pytest-bdd. Alternatives considered:
+(a) behave — rejected (separate test runner, no pytest integration,
+cannot reuse existing pytest fixtures and configuration),
+(b) Custom parser — rejected (reinventing the wheel).
+
+**Rationale**: pytest-bdd integrates natively with the existing pytest
+infrastructure (fixtures, markers, conftest.py, CLI options). Scenarios
+can share the same `python3 -m pytest` runner used for generator tests.
+pytest-bdd has ~1.5k GitHub stars and active maintenance. Adding
+"scenarios" to `testpaths` in pyproject.toml is sufficient — no
+separate runner configuration needed.
 
 **Status**: pending review
