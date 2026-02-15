@@ -8,6 +8,9 @@ from pathlib import Path
 
 import yaml
 
+# Known MCP tool names (must match scripts/mcp-server.py TOOLS list)
+_KNOWN_MCP_TOOLS = {"gpg_sign", "clipboard_get", "clipboard_set", "file_accept", "file_provide"}
+
 MANAGED_BEGIN = "# === MANAGED BY infra.yml ==="
 MANAGED_END = "# === END MANAGED ==="
 MANAGED_NOTICE = "# Do not edit this section — it will be overwritten by `make sync`"
@@ -220,6 +223,42 @@ def validate(infra):
             for p in machine.get("profiles") or []:
                 if p != "default" and p not in domain_profile_names:
                     errors.append(f"Machine '{mname}': profile '{p}' not defined in domain '{dname}'")
+
+            # Validate services declarations (Phase 20c MCP) — name/tool checks
+            svc_names_seen = set()
+            for svc in machine.get("services") or []:
+                if not isinstance(svc, dict):
+                    errors.append(f"Machine '{mname}': each service must be a mapping")
+                    continue
+                svc_name = svc.get("name")
+                if not svc_name:
+                    errors.append(f"Machine '{mname}': service missing 'name'")
+                elif svc_name in svc_names_seen:
+                    errors.append(f"Machine '{mname}': duplicate service name '{svc_name}'")
+                else:
+                    svc_names_seen.add(svc_name)
+                svc_tool = svc.get("tool")
+                if not svc_tool:
+                    errors.append(f"Machine '{mname}': service '{svc_name}' missing 'tool'")
+                elif svc_tool not in _KNOWN_MCP_TOOLS:
+                    errors.append(
+                        f"Machine '{mname}': service '{svc_name}' references unknown "
+                        f"tool '{svc_tool}'. Known tools: {', '.join(sorted(_KNOWN_MCP_TOOLS))}"
+                    )
+
+    # Services consumer validation (second pass — all machines now known)
+    for _dname, domain in domains.items():
+        for mname, machine in (domain.get("machines") or {}).items():
+            for svc in machine.get("services") or []:
+                if not isinstance(svc, dict):
+                    continue
+                svc_name = svc.get("name", "")
+                for consumer in svc.get("consumers") or []:
+                    if consumer not in all_machines:
+                        errors.append(
+                            f"Machine '{mname}': service '{svc_name}' consumer "
+                            f"'{consumer}' is not a known machine"
+                        )
 
     # GPU policy enforcement (ADR-018)
     if len(gpu_instances) > 1 and gpu_policy == "exclusive":
@@ -530,6 +569,7 @@ def generate(infra, base_dir, dry_run=False):
                 "instance_config": m.get("config"),
                 "instance_devices": m.get("devices"),
                 "instance_storage_volumes": m.get("storage_volumes"),
+                "instance_services": m.get("services"),
                 "instance_roles": m.get("roles"),
             }.items() if v is not None}
             fp, _ = _write_managed(base / "host_vars" / f"{mname}.yml", hvars, dry_run)
