@@ -268,6 +268,26 @@ golden-publish: ## Publish golden image as Incus image (TEMPLATE=<name> ALIAS=<a
 golden-list: ## List golden images (instances with 'pristine' snapshot)
 	@scripts/golden.sh list $(if $(PROJECT),--project $(PROJECT))
 
+# ── MCP Services (Phase 20c) ──────────────────────────────
+mcp-list: ## List MCP tools available on an instance (I=<instance>)
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make mcp-list I=<instance>"; exit 1; }
+	python3 scripts/mcp-client.py --instance $(I) $(if $(PROJECT),-p $(PROJECT)) list
+
+mcp-call: ## Call an MCP tool on an instance (I=<instance> TOOL=<name> ARGS='{}')
+	@test -n "$(I)" || { echo "ERROR: I required."; exit 1; }
+	@test -n "$(TOOL)" || { echo "ERROR: TOOL required."; exit 1; }
+	python3 scripts/mcp-client.py --instance $(I) $(if $(PROJECT),-p $(PROJECT)) call $(TOOL) $(if $(ARGS),'$(ARGS)')
+
+# ── Tor Gateway (Phase 20e) ────────────────────────────────
+apply-tor: ## Setup Tor transparent proxy in container (I=<instance> [PROJECT=<project>])
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make apply-tor I=<instance>"; exit 1; }
+	scripts/tor-gateway.sh setup $(I) $(if $(PROJECT),--project $(PROJECT))
+
+# ── Print Service (Phase 20e) ─────────────────────────────
+apply-print: ## Setup CUPS print service in container (I=<instance> [PROJECT=<project>])
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make apply-print I=<instance>"; exit 1; }
+	scripts/sys-print.sh setup $(I) $(if $(PROJECT),--project $(PROJECT))
+
 # ── Lifecycle ─────────────────────────────────────────────
 flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
 	@scripts/flush.sh $(if $(FORCE),--force)
@@ -336,5 +356,7 @@ help: ## Show this help
         file-copy backup restore-backup \
         disp \
         golden-create golden-derive golden-publish golden-list \
+        mcp-list mcp-call \
+        apply-tor apply-print \
         dead-code call-graph dep-graph code-graph \
         guide quickstart init install-hooks help
