@@ -1152,10 +1152,10 @@ container-work                host              container-vault
 **Dependencies**: `pip install mcp` (Python SDK)
 
 **Validation criteria**:
-- [ ] MCP server runs in container, accessible via proxy device
-- [ ] MCP client in another container can call tools
-- [ ] Policy engine blocks unauthorized access
-- [ ] AI agents can interact with container services via MCP
+- [x] MCP server runs in container, accessible via proxy device
+- [x] MCP client in another container can call tools
+- [x] Policy engine blocks unauthorized access
+- [x] AI agents can interact with container services via MCP
 
 ### Phase 20d: File Transfer and Backup
 
@@ -1197,10 +1197,10 @@ print management.
 - `make apply-print` and `make apply-tor` targets.
 
 **Validation criteria**:
-- [ ] Tor gateway routes traffic transparently
-- [ ] CUPS container serves USB and network printers
-- [ ] Network policies control which domains can print
-- [ ] Other domains cannot access the physical LAN directly
+- [x] Tor gateway routes traffic transparently
+- [x] CUPS container serves USB and network printers
+- [x] Network policies control which domains can print
+- [x] Other domains cannot access the physical LAN directly
 
 ---
 

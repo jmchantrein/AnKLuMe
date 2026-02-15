@@ -329,3 +329,60 @@ external cleanup needed. Reading the default image from `infra.yml`
 keeps the PSOT model consistent.
 
 **Status**: validated
+
+---
+
+## D-051: MCP over stdio — no external SDK dependency
+
+**Problem**: Phase 20c requires MCP inter-container services. The `mcp`
+Python SDK adds an external dependency with its own async runtime
+(anyio/httpx). Need to decide between SDK usage and direct JSON-RPC
+implementation.
+
+**Choice**: Implement the MCP protocol directly using stdlib JSON and
+stdin/stdout. The server processes JSON-RPC 2.0 messages line-by-line,
+supporting only `initialize`, `tools/list`, and `tools/call`. The client
+spawns the server as a subprocess (via `incus exec` for remote
+containers) and exchanges messages over pipes.
+
+**Alternatives considered**:
+(a) Use `mcp` Python SDK — rejected (adds external dependency with
+async runtime, violates ADR-010 spirit of minimal dependencies in
+scripts, overkill for 3 JSON-RPC methods).
+(b) Custom Unix socket server — rejected (requires socket management,
+daemon lifecycle; stdio is simpler and maps directly to `incus exec`).
+(c) HTTP REST API — rejected (requires network access between domains,
+conflicts with nftables isolation).
+
+**Rationale**: The MCP protocol over stdio is a trivial JSON-RPC
+exchange. Three methods, line-delimited JSON, no framing complexity.
+stdlib-only implementation keeps scripts self-contained (ADR-010),
+works without pip install, and the stdio transport maps naturally to
+both `incus exec` (subprocess) and Incus proxy devices (Unix socket).
+
+**Status**: pending review
+
+---
+
+## D-052: Tor + CUPS as shell scripts, not Ansible roles
+
+**Problem**: Phase 20e requires Tor gateway and CUPS container setup.
+Need to decide between Ansible roles and shell scripts.
+
+**Choice**: Implement as standalone shell scripts (`scripts/tor-gateway.sh`,
+`scripts/sys-print.sh`) wrapping `incus exec` commands. Same approach as
+Phase 20a-d scripts (disp.sh, golden.sh, transfer.sh).
+
+**Alternatives considered**:
+(a) Ansible roles — rejected (these are one-shot setup operations, not
+declarative reconciliation; same rationale as ADR-013).
+(b) Python scripts — rejected (shell wrapping CLI commands is simpler,
+matches existing precedent).
+
+**Rationale**: Consistency with the Phase 20 pattern: imperative operations
+as shell scripts, declarative infrastructure as Ansible roles. Config files
+are pushed via `incus file push` from heredocs or printf, avoiding nested
+quoting issues. The `find_project()` pattern with stdin-piped JSON ensures
+safe parameter passing (heredoc + sys.argv pattern from D-036).
+
+**Status**: pending review
