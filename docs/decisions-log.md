@@ -332,33 +332,32 @@ keeps the PSOT model consistent.
 
 ---
 
-## D-051: MCP over stdio — no external SDK dependency
+## D-051: MCP via official SDK (FastMCP) over stdio
 
-**Problem**: Phase 20c requires MCP inter-container services. The `mcp`
-Python SDK adds an external dependency with its own async runtime
-(anyio/httpx). Need to decide between SDK usage and direct JSON-RPC
+**Problem**: Phase 20c requires MCP inter-container services. Need to
+decide between the official `mcp` Python SDK and a custom JSON-RPC
 implementation.
 
-**Choice**: Implement the MCP protocol directly using stdlib JSON and
-stdin/stdout. The server processes JSON-RPC 2.0 messages line-by-line,
-supporting only `initialize`, `tools/list`, and `tools/call`. The client
-spawns the server as a subprocess (via `incus exec` for remote
-containers) and exchanges messages over pipes.
+**Choice**: Use the official MCP Python SDK (`pip install mcp`) with
+FastMCP for the server and ClientSession for the client. Transport is
+stdio, mapping naturally to `incus exec` and Incus proxy devices.
 
 **Alternatives considered**:
-(a) Use `mcp` Python SDK — rejected (adds external dependency with
-async runtime, violates ADR-010 spirit of minimal dependencies in
-scripts, overkill for 3 JSON-RPC methods).
+(a) Custom stdlib-only JSON-RPC — rejected (maintainability concern:
+as MCP usage grows, a custom implementation becomes a liability; the
+official SDK handles protocol evolution, capability negotiation, and
+transport framing correctly).
 (b) Custom Unix socket server — rejected (requires socket management,
-daemon lifecycle; stdio is simpler and maps directly to `incus exec`).
+daemon lifecycle; stdio is simpler).
 (c) HTTP REST API — rejected (requires network access between domains,
 conflicts with nftables isolation).
 
-**Rationale**: The MCP protocol over stdio is a trivial JSON-RPC
-exchange. Three methods, line-delimited JSON, no framing complexity.
-stdlib-only implementation keeps scripts self-contained (ADR-010),
-works without pip install, and the stdio transport maps naturally to
-both `incus exec` (subprocess) and Incus proxy devices (Unix socket).
+**Rationale**: The official SDK provides correct protocol implementation,
+automatic capability discovery, type-safe tool definitions via decorators,
+and future-proofing as MCP evolves. The `pip install mcp` dependency is
+acceptable — AnKLuMe already requires pip packages (pyyaml, pytest,
+libtmux). The stdio transport maps naturally to `incus exec` and Incus
+proxy devices.
 
 **Status**: pending review
 
