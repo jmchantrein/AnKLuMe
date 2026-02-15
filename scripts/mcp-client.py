@@ -1,102 +1,72 @@
 #!/usr/bin/env python3
 """MCP client CLI for AnKLuMe inter-container services.
 
-Connects to an MCP server via stdin/stdout (JSON-RPC) and provides
+Connects to an MCP server using the official Python SDK and provides
 a CLI for listing and calling tools. Designed for use with
 `incus exec` or Incus proxy device Unix sockets.
 
-Uses stdlib only (no external MCP SDK dependency).
+Requires: pip install mcp
 
 See docs/mcp-services.md and ROADMAP.md Phase 20c.
 """
 
 import argparse
-import contextlib
+import asyncio
 import json
-import subprocess
 import sys
 
-# ── JSON-RPC helpers ─────────────────────────────────────────────
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+# ── Server connection ─────────────────────────────────────────────
 
 
-def _make_request(method, params=None, req_id=1):
-    msg = {"jsonrpc": "2.0", "method": method, "id": req_id}
-    if params:
-        msg["params"] = params
-    return msg
-
-
-def _send_receive(messages, server_cmd):
-    """Send JSON-RPC messages to a server process, return responses."""
-    input_data = "\n".join(json.dumps(m) for m in messages) + "\n"
-    result = subprocess.run(  # noqa: S603
-        server_cmd, input=input_data, capture_output=True, text=True, timeout=30,
-    )
-    responses = []
-    for line in result.stdout.strip().splitlines():
-        line = line.strip()
-        if line:
-            with contextlib.suppress(json.JSONDecodeError):
-                responses.append(json.loads(line))
-    return responses
-
-
-def _build_server_cmd(instance=None, project=None):
-    """Build the command to reach the MCP server."""
+def _build_server_params(instance=None, project=None):
+    """Build StdioServerParameters for the MCP server."""
     if instance:
-        cmd = ["incus", "exec"]
+        args = ["exec"]
         if project:
-            cmd += ["--project", project]
-        cmd += [instance, "--", "python3", "/opt/anklume/mcp-server.py"]
-        return cmd
-    return ["python3", "scripts/mcp-server.py"]
+            args += ["--project", project]
+        args += [instance, "--", "python3", "/opt/anklume/mcp-server.py"]
+        return StdioServerParameters(command="incus", args=args)
+    return StdioServerParameters(
+        command=sys.executable,
+        args=["scripts/mcp-server.py"],
+    )
 
 
 # ── Commands ─────────────────────────────────────────────────────
 
 
-def cmd_list(args):
+async def _cmd_list(args):
     """List available MCP tools."""
-    server_cmd = _build_server_cmd(args.instance, args.project)
-    messages = [
-        _make_request("initialize", req_id=1),
-        _make_request("tools/list", req_id=2),
-    ]
+    server_params = _build_server_params(args.instance, args.project)
 
     if args.dry_run:
-        print("Would send to server:")
-        for m in messages:
-            print(f"  {json.dumps(m)}")
+        print("Would connect to MCP server:")
+        print(f"  command: {server_params.command}")
+        print(f"  args: {list(server_params.args)}")
+        print("  action: tools/list")
         return 0
 
     try:
-        responses = _send_receive(messages, server_cmd)
-    except FileNotFoundError:
-        print("ERROR: Cannot reach MCP server. Is the instance running?", file=sys.stderr)
-        return 1
-    except subprocess.TimeoutExpired:
-        print("ERROR: MCP server timed out.", file=sys.stderr)
-        return 1
-
-    for resp in responses:
-        if resp.get("id") == 2:
-            result = resp.get("result", {})
-            tools = result.get("tools", [])
+        async with stdio_client(server_params) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.list_tools()
+            tools = result.tools
             if not tools:
                 print("No tools available.")
                 return 0
             print("Available MCP tools:")
             for tool in tools:
-                name = tool.get("name", "?")
-                desc = tool.get("description", "")
-                print(f"  {name:<20s} {desc}")
+                print(f"  {tool.name:<20s} {tool.description or ''}")
             return 0
+    except Exception as exc:
+        print(f"ERROR: Cannot reach MCP server: {exc}", file=sys.stderr)
+        return 1
 
-    print("ERROR: No tools/list response received.", file=sys.stderr)
-    return 1
 
-
-def cmd_call(args):
+async def _cmd_call(args):
     """Call an MCP tool."""
     tool_name = args.tool_name
     try:
@@ -105,41 +75,29 @@ def cmd_call(args):
         print(f"ERROR: Invalid JSON arguments: {exc}", file=sys.stderr)
         return 1
 
-    server_cmd = _build_server_cmd(args.instance, args.project)
-    messages = [
-        _make_request("initialize", req_id=1),
-        _make_request("tools/call", {"name": tool_name, "arguments": arguments}, req_id=2),
-    ]
+    server_params = _build_server_params(args.instance, args.project)
 
     if args.dry_run:
-        print("Would send to server:")
-        for m in messages:
-            print(f"  {json.dumps(m)}")
+        print("Would connect to MCP server:")
+        print(f"  command: {server_params.command}")
+        print(f"  args: {list(server_params.args)}")
+        print(f"  action: tools/call {tool_name}")
+        print(f"  arguments: {json.dumps(arguments)}")
         return 0
 
     try:
-        responses = _send_receive(messages, server_cmd)
-    except FileNotFoundError:
-        print("ERROR: Cannot reach MCP server. Is the instance running?", file=sys.stderr)
-        return 1
-    except subprocess.TimeoutExpired:
-        print("ERROR: MCP server timed out.", file=sys.stderr)
+        async with stdio_client(server_params) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(tool_name, arguments)
+            for content in result.content:
+                print(content.text if hasattr(content, "text") else str(content))
+            return 1 if result.isError else 0
+    except Exception as exc:
+        print(f"ERROR: Cannot reach MCP server: {exc}", file=sys.stderr)
         return 1
 
-    for resp in responses:
-        if resp.get("id") == 2:
-            if "error" in resp:
-                err = resp["error"]
-                print(f"ERROR: {err.get('message', 'Unknown error')}", file=sys.stderr)
-                return 1
-            result = resp.get("result", {})
-            is_error = result.get("isError", False)
-            for content in result.get("content", []):
-                print(content.get("text", ""))
-            return 1 if is_error else 0
 
-    print("ERROR: No tools/call response received.", file=sys.stderr)
-    return 1
+# ── Entry point ───────────────────────────────────────────────────
 
 
 def main():
@@ -165,9 +123,9 @@ def main():
         return 0
 
     if args.command == "list":
-        return cmd_list(args)
+        return asyncio.run(_cmd_list(args))
     if args.command == "call":
-        return cmd_call(args)
+        return asyncio.run(_cmd_call(args))
     return 0
 
 

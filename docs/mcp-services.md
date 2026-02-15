@@ -108,14 +108,14 @@ The PSOT generator validates service declarations:
 
 ## Implementation details
 
-### Why not the `mcp` Python SDK
+### Why the official `mcp` Python SDK
 
-The MCP protocol over stdio is a simple JSON-RPC exchange. The Python
-`mcp` SDK adds an external dependency with its own async runtime. Since
-AnKLuMe only uses `initialize`, `tools/list`, and `tools/call` (no
-prompts, resources, or sampling), implementing the protocol directly
-with stdlib JSON is simpler, has zero dependencies, and keeps the
-codebase consistent with ADR-010 (no external dependencies in scripts).
+AnKLuMe uses the official MCP Python SDK (`pip install mcp`) with the
+FastMCP server framework and ClientSession client. This provides correct
+protocol implementation, automatic capability negotiation, type-safe
+tool definitions via decorators, and future-proofing as the MCP protocol
+evolves. The dependency is acceptable — AnKLuMe already requires pip
+packages (pyyaml, pytest, libtmux).
 
 ### Transport
 
