@@ -50,6 +50,25 @@ telemetry-report: ## Terminal charts of usage patterns
 console: ## Launch tmux console with domain-colored panes
 	python3 scripts/console.py $(if $(KILL),--kill) $(if $(DRY_RUN),--dry-run)
 
+# ── Desktop Integration (Phase 21) ──────────────────────
+clipboard-to: ## Copy host clipboard INTO container (I=<instance> [PROJECT=<p>])
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make clipboard-to I=<instance>"; exit 1; }
+	scripts/clipboard.sh copy-to $(I) $(if $(PROJECT),--project $(PROJECT))
+
+clipboard-from: ## Copy container clipboard TO host (I=<instance> [PROJECT=<p>])
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make clipboard-from I=<instance>"; exit 1; }
+	scripts/clipboard.sh copy-from $(I) $(if $(PROJECT),--project $(PROJECT))
+
+domain-exec: ## Open terminal to instance with domain colors (I=<instance>)
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make domain-exec I=<instance>"; exit 1; }
+	scripts/domain-exec.sh $(I) $(if $(PROJECT),--project $(PROJECT)) $(if $(TERMINAL),--terminal)
+
+desktop-config: ## Generate desktop environment config from infra.yml
+	python3 scripts/desktop_config.py $(if $(SWAY),--sway) $(if $(FOOT),--foot) $(if $(DESKTOP),--desktop)
+
+dashboard: ## Launch web dashboard (PORT=8888)
+	python3 scripts/dashboard.py --port $(or $(PORT),8888) $(if $(HOST),--host $(HOST))
+
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
 
@@ -374,4 +393,5 @@ help: ## Show this help
         apply-tor apply-print \
         dead-code call-graph dep-graph code-graph \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
+        clipboard-to clipboard-from domain-exec desktop-config dashboard \
         guide quickstart init install-hooks help
