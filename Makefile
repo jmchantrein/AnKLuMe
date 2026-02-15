@@ -166,6 +166,20 @@ runner-create: ## Create the AnKLuMe runner container
 runner-destroy: ## Destroy the AnKLuMe runner container
 	@scripts/run-tests.sh destroy
 
+# ── Scenario Testing (Phase 22) ──────────────────────────
+scenario-test: ## Run all E2E scenarios in sandbox (slow, on-demand)
+	python3 -m pytest scenarios/ -v --tb=long
+
+scenario-test-best: ## Run best-practice scenarios only
+	python3 -m pytest scenarios/best_practices/ -v --tb=long
+
+scenario-test-bad: ## Run bad-practice scenarios only
+	python3 -m pytest scenarios/bad_practices/ -v --tb=long
+
+scenario-list: ## List all available scenarios
+	@echo "Best practices:"; grep -rh "Scenario:" scenarios/best_practices/ 2>/dev/null | sed 's/^/  /'; \
+	echo ""; echo "Bad practices:"; grep -rh "Scenario:" scenarios/bad_practices/ 2>/dev/null | sed 's/^/  /'
+
 # ── Behavior Matrix (Phase 18b) ──────────────────────────
 matrix-coverage: ## Show behavior matrix test coverage
 	python3 scripts/matrix-coverage.py
@@ -359,4 +373,5 @@ help: ## Show this help
         mcp-list mcp-call \
         apply-tor apply-print \
         dead-code call-graph dep-graph code-graph \
+        scenario-test scenario-test-best scenario-test-bad scenario-list \
         guide quickstart init install-hooks help
