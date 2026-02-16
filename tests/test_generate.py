@@ -1944,3 +1944,118 @@ class TestSnapshotsSchedule:
         content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
         assert "instance_snapshots_schedule" in content
         assert "instance_snapshots_expiry" in content
+
+
+class TestNestingPrefix:
+    """Tests for global.nesting_prefix opt-in feature."""
+
+    @pytest.fixture()
+    def sample_infra(self):
+        return {
+            "project_name": "test",
+            "global": {"base_subnet": "10.200", "default_os_image": "images:debian/13"},
+            "domains": {
+                "anklume": {
+                    "subnet_id": 0,
+                    "machines": {
+                        "anklume-instance": {"type": "lxc", "ip": "10.200.0.10"},
+                    },
+                },
+                "pro": {
+                    "subnet_id": 2,
+                    "machines": {
+                        "pro-dev": {"type": "lxc", "ip": "10.200.2.10"},
+                    },
+                },
+            },
+        }
+
+    def test_prefix_disabled_by_default(self, sample_infra, tmp_path):
+        """Without nesting_prefix, Incus names are unprefixed."""
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "incus_project: pro" in gv
+        assert "name: net-pro" in gv
+        hv = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        assert "instance_name: pro-dev" in hv
+
+    def test_prefix_false_no_effect(self, sample_infra, tmp_path):
+        """nesting_prefix: false has no effect (same as default)."""
+        sample_infra["global"]["nesting_prefix"] = False
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "incus_project: pro" in gv
+
+    def test_prefix_enabled(self, sample_infra, tmp_path, monkeypatch):
+        """nesting_prefix: true prefixes Incus names with nesting level."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr(
+            "generate._read_absolute_level", lambda: 1
+        )
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "incus_project: 001-pro" in gv
+        assert "name: 001-net-pro" in gv
+        hv = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        assert "instance_name: 001-pro-dev" in hv
+
+    def test_prefix_level_zero(self, sample_infra, tmp_path, monkeypatch):
+        """Level 0 produces 000- prefix."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr("generate._read_absolute_level", lambda: 0)
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "incus_project: 000-pro" in gv
+        assert "name: 000-net-pro" in gv
+
+    def test_prefix_level_two(self, sample_infra, tmp_path, monkeypatch):
+        """Level 2 produces 002- prefix."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr("generate._read_absolute_level", lambda: 2)
+        generate(sample_infra, tmp_path)
+        hv = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        assert "instance_name: 002-pro-dev" in hv
+
+    def test_prefix_default_level_when_file_absent(self, sample_infra, tmp_path, monkeypatch):
+        """When absolute_level file is absent, default level is 1."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr("generate._read_absolute_level", lambda: None)
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "incus_project: 001-pro" in gv
+
+    def test_prefix_does_not_change_file_paths(self, sample_infra, tmp_path, monkeypatch):
+        """File paths use unprefixed domain/machine names."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr("generate._read_absolute_level", lambda: 1)
+        generate(sample_infra, tmp_path)
+        # File paths remain unprefixed
+        assert (tmp_path / "inventory" / "pro.yml").exists()
+        assert (tmp_path / "group_vars" / "pro.yml").exists()
+        assert (tmp_path / "host_vars" / "pro-dev.yml").exists()
+        # No prefixed file paths created
+        assert not (tmp_path / "inventory" / "001-pro.yml").exists()
+        assert not (tmp_path / "group_vars" / "001-pro.yml").exists()
+
+    def test_prefix_does_not_change_domain_name(self, sample_infra, tmp_path, monkeypatch):
+        """domain_name in group_vars stays unprefixed (user-facing)."""
+        sample_infra["global"]["nesting_prefix"] = True
+        monkeypatch.setattr("generate._read_absolute_level", lambda: 1)
+        generate(sample_infra, tmp_path)
+        gv = (tmp_path / "group_vars" / "pro.yml").read_text()
+        assert "domain_name: pro" in gv
+
+    def test_prefix_validation_non_boolean(self, sample_infra):
+        """Non-boolean nesting_prefix triggers validation error."""
+        sample_infra["global"]["nesting_prefix"] = "yes"
+        errors = validate(sample_infra)
+        assert any("nesting_prefix must be a boolean" in e for e in errors)
+
+    def test_prefix_validation_boolean_ok(self, sample_infra):
+        """Boolean nesting_prefix passes validation."""
+        sample_infra["global"]["nesting_prefix"] = True
+        errors = validate(sample_infra)
+        assert not any("nesting_prefix" in e for e in errors)
+        sample_infra["global"]["nesting_prefix"] = False
+        errors = validate(sample_infra)
+        assert not any("nesting_prefix" in e for e in errors)
