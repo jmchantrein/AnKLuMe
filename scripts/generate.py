@@ -36,6 +36,29 @@ def _yaml(data):
     return yaml.dump(data, Dumper=_Dumper, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
+def _read_absolute_level():
+    """Read /etc/anklume/absolute_level context file. Returns int or None."""
+    try:
+        return int(Path("/etc/anklume/absolute_level").read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _get_nesting_prefix(infra):
+    """Compute nesting prefix string from infra config.
+
+    Returns a prefix like "001-" if nesting_prefix is enabled,
+    or "" if disabled (default).
+    """
+    g = infra.get("global", {})
+    if not g.get("nesting_prefix", False):
+        return ""
+    level = _read_absolute_level()
+    if level is None:
+        level = 1  # Default when file absent
+    return f"{level:03d}-"
+
+
 def _read_vm_nested():
     """Read /etc/anklume/vm_nested context file. Returns True/False/None."""
     try:
@@ -243,6 +266,10 @@ def validate(infra, *, check_host_subnets=True):
     firewall_mode = g.get("firewall_mode", "host")
     vm_nested = _read_vm_nested()
     yolo = _read_yolo()
+
+    nesting_prefix = g.get("nesting_prefix")
+    if nesting_prefix is not None and not isinstance(nesting_prefix, bool):
+        errors.append(f"global.nesting_prefix must be a boolean, got {type(nesting_prefix).__name__}")
 
     if gpu_policy not in valid_gpu_policies:
         errors.append(f"global.gpu_policy must be 'exclusive' or 'shared', got '{gpu_policy}'")
@@ -899,6 +926,7 @@ def generate(infra, base_dir, dry_run=False):
     base = Path(base_dir)
     domains = infra.get("domains") or {}
     g = infra.get("global", {})
+    prefix = _get_nesting_prefix(infra)
     written = []
 
     # group_vars/all.yml
@@ -939,8 +967,8 @@ def generate(infra, base_dir, dry_run=False):
             "domain_description": domain.get("description", ""),
             "domain_ephemeral": domain_ephemeral,
             "domain_trust_level": domain.get("trust_level"),
-            "incus_project": dname,
-            "incus_network": {"name": f"net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
+            "incus_project": f"{prefix}{dname}",
+            "incus_network": {"name": f"{prefix}net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
             "subnet_id": sid,
         }.items() if v is not None}
         if domain.get("profiles"):
@@ -953,7 +981,7 @@ def generate(infra, base_dir, dry_run=False):
             machine_eph = m.get("ephemeral")
             instance_ephemeral = machine_eph if machine_eph is not None else domain_ephemeral
             hvars = {k: v for k, v in {
-                "instance_name": mname,
+                "instance_name": f"{prefix}{mname}",
                 "instance_type": m.get("type", "lxc"),
                 "instance_description": m.get("description", ""),
                 "instance_domain": dname,

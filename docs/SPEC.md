@@ -115,6 +115,7 @@ global:
   ai_access_policy: open            # "exclusive" or "open" (default: open)
   ai_access_default: pro            # Domain with initial access (required if exclusive)
   ai_vram_flush: true               # Flush GPU VRAM on domain switch (default: true)
+  nesting_prefix: false             # Prefix Incus names with nesting level (default: false)
   resource_policy:                  # Optional: auto-allocate CPU/memory
     host_reserve:
       cpu: "20%"                    # Reserved for host (default: 20%)
@@ -203,6 +204,35 @@ Incus-native automatic snapshots:
 Both are optional and independent. The `incus_instances` role applies
 these via `incus config set snapshots.schedule` and `snapshots.expiry`.
 
+### Nesting prefix
+
+The optional `nesting_prefix` boolean in `global:` enables prefixing
+all Incus resource names with the nesting level. This prevents name
+collisions when running AnKLuMe nested inside another AnKLuMe instance.
+
+```yaml
+global:
+  nesting_prefix: true   # Default: false
+```
+
+When enabled, the generator reads `/etc/anklume/absolute_level` (created
+by the parent instance). If the file is absent, level defaults to 1.
+The prefix format is `{level:03d}-`:
+
+| Resource | Without prefix | With prefix (level 1) |
+|----------|---------------|----------------------|
+| Incus project | `pro` | `001-pro` |
+| Bridge name | `net-pro` | `001-net-pro` |
+| Instance name | `pro-dev` | `001-pro-dev` |
+
+Ansible file paths and group names remain unprefixed (`inventory/pro.yml`,
+`group_vars/pro.yml`, `host_vars/pro-dev.yml`). The prefix only affects
+Incus-facing names stored in variables (`incus_project`, `incus_network.name`,
+`instance_name`). Ansible roles consume these variables transparently.
+
+When `nesting_prefix: false` (default), no prefix is applied and behavior
+is identical to previous versions.
+
 ### Trust levels
 
 The optional `trust_level` field indicates the security posture and
@@ -243,6 +273,7 @@ adapt behavior based on domain trust posture.
 - `resource_policy.mode`: must be `proportional` or `equal` (if present)
 - `resource_policy.cpu_mode`: must be `allowance` or `count` (if present)
 - `resource_policy.memory_enforce`: must be `soft` or `hard` (if present)
+- `nesting_prefix`: must be a boolean if present (default: false)
 - `resource_policy.overcommit`: must be a boolean (if present)
 - `resource_policy.host_reserve.cpu` and `.memory`: must be `"N%"` or a
   positive number (if present)
