@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# File transfer and backup for AnKLuMe instances.
+# File transfer and backup for anklume instances.
 # Wraps incus file/export/import commands with instance-to-project resolution.
 # See docs/file-transfer.md and ROADMAP.md Phase 20d.
 set -euo pipefail

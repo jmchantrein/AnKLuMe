@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP server template for AnKLuMe inter-container services.
+"""MCP server template for anklume inter-container services.
 
 Implements an MCP server using the official Python SDK (FastMCP).
 Provides tools for controlled service exposure between containers
@@ -124,7 +124,7 @@ def list_tools():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnKLuMe MCP server — inter-container services via MCP SDK"
+        description="anklume MCP server — inter-container services via MCP SDK"
     )
     parser.add_argument(
         "--list-tools", action="store_true",

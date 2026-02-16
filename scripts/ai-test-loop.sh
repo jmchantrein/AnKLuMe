@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-assisted test loop for AnKLuMe (Phase 13).
+# AI-assisted test loop for anklume (Phase 13).
 # Runs Molecule tests, sends failures to an LLM backend,
 # applies fixes, and re-tests. Supports pluggable backends.
 #
@@ -365,7 +365,7 @@ main() {
 - Session ID: ${_ai_session_id}
 - Full log: ${_ai_log_file}
 
-🤖 Generated with AI-assisted testing (AnKLuMe Phase 13)
+🤖 Generated with AI-assisted testing (anklume Phase 13)
 EOF
 )"
     fi

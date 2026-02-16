@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AnKLuMe web dashboard — live infrastructure status.
+"""anklume web dashboard — live infrastructure status.
 
 Single-file web dashboard using Python's stdlib http.server and htmx
 (loaded from CDN) for reactive updates. No external Python dependencies.
@@ -54,7 +54,7 @@ def fetch_instances():
 
 
 def fetch_networks():
-    """Fetch AnKLuMe networks from Incus."""
+    """Fetch anklume networks from Incus."""
     result = subprocess.run(
         ["incus", "network", "list", "--format", "json"],
         capture_output=True, text=True, timeout=10,
@@ -167,7 +167,7 @@ HTML_TEMPLATE = """\
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>AnKLuMe Dashboard</title>
+<title>anklume Dashboard</title>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 <style>
   :root { --bg: #0d1117; --fg: #c9d1d9; --card: #161b22; --border: #30363d; }
@@ -197,7 +197,7 @@ HTML_TEMPLATE = """\
 </style>
 </head>
 <body>
-<h1>AnKLuMe Dashboard</h1>
+<h1>anklume Dashboard</h1>
 <div id="content" hx-get="/api/html" hx-trigger="load, every 5s" hx-swap="innerHTML">
   <p class="empty">Loading...</p>
 </div>
@@ -254,7 +254,7 @@ def render_status_html(status):
             )
         parts.append("</div>")
     else:
-        parts.append('<p class="empty">No AnKLuMe networks found</p>')
+        parts.append('<p class="empty">No anklume networks found</p>')
 
     # Network Policies
     parts.append("<h2>Network Policies</h2>")
@@ -321,13 +321,13 @@ class DashboardHandler(http.server.BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AnKLuMe web dashboard")
+    parser = argparse.ArgumentParser(description="anklume web dashboard")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8888, help="Port (default: 8888)")
     args = parser.parse_args()
 
     server = http.server.HTTPServer((args.host, args.port), DashboardHandler)
-    print(f"AnKLuMe Dashboard: http://{args.host}:{args.port}")
+    print(f"anklume Dashboard: http://{args.host}:{args.port}")
     print("Press Ctrl+C to stop")
     try:
         server.serve_forever()

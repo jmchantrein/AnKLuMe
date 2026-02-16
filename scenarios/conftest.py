@@ -1,4 +1,4 @@
-"""Shared fixtures and step definitions for AnKLuMe E2E scenario tests.
+"""Shared fixtures and step definitions for anklume E2E scenario tests.
 
 Uses pytest-bdd with Gherkin .feature files. Designed to run inside
 the Phase 12 sandbox (Incus-in-Incus) or any environment with a live
@@ -311,7 +311,7 @@ def clean_generated_files(sandbox):
 
 
 def _clean_incus_state(sandbox: Sandbox) -> None:
-    """Remove all AnKLuMe Incus resources (instances, profiles, projects, networks).
+    """Remove all anklume Incus resources (instances, profiles, projects, networks).
 
     Used by deploy scenarios to ensure a clean starting state.
     Follows the correct deletion order: instances → images → profiles → projects → networks.
@@ -373,9 +373,9 @@ def _clean_incus_state(sandbox: Sandbox) -> None:
 
 @given("a clean sandbox environment")
 def clean_sandbox(sandbox):
-    """Verify we're in a working AnKLuMe directory."""
+    """Verify we're in a working anklume directory."""
     assert (sandbox.project_dir / "scripts" / "generate.py").exists(), (
-        "Not in an AnKLuMe project directory"
+        "Not in an anklume project directory"
     )
 
 

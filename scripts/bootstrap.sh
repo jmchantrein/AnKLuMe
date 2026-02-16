@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Initialize AnKLuMe on a new machine
+# bootstrap.sh — Initialize anklume on a new machine
 # Usage: bootstrap.sh [OPTIONS]
 #
 # Options:
@@ -47,7 +47,7 @@ if [ -z "$MODE" ]; then
     usage
 fi
 
-echo "=== AnKLuMe Bootstrap ($MODE mode) ==="
+echo "=== anklume Bootstrap ($MODE mode) ==="
 
 # ── Detect virtualization ────────────────────────────────
 VIRT_TYPE="none"

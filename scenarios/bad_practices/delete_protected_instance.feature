@@ -9,7 +9,7 @@ Feature: Delete protected instance
 
   Scenario: Flush without --force asks for confirmation and aborts
     When I run "scripts/flush.sh" and it may fail
-    Then output contains "AnKLuMe Flush"
+    Then output contains "anklume Flush"
 
   Scenario: Flush with --force destroys infrastructure
     When I run "scripts/flush.sh --force"

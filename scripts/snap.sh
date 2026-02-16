@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Snapshot management for AnKLuMe instances.
+# Snapshot management for anklume instances.
 # Wraps incus snapshot commands with instance-to-project resolution.
 # See docs/SPEC.md section 8 and ADR-013.
 set -euo pipefail

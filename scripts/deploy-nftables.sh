@@ -122,7 +122,7 @@ check_br_netfilter
 
 # ── Main ─────────────────────────────────────────────────────
 
-echo "=== AnKLuMe nftables deployment ==="
+echo "=== anklume nftables deployment ==="
 
 # Find container project
 echo "Looking for container '${SOURCE_CONTAINER}'..."
@@ -140,7 +140,7 @@ incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJ
 
 echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
 
-# Validate content — ensure rules only modify the expected AnKLuMe table
+# Validate content — ensure rules only modify the expected anklume table
 # If this check blocks a legitimate use case, review the validation logic in
 # scripts/deploy-nftables.sh lines below, or adjust the nftables template in
 # roles/incus_nftables/templates/anklume-isolation.nft.j2

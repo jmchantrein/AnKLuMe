@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Golden image management for AnKLuMe instances.
+# Golden image management for anklume instances.
 # Create, derive (CoW copy), and publish golden images from instances.
 # See docs/golden-images.md and ROADMAP.md Phase 20b.
 set -euo pipefail

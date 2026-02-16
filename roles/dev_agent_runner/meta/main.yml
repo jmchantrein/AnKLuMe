@@ -1,10 +1,10 @@
 ---
 galaxy_info:
   role_name: dev_agent_runner
-  author: AnKLuMe
+  author: anklume
   description: "Setup Claude Code Agent Teams runner container"
   license: AGPL-3.0
-  company: AnKLuMe
+  company: anklume
   min_ansible_version: "2.16"
   platforms:
     - name: Debian

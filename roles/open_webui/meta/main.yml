@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: open_webui
   namespace: anklume
-  author: AnKLuMe
+  author: anklume
   description: Install Open WebUI frontend for Ollama
   license: AGPL-3.0
   min_ansible_version: "2.16"

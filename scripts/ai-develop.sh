@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI-assisted autonomous development for AnKLuMe (Phase 13).
+# AI-assisted autonomous development for anklume (Phase 13).
 # Takes a task description, creates a feature branch, uses an LLM
 # to implement the task, runs tests, and optionally creates a PR.
 #
@@ -68,7 +68,7 @@ develop_with_ollama() {
     local context
     context="$(cat "$context_file")"
 
-    local prompt="You are an expert Ansible/infrastructure developer working on AnKLuMe.
+    local prompt="You are an expert Ansible/infrastructure developer working on anklume.
 
 Task: ${task}
 
@@ -359,7 +359,7 @@ main() {
 - Session ID: ${_ai_session_id}
 - Full log: ${_ai_log_file}
 
-🤖 Generated with AI-assisted development (AnKLuMe Phase 13)
+🤖 Generated with AI-assisted development (anklume Phase 13)
 EOF
 )"
     fi

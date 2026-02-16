@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# flush.sh — Destroy all AnKLuMe infrastructure
+# flush.sh — Destroy all anklume infrastructure
 # Usage: scripts/flush.sh [--force]
 #
 # Destroys: all Incus instances, profiles, projects, and net-* bridges
-#           managed by AnKLuMe. Also removes generated Ansible files.
+#           managed by anklume. Also removes generated Ansible files.
 # Preserves: infra.yml, roles/, scripts/, docs/, CLAUDE.md
 #
 # Safety: requires --force on production (absolute_level == 0 and yolo != true)
@@ -34,8 +34,8 @@ if [ "$ABS_LEVEL" = "0" ] && [ "$YOLO" != "true" ] && [ "$FORCE" != "true" ]; th
     exit 1
 fi
 
-echo "=== AnKLuMe Flush ==="
-echo "This will destroy ALL AnKLuMe infrastructure."
+echo "=== anklume Flush ==="
+echo "This will destroy ALL anklume infrastructure."
 
 # Pre-flight: verify Incus daemon is accessible
 if ! incus project list --format csv >/dev/null 2>&1; then
@@ -124,7 +124,7 @@ while IFS= read -r project; do
     fi
 done < <(_list_projects)
 
-# 6. Delete AnKLuMe bridges (net-*) — now unreferenced by any project
+# 6. Delete anklume bridges (net-*) — now unreferenced by any project
 echo "--- Deleting bridges ---"
 while IFS= read -r bridge; do
     [ -z "$bridge" ] && continue
@@ -148,7 +148,7 @@ done
 
 echo ""
 if [ "$deleted" -eq 0 ]; then
-    echo "Nothing to flush (no AnKLuMe resources found)."
+    echo "Nothing to flush (no anklume resources found)."
 else
     echo "Flush complete: $deleted resources destroyed."
 fi

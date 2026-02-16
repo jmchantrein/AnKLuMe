@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 @pytest.fixture()
 def git_workspace(tmp_path):
-    """Create a minimal git repo simulating an AnKLuMe project."""
+    """Create a minimal git repo simulating an anklume project."""
     ws = tmp_path / "project"
     ws.mkdir()
 

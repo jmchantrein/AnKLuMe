@@ -15,7 +15,7 @@ for arg in "$@"; do
     esac
 done
 
-echo "=== AnKLuMe Import Infrastructure ==="
+echo "=== anklume Import Infrastructure ==="
 echo "Scanning Incus state..."
 
 # Pre-flight: verify Incus daemon is accessible

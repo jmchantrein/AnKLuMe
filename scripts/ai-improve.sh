@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spec-driven improvement loop for AnKLuMe.
+# Spec-driven improvement loop for anklume.
 # Proposes enhancements by comparing spec to implementation.
 #
 # Usage: ai-improve.sh --scope <generator|roles|nftables|all> [--dry-run]
@@ -284,7 +284,7 @@ main() {
 - Session ID: ${_ai_session_id}
 - Full log: ${_ai_log_file}
 
-Generated with AnKLuMe improvement loop (Phase 18d)
+Generated with anklume improvement loop (Phase 18d)
 EOF
 )"
             fi
