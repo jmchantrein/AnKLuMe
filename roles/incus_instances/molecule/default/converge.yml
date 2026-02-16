@@ -27,24 +27,17 @@
         label: "{{ item.key }}={{ item.value }}"
       changed_when: false
 
-    - name: Setup | Ensure net-mol-test network exists
+    - name: Setup | Ensure net-mol-test network exists (safe subnet)
       ansible.builtin.command:
-        cmd: incus network create net-mol-test
+        cmd: >-
+          incus network create net-mol-test
+          ipv4.address=10.200.99.254/24 ipv4.nat=true
+          ipv6.address=none
       register: setup_network_result
       changed_when: setup_network_result.rc == 0
-      failed_when: false
-
-    - name: Setup | Configure net-mol-test subnet
-      ansible.builtin.command:
-        cmd: "incus network set net-mol-test {{ item.key }}={{ item.value }}"
-      loop:
-        - key: ipv4.address
-          value: "10.200.99.254/24"
-        - key: ipv4.nat
-          value: "true"
-      loop_control:
-        label: "{{ item.key }}={{ item.value }}"
-      changed_when: false
+      failed_when:
+        - setup_network_result.rc != 0
+        - "'already exists' not in (setup_network_result.stderr | default(''))"
 
     - name: Setup | Configure default profile eth0
       ansible.builtin.command:

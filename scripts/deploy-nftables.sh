@@ -91,6 +91,35 @@ sys.exit(1)
     echo "$project"
 }
 
+# ── Pre-flight: check br_netfilter module ──────────────────
+
+check_br_netfilter() {
+    local has_warning=false
+
+    if ! lsmod | grep -q br_netfilter; then
+        echo "WARNING: br_netfilter module is NOT loaded." >&2
+        echo "         nftables rules will NOT filter traffic between bridges." >&2
+        echo "         Load it with: modprobe br_netfilter" >&2
+        echo "         Persist with: echo br_netfilter > /etc/modules-load.d/br_netfilter.conf" >&2
+        has_warning=true
+    fi
+
+    local nf_call
+    nf_call=$(sysctl -n net.bridge.bridge-nf-call-iptables 2>/dev/null || echo "unavailable")
+    if [ "$nf_call" != "1" ]; then
+        echo "WARNING: net.bridge.bridge-nf-call-iptables = ${nf_call} (expected 1)." >&2
+        echo "         Bridge traffic will bypass nftables even if rules are loaded." >&2
+        echo "         Fix with: sysctl -w net.bridge.bridge-nf-call-iptables=1" >&2
+        has_warning=true
+    fi
+
+    if [ "$has_warning" = true ]; then
+        echo "" >&2
+    fi
+}
+
+check_br_netfilter
+
 # ── Main ─────────────────────────────────────────────────────
 
 echo "=== AnKLuMe nftables deployment ==="
