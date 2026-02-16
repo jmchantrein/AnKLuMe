@@ -7,7 +7,7 @@
 # The firewall_router_interfaces variable is built by the infra
 # play from the domain bridge list. Each entry has:
 #   - name: interface name inside the VM (eth0, eth1, ...)
-#   - bridge: the Incus bridge name (net-admin, net-perso, ...)
+#   - bridge: the Incus bridge name (net-anklume, net-perso, ...)
 #   - subnet: the subnet CIDR (10.100.0.0/24)
 #   - gateway_ip: the IP of this VM on that bridge (10.100.0.254)
 

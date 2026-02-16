@@ -29,10 +29,17 @@
 
     - name: Setup | Ensure test bridges exist
       ansible.builtin.command:
-        cmd: "incus network create {{ item }}"
+        cmd: >-
+          incus network create {{ item.name }}
+          ipv4.address={{ item.addr }} ipv4.nat=false
+          ipv6.address=none
       loop:
-        - net-mol-admin
-        - net-mol-perso
+        - name: net-mol-admin
+          addr: "192.168.250.1/24"
+        - name: net-mol-perso
+          addr: "192.168.251.1/24"
+      loop_control:
+        label: "{{ item.name }}"
       register: setup_network_result
       changed_when: setup_network_result.rc == 0
       failed_when:

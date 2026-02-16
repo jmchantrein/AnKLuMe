@@ -13,7 +13,7 @@ PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "sys-print.sh"
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
     {"name": "sys-print", "project": "print-service", "status": "Running"},
-    {"name": "admin-ansible", "project": "admin", "status": "Running"},
+    {"name": "anklume-instance", "project": "anklume", "status": "Running"},
 ])
 
 

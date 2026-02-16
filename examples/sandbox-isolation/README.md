@@ -17,14 +17,14 @@ time without affecting your main system.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller (protected) |
+| anklume | 0 | Ansible controller (protected) |
 | sandbox | 10 | Ephemeral isolation sandbox |
 
 ## Machines
 
 | Machine | Domain | Type | IP | Role |
 |---------|--------|------|-----|------|
-| sbx-admin | admin | lxc | 10.100.0.10 | Ansible controller |
+| sbx-admin | anklume | lxc | 10.100.0.10 | Ansible controller |
 | sbx-test | sandbox | lxc | 10.100.10.10 | Disposable test container |
 | sbx-vm | sandbox | vm | 10.100.10.20 | Disposable VM sandbox |
 | sbx-monitor | sandbox | lxc | 10.100.10.11 | Monitoring container |

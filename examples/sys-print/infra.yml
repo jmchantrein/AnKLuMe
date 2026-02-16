@@ -19,12 +19,12 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     trust_level: admin
     machines:
-      admin-ansible:
+      anklume-instance:
         description: "Ansible controller"
         type: lxc
         ip: "10.100.0.10"

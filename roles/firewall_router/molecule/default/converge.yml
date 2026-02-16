@@ -8,7 +8,7 @@
     firewall_router_log_prefix: "FW"
     firewall_router_interfaces:
       - name: eth0
-        bridge: net-admin
+        bridge: net-anklume
         subnet: "10.100.0.0/24"
         gateway_ip: "10.100.0.254"
       - name: eth1

@@ -1,6 +1,6 @@
 """Tests for Ansible role structure, defaults, and templates.
 
-Validates that all roles follow AnKLuMe conventions:
+Validates that all roles follow anklume conventions:
 - Required files exist (tasks/main.yml, defaults/main.yml, meta/main.yml)
 - Defaults are valid YAML with expected types
 - Templates render correctly with sample data
@@ -219,7 +219,7 @@ class TestTemplates:
         template = env.get_template("anklume-isolation.nft.j2")
 
         result = template.render(
-            incus_nftables_all_bridges=["net-admin", "net-pro", "net-perso"],
+            incus_nftables_all_bridges=["net-anklume", "net-pro", "net-perso"],
             incus_nftables_resolved_policies=[
                 {
                     "description": "Pro accesses AI",
@@ -233,7 +233,7 @@ class TestTemplates:
         )
         assert "table inet anklume" in result
         assert "priority -1" in result
-        assert 'iifname "net-admin" oifname "net-admin" accept' in result
+        assert 'iifname "net-anklume" oifname "net-anklume" accept' in result
         assert 'iifname "net-pro" oifname "net-ai-tools" tcp dport { 3000, 8080 } accept' in result
         assert "drop" in result
 
@@ -244,13 +244,13 @@ class TestTemplates:
         template = env.get_template("anklume-isolation.nft.j2")
 
         result = template.render(
-            incus_nftables_all_bridges=["net-admin", "net-work"],
+            incus_nftables_all_bridges=["net-anklume", "net-work"],
             incus_nftables_resolved_policies=[],
         )
         assert "table inet anklume" in result
         assert "Network policies" not in result
         # Should have same-bridge accept rules
-        assert 'iifname "net-admin" oifname "net-admin" accept' in result
+        assert 'iifname "net-anklume" oifname "net-anklume" accept' in result
         assert 'iifname "net-work" oifname "net-work" accept' in result
 
     def test_nftables_single_bridge(self):
@@ -278,7 +278,7 @@ class TestTemplates:
 
         result = template.render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
                 {"name": "eth2", "bridge": "net-perso"},
             ],
@@ -288,7 +288,7 @@ class TestTemplates:
         assert "table inet anklume" in result
         assert "chain forward" in result
         assert "chain input" in result
-        assert 'FW-DENY-ADMIN' in result
+        assert 'FW-DENY-ANKLUME' in result
         assert 'FW-DENY-PRO' in result
 
     def test_firewall_router_no_logging(self):
@@ -299,7 +299,7 @@ class TestTemplates:
 
         result = template.render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=False,

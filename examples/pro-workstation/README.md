@@ -15,7 +15,7 @@ Speaches (STT) services, avoiding the need for shared GPU policy.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller |
+| anklume | 0 | Ansible controller |
 | perso | 1 | Personal environment |
 | pro | 2 | Professional development |
 | homelab | 3 | GPU-enabled AI homelab (LLM + STT) |
@@ -24,7 +24,7 @@ Speaches (STT) services, avoiding the need for shared GPU policy.
 
 | Machine | Domain | IP | Role |
 |---------|--------|-----|------|
-| pw-admin | admin | 10.100.0.10 | Ansible controller with nesting |
+| pw-admin | anklume | 10.100.0.10 | Ansible controller with nesting |
 | pw-perso | perso | 10.100.1.10 | Personal workspace |
 | pw-dev | pro | 10.100.2.10 | Dev workspace (4 CPU, 8 GB RAM) |
 | pw-ai | homelab | 10.100.3.10 | Ollama + Speaches STT with GPU |

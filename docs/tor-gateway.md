@@ -16,7 +16,7 @@ anonymous internet access, controlled by `network_policies` in `infra.yml`.
 │                    │      │  tor-gw            │         │
 │                    │      │  TransPort 9040    │         │
 │                    │      │  DNSPort 5353      │         │
-│  net-admin ────────┘      │  nftables redirect │         │
+│  net-anklume ──────┘      │  nftables redirect │         │
 │    (blocked)              └────────┬──────────┘         │
 │                                    │                     │
 │                              Tor network                 │

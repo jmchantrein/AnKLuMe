@@ -6,7 +6,7 @@
 # validates the syntax, copies to /etc/nftables.d/, and reloads nftables.
 #
 # Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
-# Default source: admin-ansible
+# Default source: anklume-instance
 # Default project: admin (searches all projects if not found)
 set -euo pipefail
 
@@ -15,7 +15,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # ── Defaults ─────────────────────────────────────────────────
 
 DRY_RUN=false
-SOURCE_CONTAINER="admin-ansible"
+SOURCE_CONTAINER="anklume-instance"
 SOURCE_PATH="/opt/anklume/nftables-isolation.nft"
 DEST_DIR="/etc/nftables.d"
 DEST_FILE="${DEST_DIR}/anklume-isolation.nft"
@@ -26,12 +26,12 @@ usage() {
     cat <<'USAGE'
 Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
 
-Pulls nftables isolation rules from the admin container, validates
+Pulls nftables isolation rules from the anklume container, validates
 syntax, copies to /etc/nftables.d/, and reloads nftables.
 
 Options:
   --dry-run             Validate only, do not install or reload
-  --source CONTAINER    Source container name (default: admin-ansible)
+  --source CONTAINER    Source container name (default: anklume-instance)
   -h, --help            Show this help
 
 This script must be run ON THE HOST as root (or with sudo).
@@ -71,9 +71,9 @@ find_project() {
     local container="$1"
     local project
 
-    # Try the default project (admin) first
-    if incus info "$container" --project admin &>/dev/null; then
-        echo "admin"
+    # Try the default project (anklume) first
+    if incus info "$container" --project anklume &>/dev/null; then
+        echo "anklume"
         return 0
     fi
 
@@ -91,9 +91,38 @@ sys.exit(1)
     echo "$project"
 }
 
+# ── Pre-flight: check br_netfilter module ──────────────────
+
+check_br_netfilter() {
+    local has_warning=false
+
+    if ! lsmod | grep -q br_netfilter; then
+        echo "WARNING: br_netfilter module is NOT loaded." >&2
+        echo "         nftables rules will NOT filter traffic between bridges." >&2
+        echo "         Load it with: modprobe br_netfilter" >&2
+        echo "         Persist with: echo br_netfilter > /etc/modules-load.d/br_netfilter.conf" >&2
+        has_warning=true
+    fi
+
+    local nf_call
+    nf_call=$(sysctl -n net.bridge.bridge-nf-call-iptables 2>/dev/null || echo "unavailable")
+    if [ "$nf_call" != "1" ]; then
+        echo "WARNING: net.bridge.bridge-nf-call-iptables = ${nf_call} (expected 1)." >&2
+        echo "         Bridge traffic will bypass nftables even if rules are loaded." >&2
+        echo "         Fix with: sysctl -w net.bridge.bridge-nf-call-iptables=1" >&2
+        has_warning=true
+    fi
+
+    if [ "$has_warning" = true ]; then
+        echo "" >&2
+    fi
+}
+
+check_br_netfilter
+
 # ── Main ─────────────────────────────────────────────────────
 
-echo "=== AnKLuMe nftables deployment ==="
+echo "=== anklume nftables deployment ==="
 
 # Find container project
 echo "Looking for container '${SOURCE_CONTAINER}'..."
@@ -111,7 +140,7 @@ incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJ
 
 echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
 
-# Validate content — ensure rules only modify the expected AnKLuMe table
+# Validate content — ensure rules only modify the expected anklume table
 # If this check blocks a legitimate use case, review the validation logic in
 # scripts/deploy-nftables.sh lines below, or adjust the nftables template in
 # roles/incus_nftables/templates/anklume-isolation.nft.j2

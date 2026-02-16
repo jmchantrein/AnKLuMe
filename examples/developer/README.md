@@ -14,14 +14,14 @@ complete sandbox for testing without affecting production.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller |
+| anklume | 0 | Ansible controller |
 | dev-test | 1 | Ephemeral development and testing |
 
 ## Machines
 
 | Machine | Domain | IP | Role |
 |---------|--------|-----|------|
-| dev-admin | admin | 10.100.0.10 | Ansible controller |
+| dev-admin | anklume | 10.100.0.10 | Ansible controller |
 | dev-runner | dev-test | 10.100.1.10 | Test runner (nested Incus) |
 | dev-sandbox | dev-test | 10.100.1.11 | Manual testing sandbox |
 

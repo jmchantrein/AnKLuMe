@@ -47,7 +47,7 @@ customize further, edit generated files outside managed sections.
 
 **Context**: The host runs Incus but is not managed by Ansible.
 
-**Decision**: Ansible runs inside an admin container with the Incus socket
+**Decision**: Ansible runs inside an anklume container with the Incus socket
 mounted. Phase 1 targets `localhost`. Phase 2 targets instances via the
 `community.general.incus` connection plugin.
 
@@ -185,7 +185,7 @@ flag. Profile tasks DO need `--project` to configure each project's profile.
 ## ADR-015: Playbook uses hosts:all with connection:local
 
 **Context**: All Incus commands must run on the Ansible controller
-(`admin-ansible`) which has the Incus socket mounted. Other hosts in the
+(`anklume-instance`) which has the Incus socket mounted. Other hosts in the
 inventory do not have access to Incus and do not exist yet when the
 infrastructure roles run.
 
@@ -299,9 +299,9 @@ opt into shared GPU access explicitly.
 
 ---
 
-## ADR-019: admin-ansible proxy socket resilience at boot
+## ADR-019: anklume-instance proxy socket resilience at boot
 
-**Context:** The `admin-ansible` container has an Incus proxy device that
+**Context:** The `anklume-instance` container has an Incus proxy device that
 maps the host's Incus socket (`/var/lib/incus/unix.socket`) to
 `/var/run/incus/unix.socket` inside the container. When the container is
 restarted, the `/var/run/` directory is ephemeral (tmpfs) and the
@@ -317,12 +317,12 @@ The workaround today is manual: remove the proxy device, start the
 container, create the directory, re-add the proxy device. This must be
 automated.
 
-**Decision:** Add a systemd oneshot service in the `admin-ansible`
+**Decision:** Add a systemd oneshot service in the `anklume-instance`
 container that creates `/var/run/incus/` before the proxy device starts.
 This service runs early in boot (`Before=network.target`,
 `After=local-fs.target`).
 
-Implementation in the `base_admin` role (or provisioning for admin-ansible):
+Implementation in the `base_admin` role (or provisioning for anklume-instance):
 
 ```ini
 # /etc/systemd/system/incus-socket-dir.service
@@ -348,10 +348,10 @@ on the host — which conflicts with our principle that Ansible does not
 modify the host (ADR-004). A systemd service inside the container is
 self-contained and portable.
 
-**Scope:** This fix applies ONLY to `admin-ansible`. Other containers do
+**Scope:** This fix applies ONLY to `anklume-instance`. Other containers do
 not have the proxy device and are not affected.
 
-**Consequence:** `admin-ansible` survives restarts without manual
+**Consequence:** `anklume-instance` survives restarts without manual
 intervention. The systemd service is idempotent (mkdir -p).
 
 ---
@@ -438,17 +438,17 @@ rules. AnKLuMe isolation is evaluated first.
 
 ---
 
-## ADR-023: Two-step nftables deployment (admin → host)
+## ADR-023: Two-step nftables deployment (anklume → host)
 
-**Context**: AnKLuMe runs inside the admin container (ADR-004) but
+**Context**: AnKLuMe runs inside the anklume container (ADR-004) but
 nftables rules must be applied on the host kernel.
 
 **Decision**: Split into two steps:
-1. `make nftables` — runs inside admin container, generates rules
-2. `make nftables-deploy` — runs on the host, pulls rules from admin,
+1. `make nftables` — runs inside anklume container, generates rules
+2. `make nftables-deploy` — runs on the host, pulls rules from anklume,
    validates, and applies
 
-**Consequence**: The operator reviews rules before deploying. The admin
+**Consequence**: The operator reviews rules before deploying. The anklume
 container never needs host-level privileges. Documented exception to
 ADR-004.
 
@@ -484,15 +484,15 @@ compromised, host rules still prevent direct inter-bridge traffic.
 
 ---
 
-## ADR-026: Admin bridge — no exception in nftables rules
+## ADR-026: Anklume bridge — no exception in nftables rules
 
-**Context**: The admin container communicates with all instances via
+**Context**: The anklume container communicates with all instances via
 the Incus socket (ADR-004), not the network. Ansible uses
 `community.general.incus` which calls `incus exec` over the socket.
 
-**Decision**: The admin bridge has no special accept rule in nftables.
-All domains (including admin) are treated equally for network isolation.
-`ping` from admin to other domains fails (expected).
+**Decision**: The anklume bridge has no special accept rule in nftables.
+All domains (including anklume) are treated equally for network isolation.
+`ping` from anklume to other domains fails (expected).
 
 **Consequence**: Stronger isolation. Admin management traffic flows
 through the Incus socket, which is the correct and intended path.

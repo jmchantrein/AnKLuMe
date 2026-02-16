@@ -8,7 +8,7 @@ validation.
 
 | Example | Domains | Machines | GPU | Description |
 |---------|---------|----------|-----|-------------|
-| [student-sysadmin](student-sysadmin/) | 2 | 3 | No | Simple admin + lab for sysadmin students |
+| [student-sysadmin](student-sysadmin/) | 2 | 3 | No | Simple anklume + lab for sysadmin students |
 | [teacher-lab](teacher-lab/) | 4 | 7 | No | Admin + 3 student domains for classroom labs |
 | [pro-workstation](pro-workstation/) | 4 | 5 | Yes | Compartmentalized workstation with AI homelab (LLM + STT) |
 | [sandbox-isolation](sandbox-isolation/) | 2 | 3 | No | Maximum isolation for untrusted software |

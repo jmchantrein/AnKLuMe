@@ -13,14 +13,14 @@ their main system.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller |
+| anklume | 0 | Ansible controller |
 | lab | 1 | Ephemeral lab environment |
 
 ## Machines
 
 | Machine | Domain | IP | Role |
 |---------|--------|-----|------|
-| sa-admin | admin | 10.100.0.10 | Ansible controller with nesting |
+| sa-admin | anklume | 10.100.0.10 | Ansible controller with nesting |
 | sa-web | lab | 10.100.1.10 | Web server for exercises |
 | sa-db | lab | 10.100.1.11 | Database server for exercises |
 

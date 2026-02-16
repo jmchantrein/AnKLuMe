@@ -13,7 +13,7 @@ TOR_SH = Path(__file__).resolve().parent.parent / "scripts" / "tor-gateway.sh"
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
     {"name": "tor-gw", "project": "tor-gateway", "status": "Running"},
-    {"name": "admin-ansible", "project": "admin", "status": "Running"},
+    {"name": "anklume-instance", "project": "anklume", "status": "Running"},
 ])
 
 

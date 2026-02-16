@@ -33,8 +33,8 @@ def switch_env(tmp_path):
             "ai_access_default": "pro",
         },
         "domains": {
-            "admin": {"subnet_id": 0, "machines": {
-                "admin-ansible": {"type": "lxc", "ip": "10.100.0.10"},
+            "anklume": {"subnet_id": 0, "machines": {
+                "anklume-instance": {"type": "lxc", "ip": "10.100.0.10"},
             }},
             "pro": {"subnet_id": 2, "machines": {
                 "pro-dev": {"type": "lxc", "ip": "10.100.2.10"},
@@ -1157,7 +1157,7 @@ class TestAiSwitchInfraResolution:
                 yaml.dump({dname: dconf}, sort_keys=False),
             )
         # All non-ai-tools domains should be valid targets
-        for domain in ["pro", "perso", "admin"]:
+        for domain in ["pro", "perso", "anklume"]:
             result = run_switch(["--domain", domain, "--dry-run"], env, cwd, script=script)
             assert result.returncode == 0, f"Domain '{domain}' should be valid"
 
@@ -1353,16 +1353,16 @@ class TestAiSwitchStateFileContent:
 class TestAiSwitchValidationEdgeCases:
     """Edge cases for domain validation."""
 
-    def test_admin_domain_accepted(self, switch_env):
-        """admin domain is a valid target (not blocked like ai-tools)."""
+    def test_anklume_domain_accepted(self, switch_env):
+        """anklume domain is a valid target (not blocked like ai-tools)."""
         env, _, cwd, script = switch_env
-        result = run_switch(["--domain", "admin", "--dry-run"], env, cwd, script=script)
+        result = run_switch(["--domain", "anklume", "--dry-run"], env, cwd, script=script)
         assert result.returncode == 0
 
     def test_all_non_ai_domains_accepted(self, switch_env):
         """All non-ai-tools domains from infra.yml are valid targets."""
         env, _, cwd, script = switch_env
-        for domain in ["admin", "pro", "perso"]:
+        for domain in ["anklume", "pro", "perso"]:
             result = run_switch(["--domain", domain, "--dry-run"], env, cwd, script=script)
             assert result.returncode == 0, f"Domain '{domain}' should be accepted"
 
@@ -1463,22 +1463,22 @@ class TestAiSwitchMultipleCycles:
     def test_three_consecutive_switches(self, switch_env):
         """Three consecutive switches all succeed."""
         env, _, cwd, script = switch_env
-        for domain in ["pro", "perso", "admin"]:
+        for domain in ["pro", "perso", "anklume"]:
             result = run_switch(["--domain", domain], env, cwd, script=script)
             assert result.returncode == 0, f"Switch to {domain} failed"
 
     def test_three_switches_correct_final_state(self, switch_env):
         """After three switches, state file reflects the last switch."""
         env, _, cwd, script = switch_env
-        for domain in ["pro", "perso", "admin"]:
+        for domain in ["pro", "perso", "anklume"]:
             run_switch(["--domain", domain], env, cwd, script=script)
         state_file = cwd / "ai-access-current"
-        assert state_file.read_text().strip() == "admin"
+        assert state_file.read_text().strip() == "anklume"
 
     def test_three_switches_three_log_entries(self, switch_env):
         """Three switches produce three log entries."""
         env, _, cwd, script = switch_env
-        for domain in ["pro", "perso", "admin"]:
+        for domain in ["pro", "perso", "anklume"]:
             run_switch(["--domain", domain], env, cwd, script=script)
         log_file = cwd / "logs" / "ai-switch.log"
         content = log_file.read_text()
@@ -1499,12 +1499,12 @@ class TestAiSwitchMultipleCycles:
         env, _, cwd, script = switch_env
         run_switch(["--domain", "pro"], env, cwd, script=script)
         run_switch(["--domain", "perso"], env, cwd, script=script)
-        run_switch(["--domain", "admin"], env, cwd, script=script)
+        run_switch(["--domain", "anklume"], env, cwd, script=script)
         log_file = cwd / "logs" / "ai-switch.log"
         lines = log_file.read_text().strip().split("\n")
         assert "'<none>' -> 'pro'" in lines[0]
         assert "'pro' -> 'perso'" in lines[1]
-        assert "'perso' -> 'admin'" in lines[2]
+        assert "'perso' -> 'anklume'" in lines[2]
 
 
 # ── Python domain validation function tests ───────────────────────

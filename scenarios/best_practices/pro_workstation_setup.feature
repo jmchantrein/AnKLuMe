@@ -9,7 +9,7 @@ Feature: Pro workstation setup
     When I run "make sync"
     Then exit code is 0
     And inventory files exist for all domains
-    And file "group_vars/admin.yml" exists
+    And file "group_vars/anklume.yml" exists
     And file "host_vars/pw-admin.yml" exists
 
   Scenario: Full deployment with isolation verified

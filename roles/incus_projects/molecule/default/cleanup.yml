@@ -10,8 +10,31 @@
       register: cleanup_projects_raw
       changed_when: false
 
+    - name: Cleanup | Remove eth0 from default profile
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - device
+          - remove
+          - default
+          - eth0
+          - --project
+          - molecule-test
+      register: cleanup_remove_eth0
+      changed_when: cleanup_remove_eth0.rc == 0
+      failed_when: false
+      when: "'molecule-test' in (cleanup_projects_raw.stdout | from_json | map(attribute='name') | list)"
+
     - name: Cleanup | Delete molecule-test project
       ansible.builtin.command:
         cmd: incus project delete molecule-test
       when: "'molecule-test' in (cleanup_projects_raw.stdout | from_json | map(attribute='name') | list)"
       changed_when: true
+
+    - name: Cleanup | Delete test bridge
+      ansible.builtin.command:
+        cmd: incus network delete mol-proj-br0
+      register: cleanup_delete_br
+      changed_when: cleanup_delete_br.rc == 0
+      failed_when: false

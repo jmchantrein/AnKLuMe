@@ -7,5 +7,43 @@
     incus_project: molecule-test
     domain_description: "Molecule test project"
     domain_ephemeral: true
-  roles:
-    - role: incus_projects
+  tasks:
+    - name: Converge | Run incus_projects role
+      ansible.builtin.include_role:
+        name: incus_projects
+
+    - name: Converge | Create test bridge for NIC filtering test
+      ansible.builtin.command:
+        cmd: >-
+          incus network create mol-proj-br0
+          ipv4.address=192.168.252.1/24 ipv4.nat=false
+          ipv6.address=none
+      register: converge_create_br
+      changed_when: converge_create_br.rc == 0
+      failed_when:
+        - converge_create_br.rc != 0
+        - "'already exists' not in (converge_create_br.stderr | default(''))"
+
+    - name: Converge | Add eth0 to default profile for NIC filtering test
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - device
+          - add
+          - default
+          - eth0
+          - nic
+          - network=mol-proj-br0
+          - name=eth0
+          - --project
+          - molecule-test
+      register: converge_add_eth0
+      changed_when: converge_add_eth0.rc == 0
+      failed_when:
+        - converge_add_eth0.rc != 0
+        - "'already exists' not in (converge_add_eth0.stderr | default(''))"
+
+    - name: Converge | Re-run role to apply NIC filtering on eth0
+      ansible.builtin.include_role:
+        name: incus_projects

@@ -23,10 +23,10 @@ class TestDesktopConfig:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "trust_level": "admin",
-                    "machines": {"admin-ansible": {"type": "lxc", "ip": "10.100.0.10"}},
+                    "machines": {"anklume-instance": {"type": "lxc", "ip": "10.100.0.10"}},
                 },
                 "pro": {
                     "subnet_id": 2,
@@ -52,7 +52,7 @@ class TestDesktopConfig:
         domains = gather_domains(infra)
         assert len(domains) == 3
         names = [d["name"] for d in domains]
-        assert "admin" in names
+        assert "anklume" in names
         assert "pro" in names
 
     def test_trust_level_inference(self, infra_file):
@@ -62,7 +62,7 @@ class TestDesktopConfig:
         infra = load_infra(infra_file)
         domains = gather_domains(infra)
         by_name = {d["name"]: d for d in domains}
-        assert by_name["admin"]["trust_level"] == "admin"
+        assert by_name["anklume"]["trust_level"] == "admin"
         assert by_name["pro"]["trust_level"] == "trusted"
         assert by_name["sandbox"]["trust_level"] == "disposable"
 
@@ -74,7 +74,7 @@ class TestDesktopConfig:
         domains = gather_domains(infra)
         config = generate_sway_config(domains)
         assert "for_window" in config
-        assert "admin" in config
+        assert "anklume" in config
         assert "pro" in config
         assert "border pixel 3" in config
 
@@ -122,7 +122,7 @@ class TestDashboard:
         status = {"instances": [], "networks": [], "policies": [], "project_name": "test"}
         html = render_status_html(status)
         assert "No instances found" in html
-        assert "No AnKLuMe networks" in html
+        assert "No anklume networks" in html
 
     def test_render_status_html_with_data(self):
         from dashboard import render_status_html
@@ -132,20 +132,20 @@ class TestDashboard:
                 "name": "test-vm",
                 "status": "Running",
                 "type": "container",
-                "project": "admin",
+                "project": "anklume",
                 "ip": "10.100.0.10",
-                "domain": "admin",
+                "domain": "anklume",
                 "trust_level": "admin",
                 "colors": {"border": "#3333ff", "bg": "#0a0a2a"},
             }],
-            "networks": [{"name": "net-admin", "type": "bridge", "config": {"ipv4.address": "10.100.0.1/24"}}],
-            "policies": [{"description": "test policy", "from": "admin", "to": "pro", "ports": [80]}],
+            "networks": [{"name": "net-anklume", "type": "bridge", "config": {"ipv4.address": "10.100.0.1/24"}}],
+            "policies": [{"description": "test policy", "from": "anklume", "to": "pro", "ports": [80]}],
             "project_name": "test",
         }
         html = render_status_html(status)
         assert "test-vm" in html
         assert "Running" in html
-        assert "net-admin" in html
+        assert "net-anklume" in html
         assert "test policy" in html
 
     def test_trust_colors_complete(self):
@@ -161,6 +161,7 @@ class TestDashboard:
         from dashboard import infer_trust_level
 
         assert infer_trust_level("admin", {}) == "admin"
+        assert infer_trust_level("anklume", {}) == "admin"
         assert infer_trust_level("my-admin-domain", {}) == "admin"
         assert infer_trust_level("sandbox", {"ephemeral": True}) == "disposable"
         assert infer_trust_level("pro", {}) == "trusted"

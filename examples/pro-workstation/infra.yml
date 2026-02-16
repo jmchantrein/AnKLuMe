@@ -19,7 +19,7 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     ephemeral: false

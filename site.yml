@@ -5,7 +5,7 @@
 #
 # Phase 1 — Infrastructure (tag: infra):
 #   - hosts: all, connection: local
-#   - Drives Incus via CLI on the controller (admin-ansible)
+#   - Drives Incus via CLI on the controller (anklume-instance)
 #   - Creates projects, networks, profiles, instances
 #   - See ADR-015 in docs/ARCHITECTURE.md
 #
@@ -166,7 +166,7 @@
           tags:
             - admin
             - provision
-      when: "'admin' in group_names"
+      when: "'anklume' in group_names"
       tags:
         - admin
         - provision

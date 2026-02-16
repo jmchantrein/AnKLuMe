@@ -109,7 +109,7 @@ if result.returncode == 0:
             break
 
 # Try to resolve trust level from infra.yml
-domain = project  # domain name == project name in AnKLuMe
+domain = project  # domain name == project name in anklume
 trust_level = "trusted"
 
 infra_path = project_dir / "infra.yml"

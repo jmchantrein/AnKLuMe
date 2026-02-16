@@ -94,7 +94,7 @@ restore, delete.
 └─────────────────────────────────────────────────────────┘
 ```
 
-The admin container:
+The anklume container:
 - Has the host's Incus socket mounted read/write
 - Contains Ansible, the git repo, and drives everything via `incus` CLI
 - Never modifies the host directly
@@ -115,6 +115,15 @@ global:
   ai_access_policy: open            # "exclusive" or "open" (default: open)
   ai_access_default: pro            # Domain with initial access (required if exclusive)
   ai_vram_flush: true               # Flush GPU VRAM on domain switch (default: true)
+  nesting_prefix: false             # Prefix Incus names with nesting level (default: false)
+  resource_policy:                  # Optional: auto-allocate CPU/memory
+    host_reserve:
+      cpu: "20%"                    # Reserved for host (default: 20%)
+      memory: "20%"                 # Reserved for host (default: 20%)
+    mode: proportional              # proportional | equal (default: proportional)
+    cpu_mode: allowance             # allowance (%) | count (vCPU) (default: allowance)
+    memory_enforce: soft            # soft (ballooning) | hard (default: soft)
+    overcommit: false               # Allow total > available (default: false)
 
 domains:
   <domain-name>:
@@ -134,6 +143,11 @@ domains:
         ephemeral: false              # Optional (default: inherit from domain)
         gpu: false                    # true to enable GPU passthrough
         profiles: [default]           # List of Incus profiles
+        weight: 1                     # Resource allocation weight (default: 1)
+        boot_autostart: false         # Optional: start on host boot (default: false)
+        boot_priority: 0              # Optional: boot order 0-100 (default: 0)
+        snapshots_schedule: "0 2 * * *"  # Optional: cron schedule for auto-snapshots
+        snapshots_expiry: "30d"       # Optional: retention duration (e.g., 30d, 24h)
         config: { ... }              # Incus instance config overrides
         storage_volumes: { ... }     # Optional: dedicated volumes
         roles: [base_system]         # Ansible roles for provisioning
@@ -160,6 +174,64 @@ from accidental deletion:
   `detect_orphans()` reports protected resources but `--clean-orphans`
   skips them.
 - `ephemeral: true`: the resource can be freely created and destroyed.
+
+The `incus_instances` role propagates the ephemeral flag to Incus natively:
+`ephemeral: false` sets `security.protection.delete=true` on the instance,
+preventing deletion via `incus delete`. `ephemeral: true` sets it to `false`.
+
+### Boot autostart
+
+The optional `boot_autostart` and `boot_priority` fields control instance
+behavior when the Incus host boots:
+
+- `boot_autostart: true` sets `boot.autostart=true` on the instance,
+  causing Incus to automatically start it when the daemon starts.
+- `boot_priority` (0-100) controls the start order. Higher values start
+  first. Default: 0.
+
+The `incus_instances` role applies these via `incus config set`.
+
+### Automatic snapshots
+
+The optional `snapshots_schedule` and `snapshots_expiry` fields enable
+Incus-native automatic snapshots:
+
+- `snapshots_schedule` is a cron expression (5 fields, e.g., `"0 2 * * *"`
+  for daily at 2am). Incus creates snapshots automatically on this schedule.
+- `snapshots_expiry` is a retention duration (e.g., `"30d"`, `"24h"`,
+  `"60m"`). Incus deletes snapshots older than this automatically.
+
+Both are optional and independent. The `incus_instances` role applies
+these via `incus config set snapshots.schedule` and `snapshots.expiry`.
+
+### Nesting prefix
+
+The optional `nesting_prefix` boolean in `global:` enables prefixing
+all Incus resource names with the nesting level. This prevents name
+collisions when running AnKLuMe nested inside another AnKLuMe instance.
+
+```yaml
+global:
+  nesting_prefix: true   # Default: false
+```
+
+When enabled, the generator reads `/etc/anklume/absolute_level` (created
+by the parent instance). If the file is absent, level defaults to 1.
+The prefix format is `{level:03d}-`:
+
+| Resource | Without prefix | With prefix (level 1) |
+|----------|---------------|----------------------|
+| Incus project | `pro` | `001-pro` |
+| Bridge name | `net-pro` | `001-net-pro` |
+| Instance name | `pro-dev` | `001-pro-dev` |
+
+Ansible file paths and group names remain unprefixed (`inventory/pro.yml`,
+`group_vars/pro.yml`, `host_vars/pro-dev.yml`). The prefix only affects
+Incus-facing names stored in variables (`incus_project`, `incus_network.name`,
+`instance_name`). Ansible roles consume these variables transparently.
+
+When `nesting_prefix: false` (default), no prefix is applied and behavior
+is identical to previous versions.
 
 ### Trust levels
 
@@ -192,7 +264,19 @@ adapt behavior based on domain trust posture.
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
+- `weight`: must be a positive integer if present (default: 1)
+- `boot_autostart`: must be a boolean if present
+- `boot_priority`: must be an integer 0-100 if present (default: 0)
+- `snapshots_schedule`: must be a valid cron expression (5 fields) if present
+- `snapshots_expiry`: must be a duration string (e.g., `30d`, `24h`, `60m`) if present
 - `ai_access_policy`: must be `exclusive` or `open`
+- `resource_policy.mode`: must be `proportional` or `equal` (if present)
+- `resource_policy.cpu_mode`: must be `allowance` or `count` (if present)
+- `resource_policy.memory_enforce`: must be `soft` or `hard` (if present)
+- `nesting_prefix`: must be a boolean if present (default: false)
+- `resource_policy.overcommit`: must be a boolean (if present)
+- `resource_policy.host_reserve.cpu` and `.memory`: must be `"N%"` or a
+  positive number (if present)
 - When `ai_access_policy: exclusive`:
   - `ai_access_default` is required and must reference a known domain
   - `ai_access_default` cannot be `ai-tools` itself
@@ -202,17 +286,17 @@ adapt behavior based on domain trust posture.
 ### Auto-creation of sys-firewall (firewall_mode: vm)
 
 When `global.firewall_mode` is set to `vm`, the generator automatically
-creates a `sys-firewall` machine in the admin domain if one is not already
+creates a `sys-firewall` machine in the anklume domain if one is not already
 declared. This enrichment step (`enrich_infra()`) runs after validation but
 before file generation. The auto-created machine uses:
-- type: `vm`, ip: `<base_subnet>.<admin_subnet_id>.253`
+- type: `vm`, ip: `<base_subnet>.<anklume_subnet_id>.253`
 - config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
 - roles: `[base_system, firewall_router]`
 - ephemeral: `false`
 
 If the user declares `sys-firewall` explicitly (in any domain), their
 definition takes precedence and no auto-creation occurs. If `firewall_mode`
-is `vm` but no `admin` domain exists, the generator exits with an error.
+is `vm` but no `anklume` domain exists, the generator exits with an error.
 
 ### Security policy (privileged containers)
 
@@ -272,6 +356,73 @@ The generator validates that every `from` and `to` references a known
 domain name, machine name, or the keyword `host`. Each rule maps to an
 nftables `accept` rule before the blanket `drop`.
 
+### Resource allocation policy
+
+The optional `resource_policy` section in `global:` enables automatic
+CPU and memory allocation to instances based on detected host resources.
+
+```yaml
+global:
+  resource_policy:              # absent = no auto-allocation
+    host_reserve:
+      cpu: "20%"                # Reserved for host (default: 20%)
+      memory: "20%"             # Reserved for host (default: 20%)
+    mode: proportional          # proportional | equal (default: proportional)
+    cpu_mode: allowance         # allowance (%) | count (vCPU) (default: allowance)
+    memory_enforce: soft        # soft (ballooning) | hard (default: soft)
+    overcommit: false           # Allow total > available (default: false)
+```
+
+Setting `resource_policy: {}` or `resource_policy: true` activates
+allocation with all defaults: 20% host reserve, proportional
+distribution, CPU allowance mode, soft memory enforcement.
+
+**Host reserve**: A fixed percentage (or absolute value) of host
+resources reserved for the operating system and Incus daemon. Instances
+cannot use this reserve.
+
+**Distribution modes**:
+- `proportional`: Each machine gets resources proportional to its
+  `weight` (default weight: 1). A machine with `weight: 3` gets three
+  times the resources of a machine with `weight: 1`.
+- `equal`: All machines get the same share regardless of weight.
+
+**CPU modes**:
+- `allowance`: Sets `limits.cpu.allowance` as a percentage. Allows
+  flexible CPU sharing via CFS scheduler.
+- `count`: Sets `limits.cpu` as a fixed vCPU count. Dedicates cores
+  to instances.
+
+**Memory enforcement**:
+- `soft`: Adds `limits.memory.enforce: "soft"` (cgroups v2 memory
+  ballooning). Instances can temporarily exceed their limit when
+  host memory is available. VMs use virtio-balloon natively.
+- `hard`: Default Incus behavior — strict memory limit.
+
+**Overcommit**: When `false` (default), the generator errors if the
+sum of all allocated resources (auto + explicit) exceeds the available
+pool. When `true`, a warning is emitted instead.
+
+**Machine weight**:
+
+```yaml
+machines:
+  heavy-worker:
+    weight: 3               # Gets 3x the share of default-weight machines
+    type: lxc
+  light-worker:
+    type: lxc               # Default weight: 1
+```
+
+Machines with explicit `limits.cpu`, `limits.cpu.allowance`, or
+`limits.memory` in their `config:` are excluded from auto-allocation
+for that resource but counted towards the overcommit total. The
+generator never overwrites explicit configuration.
+
+**Detection**: Host resources are detected via `incus info --resources`
+(preferred) or `/proc/cpuinfo` + `/proc/meminfo` (fallback). If
+detection fails, resource allocation is skipped with a warning.
+
 ### infra.yml as a directory
 
 For large deployments, `infra.yml` can be replaced by an `infra/`
@@ -281,7 +432,7 @@ directory:
 infra/
 ├── base.yml                 # project_name + global settings
 ├── domains/
-│   ├── admin.yml            # One file per domain
+│   ├── anklume.yml          # One file per domain
 │   ├── ai-tools.yml
 │   ├── pro.yml
 │   └── perso.yml
@@ -430,7 +581,7 @@ resolution.
 ### "self" keyword
 
 When `I=self`, the script uses `hostname` to detect the current instance name.
-Works from any instance with access to the Incus socket (typically the admin
+Works from any instance with access to the Incus socket (typically the anklume
 container). Fails with a clear error if the hostname is not found.
 
 ### Self-restore safety

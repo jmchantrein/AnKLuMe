@@ -34,6 +34,20 @@ verify_connectivity() {
         return 1
     fi
     echo "Internet connectivity OK"
+
+    # Check br_netfilter for nftables bridge filtering
+    if ! lsmod | grep -q br_netfilter 2>/dev/null; then
+        echo "WARNING: br_netfilter module is NOT loaded." >&2
+        echo "         nftables rules will NOT filter traffic between bridges." >&2
+        echo "         Load it with: modprobe br_netfilter" >&2
+    fi
+
+    local nf_call
+    nf_call=$(sysctl -n net.bridge.bridge-nf-call-iptables 2>/dev/null || echo "unavailable")
+    if [ "$nf_call" != "1" ]; then
+        echo "WARNING: net.bridge.bridge-nf-call-iptables = ${nf_call} (expected 1)." >&2
+        echo "         Bridge traffic will bypass nftables even if rules are loaded." >&2
+    fi
 }
 
 restore_from_backup() {

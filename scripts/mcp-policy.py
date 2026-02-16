@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP policy engine for AnKLuMe inter-container services.
+"""MCP policy engine for anklume inter-container services.
 
 Simple allow-list policy engine that reads the `services:` section
 from infra.yml machine declarations and validates whether a caller
@@ -120,7 +120,7 @@ def cmd_list_services(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnKLuMe MCP policy engine — validate service access"
+        description="anklume MCP policy engine — validate service access"
     )
     sub = parser.add_subparsers(dest="command")
 

@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: incus_profiles
   namespace: anklume
-  author: AnKLuMe
+  author: anklume
   description: Reconcile default profile in each Incus project
   license: AGPL-3.0
   min_ansible_version: "2.16"
