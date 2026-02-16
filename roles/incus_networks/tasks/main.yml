@@ -61,11 +61,19 @@
     incus_networks_current_config: >-
       {{ (incus_networks_show_raw.stdout | from_yaml).config | default({}) }}
 
+- name: IncusNetworks | Build DHCP range from gateway
+  ansible.builtin.set_fact:
+    incus_networks_dhcp_range: >-
+      {{ incus_network.gateway | regex_replace('\.254$', '.100') }}-{{
+         incus_network.gateway | regex_replace('\.254$', '.249') }}
+
 - name: IncusNetworks | Build desired config
   ansible.builtin.set_fact:
     incus_networks_desired_config:
       ipv4.address: "{{ incus_network.gateway }}/24"
       ipv4.nat: "true"
+      ipv4.firewall: "true"
+      ipv4.dhcp.ranges: "{{ incus_networks_dhcp_range }}"
       ipv6.address: none
 
 - name: IncusNetworks | Set network config

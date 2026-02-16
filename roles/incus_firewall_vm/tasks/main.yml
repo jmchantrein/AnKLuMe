@@ -60,8 +60,7 @@
       incus profile device add
       {{ incus_firewall_vm_profile }}
       eth{{ idx }} nic
-      nictype=bridged
-      parent={{ bridge }}
+      network={{ bridge }}
       name=eth{{ idx }}
       --project {{ incus_firewall_vm_project }}
   loop: "{{ incus_firewall_vm_ordered_bridges }}"
