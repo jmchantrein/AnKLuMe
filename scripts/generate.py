@@ -968,7 +968,11 @@ def generate(infra, base_dir, dry_run=False):
             "domain_ephemeral": domain_ephemeral,
             "domain_trust_level": domain.get("trust_level"),
             "incus_project": f"{prefix}{dname}",
-            "incus_network": {"name": f"{prefix}net-{dname}", "subnet": f"{bs}.{sid}.0/24", "gateway": f"{bs}.{sid}.254"},
+            "incus_network": {
+                "name": f"{prefix}net-{dname}",
+                "subnet": f"{bs}.{sid}.0/24",
+                "gateway": f"{bs}.{sid}.254",
+            },
             "subnet_id": sid,
         }.items() if v is not None}
         if domain.get("profiles"):

@@ -427,6 +427,27 @@
     or (incus_instances_eth0_update_result is changed)
   changed_when: true
 
+- name: IncusInstances | Start instance if stopped
+  ansible.builtin.command:
+    argv:
+      - incus
+      - start
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: _incus_instances_start_result
+  when:
+    - instance_name in incus_instances_existing
+    - >-
+      (incus_instances_raw.stdout | from_json
+      | selectattr('name', 'equalto', instance_name)
+      | map(attribute='status') | first | default(''))
+      == 'Stopped'
+  changed_when: _incus_instances_start_result.rc == 0
+  failed_when: >-
+    _incus_instances_start_result.rc != 0
+    and 'already running' not in (_incus_instances_start_result.stderr | default(''))
+
 - name: IncusInstances | Wait for LXC container to be running
   ansible.builtin.command:
     argv:

@@ -37,6 +37,10 @@
       - network
       - create
       - "{{ incus_network.name }}"
+      - "ipv4.address={{ incus_network.gateway }}/24"
+      - "ipv4.nat=true"
+      - "ipv4.firewall=true"
+      - "ipv6.address=none"
   register: incus_networks_create_result
   when: incus_network.name not in incus_networks_existing
   changed_when: incus_networks_create_result.rc == 0
