@@ -1518,3 +1518,429 @@ class TestEdgeCases:
         ip_errors = [e for e in errors if "IP 10.100.0.10" in e]
         assert len(ip_errors) > 0
         assert "admin-ctrl" in ip_errors[0]
+
+
+# -- resource policy (ballooning/shares) --------------------------------------
+
+
+class TestResourcePolicy:
+    """Test resource_policy enrichment and validation."""
+
+    HOST_16CPU_64G = {"cpu": 16, "memory_bytes": 64 * 1024**3}
+
+    def _make_infra(self, policy=None, machines=None):
+        """Create infra with resource_policy and optional machines."""
+        infra = {
+            "project_name": "test",
+            "global": {"base_subnet": "10.100"},
+            "domains": {
+                "work": {
+                    "subnet_id": 1,
+                    "machines": machines or {
+                        "m1": {"type": "lxc", "ip": "10.100.1.10"},
+                        "m2": {"type": "lxc", "ip": "10.100.1.11"},
+                        "m3": {"type": "lxc", "ip": "10.100.1.12"},
+                    },
+                },
+            },
+        }
+        if policy is not None:
+            infra["global"]["resource_policy"] = policy
+        return infra
+
+    def test_skip_when_absent(self, monkeypatch):
+        """No resource_policy -> no enrichment."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra()
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"].get("config")
+        assert config is None
+
+    def test_proportional_equal_weights(self, monkeypatch):
+        """3 machines with weight 1 each get equal shares."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(policy={})
+        enrich_infra(infra)
+        machines = infra["domains"]["work"]["machines"]
+        m1_config = machines["m1"]["config"]
+        m2_config = machines["m2"]["config"]
+        m3_config = machines["m3"]["config"]
+        # All 3 should get the same allocation
+        assert m1_config["limits.memory"] == m2_config["limits.memory"]
+        assert m1_config["limits.memory"] == m3_config["limits.memory"]
+        # CPU allowance: 80% of 16 = 12.8 CPUs / 3 ≈ 4.27 -> 26% each
+        assert "limits.cpu.allowance" in m1_config
+
+    def test_proportional_different_weights(self, monkeypatch):
+        """Machine with weight 3 gets 3x the share of weight 1."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "heavy": {"type": "lxc", "ip": "10.100.1.10", "weight": 3},
+            "light1": {"type": "lxc", "ip": "10.100.1.11"},
+            "light2": {"type": "lxc", "ip": "10.100.1.12"},
+        }
+        infra = self._make_infra(policy={}, machines=machines)
+        enrich_infra(infra)
+        from generate import _parse_memory_value
+        heavy_mem = _parse_memory_value(
+            infra["domains"]["work"]["machines"]["heavy"]["config"]["limits.memory"]
+        )
+        light_mem = _parse_memory_value(
+            infra["domains"]["work"]["machines"]["light1"]["config"]["limits.memory"]
+        )
+        assert heavy_mem > light_mem
+        ratio = heavy_mem / light_mem
+        assert 2.5 < ratio < 3.5
+
+    def test_equal_mode(self, monkeypatch):
+        """Mode equal gives all machines the same share regardless of weight."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "heavy": {"type": "lxc", "ip": "10.100.1.10", "weight": 5},
+            "light": {"type": "lxc", "ip": "10.100.1.11"},
+        }
+        infra = self._make_infra(policy={"mode": "equal"}, machines=machines)
+        enrich_infra(infra)
+        heavy_mem = infra["domains"]["work"]["machines"]["heavy"]["config"]["limits.memory"]
+        light_mem = infra["domains"]["work"]["machines"]["light"]["config"]["limits.memory"]
+        assert heavy_mem == light_mem
+
+    def test_explicit_override_respected(self, monkeypatch):
+        """Machine with explicit limits.cpu is not overwritten."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "explicit": {
+                "type": "lxc", "ip": "10.100.1.10",
+                "config": {"limits.cpu": "4"},
+            },
+            "auto": {"type": "lxc", "ip": "10.100.1.11"},
+        }
+        infra = self._make_infra(policy={}, machines=machines)
+        enrich_infra(infra)
+        # Explicit CPU preserved
+        assert infra["domains"]["work"]["machines"]["explicit"]["config"]["limits.cpu"] == "4"
+        # Memory auto-allocated for explicit machine
+        assert "limits.memory" in infra["domains"]["work"]["machines"]["explicit"]["config"]
+        # Auto machine gets both
+        auto_config = infra["domains"]["work"]["machines"]["auto"]["config"]
+        assert "limits.cpu.allowance" in auto_config
+        assert "limits.memory" in auto_config
+
+    def test_cpu_mode_count(self, monkeypatch):
+        """cpu_mode: count sets limits.cpu as vCPU count."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(
+            policy={"cpu_mode": "count"},
+            machines={"m1": {"type": "lxc", "ip": "10.100.1.10"}},
+        )
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        assert "limits.cpu" in config
+        assert "limits.cpu.allowance" not in config
+        # 80% of 16 = 12.8, floor = 12
+        assert config["limits.cpu"] == "12"
+
+    def test_cpu_mode_allowance(self, monkeypatch):
+        """cpu_mode: allowance sets limits.cpu.allowance as percentage."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(
+            policy={"cpu_mode": "allowance"},
+            machines={"m1": {"type": "lxc", "ip": "10.100.1.10"}},
+        )
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        assert "limits.cpu.allowance" in config
+        assert "limits.cpu" not in config
+        assert config["limits.cpu.allowance"] == "80%"
+
+    def test_memory_enforce_soft(self, monkeypatch):
+        """memory_enforce: soft adds limits.memory.enforce: soft."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(policy={"memory_enforce": "soft"})
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        assert config.get("limits.memory.enforce") == "soft"
+
+    def test_memory_enforce_hard(self, monkeypatch):
+        """memory_enforce: hard does not add limits.memory.enforce."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(policy={"memory_enforce": "hard"})
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        assert "limits.memory.enforce" not in config
+
+    def test_host_reserve_percentage(self, monkeypatch):
+        """Custom host_reserve percentage changes available pool."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(
+            policy={"host_reserve": {"cpu": "50%", "memory": "50%"}, "cpu_mode": "count"},
+            machines={"m1": {"type": "lxc", "ip": "10.100.1.10"}},
+        )
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        # 50% of 16 reserved = 8 available, single machine gets 8
+        assert config["limits.cpu"] == "8"
+
+    def test_overcommit_false_error(self, monkeypatch):
+        """overcommit: false exits when total exceeds available."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "explicit": {
+                "type": "lxc", "ip": "10.100.1.10",
+                "config": {"limits.cpu": "20", "limits.memory": "100GiB"},
+            },
+            "auto": {"type": "lxc", "ip": "10.100.1.11"},
+        }
+        infra = self._make_infra(
+            policy={"overcommit": False, "cpu_mode": "count"}, machines=machines
+        )
+        with pytest.raises(SystemExit):
+            enrich_infra(infra)
+
+    def test_overcommit_true_no_error(self, monkeypatch, capsys):
+        """overcommit: true allows exceeding available (prints warning)."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "explicit": {
+                "type": "lxc", "ip": "10.100.1.10",
+                "config": {"limits.cpu": "20", "limits.memory": "100GiB"},
+            },
+            "auto": {"type": "lxc", "ip": "10.100.1.11"},
+        }
+        infra = self._make_infra(
+            policy={"overcommit": True, "cpu_mode": "count"}, machines=machines
+        )
+        enrich_infra(infra)  # should not raise
+        stderr = capsys.readouterr().err
+        assert "overcommit" in stderr.lower() or "WARNING" in stderr
+
+    def test_policy_true_uses_defaults(self, monkeypatch):
+        """resource_policy: true treated as empty dict (all defaults)."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(
+            policy=True,
+            machines={"m1": {"type": "lxc", "ip": "10.100.1.10"}},
+        )
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"]["config"]
+        assert "limits.cpu.allowance" in config
+        assert "limits.memory" in config
+
+    def test_validate_invalid_mode(self):
+        """Invalid resource_policy.mode triggers validation error."""
+        infra = self._make_infra(policy={"mode": "random"})
+        errors = validate(infra)
+        assert any("resource_policy.mode" in e for e in errors)
+
+    def test_validate_invalid_cpu_mode(self):
+        """Invalid resource_policy.cpu_mode triggers validation error."""
+        infra = self._make_infra(policy={"cpu_mode": "shares"})
+        errors = validate(infra)
+        assert any("resource_policy.cpu_mode" in e for e in errors)
+
+    def test_validate_invalid_memory_enforce(self):
+        """Invalid resource_policy.memory_enforce triggers validation error."""
+        infra = self._make_infra(policy={"memory_enforce": "rigid"})
+        errors = validate(infra)
+        assert any("resource_policy.memory_enforce" in e for e in errors)
+
+    def test_validate_invalid_weight(self):
+        """Non-positive weight triggers validation error."""
+        infra = self._make_infra(machines={
+            "m1": {"type": "lxc", "ip": "10.100.1.10", "weight": 0},
+        })
+        errors = validate(infra)
+        assert any("weight must be a positive integer" in e for e in errors)
+
+    def test_validate_weight_string(self):
+        """String weight triggers validation error."""
+        infra = self._make_infra(machines={
+            "m1": {"type": "lxc", "ip": "10.100.1.10", "weight": "high"},
+        })
+        errors = validate(infra)
+        assert any("weight must be a positive integer" in e for e in errors)
+
+    def test_host_detection_failure_skips(self, monkeypatch, capsys):
+        """If host detection fails, enrichment is skipped with warning."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: None)
+        infra = self._make_infra(policy={})
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["m1"].get("config")
+        assert config is None or "limits.memory" not in config
+        stderr = capsys.readouterr().err
+        assert "detect host resources" in stderr.lower()
+
+    def test_memory_enforce_soft_on_explicit(self, monkeypatch):
+        """memory_enforce: soft applies to machines with explicit limits.memory."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        machines = {
+            "explicit": {
+                "type": "lxc", "ip": "10.100.1.10",
+                "config": {"limits.memory": "8GiB"},
+            },
+        }
+        infra = self._make_infra(policy={"memory_enforce": "soft"}, machines=machines)
+        enrich_infra(infra)
+        config = infra["domains"]["work"]["machines"]["explicit"]["config"]
+        assert config["limits.memory"] == "8GiB"
+        assert config["limits.memory.enforce"] == "soft"
+
+    def test_generated_host_vars_contain_limits(self, monkeypatch, tmp_path):
+        """After enrichment, generated host_vars contain allocated limits."""
+        monkeypatch.setattr(gen_mod, "_detect_host_resources", lambda: self.HOST_16CPU_64G)
+        infra = self._make_infra(
+            policy={"cpu_mode": "count"},
+            machines={"m1": {"type": "lxc", "ip": "10.100.1.10"}},
+        )
+        enrich_infra(infra)
+        generate(infra, tmp_path)
+        content = (tmp_path / "host_vars" / "m1.yml").read_text()
+        assert "limits.cpu" in content
+        assert "limits.memory" in content
+
+
+# -- boot autostart -----------------------------------------------------------
+
+
+class TestBootAutostart:
+    """Test boot_autostart and boot_priority validation and generation."""
+
+    def test_boot_autostart_propagated(self, sample_infra, tmp_path):
+        """boot_autostart: true generates instance_boot_autostart in host_vars."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_autostart"] = True
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_boot_autostart: true" in content
+
+    def test_boot_autostart_false_propagated(self, sample_infra, tmp_path):
+        """boot_autostart: false generates instance_boot_autostart: false."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_autostart"] = False
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_boot_autostart: false" in content
+
+    def test_boot_autostart_omitted(self, sample_infra, tmp_path):
+        """Omitted boot_autostart does not appear in host_vars."""
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_boot_autostart" not in content
+
+    def test_boot_autostart_invalid_type(self, sample_infra):
+        """Non-boolean boot_autostart triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_autostart"] = "yes"
+        errors = validate(sample_infra)
+        assert any("boot_autostart must be a boolean" in e for e in errors)
+
+    def test_boot_priority_propagated(self, sample_infra, tmp_path):
+        """boot_priority generates instance_boot_priority in host_vars."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = 10
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_boot_priority: 10" in content
+
+    def test_boot_priority_zero_valid(self, sample_infra):
+        """boot_priority: 0 is valid."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = 0
+        errors = validate(sample_infra)
+        assert not any("boot_priority" in e for e in errors)
+
+    def test_boot_priority_100_valid(self, sample_infra):
+        """boot_priority: 100 is valid."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = 100
+        errors = validate(sample_infra)
+        assert not any("boot_priority" in e for e in errors)
+
+    def test_boot_priority_out_of_range(self, sample_infra):
+        """boot_priority: 101 triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = 101
+        errors = validate(sample_infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_negative(self, sample_infra):
+        """boot_priority: -1 triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = -1
+        errors = validate(sample_infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_string(self, sample_infra):
+        """boot_priority: 'high' triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["boot_priority"] = "high"
+        errors = validate(sample_infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+
+# -- snapshots schedule -------------------------------------------------------
+
+
+class TestSnapshotsSchedule:
+    """Test snapshots_schedule and snapshots_expiry validation and generation."""
+
+    def test_schedule_propagated(self, sample_infra, tmp_path):
+        """snapshots_schedule generates instance_snapshots_schedule in host_vars."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_schedule"] = "0 2 * * *"
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_snapshots_schedule" in content
+        assert "0 2 * * *" in content
+
+    def test_schedule_omitted(self, sample_infra, tmp_path):
+        """Omitted snapshots_schedule does not appear in host_vars."""
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_snapshots_schedule" not in content
+
+    def test_schedule_invalid_format(self, sample_infra):
+        """Invalid cron expression triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_schedule"] = "every day"
+        errors = validate(sample_infra)
+        assert any("snapshots_schedule must be a cron expression" in e for e in errors)
+
+    def test_schedule_too_few_fields(self, sample_infra):
+        """Cron with <5 fields triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_schedule"] = "0 2 *"
+        errors = validate(sample_infra)
+        assert any("snapshots_schedule must be a cron expression" in e for e in errors)
+
+    def test_expiry_propagated(self, sample_infra, tmp_path):
+        """snapshots_expiry generates instance_snapshots_expiry in host_vars."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_expiry"] = "30d"
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_snapshots_expiry" in content
+        assert "30d" in content
+
+    def test_expiry_hours_valid(self, sample_infra):
+        """snapshots_expiry: '24h' is valid."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_expiry"] = "24h"
+        errors = validate(sample_infra)
+        assert not any("snapshots_expiry" in e for e in errors)
+
+    def test_expiry_minutes_valid(self, sample_infra):
+        """snapshots_expiry: '60m' is valid."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_expiry"] = "60m"
+        errors = validate(sample_infra)
+        assert not any("snapshots_expiry" in e for e in errors)
+
+    def test_expiry_invalid_format(self, sample_infra):
+        """Invalid expiry format triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_expiry"] = "30 days"
+        errors = validate(sample_infra)
+        assert any("snapshots_expiry must be a duration" in e for e in errors)
+
+    def test_expiry_no_unit(self, sample_infra):
+        """Expiry without unit triggers validation error."""
+        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["snapshots_expiry"] = "30"
+        errors = validate(sample_infra)
+        assert any("snapshots_expiry must be a duration" in e for e in errors)
+
+    def test_schedule_and_expiry_together(self, sample_infra, tmp_path):
+        """Both schedule and expiry can be set together."""
+        m = sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]
+        m["snapshots_schedule"] = "0 3 * * 0"
+        m["snapshots_expiry"] = "7d"
+        errors = validate(sample_infra)
+        assert not any("snapshots" in e for e in errors)
+        generate(sample_infra, tmp_path)
+        content = (tmp_path / "host_vars" / "admin-ctrl.yml").read_text()
+        assert "instance_snapshots_schedule" in content
+        assert "instance_snapshots_expiry" in content

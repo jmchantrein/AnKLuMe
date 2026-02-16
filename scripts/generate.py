@@ -2,6 +2,7 @@
 """PSOT Generator — generates Ansible file tree from infra.yml."""
 
 import argparse
+import contextlib
 import ipaddress
 import json
 import os
@@ -85,6 +86,74 @@ def _detect_host_subnets():
             except (KeyError, ValueError):
                 continue
     return subnets
+
+
+def _detect_host_resources():
+    """Detect host CPU count and total memory.
+
+    Tries 'incus info --resources --format json' first, then /proc fallback.
+    Returns {"cpu": int, "memory_bytes": int} or None if detection fails.
+    """
+    try:
+        result = subprocess.run(
+            ["incus", "info", "--resources", "--format", "json"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            cpu_total = data.get("cpu", {}).get("total", 0)
+            mem_total = data.get("memory", {}).get("total", 0)
+            if cpu_total > 0 and mem_total > 0:
+                return {"cpu": cpu_total, "memory_bytes": mem_total}
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+
+    # Fallback: /proc
+    try:
+        cpu_count = 0
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("processor"):
+                    cpu_count += 1
+        mem_bytes = 0
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    mem_bytes = int(line.split()[1]) * 1024
+                    break
+        if cpu_count > 0 and mem_bytes > 0:
+            return {"cpu": cpu_count, "memory_bytes": mem_bytes}
+    except (FileNotFoundError, ValueError, IndexError):
+        pass
+
+    return None
+
+
+def _parse_memory_value(value):
+    """Parse Incus memory string (e.g., '2GiB', '512MiB') to bytes."""
+    value = str(value).strip()
+    suffixes = {"GiB": 1024**3, "MiB": 1024**2, "KiB": 1024, "GB": 10**9, "MB": 10**6}
+    for suffix, mult in suffixes.items():
+        if value.endswith(suffix):
+            try:
+                return int(float(value[: -len(suffix)]) * mult)
+            except ValueError:
+                return 0
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
+def _format_memory(bytes_val):
+    """Format bytes as Incus memory string (e.g., '2GiB', '512MiB')."""
+    gib = bytes_val / (1024**3)
+    if gib >= 1 and int(gib) == gib:
+        return f"{int(gib)}GiB"
+    mib = bytes_val / (1024**2)
+    if mib >= 1:
+        return f"{int(mib)}MiB"
+    return str(bytes_val)
 
 
 def load_infra(path):
@@ -286,6 +355,49 @@ def validate(infra, *, check_host_subnets=True):
                         f"tool '{svc_tool}'. Known tools: {', '.join(sorted(_KNOWN_MCP_TOOLS))}"
                     )
 
+            # Validate boot_autostart (boolean) and boot_priority (int 0-100)
+            boot_autostart = machine.get("boot_autostart")
+            if boot_autostart is not None and not isinstance(boot_autostart, bool):
+                errors.append(
+                    f"Machine '{mname}': boot_autostart must be a boolean, "
+                    f"got {type(boot_autostart).__name__}"
+                )
+            boot_priority = machine.get("boot_priority")
+            if boot_priority is not None and (
+                not isinstance(boot_priority, int) or not 0 <= boot_priority <= 100
+            ):
+                errors.append(
+                    f"Machine '{mname}': boot_priority must be an integer 0-100, "
+                    f"got {boot_priority}"
+                )
+
+            # Validate snapshots_schedule (basic cron) and snapshots_expiry (Nd)
+            snap_sched = machine.get("snapshots_schedule")
+            if snap_sched is not None and (
+                not isinstance(snap_sched, str)
+                or not re.match(r"^(\S+\s+){4}\S+$", snap_sched)
+            ):
+                errors.append(
+                    f"Machine '{mname}': snapshots_schedule must be a cron expression "
+                    f"(5 fields), got '{snap_sched}'"
+                )
+            snap_expiry = machine.get("snapshots_expiry")
+            if snap_expiry is not None and (
+                not isinstance(snap_expiry, str)
+                or not re.match(r"^\d+[dhm]$", snap_expiry)
+            ):
+                errors.append(
+                    f"Machine '{mname}': snapshots_expiry must be a duration "
+                    f"(e.g., '30d', '24h', '60m'), got '{snap_expiry}'"
+                )
+
+            # Validate weight for resource_policy
+            weight = machine.get("weight")
+            if weight is not None and (not isinstance(weight, int) or weight < 1):
+                errors.append(
+                    f"Machine '{mname}': weight must be a positive integer, got {weight}"
+                )
+
     # Services consumer validation (second pass — all machines now known)
     for _dname, domain in domains.items():
         for mname, machine in (domain.get("machines") or {}).items():
@@ -358,6 +470,71 @@ def validate(infra, *, check_host_subnets=True):
                 f"ai_access_policy is 'exclusive' but {len(ai_tools_policies)} "
                 f"network_policies target ai-tools (max 1 allowed)"
             )
+
+    # Resource policy validation
+    resource_policy = g.get("resource_policy")
+    if resource_policy is not None and resource_policy is not True:
+        if not isinstance(resource_policy, dict):
+            errors.append("global.resource_policy must be a mapping or true")
+        else:
+            rp_mode = resource_policy.get("mode", "proportional")
+            if rp_mode not in ("proportional", "equal"):
+                errors.append(
+                    f"resource_policy.mode must be 'proportional' or 'equal', got '{rp_mode}'"
+                )
+            rp_cpu_mode = resource_policy.get("cpu_mode", "allowance")
+            if rp_cpu_mode not in ("allowance", "count"):
+                errors.append(
+                    f"resource_policy.cpu_mode must be 'allowance' or 'count', got '{rp_cpu_mode}'"
+                )
+            rp_mem_enforce = resource_policy.get("memory_enforce", "soft")
+            if rp_mem_enforce not in ("soft", "hard"):
+                errors.append(
+                    f"resource_policy.memory_enforce must be 'soft' or 'hard', "
+                    f"got '{rp_mem_enforce}'"
+                )
+            rp_overcommit = resource_policy.get("overcommit", False)
+            if not isinstance(rp_overcommit, bool):
+                errors.append("resource_policy.overcommit must be a boolean")
+            hr = resource_policy.get("host_reserve")
+            if hr is not None:
+                if not isinstance(hr, dict):
+                    errors.append("resource_policy.host_reserve must be a mapping")
+                else:
+                    for field in ("cpu", "memory"):
+                        val = hr.get(field)
+                        if val is None:
+                            continue
+                        if isinstance(val, str) and val.endswith("%"):
+                            try:
+                                pct = int(val.rstrip("%"))
+                                if not 0 < pct < 100:
+                                    errors.append(
+                                        f"resource_policy.host_reserve.{field}: "
+                                        f"percentage must be 1-99, got {pct}"
+                                    )
+                            except ValueError:
+                                errors.append(
+                                    f"resource_policy.host_reserve.{field}: "
+                                    f"invalid format '{val}'"
+                                )
+                        elif isinstance(val, (int, float)):
+                            if val <= 0:
+                                errors.append(
+                                    f"resource_policy.host_reserve.{field}: "
+                                    f"must be positive, got {val}"
+                                )
+                        elif isinstance(val, str) and field == "memory":
+                            if _parse_memory_value(val) <= 0:
+                                errors.append(
+                                    f"resource_policy.host_reserve.memory: "
+                                    f"invalid value '{val}'"
+                                )
+                        else:
+                            errors.append(
+                                f"resource_policy.host_reserve.{field}: "
+                                f"must be 'N%' or a positive number, got '{val}'"
+                            )
 
     # Host subnet conflict detection — prevents routing loops
     # Skip if check_host_subnets=False or env ANKLUME_SKIP_HOST_SUBNET_CHECK=1
@@ -438,6 +615,7 @@ def enrich_infra(infra):
     """
     _enrich_firewall(infra)
     _enrich_ai_access(infra)
+    _enrich_resources(infra)
 
 
 def _enrich_firewall(infra):
@@ -514,6 +692,159 @@ def _enrich_ai_access(infra):
     })
     print(f"INFO: ai_access_policy is 'exclusive' — auto-created network policy "
           f"from '{ai_access_default}' to 'ai-tools'", file=sys.stderr)
+
+
+def _enrich_resources(infra):
+    """Auto-allocate CPU and memory based on resource_policy."""
+    g = infra.get("global", {})
+    policy = g.get("resource_policy")
+    if policy is None:
+        return
+
+    # resource_policy: true → all defaults
+    if policy is True:
+        policy = {}
+    if not isinstance(policy, dict):
+        return
+
+    host = _detect_host_resources()
+    if host is None:
+        print("WARNING: Could not detect host resources, "
+              "skipping resource allocation.", file=sys.stderr)
+        return
+
+    host_reserve = policy.get("host_reserve", {})
+    if not isinstance(host_reserve, dict):
+        host_reserve = {}
+
+    mode = policy.get("mode", "proportional")
+    cpu_mode = policy.get("cpu_mode", "allowance")
+    memory_enforce = policy.get("memory_enforce", "soft")
+    overcommit = policy.get("overcommit", False)
+
+    # Parse CPU reserve
+    cpu_reserve_val = host_reserve.get("cpu", "20%")
+    if isinstance(cpu_reserve_val, str) and cpu_reserve_val.endswith("%"):
+        reserve_cpu = host["cpu"] * int(cpu_reserve_val.rstrip("%")) / 100
+    else:
+        reserve_cpu = float(cpu_reserve_val)
+
+    # Parse memory reserve
+    mem_reserve_val = host_reserve.get("memory", "20%")
+    if isinstance(mem_reserve_val, str) and mem_reserve_val.endswith("%"):
+        reserve_mem = int(host["memory_bytes"] * int(mem_reserve_val.rstrip("%")) / 100)
+    elif isinstance(mem_reserve_val, str):
+        reserve_mem = _parse_memory_value(mem_reserve_val)
+    else:
+        reserve_mem = int(mem_reserve_val)
+
+    available_cpu = host["cpu"] - reserve_cpu
+    available_mem = host["memory_bytes"] - reserve_mem
+
+    if available_cpu <= 0 or available_mem <= 0:
+        print("WARNING: Host reserve exceeds available resources, "
+              "skipping resource allocation.", file=sys.stderr)
+        return
+
+    # Collect machines needing allocation
+    domains = infra.get("domains") or {}
+    entries = []  # (machine_dict, weight, needs_cpu, needs_mem)
+
+    for domain in domains.values():
+        for machine in (domain.get("machines") or {}).values():
+            config = machine.get("config") or {}
+            needs_cpu = "limits.cpu" not in config and "limits.cpu.allowance" not in config
+            needs_mem = "limits.memory" not in config
+            if needs_cpu or needs_mem:
+                entries.append((machine, machine.get("weight", 1), needs_cpu, needs_mem))
+
+    if not entries:
+        # Still apply memory_enforce to explicit machines
+        if memory_enforce == "soft":
+            _apply_memory_enforce(infra)
+        return
+
+    # CPU distribution
+    cpu_entries = [(m, w) for m, w, nc, _ in entries if nc]
+    if cpu_entries:
+        w_total = len(cpu_entries) if mode == "equal" else sum(w for _, w in cpu_entries)
+        for m, w in cpu_entries:
+            share = available_cpu * (1 if mode == "equal" else w) / w_total
+            config = m.setdefault("config", {})
+            if cpu_mode == "count":
+                config["limits.cpu"] = str(max(1, int(share)))
+            else:
+                pct = max(1, int(share / host["cpu"] * 100))
+                config["limits.cpu.allowance"] = f"{pct}%"
+
+    # Memory distribution
+    mem_entries = [(m, w) for m, w, _, nm in entries if nm]
+    if mem_entries:
+        w_total = len(mem_entries) if mode == "equal" else sum(w for _, w in mem_entries)
+        for m, w in mem_entries:
+            share = int(available_mem * (1 if mode == "equal" else w) / w_total)
+            share = max(128 * 1024 * 1024, share)  # min 128 MiB
+            config = m.setdefault("config", {})
+            config["limits.memory"] = _format_memory(share)
+
+    # Apply memory_enforce: soft
+    if memory_enforce == "soft":
+        _apply_memory_enforce(infra)
+
+    # Overcommit check — core counts and allowance % are independent constraints
+    total_cpu_count = 0.0
+    total_cpu_allowance_pct = 0.0
+    total_mem = 0
+    for domain in domains.values():
+        for machine in (domain.get("machines") or {}).values():
+            config = machine.get("config") or {}
+            if "limits.cpu" in config:
+                with contextlib.suppress(ValueError, TypeError):
+                    total_cpu_count += int(config["limits.cpu"])
+            elif "limits.cpu.allowance" in config:
+                val = str(config["limits.cpu.allowance"])
+                if val.endswith("%"):
+                    with contextlib.suppress(ValueError):
+                        total_cpu_allowance_pct += int(val.rstrip("%"))
+            if "limits.memory" in config:
+                total_mem += _parse_memory_value(config["limits.memory"])
+
+    max_allowance_pct = available_cpu / host["cpu"] * 100
+    cpu_count_over = total_cpu_count > available_cpu * 1.001
+    cpu_allowance_over = total_cpu_allowance_pct > max_allowance_pct * 1.001
+    mem_over = total_mem > available_mem
+    if cpu_count_over or cpu_allowance_over or mem_over:
+        parts = []
+        if cpu_count_over:
+            parts.append(
+                f"CPU: {total_cpu_count:.0f} cores > {available_cpu:.0f} available"
+            )
+        if cpu_allowance_over:
+            parts.append(
+                f"CPU allowance: {total_cpu_allowance_pct:.0f}% > "
+                f"{max_allowance_pct:.0f}% available"
+            )
+        if mem_over:
+            parts.append(
+                f"Memory: {_format_memory(total_mem)} > "
+                f"{_format_memory(int(available_mem))}"
+            )
+        msg = "Resource overcommit: " + "; ".join(parts)
+        if not overcommit:
+            print(f"ERROR: {msg}. Set resource_policy.overcommit: true to allow.",
+                  file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"WARNING: {msg}", file=sys.stderr)
+
+
+def _apply_memory_enforce(infra):
+    """Set limits.memory.enforce: soft on all machines with limits.memory."""
+    for domain in (infra.get("domains") or {}).values():
+        for machine in (domain.get("machines") or {}).values():
+            config = machine.get("config") or {}
+            if "limits.memory" in config and "limits.memory.enforce" not in config:
+                config["limits.memory.enforce"] = "soft"
 
 
 def extract_all_images(infra):
@@ -636,6 +967,10 @@ def generate(infra, base_dir, dry_run=False):
                 "instance_storage_volumes": m.get("storage_volumes"),
                 "instance_services": m.get("services"),
                 "instance_roles": m.get("roles"),
+                "instance_boot_autostart": m.get("boot_autostart"),
+                "instance_boot_priority": m.get("boot_priority"),
+                "instance_snapshots_schedule": m.get("snapshots_schedule"),
+                "instance_snapshots_expiry": m.get("snapshots_expiry"),
             }.items() if v is not None}
             fp, _ = _write_managed(base / "host_vars" / f"{mname}.yml", hvars, dry_run)
             written.append(fp)
