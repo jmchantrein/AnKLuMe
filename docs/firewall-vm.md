@@ -14,16 +14,16 @@ kernel, with centralized logging and full nftables control inside the VM.
 ┌──────────────────────────────────────────────────────────┐
 │ Host                                                      │
 │                                                           │
-│  net-admin    net-perso    net-pro    net-homelab         │
+│  net-anklume  net-perso    net-pro    net-homelab         │
 │    │              │           │           │                │
 │    └──────┬───────┴───────┬──┘           │                │
 │           │               │              │                │
 │    ┌──────┴───────────────┴──────────────┴──────┐        │
 │    │         sys-firewall (KVM VM)               │        │
-│    │  eth0=admin  eth1=perso  eth2=pro  eth3=hl  │        │
+│    │  eth0=anklume  eth1=perso  eth2=pro  eth3=hl │        │
 │    │                                              │        │
 │    │  nftables: all inter-domain dropped            │        │
-│    │            admin uses Incus socket (not net)   │        │
+│    │            anklume uses Incus socket (not net)  │        │
 │    │            centralized logging                │        │
 │    └──────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────┘
@@ -36,7 +36,7 @@ router between domains, applying nftables rules on forwarded traffic.
 
 The simplest way to enable the firewall VM is to set `firewall_mode: vm`
 in `infra.yml`. The PSOT generator automatically creates the `sys-firewall`
-machine in the admin domain if you have not declared one yourself:
+machine in the anklume domain if you have not declared one yourself:
 
 ```yaml
 # infra.yml — just add firewall_mode: vm
@@ -45,10 +45,10 @@ global:
   firewall_mode: vm
 
 domains:
-  admin:
+  anklume:
     subnet_id: 0
     machines:
-      admin-ansible:
+      anklume-instance:
         type: lxc
         ip: "10.100.0.10"
         roles: [base_system]
@@ -56,17 +56,17 @@ domains:
 ```
 
 ```bash
-make sync    # Auto-creates sys-firewall (10.100.0.253) in admin domain
+make sync    # Auto-creates sys-firewall (10.100.0.253) in anklume domain
 make apply   # Creates infrastructure + provisions the firewall VM
 ```
 
 The generator prints an informational message when auto-creating:
 
 ```
-INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain (ip: 10.100.0.253)
+INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain (ip: 10.100.0.253)
 ```
 
-The auto-created `sys-firewall` has: type `vm`, IP `.253` in the admin
+The auto-created `sys-firewall` has: type `vm`, IP `.253` in the anklume
 subnet, 2 vCPU, 2 GiB memory, roles `[base_system, firewall_router]`,
 and `ephemeral: false`.
 
@@ -86,14 +86,14 @@ global:
 
 ### 2. Declare the firewall VM (optional — auto-created if omitted)
 
-To override the defaults, add `sys-firewall` to the admin domain:
+To override the defaults, add `sys-firewall` to the anklume domain:
 
 ```yaml
 domains:
-  admin:
+  anklume:
     subnet_id: 0
     machines:
-      admin-ansible:
+      anklume-instance:
         type: lxc
         ip: "10.100.0.10"
         roles: [base_system]
@@ -136,7 +136,7 @@ The generated nftables rules inside the VM enforce:
 | any | any (ICMP) | ACCEPT |
 | any | any (established) | ACCEPT |
 
-The admin domain is treated like any other domain. The admin container
+The anklume domain is treated like any other domain. The anklume container
 communicates with all instances via the Incus socket, not the network,
 so it does not need a network-level exception.
 
@@ -149,7 +149,7 @@ All decisions are logged with prefixes:
 ### Viewing logs
 
 ```bash
-incus exec sys-firewall --project admin -- journalctl -kf | grep "FW-"
+incus exec sys-firewall --project anklume -- journalctl -kf | grep "FW-"
 ```
 
 ## Defense in depth
@@ -212,11 +212,11 @@ Add a route configuration task in the `base_system` role or a custom role:
 Edit the firewall rules inside the VM:
 
 ```bash
-incus exec sys-firewall --project admin -- \
+incus exec sys-firewall --project anklume -- \
   vi /etc/nftables.d/anklume-firewall.nft
 
 # Reload
-incus exec sys-firewall --project admin -- \
+incus exec sys-firewall --project anklume -- \
   systemctl restart nftables
 ```
 
@@ -234,7 +234,7 @@ incus network list | grep net-
 Check the profile:
 
 ```bash
-incus profile show firewall-multi-nic --project admin
+incus profile show firewall-multi-nic --project anklume
 ```
 
 ### Traffic not flowing through firewall VM

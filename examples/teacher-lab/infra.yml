@@ -7,7 +7,7 @@
 #
 # See docs/SPEC.md section 5 for the full format reference.
 
-# Teacher lab: admin domain + 3 student domains.
+# Teacher lab: anklume domain + 3 student domains.
 # Each student gets an isolated network with a web server and a client.
 # Scale by copying the student domain blocks with new subnet_ids.
 
@@ -20,7 +20,7 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Teacher administration"
     subnet_id: 0
     ephemeral: false

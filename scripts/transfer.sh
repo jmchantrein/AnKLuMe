@@ -194,10 +194,10 @@ Restore options:
 Examples:
   transfer.sh copy pro-dev:/etc/hosts perso-desktop:/tmp/hosts
   transfer.sh backup homelab-ai
-  transfer.sh backup --gpg-recipient user@example.com --output /mnt/backup admin-ansible
+  transfer.sh backup --gpg-recipient user@example.com --output /mnt/backup anklume-instance
   transfer.sh restore backups/homelab-ai-20260214-120000.tar.gz
   transfer.sh restore --name homelab-ai-v2 --project homelab backups/homelab-ai.tar.gz
-  transfer.sh restore backups/admin-ansible.tar.gz.gpg
+  transfer.sh restore backups/anklume-instance.tar.gz.gpg
 USAGE
 }
 

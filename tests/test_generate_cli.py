@@ -28,10 +28,10 @@ def _make_infra(tmp_path, infra_data=None):
                 "default_os_image": "images:debian/13",
             },
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
-                        "admin-ansible": {
+                        "anklume-instance": {
                             "type": "lxc",
                             "ip": "10.100.0.10",
                         },
@@ -300,14 +300,14 @@ class TestBaseDir:
             [str(infra_file), "--base-dir", str(out_dir)],
         )
         assert result.returncode == 0
-        assert (out_dir / "inventory" / "admin.yml").exists()
+        assert (out_dir / "inventory" / "anklume.yml").exists()
 
     def test_base_dir_defaults_to_cwd(self, tmp_path):
         """Without --base-dir, output goes to cwd."""
         infra_file = _make_infra(tmp_path)
         result = _run_generate([str(infra_file)], cwd=tmp_path)
         assert result.returncode == 0
-        assert (tmp_path / "inventory" / "admin.yml").exists()
+        assert (tmp_path / "inventory" / "anklume.yml").exists()
 
 
 # -------------------------------------------------------------------
@@ -530,9 +530,9 @@ class TestNormalOutput:
             [str(infra_file), "--base-dir", str(tmp_path)],
         )
         assert result.returncode == 0
-        assert (tmp_path / "inventory" / "admin.yml").exists()
-        assert (tmp_path / "group_vars" / "admin.yml").exists()
-        assert (tmp_path / "host_vars" / "admin-ansible.yml").exists()
+        assert (tmp_path / "inventory" / "anklume.yml").exists()
+        assert (tmp_path / "group_vars" / "anklume.yml").exists()
+        assert (tmp_path / "host_vars" / "anklume-instance.yml").exists()
         assert (tmp_path / "group_vars" / "all.yml").exists()
 
     def test_reports_domain_count(self, tmp_path):

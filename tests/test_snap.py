@@ -12,7 +12,7 @@ SNAP_SH = Path(__file__).resolve().parent.parent / "scripts" / "snap.sh"
 
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
-    {"name": "admin-ansible", "project": "admin", "status": "Running"},
+    {"name": "anklume-instance", "project": "anklume", "status": "Running"},
     {"name": "dev-workspace", "project": "work", "status": "Running"},
 ])
 
@@ -70,17 +70,17 @@ def read_log(log_file):
 class TestCreate:
     def test_create_with_name(self, mock_env):
         env, log = mock_env
-        result = run_snap(["create", "admin-ansible", "my-snap"], env)
+        result = run_snap(["create", "anklume-instance", "my-snap"], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("snapshot create admin-ansible my-snap --project admin" in c for c in cmds)
+        assert any("snapshot create anklume-instance my-snap --project anklume" in c for c in cmds)
 
     def test_create_auto_name(self, mock_env):
         env, log = mock_env
-        result = run_snap(["create", "admin-ansible"], env)
+        result = run_snap(["create", "anklume-instance"], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("snapshot create admin-ansible snap-" in c for c in cmds)
+        assert any("snapshot create anklume-instance snap-" in c for c in cmds)
 
     def test_create_unknown_instance(self, mock_env):
         env, _ = mock_env
@@ -102,7 +102,7 @@ class TestRestore:
 
     def test_self_restore_requires_confirmation(self, mock_env):
         env, _ = mock_env
-        env["HOSTNAME"] = "admin-ansible"
+        env["HOSTNAME"] = "anklume-instance"
         result = run_snap(["restore", "self", "my-snap"], env, input_text="no\n")
         assert result.returncode != 0
         assert "WARNING" in result.stdout or "WARNING" in result.stderr
@@ -110,18 +110,18 @@ class TestRestore:
     def test_self_restore_confirm_yes(self, mock_env):
         """Typing 'yes' at the self-restore prompt proceeds with restore."""
         env, log = mock_env
-        env["HOSTNAME"] = "admin-ansible"
+        env["HOSTNAME"] = "anklume-instance"
         result = run_snap(["restore", "self", "my-snap"], env, input_text="yes\n")
         assert result.returncode == 0
         cmds = read_log(log)
         assert any(
-            "snapshot restore admin-ansible my-snap --project admin" in c
+            "snapshot restore anklume-instance my-snap --project anklume" in c
             for c in cmds
         )
 
     def test_self_restore_with_force(self, mock_env):
         env, log = mock_env
-        env["HOSTNAME"] = "admin-ansible"
+        env["HOSTNAME"] = "anklume-instance"
         result = run_snap(["restore", "--force", "self", "my-snap"], env)
         assert result.returncode == 0
 
@@ -132,17 +132,17 @@ class TestRestore:
 class TestList:
     def test_list_instance(self, mock_env):
         env, log = mock_env
-        result = run_snap(["list", "admin-ansible"], env)
+        result = run_snap(["list", "anklume-instance"], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("snapshot list admin-ansible" in c for c in cmds)
+        assert any("snapshot list anklume-instance" in c for c in cmds)
 
     def test_list_all(self, mock_env):
         env, log = mock_env
         result = run_snap(["list"], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("admin-ansible" in c for c in cmds)
+        assert any("anklume-instance" in c for c in cmds)
         assert any("dev-workspace" in c for c in cmds)
 
 
@@ -152,10 +152,10 @@ class TestList:
 class TestDelete:
     def test_delete(self, mock_env):
         env, log = mock_env
-        result = run_snap(["delete", "admin-ansible", "my-snap"], env)
+        result = run_snap(["delete", "anklume-instance", "my-snap"], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("snapshot delete admin-ansible my-snap --project admin" in c for c in cmds)
+        assert any("snapshot delete anklume-instance my-snap --project anklume" in c for c in cmds)
 
 
 # ── self detection ───────────────────────────────────────────
@@ -209,7 +209,7 @@ class TestForceFlag:
     def test_force_skips_warning(self, mock_env):
         """Force flag suppresses self-restore WARNING output."""
         env, log = mock_env
-        env["HOSTNAME"] = "admin-ansible"
+        env["HOSTNAME"] = "anklume-instance"
         result = run_snap(["restore", "--force", "self", "snap1"], env)
         assert result.returncode == 0
         assert "WARNING" not in result.stdout

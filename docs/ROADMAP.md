@@ -11,7 +11,7 @@ before phase N is complete and validated.
 
 **Deliverables**:
 - `scripts/generate.py` — the PSOT generator
-- `infra.yml` — PSOT file with 4 domains (admin, pro, perso, homelab)
+- `infra.yml` — PSOT file with 4 domains (anklume, pro, perso, homelab)
 - Generated inventory in `inventory/`
 - Generated group_vars and host_vars with managed sections
 - Constraint validation (unique names, unique subnets, valid IPs)
@@ -60,12 +60,12 @@ before phase N is complete and validated.
 
 **Deliverables**:
 - Commit manual hotfixes (failed_when images remote)
-- Systemd service for admin-ansible proxy socket (ADR-019)
+- Systemd service for anklume-instance proxy socket (ADR-019)
 - ADR-017, ADR-018, ADR-019 documented in ARCHITECTURE.md
 - Molecule tests updated for fixes
 
 **Validation criteria**:
-- [x] admin-ansible restarts without manual intervention
+- [x] anklume-instance restarts without manual intervention
 - [x] `ansible-playbook site.yml` idempotent after fixes
 - [x] `make lint` passes
 - [x] ADR-017 to ADR-019 present in ARCHITECTURE.md
@@ -149,7 +149,7 @@ Phase 12 will provide proper isolation via Incus-in-Incus.
 - `examples/` directory with documented infra.yml files:
   - `examples/student-sysadmin.infra.yml` — Sysadmin student: 2 simple
     domains (admin + lab), no GPU, isolated network for lab exercises
-  - `examples/teacher-lab.infra.yml` — Teacher: 1 admin domain + N
+  - `examples/teacher-lab.infra.yml` — Teacher: 1 anklume domain + N
     student domains generated dynamically, pre-lab snapshots
   - `examples/pro-workstation.infra.yml` — Pro workstation:
     admin/perso/pro/homelab, GPU on homelab, strict network isolation
@@ -983,10 +983,10 @@ QubesOS-style visual domain isolation in the terminal.
 │ tmux session "anklume"                               │
 │ ┌─────────────┐ ┌──────────┐ ┌──────────────────┐  │
 │ │ pane bg:blue │ │ bg:green │ │ bg:yellow        │  │
-│ │ admin-ansible│ │ pro-dev  │ │ perso-desktop    │  │
+│ │ anklume-instance   │ │ pro-dev  │ │ perso-desktop    │  │
 │ │ incus exec...│ │          │ │                  │  │
 │ └─────────────┘ └──────────┘ └──────────────────┘  │
-│ [0:admin]  [1:pro]  [2:perso]  [3:homelab]          │
+│ [0:anklume]  [1:pro]  [2:perso]  [3:homelab]        │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -1464,7 +1464,7 @@ def check_isolation(sandbox):
 
 | Domain | Container | IP | Network | Status |
 |--------|-----------|-----|---------|--------|
-| admin | admin-ansible | 10.100.0.10 | net-admin | Running |
+| anklume | anklume-instance | 10.100.0.10 | net-anklume | Running |
 | perso | perso-desktop | 10.100.1.10 | net-perso | Running |
 | pro | pro-dev | 10.100.2.10 | net-pro | Running |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |

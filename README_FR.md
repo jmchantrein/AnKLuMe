@@ -68,7 +68,7 @@ Avant d'utiliser AnKLuMe, il vous faut :
 
 1. **Un hôte Linux** avec [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
    installé et initialisé
-2. **Une instance d'administration** (container LXC ou VM) nommée `admin-ansible`, avec :
+2. **Une instance d'administration** (container LXC ou VM) nommée `anklume-instance`, avec :
    - Le socket Incus monté (`/var/run/incus/unix.socket`)
    - Ansible, Python 3.11+, git installés
 3. **Ce dépôt** cloné dans l'instance d'administration
@@ -80,7 +80,7 @@ jamais l'hôte directement — tout passe par le socket Incus.
 
 ## Démarrage rapide
 
-Dans l'instance `admin-ansible` :
+Dans l'instance `anklume-instance` :
 
 ```bash
 # Cloner

@@ -1,6 +1,6 @@
 ---
 # Default variables for admin_bootstrap
-# Packages required on the admin-ansible controller.
+# Packages required on the anklume-instance controller.
 
 admin_bootstrap_packages:
   - ansible

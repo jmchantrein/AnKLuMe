@@ -21,20 +21,20 @@ manuellement sur votre hote :
 
 ```bash
 # Creer le container d'administration
-incus launch images:debian/13 admin-ansible
+incus launch images:debian/13 anklume-instance
 
 # Monter le socket Incus (necessaire pour gerer les autres instances)
-incus config device add admin-ansible incus-socket proxy \
+incus config device add anklume-instance incus-socket proxy \
   connect=unix:/var/lib/incus/unix.socket \
   listen=unix:/var/run/incus/unix.socket \
   bind=container \
   security.uid=0 security.gid=0
 
 # Activer l'imbrication (necessaire pour le CLI Incus dans le container)
-incus config set admin-ansible security.nesting=true
+incus config set anklume-instance security.nesting=true
 
 # Entrer dans le container
-incus exec admin-ansible -- bash
+incus exec anklume-instance -- bash
 ```
 
 A l'interieur du container d'administration, installez les outils requis :
@@ -91,9 +91,9 @@ Sortie attendue :
 ```
 Generating files for 2 domain(s)...
   Written: group_vars/all.yml
-  Written: inventory/admin.yml
-  Written: group_vars/admin.yml
-  Written: host_vars/admin-ansible.yml
+  Written: inventory/anklume.yml
+  Written: group_vars/anklume.yml
+  Written: host_vars/anklume-instance.yml
   Written: inventory/lab.yml
   Written: group_vars/lab.yml
   Written: host_vars/lab-server.yml
@@ -171,12 +171,12 @@ Apres votre installation initiale, le flux de travail quotidien est :
   d'ecrire. Lisez le message d'erreur pour identifier la contrainte specifique
   qui a echoue.
 - **Socket Incus introuvable** : Verifiez que le peripherique proxy est
-  configure avec `incus config device show admin-ansible`
+  configure avec `incus config device show anklume-instance`
 - **Le container ne demarre pas apres un redemarrage** : Le repertoire
   `/var/run/incus/` peut ne pas exister. Voir ADR-019 dans
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **make apply bloque** : Verifiez qu'Incus fonctionne (`systemctl status incus`)
-  et que le socket est accessible (`incus list` depuis admin-ansible).
+  et que le socket est accessible (`incus list` depuis anklume-instance).
 
 ## Etapes suivantes
 

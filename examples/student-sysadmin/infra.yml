@@ -7,7 +7,7 @@
 #
 # See docs/SPEC.md section 5 for the full format reference.
 
-# Sysadmin student: 2 domains (admin + lab)
+# Sysadmin student: 2 domains (anklume + lab)
 # Isolated lab environment for practicing system administration.
 
 project_name: student-sysadmin
@@ -19,7 +19,7 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     ephemeral: false

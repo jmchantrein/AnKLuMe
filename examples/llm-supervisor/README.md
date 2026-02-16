@@ -18,7 +18,7 @@ container that can communicate with both via their APIs. Useful for:
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller |
+| anklume | 0 | Ansible controller |
 | llm-alpha | 1 | First LLM (primary model) |
 | llm-beta | 2 | Second LLM (secondary model) |
 | supervisor | 3 | Supervisor + Open WebUI |
@@ -27,7 +27,7 @@ container that can communicate with both via their APIs. Useful for:
 
 | Machine | Domain | IP | GPU | Role |
 |---------|--------|-----|-----|------|
-| llms-admin | admin | 10.100.0.10 | No | Ansible controller |
+| llms-admin | anklume | 10.100.0.10 | No | Ansible controller |
 | llm-alpha-server | llm-alpha | 10.100.1.10 | Yes | Ollama (primary) |
 | llm-beta-server | llm-beta | 10.100.2.10 | Yes | Ollama (secondary) |
 | llm-supervisor | supervisor | 10.100.3.10 | No | Supervisor scripts |

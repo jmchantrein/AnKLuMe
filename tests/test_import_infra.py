@@ -17,15 +17,15 @@ def mock_env(tmp_path):
     mock_bin.mkdir()
     log_file = tmp_path / "cmds.log"
 
-    # Mock incus with 2 projects (admin, work) and instances
+    # Mock incus with 2 projects (anklume, work) and instances
     # Build JSON responses in separate files to avoid long lines
     proj_json = tmp_path / "proj.json"
     proj_json.write_text(
-        '[{"name":"default"},{"name":"admin"},{"name":"work"}]',
+        '[{"name":"default"},{"name":"anklume"},{"name":"work"}]',
     )
-    admin_json = tmp_path / "admin.json"
-    admin_json.write_text(
-        '[{"name":"admin-ctrl","type":"container",'
+    anklume_json = tmp_path / "anklume.json"
+    anklume_json.write_text(
+        '[{"name":"anklume-ctrl","type":"container",'
         '"state":{"network":{"eth0":{"addresses":'
         '[{"family":"inet","address":"10.100.0.10"}]}}}}]',
     )
@@ -48,9 +48,9 @@ if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
     exit 0
 fi
 
-# list instances --project admin --format json
-if [[ "$1" == "list" && "$*" == *"--project admin"* && "$*" == *"--format json"* ]]; then
-    cat "{admin_json}"
+# list instances --project anklume --format json
+if [[ "$1" == "list" && "$*" == *"--project anklume"* && "$*" == *"--format json"* ]]; then
+    cat "{anklume_json}"
     exit 0
 fi
 
@@ -129,7 +129,7 @@ class TestImportContent:
         env, _, cwd = mock_env
         run_import([], env, cwd=cwd)
         content = (cwd / "infra.imported.yml").read_text()
-        assert "admin:" in content
+        assert "anklume:" in content
         assert "work:" in content
         # default project should not appear as a domain
         assert "  default:" not in content
@@ -139,7 +139,7 @@ class TestImportContent:
         env, _, cwd = mock_env
         run_import([], env, cwd=cwd)
         content = (cwd / "infra.imported.yml").read_text()
-        assert "admin-ctrl:" in content
+        assert "anklume-ctrl:" in content
         assert "work-dev:" in content
         assert "work-vm:" in content
         # Check types
@@ -865,19 +865,19 @@ class TestImportOutputFormat:
         found_domain = False
         found_machine = False
         for line in lines:
-            # Domain lines: exactly 2 spaces then name + colon (e.g. "  admin:")
-            if line.startswith("  admin:"):
+            # Domain lines: exactly 2 spaces then name + colon (e.g. "  anklume:")
+            if line.startswith("  anklume:"):
                 found_domain = True
                 # Verify exactly 2 spaces of indentation
                 stripped = line.lstrip()
                 indent = len(line) - len(stripped)
                 assert indent == 2
-            # Machine lines: exactly 6 spaces then name + colon (e.g. "      admin-ctrl:")
-            if line.startswith("      admin-ctrl:"):
+            # Machine lines: exactly 6 spaces then name + colon (e.g. "      anklume-ctrl:")
+            if line.startswith("      anklume-ctrl:"):
                 found_machine = True
                 stripped = line.lstrip()
                 indent = len(line) - len(stripped)
                 assert indent == 6
 
-        assert found_domain, "Should find domain 'admin' at 2-space indent"
-        assert found_machine, "Should find machine 'admin-ctrl' at 6-space indent"
+        assert found_domain, "Should find domain 'anklume' at 2-space indent"
+        assert found_machine, "Should find machine 'anklume-ctrl' at 6-space indent"

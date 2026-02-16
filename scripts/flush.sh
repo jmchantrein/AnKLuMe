@@ -41,7 +41,7 @@ echo "This will destroy ALL anklume infrastructure."
 if ! incus project list --format csv >/dev/null 2>&1; then
     echo "ERROR: Cannot connect to the Incus daemon."
     echo "       Check that incus is installed and you have socket access."
-    echo "       (Run from the admin container or a user in the 'incus' group)"
+    echo "       (Run from the anklume container or a user in the 'incus' group)"
     exit 1
 fi
 

@@ -16,7 +16,7 @@ IPP without direct LAN access.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller (protected) |
+| anklume | 0 | Ansible controller (protected) |
 | print-service | 7 | Dedicated print service |
 | pro | 2 | Professional workstation |
 | perso | 1 | Personal domain |
@@ -25,7 +25,7 @@ IPP without direct LAN access.
 
 | Machine | Domain | Type | IP | Role |
 |---------|--------|------|-----|------|
-| admin-ansible | admin | lxc | 10.100.0.10 | Ansible controller |
+| anklume-instance | anklume | lxc | 10.100.0.10 | Ansible controller |
 | sys-print | print-service | lxc | 10.100.7.10 | CUPS print server |
 | pro-dev | pro | lxc | 10.100.2.10 | Development workstation |
 | perso-desktop | perso | lxc | 10.100.1.10 | Personal desktop |

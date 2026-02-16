@@ -138,9 +138,9 @@ Use "self" as instance name to auto-detect from hostname.
 Default snapshot name: snap-YYYYMMDD-HHMMSS
 
 Examples:
-  snap.sh create admin-ansible
+  snap.sh create anklume-instance
   snap.sh create self my-checkpoint
-  snap.sh restore admin-ansible snap-20250210-143000
+  snap.sh restore anklume-instance snap-20250210-143000
   snap.sh restore self my-checkpoint
   snap.sh list
   snap.sh list self

@@ -18,7 +18,7 @@ des modeles.
 │                │ ✓ (actuel)       ┌──────────────┐      │
 │  net-perso ────┤ ✗ (bloque)  ──▶│ net-ai-tools │      │
 │                │                  │  ai-ollama   │      │
-│  net-admin ────┘ ✗ (bloque)     │  ai-webui    │      │
+│  net-anklume ──┘ ✗ (bloque)     │  ai-webui    │      │
 │                                   └──────────────┘      │
 │  nftables: seul net-pro <-> net-ai-tools autorise       │
 └─────────────────────────────────────────────────────────┘

@@ -150,7 +150,7 @@ Generated `.desktop` files for quick-launch from application menus:
 
 ```
 ~/.local/share/applications/
-├── anklume-admin-ansible.desktop
+├── anklume-anklume-instance.desktop
 ├── anklume-pro-dev.desktop
 └── anklume-perso-desktop.desktop
 ```

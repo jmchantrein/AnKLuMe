@@ -6,7 +6,7 @@
 # validates the syntax, copies to /etc/nftables.d/, and reloads nftables.
 #
 # Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
-# Default source: admin-ansible
+# Default source: anklume-instance
 # Default project: admin (searches all projects if not found)
 set -euo pipefail
 
@@ -15,7 +15,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # ── Defaults ─────────────────────────────────────────────────
 
 DRY_RUN=false
-SOURCE_CONTAINER="admin-ansible"
+SOURCE_CONTAINER="anklume-instance"
 SOURCE_PATH="/opt/anklume/nftables-isolation.nft"
 DEST_DIR="/etc/nftables.d"
 DEST_FILE="${DEST_DIR}/anklume-isolation.nft"
@@ -26,12 +26,12 @@ usage() {
     cat <<'USAGE'
 Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
 
-Pulls nftables isolation rules from the admin container, validates
+Pulls nftables isolation rules from the anklume container, validates
 syntax, copies to /etc/nftables.d/, and reloads nftables.
 
 Options:
   --dry-run             Validate only, do not install or reload
-  --source CONTAINER    Source container name (default: admin-ansible)
+  --source CONTAINER    Source container name (default: anklume-instance)
   -h, --help            Show this help
 
 This script must be run ON THE HOST as root (or with sudo).
@@ -71,9 +71,9 @@ find_project() {
     local container="$1"
     local project
 
-    # Try the default project (admin) first
-    if incus info "$container" --project admin &>/dev/null; then
-        echo "admin"
+    # Try the default project (anklume) first
+    if incus info "$container" --project anklume &>/dev/null; then
+        echo "anklume"
         return 0
     fi
 

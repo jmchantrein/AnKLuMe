@@ -10,7 +10,7 @@ Feature: Edit managed sections
     Given infra.yml from "student-sysadmin"
     When I run "make sync"
     Then exit code is 0
-    When I edit the managed section in "group_vars/admin.yml"
+    When I edit the managed section in "group_vars/anklume.yml"
     When I run "make sync"
     Then exit code is 0
-    And the managed section in "group_vars/admin.yml" is unchanged
+    And the managed section in "group_vars/anklume.yml" is unchanged
