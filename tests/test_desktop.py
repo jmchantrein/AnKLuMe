@@ -122,7 +122,7 @@ class TestDashboard:
         status = {"instances": [], "networks": [], "policies": [], "project_name": "test"}
         html = render_status_html(status)
         assert "No instances found" in html
-        assert "No AnKLuMe networks" in html
+        assert "No anklume networks" in html
 
     def test_render_status_html_with_data(self):
         from dashboard import render_status_html

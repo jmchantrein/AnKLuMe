@@ -17,7 +17,7 @@ def mock_env(tmp_path):
     mock_bin.mkdir()
     log_file = tmp_path / "incus.log"
 
-    # Simulate AnKLuMe resources: 2 projects, 2 instances, 1 profile, 1 bridge
+    # Simulate anklume resources: 2 projects, 2 instances, 1 profile, 1 bridge
     mock_incus = mock_bin / "incus"
     mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"

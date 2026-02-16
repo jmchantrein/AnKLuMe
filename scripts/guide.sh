@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# guide.sh — Interactive step-by-step onboarding tutorial for AnKLuMe
+# guide.sh — Interactive step-by-step onboarding tutorial for anklume
 # Usage: scripts/guide.sh [--step N] [--auto]
 #
-# Walks the user through setting up AnKLuMe from scratch.
+# Walks the user through setting up anklume from scratch.
 # Each step: explain -> execute -> validate (green/red) -> pause.
 #
 # Options:
@@ -66,7 +66,7 @@ header() {
     clear 2>/dev/null || true
     echo -e "${CYAN}${BOLD}"
     echo "  ┌─────────────────────────────────────────┐"
-    echo "  │           AnKLuMe Setup Guide            │"
+    echo "  │           anklume Setup Guide             │"
     echo "  │   Infrastructure Compartmentalization    │"
     echo "  └─────────────────────────────────────────┘"
     echo -e "${RESET}"
@@ -238,7 +238,7 @@ step_1_prerequisites() {
 
 step_2_use_case() {
     step_header 2 "Use Case Selection"
-    echo "  AnKLuMe ships with example configurations for common use cases."
+    echo "  anklume ships with example configurations for common use cases."
     echo "  Each example includes a ready-to-use infra.yml."
     echo ""
 
@@ -467,9 +467,9 @@ step_7_verify() {
     echo ""
     echo "  Networks:"
     if incus network list --format compact 2>/dev/null | grep "net-" | sed 's/^/    /'; then
-        ok "AnKLuMe networks found"
+        ok "anklume networks found"
     else
-        warn "No AnKLuMe networks found (net-* pattern)"
+        warn "No anklume networks found (net-* pattern)"
     fi
 
     pause
@@ -513,7 +513,7 @@ step_8_snapshot() {
 
 step_9_next_steps() {
     step_header 9 "Next Steps"
-    echo "  Your AnKLuMe infrastructure is set up. Here is what to explore next:"
+    echo "  Your anklume infrastructure is set up. Here is what to explore next:"
     echo ""
     echo -e "  ${CYAN}Network isolation${RESET}"
     info "  Block traffic between domains with nftables"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tor transparent proxy setup for AnKLuMe instances.
+# Tor transparent proxy setup for anklume instances.
 # Install, configure, and verify Tor inside an Incus container.
 # See docs/tor-gateway.md and ROADMAP.md Phase 20e.
 set -euo pipefail
@@ -61,7 +61,7 @@ cmd_setup() {
     # Configure Tor as transparent proxy
     echo "Configuring Tor transparent proxy (TransPort 9040, DNSPort 5353)..."
     printf '%s\n' \
-        '# AnKLuMe Tor transparent proxy configuration' \
+        '# anklume Tor transparent proxy configuration' \
         'VirtualAddrNetworkIPv4 10.192.0.0/10' \
         'AutomapHostsOnResolve 1' \
         'TransPort 0.0.0.0:9040' \
@@ -75,7 +75,7 @@ cmd_setup() {
     echo "Configuring nftables traffic redirection..."
     incus exec "$instance" --project "$project" -- mkdir -p /etc/nftables.d
     printf '%s\n' \
-        '# AnKLuMe Tor transparent proxy nftables rules' \
+        '# anklume Tor transparent proxy nftables rules' \
         'table inet tor-redirect' \
         '' \
         'delete table inet tor-redirect' \

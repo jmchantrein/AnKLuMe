@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CUPS print service management for AnKLuMe instances.
+# CUPS print service management for anklume instances.
 # Install CUPS, add USB printers, and configure network printer access.
 # See docs/sys-print.md and ROADMAP.md Phase 20e.
 set -euo pipefail
@@ -61,7 +61,7 @@ cmd_setup() {
     # Configure CUPS for remote access
     echo "Configuring CUPS for remote access (port 631)..."
     cat <<'CUPSCONF' | incus file push - "${instance}/etc/cups/cupsd.conf" --project "$project"
-# AnKLuMe CUPS configuration - remote access enabled
+# anklume CUPS configuration - remote access enabled
 LogLevel warn
 MaxLogSize 0
 Listen *:631

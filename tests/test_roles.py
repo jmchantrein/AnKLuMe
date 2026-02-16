@@ -1,6 +1,6 @@
 """Tests for Ansible role structure, defaults, and templates.
 
-Validates that all roles follow AnKLuMe conventions:
+Validates that all roles follow anklume conventions:
 - Required files exist (tasks/main.yml, defaults/main.yml, meta/main.yml)
 - Defaults are valid YAML with expected types
 - Templates render correctly with sample data

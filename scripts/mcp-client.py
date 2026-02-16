@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP client CLI for AnKLuMe inter-container services.
+"""MCP client CLI for anklume inter-container services.
 
 Connects to an MCP server using the official Python SDK and provides
 a CLI for listing and calling tools. Designed for use with
@@ -102,7 +102,7 @@ async def _cmd_call(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnKLuMe MCP client — call inter-container services"
+        description="anklume MCP client — call inter-container services"
     )
     parser.add_argument("--instance", "-i", help="Target instance name")
     parser.add_argument("--project", "-p", help="Incus project for the target instance")

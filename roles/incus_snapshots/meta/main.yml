@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: incus_snapshots
   namespace: anklume
-  author: AnKLuMe
+  author: anklume
   description: Manage Incus instance snapshots (create, restore, delete, list)
   license: AGPL-3.0
   min_ansible_version: "2.16"
