@@ -98,12 +98,31 @@ check: ## Dry-run (ansible-playbook --check --diff)
 syntax: ## Syntax check only
 	ansible-playbook site.yml --syntax-check
 
+# ── Network Safety Wrapper ───────────────────────────────
+# Wraps network-critical commands with safety checks
+# Usage: $(call safe_apply_wrap,<target>,<command>)
+define safe_apply_wrap
+	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@echo "🛡️  Network safety: backing up current state...")
+	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@scripts/network-safety-check.sh backup)
+	@echo "🔄 Running: $(1)"
+	@$(call tele_wrap,$(1),$(2))
+	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@echo "✅ Verifying network connectivity...")
+	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@scripts/network-safety-check.sh verify || (echo "⚠️  WARNING: Network connectivity lost after $(1)!" && \
+		echo "    Last backup: $$(ls -t ~/.anklume-network-backups/network-*.txt 2>/dev/null | head -1)" && \
+		echo "    Run: scripts/network-safety-check.sh restore-info" && exit 1))
+	@echo "✅ $(1) complete"
+endef
+
 # ── Apply ─────────────────────────────────────────────────
 apply: ## Apply full infrastructure + provisioning
-	$(call tele_wrap,apply,ansible-playbook site.yml)
+	@if [ ! -d inventory ] || [ -z "$$(ls inventory/*.yml 2>/dev/null)" ]; then \
+		echo "ERROR: No inventory files found. Run 'make sync' first to generate them from infra.yml." >&2; \
+		exit 1; \
+	fi
+	$(call safe_apply_wrap,apply,ansible-playbook site.yml)
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
-	$(call tele_wrap,apply-infra,ansible-playbook site.yml --tags infra)
+	$(call safe_apply_wrap,apply-infra,ansible-playbook site.yml --tags infra)
 
 apply-provision: ## Apply provisioning only (packages, services)
 	$(call tele_wrap,apply-provision,ansible-playbook site.yml --tags provision)
