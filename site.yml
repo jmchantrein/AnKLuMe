@@ -40,7 +40,7 @@
   hosts: all
   connection: local
   gather_facts: false
-  # serial: 1  # Uncomment for strict sequential execution (prevents race conditions)
+  serial: 1  # Sequential execution — prevents race conditions on shared Incus resources
   tags:
     - infra
 
