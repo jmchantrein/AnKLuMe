@@ -37,8 +37,13 @@
       - network
       - create
       - "{{ incus_network.name }}"
+  register: incus_networks_create_result
   when: incus_network.name not in incus_networks_existing
-  changed_when: true
+  changed_when: incus_networks_create_result.rc == 0
+  failed_when: >-
+    incus_networks_create_result.rc != 0
+    and 'UNIQUE constraint failed' not in (incus_networks_create_result.stderr | default(''))
+    and 'already exists' not in (incus_networks_create_result.stderr | default(''))
 
 - name: IncusNetworks | Read network config
   ansible.builtin.command:

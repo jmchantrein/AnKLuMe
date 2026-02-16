@@ -30,8 +30,13 @@
       - project
       - create
       - "{{ incus_project }}"
+  register: incus_projects_create_result
   when: incus_project not in incus_projects_existing
-  changed_when: true
+  changed_when: incus_projects_create_result.rc == 0
+  failed_when: >-
+    incus_projects_create_result.rc != 0
+    and 'UNIQUE constraint failed' not in (incus_projects_create_result.stderr | default(''))
+    and 'already exists' not in (incus_projects_create_result.stderr | default(''))
 
 - name: IncusProjects | Configure project features
   ansible.builtin.command:
@@ -66,7 +71,11 @@
       - "{{ incus_project }}"
       - "description={{ domain_description }}"
       - --property
+  register: incus_projects_desc_result
   when: >-
     (incus_projects_show_raw.stdout | from_yaml).description | default('')
     != domain_description
-  changed_when: true
+  changed_when: incus_projects_desc_result.rc == 0
+  failed_when: >-
+    incus_projects_desc_result.rc != 0
+    and 'ETag' not in (incus_projects_desc_result.stderr | default(''))

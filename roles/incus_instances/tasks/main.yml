@@ -105,10 +105,14 @@
       {{ ['incus', 'launch', instance_os_image, instance_name,
           '--project', instance_domain]
          + (_incus_instances_profile_args | from_yaml) }}
+  register: incus_instances_launch_lxc_result
   when:
     - instance_name not in incus_instances_existing
     - instance_type == 'lxc'
-  changed_when: true
+  changed_when: incus_instances_launch_lxc_result.rc == 0
+  failed_when: >-
+    incus_instances_launch_lxc_result.rc != 0
+    and 'already exists' not in (incus_instances_launch_lxc_result.stderr | default(''))
 
 - name: IncusInstances | Launch VM if missing
   ansible.builtin.command:
@@ -116,10 +120,14 @@
       {{ ['incus', 'launch', instance_os_image, instance_name,
           '--vm', '--project', instance_domain]
          + (_incus_instances_profile_args | from_yaml) }}
+  register: incus_instances_launch_vm_result
   when:
     - instance_name not in incus_instances_existing
     - instance_type == 'vm'
-  changed_when: true
+  changed_when: incus_instances_launch_vm_result.rc == 0
+  failed_when: >-
+    incus_instances_launch_vm_result.rc != 0
+    and 'already exists' not in (incus_instances_launch_vm_result.stderr | default(''))
 
 - name: IncusInstances | Read current instance profiles
   ansible.builtin.command:
@@ -130,8 +138,6 @@
       - "{{ instance_name }}"
       - --project
       - "{{ instance_domain }}"
-      - --format
-      - json
   register: _incus_instances_config_raw
   changed_when: false
   check_mode: false
@@ -140,7 +146,7 @@
 - name: IncusInstances | Parse current profiles
   ansible.builtin.set_fact:
     _incus_instances_current_profiles: >-
-      {{ (_incus_instances_config_raw.stdout | from_json).profiles | default(['default']) }}
+      {{ (_incus_instances_config_raw.stdout | from_yaml).profiles | default(['default']) }}
   when: _incus_instances_config_raw is not skipped
 
 - name: IncusInstances | Assign profiles if changed
@@ -205,6 +211,7 @@
       - "ipv4.address={{ instance_ip }}"
       - --project
       - "{{ instance_domain }}"
+  register: incus_instances_eth0_override_result
   when:
     - instance_ip is defined and (instance_ip | length > 0)
     - "'eth0' not in (incus_instance_devices | default({}))"
@@ -222,6 +229,7 @@
       - "ipv4.address={{ instance_ip }}"
       - --project
       - "{{ instance_domain }}"
+  register: incus_instances_eth0_update_result
   when:
     - instance_ip is defined and (instance_ip | length > 0)
     - "'eth0' in (incus_instance_devices | default({}))"
@@ -339,7 +347,11 @@
       - "{{ instance_name }}"
       - --project
       - "{{ instance_domain }}"
-  when: (incus_device_add_result is changed) or (_incus_instances_vol_attach is changed)
+  when: >-
+    (incus_device_add_result is changed)
+    or (_incus_instances_vol_attach is changed)
+    or (incus_instances_eth0_override_result is changed)
+    or (incus_instances_eth0_update_result is changed)
   changed_when: true
 
 - name: IncusInstances | Wait for LXC container to be running
