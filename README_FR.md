@@ -1,4 +1,7 @@
-# AnKLuMe 🔨
+# AnKLuMe
+
+> **Note** : La version anglaise (`README.md`) fait reference en cas
+> de divergence.
 
 <!-- Badges -->
 [![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
@@ -13,170 +16,273 @@
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Molecule](https://img.shields.io/badge/molecule-tested-green)](https://molecule.readthedocs.io/)
 
-<!-- Badges statiques — quality gates (validés par la CI) -->
+<!-- Badges statiques — quality gates (valides par la CI) -->
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
 [![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
 
-**Isolation type QubesOS utilisant les fonctionnalités natives du noyau Linux (KVM/LXC).**
+**Une interface declarative haut niveau pour Incus.**
 
-Orchestré sereinement par vous, en assemblant des outils standards éprouvés
-sans réinventer la roue.
+Isolation type QubesOS utilisant les fonctionnalites natives du noyau
+Linux (KVM/LXC), orchestree sereinement par vous en assemblant des
+outils standards eprouves.
 
-> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) ⇒ **AnKLuMe** — de "enclume", traduction française d'[Incus](https://linuxcontainers.org/incus/) 🔨
+> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) => **AnKLuMe** — de "enclume", traduction francaise d'[Incus](https://linuxcontainers.org/incus/) (enclume)
 
 ---
 
 ## Qu'est-ce qu'AnKLuMe ?
 
-AnKLuMe est un framework déclaratif de cloisonnement d'infrastructure.
-Vous décrivez vos environnements isolés dans un seul fichier YAML, lancez
-deux commandes, et obtenez des domaines reproductibles, jetables et isolés
-par réseau — chacun avec son propre sous-réseau, projet Incus et ensemble
+AnKLuMe est un framework declaratif de cloisonnement d'infrastructure.
+Vous decrivez vos environnements isoles dans un seul fichier YAML, lancez
+deux commandes, et obtenez des domaines reproductibles, jetables et isoles
+par reseau — chacun avec son propre sous-reseau, projet Incus et ensemble
 de containers ou VMs.
 
 La philosophie [QubesOS](https://www.qubes-os.org/), mais :
-- **Pas d'OS dédié** — fonctionne sur n'importe quelle distribution Linux
-- **Pas de Xen** — utilise les fonctionnalités natives du noyau (KVM pour les VMs, LXC pour les containers)
-- **Pas de boîte noire** — des outils standards que vous connaissez déjà, assemblés intelligemment
-- **Déclaratif** — décrivez ce que vous voulez, AnKLuMe converge
+- **Pas d'OS dedie** — fonctionne sur n'importe quelle distribution Linux
+- **Pas de Xen** — utilise les fonctionnalites natives du noyau (KVM pour les VMs, LXC pour les containers)
+- **Pas de boite noire** — des outils standards que vous connaissez deja, assembles intelligemment
+- **Declaratif** — decrivez ce que vous voulez, AnKLuMe converge
 
 ## Pour qui ?
 
-- **Administrateurs systèmes** qui veulent cloisonner leur poste de travail
-  (admin, professionnel, personnel, homelab — chacun dans son réseau isolé)
-- **Enseignants** déployant des TPs réseau pour N étudiants en une commande
-- **Utilisateurs avancés** qui veulent l'isolation QubesOS sans les contraintes
+- **Administrateurs systemes** qui veulent cloisonner leur poste de travail
+  (admin, professionnel, personnel, homelab — chacun dans son reseau isole)
+- **Enseignants** deployant des TPs reseau pour N etudiants en une commande
+- **Utilisateurs avances** qui veulent l'isolation QubesOS sans les contraintes
   QubesOS
 
-## Comment ça marche
+## Comment ca marche
 
 ```
-infra.yml          →    make sync    →    Fichiers Ansible  →    make apply    →    État Incus
-(vous décrivez)         (génération)      (vous enrichissez)     (convergence)      (infra active)
+infra.yml          ->    make sync    ->    Fichiers Ansible  ->    make apply    ->    Etat Incus
+(vous decrivez)         (generation)      (vous enrichissez)     (convergence)      (infra active)
 ```
 
-1. **Décrivez** votre infrastructure dans `infra.yml` (Source de Vérité Primaire)
-2. **Générez** l'arborescence Ansible : `make sync`
-3. **Enrichissez** les fichiers générés avec vos variables personnalisées (Source de Vérité Secondaire)
-4. **Appliquez** : `make apply` — réseaux, projets, profils, instances, provisioning
+1. **Decrivez** votre infrastructure dans `infra.yml` (Source de Verite Primaire)
+2. **Generez** l'arborescence Ansible : `make sync`
+3. **Enrichissez** les fichiers generes avec vos variables personnalisees (Source de Verite Secondaire)
+4. **Appliquez** : `make apply` — reseaux, projets, profils, instances, provisioning
 
-## Prérequis
+## Prerequis
 
 Avant d'utiliser AnKLuMe, il vous faut :
 
-1. **Un hôte Linux** avec [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
-   installé et initialisé
-2. **Une instance d'administration** (container LXC ou VM) nommée `admin-ansible`, avec :
-   - Le socket Incus monté (`/var/run/incus/unix.socket`)
-   - Ansible, Python 3.11+, git installés
-3. **Ce dépôt** cloné dans l'instance d'administration
+1. **Un hote Linux** avec [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
+   installe et initialise
+2. **Une instance anklume** (container LXC ou VM) nommee `anklume-instance`, avec :
+   - Le socket Incus monte (`/var/run/incus/unix.socket`)
+   - Ansible, Python 3.11+, git installes
+3. **Ce depot** clone dans l'instance anklume
 
-AnKLuMe s'exécute entièrement depuis l'instance d'administration. Il ne modifie
-jamais l'hôte directement — tout passe par le socket Incus.
+AnKLuMe s'execute entierement depuis l'instance anklume. Il ne modifie
+jamais l'hote directement — tout passe par le socket Incus.
 
-> Guides d'installation de l'hôte pour Debian et Arch Linux : voir [ROADMAP](docs/ROADMAP.md).
-
-## Démarrage rapide
-
-Dans l'instance `admin-ansible` :
+## Demarrage rapide
 
 ```bash
-# Cloner
-git clone https://github.com/<user>/anklume.git
-cd anklume
+# Dans le container anklume-instance :
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe
 
-# Installer les dépendances Ansible
+# Installer les dependances Ansible
 make init
 
-# Créer votre descripteur d'infrastructure
-cp infra.yml.example infra.yml
-# Éditez infra.yml — définissez vos domaines et machines
+# Configuration guidee interactive (recommandee pour les nouveaux utilisateurs)
+make guide
 
-# Générer les fichiers Ansible
-make sync
-
-# Prévisualiser les changements
-make check
-
-# Appliquer
-make apply
+# Ou configuration manuelle :
+cp infra.yml.example infra.yml   # Editez infra.yml selon vos besoins
+make sync                        # Generer les fichiers Ansible
+make check                       # Previsualiser les changements (dry-run)
+make apply                       # Appliquer l'infrastructure
 ```
+
+Voir le [guide de demarrage rapide](docs/quickstart.md) pour plus de details.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ Hôte (n'importe quelle distro Linux)                    │
-│  • Incus daemon + nftables + (optionnel) GPU NVIDIA     │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                │
-│  │ net-aaa  │ │ net-bbb  │ │ net-ccc  │  ...           │
-│  │ subnet A │ │ subnet B │ │ subnet C │                │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘                │
-│       │             │             │                      │
-│  ┌────┴────┐  ┌─────┴────┐ ┌────┴──────┐               │
-│  │ LXC/VM  │  │ LXC/VM   │ │ LXC/VM   │               │
-│  └─────────┘  └──────────┘ └──────────┘                │
-│                                                         │
-│  Isolation nftables : subnet A ≠ B ≠ C (pas de forward)│
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------------+
+| Hote (n'importe quelle distro Linux)                          |
+|  Incus daemon + nftables + (optionnel) GPU NVIDIA             |
+|                                                               |
+|  +-----------+ +-----------+ +-----------+                    |
+|  | net-aaa   | | net-bbb   | | net-ccc   |  ...              |
+|  | subnet A  | | subnet B  | | subnet C  |                   |
+|  +-----+-----+ +-----+-----+ +-----+-----+                  |
+|        |              |              |                         |
+|  +-----+-----+ +-----+-----+ +-----+-----+                  |
+|  | LXC / VM  | | LXC / VM  | | LXC / VM  |                  |
+|  +-----------+ +-----------+ +-----------+                    |
+|                                                               |
+|  Isolation nftables : subnet A != B != C (pas de forwarding)  |
+|  Acces inter-domaines selectif via network_policies            |
++---------------------------------------------------------------+
 ```
 
-Chaque **domaine** est un sous-réseau isolé avec son propre projet Incus.
-Les containers et VMs d'un domaine communiquent entre eux mais pas avec les
-autres domaines. Un container d'administration pilote tout via le socket
-Incus — pas besoin de SSH.
+Chaque **domaine** est un sous-reseau isole avec son propre projet Incus.
+Les containers et VMs d'un domaine communiquent entre eux mais le trafic
+inter-domaines est bloque par nftables. Les exceptions selectives sont
+declarees via `network_policies`. Le container anklume pilote tout via
+le socket Incus — pas besoin de SSH.
 
-## Fonctionnalités
+## Fonctionnalites
 
-- **Déclaratif** : Décrivez domaines, machines, profils dans `infra.yml`
-- **Exécution en deux phases** : Infrastructure (réseaux, projets, instances)
-  puis provisioning (paquets, services)
-- **Réconciliation** : Idempotent — détecte la dérive, crée ce qui manque,
-  signale les orphelins
-- **GPU passthrough** : Support optionnel NVIDIA pour containers LXC (LLM, ML)
-- **Snapshots** : Individuels, par domaine, ou globaux — avec restauration
-- **Testé** : Molecule pour les rôles, pytest pour le générateur
+| Categorie | Fonctionnalite |
+|-----------|---------------|
+| **Coeur** | YAML declaratif (`infra.yml`) avec generateur PSOT |
+| | Execution en deux phases : infrastructure puis provisioning |
+| | Gestion idempotente par reconciliation |
+| | Detection et nettoyage des orphelins |
+| **Isolation** | Bridges par domaine avec isolation nftables cross-bridge |
+| | Acces inter-domaines selectif via `network_policies` |
+| | Firewall VM dedie optionnel (style QubesOS sys-firewall) |
+| | Niveaux de confiance avec console tmux coloree |
+| **Calcul** | Containers LXC et VMs KVM dans le meme domaine |
+| | GPU passthrough NVIDIA (politique exclusive ou partagee) |
+| | Allocation automatique CPU/memoire (`resource_policy`) |
+| | Demarrage automatique avec priorite d'ordonnancement |
+| **Services IA** | Serveur LLM Ollama avec GPU |
+| | Interface chat Open WebUI |
+| | Interface web multi-fournisseur LobeChat |
+| | STT Speaches (faster-whisper, API compatible OpenAI) |
+| | Serveur de code IA headless OpenCode |
+| | Acces reseau exclusif aux outils IA avec flush VRAM |
+| **Cycle de vie** | Snapshots (manuels + automatiques avec schedule/expiry) |
+| | Images gold avec derivation CoW |
+| | Instances jetables (ephemeres) |
+| | Sauvegarde/restauration chiffree |
+| | Reinitialisation (`make flush && make sync && make apply`) |
+| | Mise a jour securisee du framework (`make upgrade`) |
+| | Import d'etat Incus existant (`make import-infra`) |
+| **Bureau** | Console tmux coloree style QubesOS (`make console`) |
+| | Partage de presse-papiers (hote <-> container) |
+| | Generateur de regles Sway/i3 |
+| | Tableau de bord web lecture seule |
+| **Reseau** | Passerelle proxy transparent Tor |
+| | Serveur d'impression CUPS avec passthrough USB/reseau |
+| | Services inter-containers via MCP |
+| **Tests** | Tests Molecule pour les 18 roles |
+| | pytest pour le generateur PSOT (2600+ tests) |
+| | Tests de scenarios BDD (bonnes/mauvaises pratiques) |
+| | Matrice comportementale avec suivi de couverture |
+| | Tests property-based Hypothesis |
+| | Sandbox Incus-dans-Incus pour tests isoles |
+| **Dev assiste par IA** | Correction de tests par LLM (Ollama, Claude, Aider) |
+| | Claude Code Agent Teams pour developpement autonome |
+| | Bibliotheque d'experience pour auto-amelioration |
+| **Observabilite** | Telemetrie locale (opt-in, ne quitte jamais la machine) |
+| | Detection de code mort et generation de graphe d'appels |
+| | Propagation du contexte d'imbrication entre niveaux |
 
 ## Documentation
 
-- [Guide de démarrage rapide](docs/quickstart.md)
-- [Guide de déploiement TP](docs/lab-tp.md) — pour les enseignants déployant des TPs étudiants
-- [Guide GPU + LLM](docs/gpu-llm.md) — GPU passthrough, Ollama, Open WebUI
-- [Spécification complète](docs/SPEC.md)
-- [Décisions d'architecture](docs/ARCHITECTURE.md)
-- [Feuille de route](docs/ROADMAP.md)
-- [Workflow Claude Code](docs/claude-code-workflow.md)
-- [Contribuer](CONTRIBUTING.md)
+| Categorie | Document |
+|-----------|----------|
+| **Demarrage** | [Demarrage rapide](docs/quickstart.md) |
+| | [Guide interactif](docs/guide.md) |
+| | [Specification complete](docs/SPEC.md) |
+| **Architecture** | [Decisions d'architecture (ADR-001 a ADR-035)](docs/ARCHITECTURE.md) |
+| | [Couverture des fonctionnalites Incus](docs/incus-coverage.md) |
+| | [Feuille de route](docs/ROADMAP.md) |
+| | [Journal des decisions](docs/decisions-log.md) |
+| **Reseau** | [Isolation reseau (nftables)](docs/network-isolation.md) |
+| | [Firewall VM dedie](docs/firewall-vm.md) |
+| | [Passerelle Tor](docs/tor-gateway.md) |
+| **Services IA** | [Acces exclusif aux outils IA](docs/ai-switch.md) |
+| | [Service Speech-to-Text](docs/stt-service.md) |
+| **Calcul** | [Guide VM](docs/vm-support.md) |
+| | [Gestion GPU et securite](docs/gpu-advanced.md) |
+| **Bureau** | [Integration bureau](docs/desktop-integration.md) |
+| **Cycle de vie** | [Transfert de fichiers et sauvegarde](docs/file-transfer.md) |
+| **Developpement** | [Tests assistes par IA](docs/ai-testing.md) |
+| | [Agent Teams](docs/agent-teams.md) |
+| | [Tests de scenarios BDD](docs/scenario-testing.md) |
+| | [Guide de deploiement TP](docs/lab-tp.md) |
+| | [Contribuer](CONTRIBUTING.md) |
 
 ## Exemples
 
-Configurations `infra.yml` prêtes à l'emploi pour les cas d'usage courants :
+Configurations `infra.yml` pretes a l'emploi :
 
 | Exemple | Description |
 |---------|-------------|
-| [Étudiant sysadmin](examples/student-sysadmin/) | 2 domaines (admin + lab) pour étudiants sysadmin, sans GPU |
-| [TP enseignant](examples/teacher-lab/) | Admin + N domaines étudiants avec réseaux isolés et snapshots |
-| [Poste professionnel](examples/pro-workstation/) | Domaines admin, perso, pro, homelab avec GPU |
-| [Sandbox isolation](examples/sandbox-isolation/) | Isolation maximale pour tests de logiciels non fiables |
-| [Superviseur LLM](examples/llm-supervisor/) | 2 LLMs isolés + 1 superviseur pour gestion multi-LLM |
-| [Développeur](examples/developer/) | Environnement développeur AnKLuMe avec tests Incus-in-Incus |
+| [Etudiant sysadmin](examples/student-sysadmin/) | 2 domaines (anklume + lab), sans GPU |
+| [TP enseignant](examples/teacher-lab/) | Anklume + N domaines etudiants avec snapshots |
+| [Poste professionnel](examples/pro-workstation/) | Anklume/pro/perso/homelab avec GPU |
+| [Sandbox isolation](examples/sandbox-isolation/) | Isolation maximale pour logiciels non fiables |
+| [Superviseur LLM](examples/llm-supervisor/) | 2 LLMs isoles + 1 superviseur |
+| [Developpeur](examples/developer/) | Environnement dev AnKLuMe avec Incus-dans-Incus |
+| [Outils IA](examples/ai-tools/) | Stack IA complete (Ollama, WebUI, LobeChat, STT) |
+| [Passerelle Tor](examples/tor-gateway/) | Navigation anonyme via proxy transparent Tor |
+| [Service d'impression](examples/sys-print/) | Serveur CUPS dedie avec imprimantes USB/reseau |
 
-Voir [examples/README.md](examples/README.md) pour plus de détails.
+## Roles Ansible
+
+### Roles d'infrastructure (Phase 1 : `connection: local`)
+
+| Role | Responsabilite |
+|------|---------------|
+| `incus_networks` | Creation/reconciliation des bridges par domaine |
+| `incus_projects` | Creation/reconciliation des projets Incus + profil par defaut |
+| `incus_profiles` | Creation des profils supplementaires (GPU, nesting, ressources) |
+| `incus_instances` | Creation/gestion des instances LXC + VM |
+| `incus_nftables` | Generation des regles d'isolation inter-bridges |
+| `incus_firewall_vm` | Profil multi-NIC pour firewall VM |
+| `incus_images` | Pre-telechargement et export des images OS |
+| `incus_nesting` | Propagation du contexte d'imbrication |
+
+### Roles de provisioning (Phase 2 : `connection: community.general.incus`)
+
+| Role | Responsabilite |
+|------|---------------|
+| `base_system` | Paquets de base, locale, fuseau horaire |
+| `admin_bootstrap` | Provisioning specifique anklume (Ansible, git) |
+| `ollama_server` | Serveur d'inference LLM Ollama |
+| `open_webui` | Interface chat Open WebUI |
+| `stt_server` | Serveur STT Speaches (faster-whisper) |
+| `lobechat` | Interface web multi-fournisseur LobeChat |
+| `opencode_server` | Serveur de code IA headless OpenCode |
+| `firewall_router` | Routage nftables dans la firewall VM |
+| `dev_test_runner` | Provisioning sandbox Incus-dans-Incus |
+| `dev_agent_runner` | Configuration Claude Code Agent Teams |
+
+## Commandes Make
+
+| Commande | Description |
+|----------|-------------|
+| `make guide` | Tutoriel interactif d'integration |
+| `make sync` | Generer les fichiers Ansible depuis infra.yml |
+| `make sync-dry` | Previsualiser les changements sans ecrire |
+| `make lint` | Lancer tous les validateurs (ansible-lint, yamllint, shellcheck, ruff) |
+| `make check` | Dry-run (--check --diff) |
+| `make apply` | Appliquer toute l'infrastructure |
+| `make apply-limit G=<domaine>` | Appliquer un seul domaine |
+| `make console` | Lancer la session tmux coloree |
+| `make nftables` | Generer les regles d'isolation nftables |
+| `make nftables-deploy` | Deployer les regles sur l'hote |
+| `make snap I=<nom>` | Creer un snapshot |
+| `make flush` | Detruire toute l'infrastructure AnKLuMe |
+| `make upgrade` | Mise a jour securisee du framework |
+| `make import-infra` | Generer infra.yml depuis l'etat Incus existant |
+| `make help` | Lister toutes les commandes disponibles |
 
 ## Stack technique
 
-| Outil | Rôle |
-|-------|------|
-| [Ansible](https://www.ansible.com/) | Orchestration, rôles, playbooks |
-| [Incus](https://linuxcontainers.org/incus/) | Gestion containers/VMs (LXC + KVM) |
-| [KVM](https://linux-kvm.org/) | Virtualisation native du noyau (VMs) |
-| [LXC](https://linuxcontainers.org/lxc/) | Containers natifs du noyau |
-| [Molecule](https://molecule.readthedocs.io/) | Tests des rôles Ansible |
-| [nftables](https://netfilter.org/projects/nftables/) | Isolation réseau inter-domaines |
-| [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) | Plugin de connexion Incus |
+| Composant | Version | Role |
+|-----------|---------|------|
+| [Incus](https://linuxcontainers.org/incus/) | >= 6.0 LTS | Containers LXC + VMs KVM |
+| [Ansible](https://www.ansible.com/) | >= 2.16 | Orchestration, roles, playbooks |
+| [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) | >= 9.0 | Plugin de connexion Incus |
+| [Molecule](https://molecule.readthedocs.io/) | >= 24.0 | Tests des roles Ansible |
+| [pytest](https://docs.pytest.org/) | >= 8.0 | Tests generateur + BDD |
+| [Python](https://www.python.org/) | >= 3.11 | Generateur PSOT, scripts |
+| [nftables](https://netfilter.org/projects/nftables/) | -- | Isolation inter-bridges |
+| [shellcheck](https://www.shellcheck.net/) | -- | Validation scripts shell |
+| [ruff](https://docs.astral.sh/ruff/) | -- | Linting Python |
 
 ## Licence
 
@@ -184,4 +290,4 @@ Voir [examples/README.md](examples/README.md) pour plus de détails.
 
 ---
 
-🇬🇧 [English version](README.md)
+[English version](README.md)

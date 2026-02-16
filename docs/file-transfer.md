@@ -14,16 +14,16 @@ make file-copy SRC=pro-dev:/etc/hosts DST=perso-desktop:/tmp/hosts
 ### Backup an instance
 
 ```bash
-make backup I=admin-ansible
-make backup I=admin-ansible GPG=user@example.com
-make backup I=admin-ansible O=/mnt/external
+make backup I=anklume-instance
+make backup I=anklume-instance GPG=user@example.com
+make backup I=anklume-instance O=/mnt/external
 ```
 
 ### Restore from backup
 
 ```bash
-make restore-backup FILE=backups/admin-ansible-20260214-120000.tar.gz
-make restore-backup FILE=backups/admin-ansible.tar.gz.gpg NAME=admin-v2 PROJECT=admin
+make restore-backup FILE=backups/anklume-instance-20260214-120000.tar.gz
+make restore-backup FILE=backups/anklume-instance.tar.gz.gpg NAME=admin-v2 PROJECT=anklume
 ```
 
 ## Commands
@@ -43,14 +43,14 @@ The copy is performed via a pipe:
 incus file pull <src> - | incus file push - <dst>
 ```
 
-This means the file content passes through the admin container (or
+This means the file content passes through the anklume container (or
 wherever the script runs) but is never written to disk on the host.
 
 **Examples**:
 
 ```bash
-# Copy a config file from pro to admin
-scripts/transfer.sh copy pro-dev:/etc/nginx/nginx.conf admin-ansible:/tmp/nginx.conf
+# Copy a config file from pro to anklume
+scripts/transfer.sh copy pro-dev:/etc/nginx/nginx.conf anklume-instance:/tmp/nginx.conf
 
 # Copy a log file to perso for analysis
 scripts/transfer.sh copy homelab-ai:/var/log/ollama.log perso-desktop:/tmp/ollama.log
@@ -80,10 +80,10 @@ pattern `<instance>-YYYYMMDD-HHMMSS.tar.gz`.
 
 ```bash
 # Basic backup
-scripts/transfer.sh backup admin-ansible
+scripts/transfer.sh backup anklume-instance
 
 # Encrypted backup
-scripts/transfer.sh backup --gpg-recipient admin@example.com admin-ansible
+scripts/transfer.sh backup --gpg-recipient admin@example.com anklume-instance
 
 # Custom output directory
 scripts/transfer.sh backup --output /mnt/backup homelab-ai
@@ -113,13 +113,13 @@ before import. The decrypted file is removed after successful import.
 
 ```bash
 # Restore from backup
-scripts/transfer.sh restore backups/admin-ansible-20260214-120000.tar.gz
+scripts/transfer.sh restore backups/anklume-instance-20260214-120000.tar.gz
 
 # Restore with new name
-scripts/transfer.sh restore --name admin-v2 --project admin backups/admin-ansible.tar.gz
+scripts/transfer.sh restore --name admin-v2 --project anklume backups/anklume-instance.tar.gz
 
 # Restore from encrypted backup
-scripts/transfer.sh restore backups/admin-ansible.tar.gz.gpg
+scripts/transfer.sh restore backups/anklume-instance.tar.gz.gpg
 ```
 
 ## Makefile targets
@@ -146,7 +146,7 @@ gpg --full-generate-key
 gpg --list-keys
 
 # Backup with encryption
-make backup I=admin-ansible GPG=admin@example.com
+make backup I=anklume-instance GPG=admin@example.com
 ```
 
 ### Key management
@@ -197,7 +197,7 @@ incus list --all-projects | grep <instance-name>
 ### "Permission denied" on file pull/push
 
 Ensure the script runs from a context with access to the Incus socket
-(typically the admin container).
+(typically the anklume container).
 
 ### GPG decryption fails
 

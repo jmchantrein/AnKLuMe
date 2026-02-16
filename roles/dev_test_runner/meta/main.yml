@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: dev_test_runner
   namespace: anklume
-  author: AnKLuMe
+  author: anklume
   description: Provisions a container for nested Incus usage (Incus-in-Incus)
   license: AGPL-3.0
   min_ansible_version: "2.16"

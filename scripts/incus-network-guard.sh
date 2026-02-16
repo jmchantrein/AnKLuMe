@@ -42,9 +42,14 @@ log "Host network: ${HOST_PREFIX}.0/24 on $DEFAULT_DEV (gw: ${DEFAULT_GW:-unknow
 
 # ── Delete conflicting bridges at kernel level ────────────────
 # ip link is a local kernel call — works even with broken network
+# Check ALL bridges (not just net-*) because incus network create
+# without explicit ipv4.address auto-assigns a random subnet
 CONFLICTS_FOUND=0
+CONFLICT_NAMES=()
 for iface in $(ip -o link show type bridge 2>/dev/null \
-        | grep -oP '\d+: \Knet-[a-z0-9-]+' || true); do
+        | grep -oP '\d+: \K[a-z0-9][a-z0-9-]+' || true); do
+    # Skip the host's own interface
+    [[ "$iface" == "$DEFAULT_DEV" ]] && continue
     bridge_prefix=$(ip -4 addr show "$iface" 2>/dev/null \
         | grep -oP 'inet \K[0-9]+\.[0-9]+\.[0-9]+' || true)
     if [[ "$bridge_prefix" == "$HOST_PREFIX" ]]; then
@@ -52,6 +57,7 @@ for iface in $(ip -o link show type bridge 2>/dev/null \
         ip link set "$iface" down 2>/dev/null || true
         ip link delete "$iface" 2>/dev/null || true
         CONFLICTS_FOUND=$((CONFLICTS_FOUND + 1))
+        CONFLICT_NAMES+=("$iface")
     fi
 done
 
@@ -59,7 +65,7 @@ done
 if [[ $CONFLICTS_FOUND -gt 0 ]]; then
     sleep 1  # Give Incus a moment
     for net in $(incus network list --format csv 2>/dev/null \
-            | cut -d, -f1 | grep "^net-" || true); do
+            | cut -d, -f1 || true); do
         net_addr=$(incus network get "$net" ipv4.address 2>/dev/null || true)
         if [[ "$net_addr" == "${HOST_PREFIX}."* ]]; then
             log "Cleaning Incus DB: deleting network $net ($net_addr)"

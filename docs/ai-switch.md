@@ -15,7 +15,7 @@ between access switches to clear residual model state.
 │                │ ✓ (current)      ┌──────────────┐      │
 │  net-perso ────┤ ✗ (blocked)  ──▶│ net-ai-tools │      │
 │                │                  │  ai-ollama   │      │
-│  net-admin ────┘ ✗ (blocked)     │  ai-webui    │      │
+│  net-anklume ──┘ ✗ (blocked)     │  ai-webui    │      │
 │                                   └──────────────┘      │
 │  nftables: only net-pro <-> net-ai-tools allowed        │
 └─────────────────────────────────────────────────────────┘

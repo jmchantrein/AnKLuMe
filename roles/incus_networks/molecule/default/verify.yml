@@ -48,6 +48,19 @@
           - "verify_network.config['ipv6.address'] == 'none'"
         fail_msg: "Network ipv6.address is not none"
 
+    - name: Verify | Network has explicit ipv4.firewall
+      ansible.builtin.assert:
+        that:
+          - "verify_network.config['ipv4.firewall'] == 'true'"
+        fail_msg: "Network ipv4.firewall is not explicitly true"
+
+    - name: Verify | Network has DHCP range configured
+      ansible.builtin.assert:
+        that:
+          - "'ipv4.dhcp.ranges' in verify_network.config"
+          - "verify_network.config['ipv4.dhcp.ranges'] == '10.200.99.100-10.200.99.249'"
+        fail_msg: "Network ipv4.dhcp.ranges is not 10.200.99.100-10.200.99.249"
+
     - name: Verify | Idempotency - run role again
       ansible.builtin.include_role:
         name: incus_networks

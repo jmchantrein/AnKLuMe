@@ -62,7 +62,7 @@ class TestMCPServer:
             capture_output=True, text=True,
         )
         assert result.returncode == 0
-        assert "AnKLuMe MCP server" in result.stdout
+        assert "anklume MCP server" in result.stdout
 
     def test_list_tools_flag(self):
         """--list-tools shows all registered tools."""
@@ -171,7 +171,7 @@ class TestMCPClient:
             capture_output=True, text=True,
         )
         assert result.returncode == 0
-        assert "AnKLuMe MCP client" in result.stdout
+        assert "anklume MCP client" in result.stdout
 
     def test_no_args_shows_help(self):
         """No arguments shows help."""
@@ -270,7 +270,7 @@ class TestMCPPolicy:
             capture_output=True, text=True,
         )
         assert result.returncode == 0
-        assert "AnKLuMe MCP policy engine" in result.stdout
+        assert "anklume MCP policy engine" in result.stdout
 
     def test_authorized_access(self, infra_with_services):
         """Authorized consumer gets exit 0."""

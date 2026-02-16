@@ -45,6 +45,40 @@
           - "verify_project.description == 'Molecule test project'"
         fail_msg: "Project description does not match"
 
+    - name: Verify | Read default profile
+      ansible.builtin.command:
+        argv:
+          - incus
+          - profile
+          - show
+          - default
+          - --project
+          - molecule-test
+      register: verify_profile_raw
+      changed_when: false
+
+    - name: Verify | Parse default profile
+      ansible.builtin.set_fact:
+        verify_profile: "{{ verify_profile_raw.stdout | from_yaml }}"
+
+    - name: Verify | NIC security MAC filtering enabled
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0['security.mac_filtering'] == 'true'"
+        fail_msg: "security.mac_filtering not set on eth0"
+
+    - name: Verify | NIC security IPv4 filtering enabled
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0['security.ipv4_filtering'] == 'true'"
+        fail_msg: "security.ipv4_filtering not set on eth0"
+
+    - name: Verify | NIC security IPv6 filtering enabled
+      ansible.builtin.assert:
+        that:
+          - "verify_profile.devices.eth0['security.ipv6_filtering'] == 'true'"
+        fail_msg: "security.ipv6_filtering not set on eth0"
+
     - name: Verify | Idempotency - run role again
       ansible.builtin.include_role:
         name: incus_projects

@@ -60,13 +60,13 @@
     - name: Verify | No admin bridge accept rule (admin uses Incus socket)
       ansible.builtin.assert:
         that:
-          - "'iifname \"net-admin\" accept' not in verify_nft_content"
+          - "'iifname \"net-anklume\" accept' not in verify_nft_content"
         fail_msg: "Admin bridge accept rule should not exist (admin uses Incus socket)"
 
     - name: Verify | Contains same-bridge accept rules
       ansible.builtin.assert:
         that:
-          - "'iifname \"net-admin\" oifname \"net-admin\" accept' in verify_nft_content"
+          - "'iifname \"net-anklume\" oifname \"net-anklume\" accept' in verify_nft_content"
           - "'iifname \"net-perso\" oifname \"net-perso\" accept' in verify_nft_content"
           - "'iifname \"net-pro\" oifname \"net-pro\" accept' in verify_nft_content"
           - "'iifname \"net-homelab\" oifname \"net-homelab\" accept' in verify_nft_content"
@@ -76,7 +76,7 @@
       ansible.builtin.assert:
         that:
           - "'drop' in verify_nft_content"
-          - "'net-admin' in verify_nft_content"
+          - "'net-anklume' in verify_nft_content"
           - "'net-homelab' in verify_nft_content"
           - "'net-perso' in verify_nft_content"
           - "'net-pro' in verify_nft_content"
@@ -95,7 +95,7 @@
         mode: "0644"
       vars:
         incus_nftables_all_bridges:
-          - "net-admin"
+          - "net-anklume"
           - "net-homelab"
           - "net-perso"
           - "net-pro"

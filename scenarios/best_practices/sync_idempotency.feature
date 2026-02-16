@@ -18,4 +18,4 @@ Feature: Sync idempotency
     And infra.yml from "student-sysadmin"
     When I run "make sync-dry"
     Then exit code is 0
-    And file "inventory/admin.yml" does not exist
+    And file "inventory/anklume.yml" does not exist

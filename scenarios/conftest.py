@@ -1,4 +1,4 @@
-"""Shared fixtures and step definitions for AnKLuMe E2E scenario tests.
+"""Shared fixtures and step definitions for anklume E2E scenario tests.
 
 Uses pytest-bdd with Gherkin .feature files. Designed to run inside
 the Phase 12 sandbox (Incus-in-Incus) or any environment with a live
@@ -194,6 +194,22 @@ class Sandbox:
             pass
         return None
 
+    def first_running_instance(self) -> str | None:
+        """Return the name of the first running instance."""
+        result = self.run(
+            "incus list --all-projects --format json 2>/dev/null"
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            instances = json.loads(result.stdout)
+            for i in sorted(instances, key=lambda x: x.get("name", "")):
+                if i.get("status") == "Running":
+                    return i["name"]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return None
+
     def load_infra(self) -> dict:
         """Load the current infra.yml."""
         infra_path = self.project_dir / "infra.yml"
@@ -311,7 +327,7 @@ def clean_generated_files(sandbox):
 
 
 def _clean_incus_state(sandbox: Sandbox) -> None:
-    """Remove all AnKLuMe Incus resources (instances, profiles, projects, networks).
+    """Remove all anklume Incus resources (instances, profiles, projects, networks).
 
     Used by deploy scenarios to ensure a clean starting state.
     Follows the correct deletion order: instances → images → profiles → projects → networks.
@@ -373,9 +389,9 @@ def _clean_incus_state(sandbox: Sandbox) -> None:
 
 @given("a clean sandbox environment")
 def clean_sandbox(sandbox):
-    """Verify we're in a working AnKLuMe directory."""
+    """Verify we're in a working anklume directory."""
     assert (sandbox.project_dir / "scripts" / "generate.py").exists(), (
-        "Not in an AnKLuMe project directory"
+        "Not in an anklume project directory"
     )
 
 
@@ -391,6 +407,23 @@ def incus_available(sandbox):
     """Skip if no Incus daemon is accessible."""
     if not sandbox.has_incus():
         pytest.skip("No Incus daemon available")
+
+
+@given("storage backend supports snapshots")
+def storage_supports_snapshots(sandbox):
+    """Skip if the default storage pool uses 'dir' backend (snapshots hang)."""
+    result = sandbox.run("incus storage show default --format json")
+    if result.returncode != 0:
+        pytest.skip("Cannot query storage pool")
+    try:
+        pool = json.loads(result.stdout)
+        driver = pool.get("driver", "dir")
+        if driver == "dir":
+            pytest.skip(
+                f"Storage backend '{driver}' does not support reliable snapshots"
+            )
+    except (json.JSONDecodeError, TypeError):
+        pytest.skip("Cannot parse storage pool info")
 
 
 @given("we are in a sandbox environment")
@@ -451,13 +484,14 @@ def running_infra(sandbox):
     """Verify that instances are running; rebuild if destroyed (e.g. by flush test)."""
     if not sandbox.has_incus():
         pytest.skip("No Incus daemon available")
-    result = sandbox.run("incus list --all-projects --format json 2>/dev/null")
+    result = sandbox.run("incus list --all-projects --format json")
     if result.returncode != 0:
         pytest.skip("No Incus daemon available")
     try:
         instances = json.loads(result.stdout)
         running = [i for i in instances if i.get("status") == "Running"]
         if running:
+            logger.info("Found %d running instances", len(running))
             return  # Infrastructure is up
     except (json.JSONDecodeError, TypeError):
         pass
@@ -690,3 +724,27 @@ def check_managed_unchanged(sandbox, filename):
     assert "SCENARIO-INJECTED" not in content, (
         "Managed section still contains injected content after sync"
     )
+
+
+@when(parsers.parse('I snapshot the first running instance as "{snap_name}"'))
+def snapshot_first_instance(sandbox, snap_name):
+    """Create a snapshot on the first running instance."""
+    name = sandbox.first_running_instance()
+    assert name, "No running instance found"
+    sandbox.run(f"scripts/snap.sh create {name} {snap_name}")
+
+
+@when("I list snapshots of the first running instance")
+def list_snapshots_first_instance(sandbox):
+    """List snapshots for the first running instance."""
+    name = sandbox.first_running_instance()
+    assert name, "No running instance found"
+    sandbox.run(f"scripts/snap.sh list {name}")
+
+
+@when(parsers.parse('I delete snapshot "{snap_name}" from the first running instance'))
+def delete_snapshot_first_instance(sandbox, snap_name):
+    """Delete a snapshot from the first running instance."""
+    name = sandbox.first_running_instance()
+    assert name, "No running instance found"
+    sandbox.run(f"scripts/snap.sh delete {name} {snap_name}")

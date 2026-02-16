@@ -17,16 +17,16 @@ de nftables dans la VM.
 +----------------------------------------------------------+
 | Hote                                                      |
 |                                                           |
-|  net-admin    net-perso    net-pro    net-homelab         |
+|  net-anklume    net-perso    net-pro    net-homelab         |
 |    |              |           |           |                |
 |    +------+-------+-------+--+           |                |
 |           |               |              |                |
 |    +------+---------------+--------------+------+        |
 |    |         sys-firewall (VM KVM)               |        |
-|    |  eth0=admin  eth1=perso  eth2=pro  eth3=hl  |        |
+|    |  eth0=anklume  eth1=perso  eth2=pro  eth3=hl |        |
 |    |                                              |        |
 |    |  nftables : tout inter-domaine rejete         |        |
-|    |            admin utilise le socket Incus       |        |
+|    |            anklume utilise le socket Incus     |        |
 |    |            journalisation centralisee          |        |
 |    +----------------------------------------------+        |
 +----------------------------------------------------------+
@@ -40,7 +40,7 @@ sur le trafic transmis.
 
 Le moyen le plus simple d'activer la VM pare-feu est de definir `firewall_mode: vm`
 dans `infra.yml`. Le generateur PSOT cree automatiquement la machine `sys-firewall`
-dans le domaine admin si vous n'en avez pas declare une vous-meme :
+dans le domaine anklume si vous n'en avez pas declare une vous-meme :
 
 ```yaml
 # infra.yml -- ajoutez simplement firewall_mode: vm
@@ -49,10 +49,10 @@ global:
   firewall_mode: vm
 
 domains:
-  admin:
+  anklume:
     subnet_id: 0
     machines:
-      admin-ansible:
+      anklume-instance:
         type: lxc
         ip: "10.100.0.10"
         roles: [base_system]
@@ -60,18 +60,18 @@ domains:
 ```
 
 ```bash
-make sync    # Cree automatiquement sys-firewall (10.100.0.253) dans le domaine admin
+make sync    # Cree automatiquement sys-firewall (10.100.0.253) dans le domaine anklume
 make apply   # Cree l'infrastructure + provisionne la VM pare-feu
 ```
 
 Le generateur affiche un message informatif lors de la creation automatique :
 
 ```
-INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain (ip: 10.100.0.253)
+INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain (ip: 10.100.0.253)
 ```
 
 La `sys-firewall` creee automatiquement a : type `vm`, IP `.253` dans le
-sous-reseau admin, 2 vCPU, 2 Gio de memoire, roles `[base_system, firewall_router]`,
+sous-reseau anklume, 2 vCPU, 2 Gio de memoire, roles `[base_system, firewall_router]`,
 et `ephemeral: false`.
 
 Pour personnaliser la VM pare-feu (IP differente, plus de ressources, roles
@@ -91,14 +91,14 @@ global:
 
 ### 2. Declarer la VM pare-feu (optionnel -- creee automatiquement si omise)
 
-Pour surcharger les valeurs par defaut, ajoutez `sys-firewall` au domaine admin :
+Pour surcharger les valeurs par defaut, ajoutez `sys-firewall` au domaine anklume :
 
 ```yaml
 domains:
-  admin:
+  anklume:
     subnet_id: 0
     machines:
-      admin-ansible:
+      anklume-instance:
         type: lxc
         ip: "10.100.0.10"
         roles: [base_system]
@@ -141,8 +141,8 @@ Les regles nftables generees dans la VM appliquent :
 | tout | tout (ICMP) | ACCEPT |
 | tout | tout (connexion etablie) | ACCEPT |
 
-Le domaine admin est traite comme n'importe quel autre domaine. Le container
-admin communique avec toutes les instances via le socket Incus, pas le reseau,
+Le domaine anklume est traite comme n'importe quel autre domaine. Le container
+anklume communique avec toutes les instances via le socket Incus, pas le reseau,
 donc il n'a pas besoin d'exception au niveau reseau.
 
 Toutes les decisions sont journalisees avec des prefixes :
@@ -154,7 +154,7 @@ Toutes les decisions sont journalisees avec des prefixes :
 ### Consulter les journaux
 
 ```bash
-incus exec sys-firewall --project admin -- journalctl -kf | grep "FW-"
+incus exec sys-firewall --project anklume -- journalctl -kf | grep "FW-"
 ```
 
 ## Defense en profondeur
@@ -217,11 +217,11 @@ Ajoutez une tache de configuration de route dans le role `base_system` ou un rol
 Editez les regles de pare-feu dans la VM :
 
 ```bash
-incus exec sys-firewall --project admin -- \
+incus exec sys-firewall --project anklume -- \
   vi /etc/nftables.d/anklume-firewall.nft
 
 # Recharger
-incus exec sys-firewall --project admin -- \
+incus exec sys-firewall --project anklume -- \
   systemctl restart nftables
 ```
 
@@ -239,7 +239,7 @@ incus network list | grep net-
 Verifiez le profil :
 
 ```bash
-incus profile show firewall-multi-nic --project admin
+incus profile show firewall-multi-nic --project anklume
 ```
 
 ### Le trafic ne passe pas par la VM pare-feu

@@ -138,7 +138,7 @@ la regle de rejet inter-bridges.
 **Decision** : Ajouter des regles d'acceptation explicites intra-bridge pour chaque
 bridge AnKLuMe avant la regle de rejet inter-bridges :
 ```nft
-iifname "net-admin" oifname "net-admin" accept
+iifname "net-anklume" oifname "net-anklume" accept
 iifname "net-perso" oifname "net-perso" accept
 ...
 ```
@@ -289,18 +289,18 @@ dans des phases de playbook differentes avec des types de connexion differents.
 **Justification** : Correspond a l'architecture en deux phases (ADR-006). L'infrastructure
 cree la topologie, le provisionnement configure l'interieur de la VM.
 
-### D-019 : Le bridge admin toujours en eth0
+### D-019 : Le bridge anklume toujours en eth0
 
 **Contexte** : La VM pare-feu a besoin d'une carte reseau par bridge de domaine.
-Le bridge admin doit etre previsible pour les regles nftables.
+Le bridge anklume doit etre previsible pour les regles nftables.
 
-**Decision** : Le role `incus_firewall_vm` trie les bridges avec `net-admin`
+**Decision** : Le role `incus_firewall_vm` trie les bridges avec `net-anklume`
 toujours en premier (eth0). Les autres bridges sont tries alphabetiquement et
 assignes eth1, eth2, etc. Le template nftables utilise cet ordonnancement pour
-identifier l'interface admin.
+identifier l'interface anklume.
 
 **Consequence** : Les regles de pare-feu peuvent referencer `eth0` comme l'interface
-admin sans configuration. L'ajout de nouveaux domaines ajoute automatiquement de
+anklume sans configuration. L'ajout de nouveaux domaines ajoute automatiquement de
 nouvelles cartes reseau.
 
 ### D-020 : Validation de firewall_mode dans le generateur PSOT

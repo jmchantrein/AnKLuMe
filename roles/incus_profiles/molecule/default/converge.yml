@@ -27,12 +27,17 @@
         label: "{{ item.key }}={{ item.value }}"
       changed_when: false
 
-    - name: Setup | Ensure net-mol-test network exists
+    - name: Setup | Ensure net-mol-test network exists (safe subnet)
       ansible.builtin.command:
-        cmd: incus network create net-mol-test
+        cmd: >-
+          incus network create net-mol-test
+          ipv4.address=192.168.253.1/24 ipv4.nat=false
+          ipv6.address=none
       register: setup_network_result
       changed_when: setup_network_result.rc == 0
-      failed_when: false
+      failed_when:
+        - setup_network_result.rc != 0
+        - "'already exists' not in (setup_network_result.stderr | default(''))"
 
 - name: Converge - apply incus_profiles
   hosts: localhost

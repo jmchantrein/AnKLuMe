@@ -41,7 +41,7 @@ def sample_infra():
             "default_os_image": "images:debian/13",
         },
         "domains": {
-            "admin": {
+            "anklume": {
                 "description": "Administration",
                 "subnet_id": 0,
                 "machines": {
@@ -74,7 +74,7 @@ class TestValidationBoundaries:
 
     def test_subnet_id_zero_valid(self, sample_infra):
         """subnet_id=0 is the minimum valid value."""
-        sample_infra["domains"]["admin"]["subnet_id"] = 0
+        sample_infra["domains"]["anklume"]["subnet_id"] = 0
         errors = validate(sample_infra)
         assert not any("subnet_id" in e and "0-254" in e for e in errors)
 
@@ -117,7 +117,7 @@ class TestValidationBoundaries:
     def test_port_zero_invalid(self, sample_infra):
         """Port 0 is below the valid range (1-65535)."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [0]},
+            {"from": "anklume", "to": "work", "ports": [0]},
         ]
         errors = validate(sample_infra)
         assert any("invalid port 0" in e for e in errors)
@@ -125,7 +125,7 @@ class TestValidationBoundaries:
     def test_port_one_valid(self, sample_infra):
         """Port 1 is the minimum valid port."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [1]},
+            {"from": "anklume", "to": "work", "ports": [1]},
         ]
         errors = validate(sample_infra)
         assert not any("invalid port" in e for e in errors)
@@ -133,7 +133,7 @@ class TestValidationBoundaries:
     def test_port_65535_valid(self, sample_infra):
         """Port 65535 is the maximum valid port."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [65535]},
+            {"from": "anklume", "to": "work", "ports": [65535]},
         ]
         errors = validate(sample_infra)
         assert not any("invalid port" in e for e in errors)
@@ -141,7 +141,7 @@ class TestValidationBoundaries:
     def test_port_65536_invalid(self, sample_infra):
         """Port 65536 exceeds the valid range."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [65536]},
+            {"from": "anklume", "to": "work", "ports": [65536]},
         ]
         errors = validate(sample_infra)
         assert any("invalid port" in e for e in errors)
@@ -149,7 +149,7 @@ class TestValidationBoundaries:
     def test_port_negative_invalid(self, sample_infra):
         """Negative port number is invalid."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [-1]},
+            {"from": "anklume", "to": "work", "ports": [-1]},
         ]
         errors = validate(sample_infra)
         assert any("invalid port" in e for e in errors)
@@ -157,7 +157,7 @@ class TestValidationBoundaries:
     def test_port_string_in_list_invalid(self, sample_infra):
         """Port as string in a list is invalid."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": ["80"]},
+            {"from": "anklume", "to": "work", "ports": ["80"]},
         ]
         errors = validate(sample_infra)
         assert any("invalid port" in e for e in errors)
@@ -165,7 +165,7 @@ class TestValidationBoundaries:
     def test_ports_none_accepted(self, sample_infra):
         """Omitting ports is acceptable (no error)."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work"},
+            {"from": "anklume", "to": "work"},
         ]
         errors = validate(sample_infra)
         assert not any("port" in e for e in errors)
@@ -173,7 +173,7 @@ class TestValidationBoundaries:
     def test_protocol_none_accepted(self, sample_infra):
         """Omitting protocol is acceptable (no error)."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [22]},
+            {"from": "anklume", "to": "work", "ports": [22]},
         ]
         errors = validate(sample_infra)
         assert not any("protocol" in e for e in errors)
@@ -181,7 +181,7 @@ class TestValidationBoundaries:
     def test_multiple_valid_ports(self, sample_infra):
         """Multiple valid ports in a single policy."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [22, 80, 443, 8080]},
+            {"from": "anklume", "to": "work", "ports": [22, 80, 443, 8080]},
         ]
         errors = validate(sample_infra)
         assert not any("port" in e for e in errors)
@@ -189,7 +189,7 @@ class TestValidationBoundaries:
     def test_mixed_valid_invalid_ports(self, sample_infra):
         """Mix of valid and invalid ports produces errors for invalid ones."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [22, 0, 443, 99999]},
+            {"from": "anklume", "to": "work", "ports": [22, 0, 443, 99999]},
         ]
         errors = validate(sample_infra)
         port_errors = [e for e in errors if "invalid port" in e]
@@ -505,8 +505,8 @@ class TestNetworkPolicyEdgeCases:
     def test_multiple_policies_valid(self, sample_infra):
         """Multiple valid policies in a single list."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [22], "protocol": "tcp"},
-            {"from": "work", "to": "admin", "ports": [443], "protocol": "tcp"},
+            {"from": "anklume", "to": "work", "ports": [22], "protocol": "tcp"},
+            {"from": "work", "to": "anklume", "ports": [443], "protocol": "tcp"},
             {"from": "host", "to": "work", "ports": "all"},
         ]
         errors = validate(sample_infra)
@@ -523,7 +523,7 @@ class TestNetworkPolicyEdgeCases:
     def test_policy_with_description(self, sample_infra):
         """Policy with description field is valid (description ignored)."""
         sample_infra["network_policies"] = [
-            {"description": "Allow SSH", "from": "admin", "to": "work", "ports": [22]},
+            {"description": "Allow SSH", "from": "anklume", "to": "work", "ports": [22]},
         ]
         errors = validate(sample_infra)
         assert not any("network_policies" in e for e in errors)
@@ -546,9 +546,9 @@ class TestEnrichEdgeCases:
 
     def test_enrich_firewall_host_mode_noop(self, sample_infra):
         """enrich_infra is a no-op when firewall_mode is 'host' (default)."""
-        original_machines = dict(sample_infra["domains"]["admin"]["machines"])
+        original_machines = dict(sample_infra["domains"]["anklume"]["machines"])
         enrich_infra(sample_infra)
-        assert sample_infra["domains"]["admin"]["machines"] == original_machines
+        assert sample_infra["domains"]["anklume"]["machines"] == original_machines
 
     def test_enrich_ai_access_open_mode_noop(self, sample_infra):
         """enrich_infra is a no-op for AI when ai_access_policy is 'open' (default)."""
@@ -574,21 +574,21 @@ class TestEnrichEdgeCases:
         assert "network_policies" not in sample_infra
 
     def test_enrich_firewall_vm_null_machines(self, sample_infra):
-        """enrich_infra handles admin domain with null machines."""
+        """enrich_infra handles anklume domain with null machines."""
         sample_infra["global"]["firewall_mode"] = "vm"
-        sample_infra["domains"]["admin"]["machines"] = None
+        sample_infra["domains"]["anklume"]["machines"] = None
         enrich_infra(sample_infra)
-        assert "sys-firewall" in sample_infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]
 
     def test_enrich_firewall_sys_firewall_in_other_domain(self, sample_infra):
-        """sys-firewall in a non-admin domain prevents auto-creation."""
+        """sys-firewall in a non-anklume domain prevents auto-creation."""
         sample_infra["global"]["firewall_mode"] = "vm"
         sample_infra["domains"]["work"]["machines"]["sys-firewall"] = {
             "type": "vm", "ip": "10.100.1.253",
         }
         enrich_infra(sample_infra)
-        # Should not auto-create in admin since sys-firewall exists
-        assert "sys-firewall" not in sample_infra["domains"]["admin"]["machines"]
+        # Should not auto-create in anklume since sys-firewall exists
+        assert "sys-firewall" not in sample_infra["domains"]["anklume"]["machines"]
 
     def test_enrich_ai_auto_created_policy_is_bidirectional(self, sample_infra):
         """Auto-created AI policy has bidirectional: true and ports: all."""
@@ -882,7 +882,7 @@ class TestPrivilegedStringBooleans:
     """Test security.privileged with various boolean-like string values."""
 
     def _make_privileged_config(self, sample_infra, value):
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = {
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["config"] = {
             "security.privileged": value,
         }
 
@@ -930,7 +930,7 @@ class TestPrivilegedStringBooleans:
         """Missing security.privileged config is not privileged."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = {}
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["config"] = {}
         errors = validate(sample_infra)
         assert not any("privileged" in e for e in errors)
 
@@ -938,7 +938,7 @@ class TestPrivilegedStringBooleans:
         """Machine with config=None is not privileged."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = None
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["config"] = None
         errors = validate(sample_infra)
         assert not any("privileged" in e for e in errors)
 
@@ -946,7 +946,7 @@ class TestPrivilegedStringBooleans:
         """Machine without config key at all is not privileged."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"].pop("config", None)
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"].pop("config", None)
         errors = validate(sample_infra)
         assert not any("privileged" in e for e in errors)
 
@@ -959,19 +959,19 @@ class TestIPEdgeCases:
 
     def test_ip_host_part_one(self, sample_infra):
         """IP with host part .1 is valid."""
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.1"
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.1"
         errors = validate(sample_infra)
         assert not any("not in subnet" in e for e in errors)
 
     def test_ip_host_part_253(self, sample_infra):
         """IP with host part .253 is valid."""
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.253"
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.253"
         errors = validate(sample_infra)
         assert not any("not in subnet" in e for e in errors)
 
     def test_ip_host_part_254_gateway(self, sample_infra):
         """IP .254 (gateway) is technically valid from generator perspective."""
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.254"
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.254"
         errors = validate(sample_infra)
         # The generator validates subnet membership, not gateway collision
         assert not any("not in subnet" in e for e in errors)
@@ -997,7 +997,7 @@ class TestIPEdgeCases:
 
     def test_same_ip_different_domains(self, sample_infra):
         """Same IP in different domains is a duplicate error."""
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.10"
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["ip"] = "10.100.0.10"
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["ip"] = "10.100.0.10"
         errors = validate(sample_infra)
         assert any("IP 10.100.0.10 already used" in e for e in errors)
@@ -1011,7 +1011,7 @@ class TestMultipleErrors:
 
     def test_multiple_independent_errors(self, sample_infra):
         """Multiple validation errors are all reported."""
-        sample_infra["domains"]["admin"]["subnet_id"] = 999  # Invalid range
+        sample_infra["domains"]["anklume"]["subnet_id"] = 999  # Invalid range
         sample_infra["domains"]["work"]["machines"]["dev-ws"]["type"] = "docker"  # Invalid type
         sample_infra["domains"]["BAD_NAME"] = {"subnet_id": 50, "machines": {}}  # Invalid name
         errors = validate(sample_infra)
@@ -1070,14 +1070,14 @@ class TestLoadInfraDirectoryEdgeCases:
         domains_dir = d / "domains"
         domains_dir.mkdir()
         # Write one valid domain file
-        (domains_dir / "admin.yml").write_text(yaml.dump({
-            "admin": {"subnet_id": 0, "machines": {}},
+        (domains_dir / "anklume.yml").write_text(yaml.dump({
+            "anklume": {"subnet_id": 0, "machines": {}},
         }))
         # Write an empty domain file
         (domains_dir / "empty.yml").write_text("")
         result = load_infra(d)
         # The empty file yields None or {}, so no domains are added from it
-        assert "admin" in result["domains"]
+        assert "anklume" in result["domains"]
         # No crash from the empty file
         assert len(result["domains"]) == 1
 
@@ -1168,7 +1168,7 @@ class TestValidateEdgeCases:
 
     def test_machines_none_in_domain(self, sample_infra):
         """machines: null in domain doesn't crash."""
-        sample_infra["domains"]["admin"]["machines"] = None
+        sample_infra["domains"]["anklume"]["machines"] = None
         # Should not crash; machines handled by `or {}`
         errors = validate(sample_infra)
         # No crash, possibly no machine-related errors since None -> {}
@@ -1178,7 +1178,7 @@ class TestValidateEdgeCases:
         """config: null in machine doesn't crash."""
         monkeypatch.setattr(gen_mod, "_read_vm_nested", lambda: False)
         monkeypatch.setattr(gen_mod, "_read_yolo", lambda: False)
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["config"] = None
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["config"] = None
         errors = validate(sample_infra)
         # config=None handled by `or {}`; no privileged check issue
         assert not any("NoneType" in str(e) for e in errors)
@@ -1190,7 +1190,7 @@ class TestValidateEdgeCases:
         An integer IP triggers an unhandled AttributeError. This test documents
         the current behavior (crash on non-string IP).
         """
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["ip"] = 12345
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["ip"] = 12345
         with pytest.raises(AttributeError):
             validate(sample_infra)
 
@@ -1205,7 +1205,7 @@ class TestValidateEdgeCases:
     def test_protocol_empty_string(self, sample_infra):
         """protocol: '' errors as invalid."""
         sample_infra["network_policies"] = [
-            {"from": "admin", "to": "work", "ports": [22], "protocol": ""},
+            {"from": "anklume", "to": "work", "ports": [22], "protocol": ""},
         ]
         errors = validate(sample_infra)
         assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
@@ -1223,10 +1223,10 @@ class TestValidateEdgeCases:
 
     def test_gpu_profile_non_gpu_device_type(self, sample_infra):
         """Profile with type: 'disk' not counted as GPU."""
-        sample_infra["domains"]["admin"]["profiles"] = {
+        sample_infra["domains"]["anklume"]["profiles"] = {
             "storage": {"devices": {"data": {"type": "disk", "path": "/data"}}},
         }
-        sample_infra["domains"]["admin"]["machines"]["admin-ctrl"]["profiles"] = [
+        sample_infra["domains"]["anklume"]["machines"]["admin-ctrl"]["profiles"] = [
             "default", "storage",
         ]
         # With exclusive policy (default), should NOT trigger GPU error

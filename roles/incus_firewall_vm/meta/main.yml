@@ -1,6 +1,6 @@
 ---
 galaxy_info:
-  author: AnKLuMe
+  author: anklume
   description: Create multi-NIC profile for the firewall VM
   license: AGPL-3.0
   min_ansible_version: "2.16"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AnKLuMe tmux console — domain-colored panes from infra.yml."""
+"""anklume tmux console — domain-colored panes from infra.yml."""
 
 import argparse
 import sys
@@ -26,7 +26,7 @@ TRUST_LABELS = {
     "disposable": "dark magenta",
 }
 
-# Default prefix for the AnKLuMe session. Using Ctrl-a (screen-style) avoids
+# Default prefix for the anklume session. Using Ctrl-a (screen-style) avoids
 # conflict with the standard Ctrl-b prefix, so users can run tmux inside
 # containers without prefix collision (nested tmux comfort).
 DEFAULT_PREFIX = "C-a"
@@ -36,11 +36,11 @@ def infer_trust_level(domain_name, domain_config):
     """Infer trust level from domain name and config if not explicitly set.
 
     Heuristic:
-    - domain name contains "admin" → admin
+    - domain name contains "admin" or "anklume" → admin
     - ephemeral: true → disposable
     - default → trusted
     """
-    if "admin" in domain_name.lower():
+    if "admin" in domain_name.lower() or "anklume" in domain_name.lower():
         return "admin"
     if domain_config.get("ephemeral", False):
         return "disposable"

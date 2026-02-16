@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# code-analysis.sh — Static code analysis for AnKLuMe
+# code-analysis.sh — Static code analysis for anklume
 # Usage: scripts/code-analysis.sh <subcommand> [options]
 #
 # Subcommands:

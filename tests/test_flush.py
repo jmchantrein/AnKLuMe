@@ -17,7 +17,7 @@ def mock_env(tmp_path):
     mock_bin.mkdir()
     log_file = tmp_path / "incus.log"
 
-    # Simulate AnKLuMe resources: 2 projects, 2 instances, 1 profile, 1 bridge
+    # Simulate anklume resources: 2 projects, 2 instances, 1 profile, 1 bridge
     mock_incus = mock_bin / "incus"
     mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
@@ -25,14 +25,14 @@ echo "$@" >> "{log_file}"
 # project list --format csv -c n (used by _list_projects and pre-flight)
 if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then
     echo "default"
-    echo "admin"
+    echo "anklume"
     echo "work"
     exit 0
 fi
 # list instances --format csv -c n
 if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then
-    if [[ "$*" == *"--project admin"* ]]; then
-        echo "admin-ctrl"
+    if [[ "$*" == *"--project anklume"* ]]; then
+        echo "anklume-ctrl"
         exit 0
     elif [[ "$*" == *"--project work"* ]]; then
         echo "work-dev"
@@ -71,7 +71,7 @@ if [[ "$1" == "project" && "$2" == "delete" ]]; then
 fi
 # network list --format csv
 if [[ "$1" == "network" && "$2" == "list" ]]; then
-    echo "net-admin"
+    echo "net-anklume"
     echo "net-work"
     echo "incusbr0"
     exit 0
@@ -154,7 +154,7 @@ class TestFlushResources:
         env, log, cwd = mock_env
         run_flush(["--force"], env, cwd=cwd)
         cmds = read_log(log)
-        assert any("delete admin-ctrl" in c for c in cmds)
+        assert any("delete anklume-ctrl" in c for c in cmds)
         assert any("delete work-dev" in c for c in cmds)
 
     def test_only_net_bridges_deleted(self, mock_env):
@@ -162,7 +162,7 @@ class TestFlushResources:
         env, log, cwd = mock_env
         run_flush(["--force"], env, cwd=cwd)
         cmds = read_log(log)
-        assert any("network delete net-admin" in c for c in cmds)
+        assert any("network delete net-anklume" in c for c in cmds)
         assert any("network delete net-work" in c for c in cmds)
         assert not any("network delete incusbr0" in c for c in cmds)
 
@@ -179,7 +179,7 @@ class TestFlushResources:
         env, log, cwd = mock_env
         run_flush(["--force"], env, cwd=cwd)
         cmds = read_log(log)
-        assert any("project delete admin" in c for c in cmds)
+        assert any("project delete anklume" in c for c in cmds)
         assert any("project delete work" in c for c in cmds)
         assert not any("project delete default" in c for c in cmds)
 
@@ -393,30 +393,30 @@ echo "$@" >> "{log_file}"
 
 # project list --format json
 if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
-    echo '[{{"name":"default"}},{{"name":"admin"}}]'
+    echo '[{{"name":"default"}},{{"name":"anklume"}}]'
     exit 0
 fi
 # project list --format csv
 if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then
     echo "default"
-    echo "admin"
+    echo "anklume"
     exit 0
 fi
 # list instances
 if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then
-    if [[ "$*" == *"--project admin"* ]]; then
-        echo "admin-ctrl"
-        echo "admin-stuck"
+    if [[ "$*" == *"--project anklume"* ]]; then
+        echo "anklume-ctrl"
+        echo "anklume-stuck"
         exit 0
     fi
     exit 0
 fi
-# delete instance — admin-stuck fails
-if [[ "$1" == "delete" && "$2" == "admin-stuck" ]]; then
+# delete instance — anklume-stuck fails
+if [[ "$1" == "delete" && "$2" == "anklume-stuck" ]]; then
     echo "Error: instance is busy" >&2
     exit 1
 fi
-# delete instance — admin-ctrl succeeds
+# delete instance — anklume-ctrl succeeds
 if [[ "$1" == "delete" ]]; then
     exit 0
 fi
@@ -425,8 +425,8 @@ if [[ "$1" == "profile" && "$2" == "list" ]]; then
     echo "default"
     exit 0
 fi
-# project delete — admin fails
-if [[ "$1" == "project" && "$2" == "delete" && "$3" == "admin" ]]; then
+# project delete — anklume fails
+if [[ "$1" == "project" && "$2" == "delete" && "$3" == "anklume" ]]; then
     echo "Error: project not empty" >&2
     exit 1
 fi
@@ -435,7 +435,7 @@ if [[ "$1" == "project" && "$2" == "delete" ]]; then
 fi
 # network list
 if [[ "$1" == "network" && "$2" == "list" ]]; then
-    echo "net-admin"
+    echo "net-anklume"
     exit 0
 fi
 # network delete
@@ -460,7 +460,7 @@ exit 0
         result = run_flush(["--force"], env, cwd=cwd)
         assert result.returncode == 0
         assert "WARNING" in result.stdout
-        assert "admin-stuck" in result.stdout
+        assert "anklume-stuck" in result.stdout
 
     def test_continues_after_project_delete_failure(self, failing_env):
         """Flush continues and warns when a project deletion fails."""

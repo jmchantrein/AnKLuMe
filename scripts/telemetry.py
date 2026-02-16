@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AnKLuMe local telemetry — opt-in, local-only usage analytics.
+"""anklume local telemetry — opt-in, local-only usage analytics.
 
 Data is stored in ~/.anklume/telemetry/ and never leaves the machine.
 Default: DISABLED. Enable with `make telemetry-on`.
@@ -238,7 +238,7 @@ def _human_duration(seconds):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AnKLuMe local telemetry management",
+        description="anklume local telemetry management",
         epilog="Data is stored locally in ~/.anklume/telemetry/ and never leaves the machine.",
     )
     sub = parser.add_subparsers(dest="command")

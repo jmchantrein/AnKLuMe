@@ -37,21 +37,21 @@
     - name: Verify | eth0 is connected to admin bridge
       ansible.builtin.assert:
         that:
-          - "verify_profile.devices.eth0.parent == 'net-mol-admin'"
+          - "verify_profile.devices.eth0.network == 'net-mol-admin'"
           - "verify_profile.devices.eth0.type == 'nic'"
         fail_msg: "eth0 should be connected to net-mol-admin"
 
     - name: Verify | eth1 is connected to perso bridge
       ansible.builtin.assert:
         that:
-          - "verify_profile.devices.eth1.parent == 'net-mol-perso'"
+          - "verify_profile.devices.eth1.network == 'net-mol-perso'"
           - "verify_profile.devices.eth1.type == 'nic'"
         fail_msg: "eth1 should be connected to net-mol-perso"
 
     - name: Verify | Admin bridge is first (eth0)
       ansible.builtin.assert:
         that:
-          - "verify_profile.devices.eth0.parent == 'net-mol-admin'"
+          - "verify_profile.devices.eth0.network == 'net-mol-admin'"
         fail_msg: "Admin bridge must be eth0 (first NIC)"
 
     - name: Verify | Idempotency - run role again

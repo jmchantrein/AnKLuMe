@@ -21,7 +21,7 @@ global:
   gpu_policy: shared
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     ephemeral: false

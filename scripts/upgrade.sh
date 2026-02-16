@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# upgrade.sh — Safe AnKLuMe framework upgrade
+# upgrade.sh — Safe anklume framework upgrade
 # Usage: scripts/upgrade.sh
 #
 # Pulls upstream changes, detects modified framework files, creates backups,
@@ -23,7 +23,7 @@ USER_FILES=(
     "roles_custom/"
 )
 
-echo "=== AnKLuMe Upgrade ==="
+echo "=== anklume Upgrade ==="
 
 # Check we're in a git repository
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then

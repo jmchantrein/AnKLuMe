@@ -13,12 +13,12 @@ GOLDEN_SH = Path(__file__).resolve().parent.parent / "scripts" / "golden.sh"
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
     {"name": "pro-dev", "project": "pro", "status": "Running"},
-    {"name": "admin-ansible", "project": "admin", "status": "Stopped"},
+    {"name": "anklume-instance", "project": "anklume", "status": "Stopped"},
 ])
 
 FAKE_PROJECT_LIST = json.dumps([
     {"name": "default"},
-    {"name": "admin"},
+    {"name": "anklume"},
     {"name": "pro"},
 ])
 
@@ -38,9 +38,9 @@ FAKE_PRO_INSTANCES = json.dumps([
     },
 ])
 
-FAKE_ADMIN_INSTANCES = json.dumps([
+FAKE_ANKLUME_INSTANCES = json.dumps([
     {
-        "name": "admin-ansible",
+        "name": "anklume-instance",
         "status": "Stopped",
         "snapshots": None,
     },
@@ -74,9 +74,9 @@ if [[ "$1" == "list" && "$*" == *"--all-projects"* ]]; then
     exit 0
 fi
 
-# list --project admin (check before pro since --project contains "pro")
-if [[ "$1" == "list" && "$*" == *"--project"* && "$*" == *"admin"* && "$*" == *"--format json"* ]]; then
-    echo '{FAKE_ADMIN_INSTANCES}'
+# list --project anklume (check before pro since --project contains "pro")
+if [[ "$1" == "list" && "$*" == *"--project"* && "$*" == *"anklume"* && "$*" == *"--format json"* ]]; then
+    echo '{FAKE_ANKLUME_INSTANCES}'
     exit 0
 fi
 
@@ -209,12 +209,12 @@ class TestCreate:
     def test_create_already_stopped(self, mock_env):
         """create on a stopped instance skips the stop step."""
         env, log = mock_env
-        result = run_golden(["create", "admin-ansible"], env)
+        result = run_golden(["create", "anklume-instance"], env)
         assert result.returncode == 0
         cmds = read_log(log)
         # Should NOT have a stop command (already stopped)
-        assert not any("stop admin-ansible" in c for c in cmds)
-        assert any("snapshot create admin-ansible pristine --project admin" in c for c in cmds)
+        assert not any("stop anklume-instance" in c for c in cmds)
+        assert any("snapshot create anklume-instance pristine --project anklume" in c for c in cmds)
 
 
 # ── derive ────────────────────────────────────────────────────────

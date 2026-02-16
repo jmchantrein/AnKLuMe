@@ -3,7 +3,7 @@
 #
 # Problem: Incus recreates bridges from its database on startup.
 # If those bridges use subnets that conflict with the host network
-# (e.g., net-admin on 10.100.0.x when host is on 10.100.0.0/24),
+# (e.g., net-anklume on 10.100.0.x when host is on 10.100.0.0/24),
 # the host loses connectivity.
 #
 # Solution: Run a kernel-level bridge watcher that deletes conflicting

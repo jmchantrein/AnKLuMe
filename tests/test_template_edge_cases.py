@@ -66,10 +66,10 @@ class TestNftablesEdgeCases:
     def test_ports_all_policy(self):
         """Policy with ports='all' generates accept without port filter."""
         result = self._render(
-            incus_nftables_all_bridges=["net-admin", "net-work"],
+            incus_nftables_all_bridges=["net-anklume", "net-work"],
             incus_nftables_resolved_policies=[{
                 "description": "Full access",
-                "from_bridge": "net-admin",
+                "from_bridge": "net-anklume",
                 "to_bridge": "net-work",
                 "ports": "all",
                 "protocol": "tcp",
@@ -77,7 +77,7 @@ class TestNftablesEdgeCases:
             }],
         )
         # Should have accept without tcp dport
-        assert 'iifname "net-admin" oifname "net-work" accept' in result
+        assert 'iifname "net-anklume" oifname "net-work" accept' in result
         assert "dport" not in result.split("net-work")[1].split("\n")[0]
 
     def test_bidirectional_ports_all(self):
@@ -209,7 +209,7 @@ class TestFirewallRouterEdgeCases:
     def test_single_interface_no_inter_domain_rules(self):
         """With one interface, no inter-domain drop rules are generated."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=True,
             firewall_router_log_prefix="FW",
         )
@@ -235,13 +235,13 @@ class TestFirewallRouterEdgeCases:
         """Custom log prefix is used throughout."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=True,
             firewall_router_log_prefix="MYFW",
         )
-        assert 'MYFW-DENY-ADMIN' in result
+        assert 'MYFW-DENY-ANKLUME' in result
         assert 'MYFW-INVALID' in result
         assert 'MYFW-DROP' in result
         assert 'MYFW-INPUT-DROP' in result
@@ -250,7 +250,7 @@ class TestFirewallRouterEdgeCases:
         """ICMP is allowed regardless of configuration."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=False,
@@ -282,14 +282,14 @@ class TestFirewallRouterEdgeCases:
         """Deny log prefix uses bridge name without 'net-' prefix, uppercased."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=True,
             firewall_router_log_prefix="FW",
         )
-        # Bridge "net-admin" → "ADMIN", "net-pro" → "PRO"
-        assert "FW-DENY-ADMIN" in result
+        # Bridge "net-anklume" → "ANKLUME", "net-pro" → "PRO"
+        assert "FW-DENY-ANKLUME" in result
         assert "FW-DENY-PRO" in result
 
 
@@ -792,9 +792,9 @@ class TestFirewallRouterManyInterfaces:
                     assert f'"eth{j}"' in deny_line[0]
 
     def test_admin_on_eth0_admin_rules_applied(self):
-        """Admin interface on eth0 gets admin-specific deny prefix."""
+        """Anklume interface on eth0 gets anklume-specific deny prefix."""
         ifaces = [
-            {"name": "eth0", "bridge": "net-admin"},
+            {"name": "eth0", "bridge": "net-anklume"},
             {"name": "eth1", "bridge": "net-pro"},
             {"name": "eth2", "bridge": "net-perso"},
         ]
@@ -803,14 +803,14 @@ class TestFirewallRouterManyInterfaces:
             firewall_router_logging=True,
             firewall_router_log_prefix="FW",
         )
-        assert "FW-DENY-ADMIN" in result
+        assert "FW-DENY-ANKLUME" in result
         assert "FW-DENY-PRO" in result
         assert "FW-DENY-PERSO" in result
 
     def test_no_non_admin_interfaces_minimal_ruleset(self):
         """With only one interface, no inter-domain deny rules are generated."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=True,
             firewall_router_log_prefix="FW",
         )
@@ -1573,7 +1573,7 @@ class TestFirewallRouterLoggingDisabled:
         """No log prefix strings appear when logging is disabled."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=False,
@@ -1585,7 +1585,7 @@ class TestFirewallRouterLoggingDisabled:
         """Drop rules still present when logging is disabled."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=False,
@@ -1597,7 +1597,7 @@ class TestFirewallRouterLoggingDisabled:
         """All three chains exist without logging."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-pro"},
             ],
             firewall_router_logging=False,
@@ -1624,13 +1624,13 @@ class TestFirewallRouterBridgeNameExtraction:
         """The 'net-' prefix is removed from bridge name in log prefix."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-perso"},
             ],
             firewall_router_logging=True,
             firewall_router_log_prefix="FW",
         )
-        assert "FW-DENY-ADMIN" in result
+        assert "FW-DENY-ANKLUME" in result
         assert "FW-DENY-PERSO" in result
         # Should NOT contain "NET-" in the prefix
         assert "FW-DENY-NET-" not in result
@@ -1639,7 +1639,7 @@ class TestFirewallRouterBridgeNameExtraction:
         """Bridge with multiple hyphens extracts correctly."""
         result = self._render(
             firewall_router_interfaces=[
-                {"name": "eth0", "bridge": "net-admin"},
+                {"name": "eth0", "bridge": "net-anklume"},
                 {"name": "eth1", "bridge": "net-ai-tools"},
             ],
             firewall_router_logging=True,
@@ -2306,7 +2306,7 @@ class TestFirewallRouterChainPolicies:
     def test_forward_policy_drop(self):
         """Forward chain has default policy drop."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=False,
             firewall_router_log_prefix="FW",
         )
@@ -2321,7 +2321,7 @@ class TestFirewallRouterChainPolicies:
     def test_input_policy_drop(self):
         """Input chain has default policy drop."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=False,
             firewall_router_log_prefix="FW",
         )
@@ -2332,7 +2332,7 @@ class TestFirewallRouterChainPolicies:
     def test_output_policy_accept(self):
         """Output chain has default policy accept."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=False,
             firewall_router_log_prefix="FW",
         )
@@ -2343,7 +2343,7 @@ class TestFirewallRouterChainPolicies:
     def test_atomic_replacement_header(self):
         """Firewall router template uses atomic table replacement."""
         result = self._render(
-            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-admin"}],
+            firewall_router_interfaces=[{"name": "eth0", "bridge": "net-anklume"}],
             firewall_router_logging=False,
             firewall_router_log_prefix="FW",
         )
@@ -2680,15 +2680,15 @@ class TestPSOTEnrichEdgeCases:
         """enrich_infra creates sys-firewall when firewall_mode=vm."""
         infra = _minimal_infra()
         infra["global"]["firewall_mode"] = "vm"
-        infra["domains"]["admin"] = {
+        infra["domains"]["anklume"] = {
             "subnet_id": 0,
             "machines": {
-                "admin-ctrl": {"type": "lxc", "ip": "10.100.0.10"},
+                "anklume-ctrl": {"type": "lxc", "ip": "10.100.0.10"},
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert fw["type"] == "vm"
         assert fw["ip"] == "10.100.0.253"
 
@@ -2696,10 +2696,10 @@ class TestPSOTEnrichEdgeCases:
         """enrich_infra does not overwrite user-defined sys-firewall."""
         infra = _minimal_infra()
         infra["global"]["firewall_mode"] = "vm"
-        infra["domains"]["admin"] = {
+        infra["domains"]["anklume"] = {
             "subnet_id": 0,
             "machines": {
-                "admin-ctrl": {"type": "lxc", "ip": "10.100.0.10"},
+                "anklume-ctrl": {"type": "lxc", "ip": "10.100.0.10"},
                 "sys-firewall": {
                     "type": "vm",
                     "ip": "10.100.0.200",
@@ -2708,7 +2708,7 @@ class TestPSOTEnrichEdgeCases:
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert fw["ip"] == "10.100.0.200"  # User's IP preserved
         assert fw["config"]["limits.cpu"] == "8"  # User's config preserved
 
