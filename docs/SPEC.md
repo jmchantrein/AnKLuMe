@@ -115,6 +115,14 @@ global:
   ai_access_policy: open            # "exclusive" or "open" (default: open)
   ai_access_default: pro            # Domain with initial access (required if exclusive)
   ai_vram_flush: true               # Flush GPU VRAM on domain switch (default: true)
+  resource_policy:                  # Optional: auto-allocate CPU/memory
+    host_reserve:
+      cpu: "20%"                    # Reserved for host (default: 20%)
+      memory: "20%"                 # Reserved for host (default: 20%)
+    mode: proportional              # proportional | equal (default: proportional)
+    cpu_mode: allowance             # allowance (%) | count (vCPU) (default: allowance)
+    memory_enforce: soft            # soft (ballooning) | hard (default: soft)
+    overcommit: false               # Allow total > available (default: false)
 
 domains:
   <domain-name>:
@@ -134,6 +142,11 @@ domains:
         ephemeral: false              # Optional (default: inherit from domain)
         gpu: false                    # true to enable GPU passthrough
         profiles: [default]           # List of Incus profiles
+        weight: 1                     # Resource allocation weight (default: 1)
+        boot_autostart: false         # Optional: start on host boot (default: false)
+        boot_priority: 0              # Optional: boot order 0-100 (default: 0)
+        snapshots_schedule: "0 2 * * *"  # Optional: cron schedule for auto-snapshots
+        snapshots_expiry: "30d"       # Optional: retention duration (e.g., 30d, 24h)
         config: { ... }              # Incus instance config overrides
         storage_volumes: { ... }     # Optional: dedicated volumes
         roles: [base_system]         # Ansible roles for provisioning
@@ -160,6 +173,35 @@ from accidental deletion:
   `detect_orphans()` reports protected resources but `--clean-orphans`
   skips them.
 - `ephemeral: true`: the resource can be freely created and destroyed.
+
+The `incus_instances` role propagates the ephemeral flag to Incus natively:
+`ephemeral: false` sets `security.protection.delete=true` on the instance,
+preventing deletion via `incus delete`. `ephemeral: true` sets it to `false`.
+
+### Boot autostart
+
+The optional `boot_autostart` and `boot_priority` fields control instance
+behavior when the Incus host boots:
+
+- `boot_autostart: true` sets `boot.autostart=true` on the instance,
+  causing Incus to automatically start it when the daemon starts.
+- `boot_priority` (0-100) controls the start order. Higher values start
+  first. Default: 0.
+
+The `incus_instances` role applies these via `incus config set`.
+
+### Automatic snapshots
+
+The optional `snapshots_schedule` and `snapshots_expiry` fields enable
+Incus-native automatic snapshots:
+
+- `snapshots_schedule` is a cron expression (5 fields, e.g., `"0 2 * * *"`
+  for daily at 2am). Incus creates snapshots automatically on this schedule.
+- `snapshots_expiry` is a retention duration (e.g., `"30d"`, `"24h"`,
+  `"60m"`). Incus deletes snapshots older than this automatically.
+
+Both are optional and independent. The `incus_instances` role applies
+these via `incus config set snapshots.schedule` and `snapshots.expiry`.
 
 ### Trust levels
 
@@ -192,7 +234,18 @@ adapt behavior based on domain trust posture.
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
+- `weight`: must be a positive integer if present (default: 1)
+- `boot_autostart`: must be a boolean if present
+- `boot_priority`: must be an integer 0-100 if present (default: 0)
+- `snapshots_schedule`: must be a valid cron expression (5 fields) if present
+- `snapshots_expiry`: must be a duration string (e.g., `30d`, `24h`, `60m`) if present
 - `ai_access_policy`: must be `exclusive` or `open`
+- `resource_policy.mode`: must be `proportional` or `equal` (if present)
+- `resource_policy.cpu_mode`: must be `allowance` or `count` (if present)
+- `resource_policy.memory_enforce`: must be `soft` or `hard` (if present)
+- `resource_policy.overcommit`: must be a boolean (if present)
+- `resource_policy.host_reserve.cpu` and `.memory`: must be `"N%"` or a
+  positive number (if present)
 - When `ai_access_policy: exclusive`:
   - `ai_access_default` is required and must reference a known domain
   - `ai_access_default` cannot be `ai-tools` itself
@@ -271,6 +324,73 @@ Special keywords:
 The generator validates that every `from` and `to` references a known
 domain name, machine name, or the keyword `host`. Each rule maps to an
 nftables `accept` rule before the blanket `drop`.
+
+### Resource allocation policy
+
+The optional `resource_policy` section in `global:` enables automatic
+CPU and memory allocation to instances based on detected host resources.
+
+```yaml
+global:
+  resource_policy:              # absent = no auto-allocation
+    host_reserve:
+      cpu: "20%"                # Reserved for host (default: 20%)
+      memory: "20%"             # Reserved for host (default: 20%)
+    mode: proportional          # proportional | equal (default: proportional)
+    cpu_mode: allowance         # allowance (%) | count (vCPU) (default: allowance)
+    memory_enforce: soft        # soft (ballooning) | hard (default: soft)
+    overcommit: false           # Allow total > available (default: false)
+```
+
+Setting `resource_policy: {}` or `resource_policy: true` activates
+allocation with all defaults: 20% host reserve, proportional
+distribution, CPU allowance mode, soft memory enforcement.
+
+**Host reserve**: A fixed percentage (or absolute value) of host
+resources reserved for the operating system and Incus daemon. Instances
+cannot use this reserve.
+
+**Distribution modes**:
+- `proportional`: Each machine gets resources proportional to its
+  `weight` (default weight: 1). A machine with `weight: 3` gets three
+  times the resources of a machine with `weight: 1`.
+- `equal`: All machines get the same share regardless of weight.
+
+**CPU modes**:
+- `allowance`: Sets `limits.cpu.allowance` as a percentage. Allows
+  flexible CPU sharing via CFS scheduler.
+- `count`: Sets `limits.cpu` as a fixed vCPU count. Dedicates cores
+  to instances.
+
+**Memory enforcement**:
+- `soft`: Adds `limits.memory.enforce: "soft"` (cgroups v2 memory
+  ballooning). Instances can temporarily exceed their limit when
+  host memory is available. VMs use virtio-balloon natively.
+- `hard`: Default Incus behavior — strict memory limit.
+
+**Overcommit**: When `false` (default), the generator errors if the
+sum of all allocated resources (auto + explicit) exceeds the available
+pool. When `true`, a warning is emitted instead.
+
+**Machine weight**:
+
+```yaml
+machines:
+  heavy-worker:
+    weight: 3               # Gets 3x the share of default-weight machines
+    type: lxc
+  light-worker:
+    type: lxc               # Default weight: 1
+```
+
+Machines with explicit `limits.cpu`, `limits.cpu.allowance`, or
+`limits.memory` in their `config:` are excluded from auto-allocation
+for that resource but counted towards the overcommit total. The
+generator never overwrites explicit configuration.
+
+**Detection**: Host resources are detected via `incus info --resources`
+(preferred) or `/proc/cpuinfo` + `/proc/meminfo` (fallback). If
+detection fails, resource allocation is skipped with a warning.
 
 ### infra.yml as a directory
 

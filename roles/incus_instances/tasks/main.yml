@@ -180,6 +180,79 @@
   when: instance_config is defined and (instance_config | length > 0)
   changed_when: false
 
+# ── Boot autostart (from instance_boot_autostart / instance_boot_priority) ──
+
+- name: IncusInstances | Set boot.autostart
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "boot.autostart={{ instance_boot_autostart | lower }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: instance_boot_autostart is defined
+  changed_when: false
+
+- name: IncusInstances | Set boot.autostart.priority
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "boot.autostart.priority={{ instance_boot_priority }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: instance_boot_priority is defined
+  changed_when: false
+
+# ── Delete protection (from instance_ephemeral) ─────────────────────────────
+# ephemeral: false → security.protection.delete=true (protected)
+# ephemeral: true  → security.protection.delete=false (deletable)
+
+- name: IncusInstances | Set security.protection.delete from ephemeral flag
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "security.protection.delete={{ 'false' if (instance_ephemeral | bool) else 'true' }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: instance_ephemeral is defined
+  changed_when: false
+
+# ── Snapshot scheduling (from instance_snapshots_schedule / _expiry) ─────────
+
+- name: IncusInstances | Set snapshots.schedule
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "snapshots.schedule={{ instance_snapshots_schedule }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: instance_snapshots_schedule is defined
+  changed_when: false
+
+- name: IncusInstances | Set snapshots.expiry
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "snapshots.expiry={{ instance_snapshots_expiry }}"
+      - --project
+      - "{{ instance_domain }}"
+  when: instance_snapshots_expiry is defined
+  changed_when: false
+
 - name: IncusInstances | Check if eth0 is already overridden
   ansible.builtin.command:
     argv:
