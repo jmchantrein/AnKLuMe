@@ -2,7 +2,11 @@
 """PSOT Generator — generates Ansible file tree from infra.yml."""
 
 import argparse
+import ipaddress
+import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,6 +49,42 @@ def _read_yolo():
         return Path("/etc/anklume/yolo").read_text().strip().lower() == "true"
     except FileNotFoundError:
         return False
+
+
+def _detect_host_subnets():
+    """Detect network subnets on host interfaces via `ip -json addr show`.
+
+    Returns a list of (interface_name, network) tuples where network is an
+    ipaddress.IPv4Network. Returns empty list if detection fails.
+    """
+    try:
+        result = subprocess.run(
+            ["ip", "-json", "addr", "show"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0:
+            return []
+        data = json.loads(result.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return []
+
+    subnets = []
+    for iface in data:
+        ifname = iface.get("ifname", "")
+        # Skip loopback and Incus bridges (net-*)
+        if ifname == "lo" or ifname.startswith("net-"):
+            continue
+        for addr_info in iface.get("addr_info", []):
+            if addr_info.get("family") != "inet":
+                continue
+            try:
+                net = ipaddress.IPv4Network(
+                    f"{addr_info['local']}/{addr_info['prefixlen']}", strict=False
+                )
+                subnets.append((ifname, net))
+            except (KeyError, ValueError):
+                continue
+    return subnets
 
 
 def load_infra(path):
@@ -112,7 +152,7 @@ def _load_infra_dir(dirpath):
     return infra
 
 
-def validate(infra):
+def validate(infra, *, check_host_subnets=True):
     """Validate infra.yml constraints. Returns list of error strings (empty = OK)."""
     errors = []
     for key in ("project_name", "global", "domains"):
@@ -318,6 +358,31 @@ def validate(infra):
                 f"ai_access_policy is 'exclusive' but {len(ai_tools_policies)} "
                 f"network_policies target ai-tools (max 1 allowed)"
             )
+
+    # Host subnet conflict detection — prevents routing loops
+    # Skip if check_host_subnets=False or env ANKLUME_SKIP_HOST_SUBNET_CHECK=1
+    skip_host_check = (
+        not check_host_subnets
+        or os.environ.get("ANKLUME_SKIP_HOST_SUBNET_CHECK") == "1"
+    )
+    host_subnets = [] if skip_host_check else _detect_host_subnets()
+    if host_subnets:
+        for sid, dname in subnet_ids.items():
+            try:
+                domain_net = ipaddress.IPv4Network(f"{base_subnet}.{sid}.0/24")
+            except ValueError:
+                continue
+            for ifname, host_net in host_subnets:
+                if domain_net.overlaps(host_net):
+                    alt_base = "10.200" if base_subnet == "10.100" else "10.100"
+                    errors.append(
+                        f"SUBNET CONFLICT: Domain '{dname}' uses {domain_net} which "
+                        f"overlaps with host interface '{ifname}' ({host_net}). "
+                        f"Incus would create a bridge on the same subnet, causing a "
+                        f"routing loop and total loss of network connectivity. "
+                        f"Change global.base_subnet to '{alt_base}' or use a different "
+                        f"subnet_id for this domain."
+                    )
 
     return errors
 

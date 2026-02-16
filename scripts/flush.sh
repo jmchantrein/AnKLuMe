@@ -55,59 +55,88 @@ fi
 
 deleted=0
 
+# Helper: list projects as one-per-line (strip " (current)" suffix from CSV)
+_list_projects() {
+    incus project list --format csv -c n 2>/dev/null | sed 's/ (current)$//'
+}
+
 # 1. Destroy instances in all projects
 echo "--- Destroying instances ---"
-for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
-    for instance in $(incus list --project "$project" --format csv -c n 2>/dev/null); do
+while IFS= read -r project; do
+    while IFS= read -r instance; do
+        [ -z "$instance" ] && continue
         echo "  Deleting: $instance (project: $project)"
         if incus delete "$instance" --project "$project" --force; then
             deleted=$((deleted + 1))
         else
             echo "  WARNING: Failed to delete $instance (project: $project)"
         fi
-    done
-done
+    done < <(incus list --project "$project" --format csv -c n 2>/dev/null)
+done < <(_list_projects)
 
-# 2. Delete non-default profiles in all projects
-echo "--- Deleting profiles ---"
-for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
-    for profile in $(incus profile list --project "$project" --format csv -c n 2>/dev/null); do
-        if [ "$profile" != "default" ]; then
-            echo "  Deleting profile: $profile (project: $project)"
-            if incus profile delete "$profile" --project "$project"; then
-                deleted=$((deleted + 1))
-            else
-                echo "  WARNING: Failed to delete profile $profile (project: $project)"
-            fi
-        fi
-    done
-done
-
-# 3. Delete non-default projects
-echo "--- Deleting projects ---"
-for project in $(incus project list --format json | python3 -c "import json,sys;[print(p['name']) for p in json.load(sys.stdin)]"); do
-    if [ "$project" != "default" ]; then
-        echo "  Deleting project: $project"
-        if incus project delete "$project"; then
+# 2. Delete cached images in non-default projects (blocks project deletion)
+echo "--- Deleting cached images ---"
+while IFS= read -r project; do
+    [ "$project" = "default" ] && continue
+    while IFS= read -r fingerprint; do
+        [ -z "$fingerprint" ] && continue
+        echo "  Deleting image: ${fingerprint:0:12} (project: $project)"
+        if incus image delete "$fingerprint" --project "$project" 2>/dev/null; then
             deleted=$((deleted + 1))
-        else
-            echo "  WARNING: Failed to delete project $project"
         fi
-    fi
-done
+    done < <(incus image list --project "$project" --format csv -c f 2>/dev/null)
+done < <(_list_projects)
 
-# 4. Delete AnKLuMe bridges (net-*)
+# 3. Delete non-default profiles in all projects
+echo "--- Deleting profiles ---"
+while IFS= read -r project; do
+    while IFS= read -r profile; do
+        [ -z "$profile" ] && continue
+        [ "$profile" = "default" ] && continue
+        echo "  Deleting profile: $profile (project: $project)"
+        if incus profile delete "$profile" --project "$project"; then
+            deleted=$((deleted + 1))
+        fi
+    done < <(incus profile list --project "$project" --format csv -c n 2>/dev/null)
+done < <(_list_projects)
+
+# 4. Reset default profile in non-default projects (remove device references to net-* bridges)
+echo "--- Resetting default profiles ---"
+while IFS= read -r project; do
+    [ "$project" = "default" ] && continue
+    # Remove all devices from default profile so it no longer references bridges
+    for device in $(incus profile device list default --project "$project" --format csv 2>/dev/null | cut -d, -f1); do
+        [ -z "$device" ] && continue
+        echo "  Removing device '$device' from default profile (project: $project)"
+        incus profile device remove default "$device" --project "$project" 2>/dev/null || true
+    done
+done < <(_list_projects)
+
+# 5. Delete non-default projects (now empty: no instances, images, or device refs)
+echo "--- Deleting projects ---"
+while IFS= read -r project; do
+    [ "$project" = "default" ] && continue
+    echo "  Deleting project: $project"
+    if incus project delete "$project"; then
+        deleted=$((deleted + 1))
+    else
+        echo "  WARNING: Failed to delete project $project"
+    fi
+done < <(_list_projects)
+
+# 6. Delete AnKLuMe bridges (net-*) — now unreferenced by any project
 echo "--- Deleting bridges ---"
-for bridge in $(incus network list --format csv -c n | grep "^net-"); do
+while IFS= read -r bridge; do
+    [ -z "$bridge" ] && continue
     echo "  Deleting bridge: $bridge"
     if incus network delete "$bridge"; then
         deleted=$((deleted + 1))
     else
         echo "  WARNING: Failed to delete bridge $bridge"
     fi
-done
+done < <(incus network list --format csv -c n 2>/dev/null | grep "^net-")
 
-# 5. Remove generated Ansible files
+# 7. Remove generated Ansible files
 echo "--- Removing generated files ---"
 for dir in inventory group_vars host_vars; do
     if [ -d "$dir" ]; then
