@@ -19,20 +19,20 @@ on your host:
 
 ```bash
 # Create the admin container
-incus launch images:debian/13 admin-ansible
+incus launch images:debian/13 anklume-instance
 
 # Mount the Incus socket (required for managing other instances)
-incus config device add admin-ansible incus-socket proxy \
+incus config device add anklume-instance incus-socket proxy \
   connect=unix:/var/lib/incus/unix.socket \
   listen=unix:/var/run/incus/unix.socket \
   bind=container \
   security.uid=0 security.gid=0
 
 # Enable nesting (required for Incus CLI inside the container)
-incus config set admin-ansible security.nesting=true
+incus config set anklume-instance security.nesting=true
 
 # Enter the container
-incus exec admin-ansible -- bash
+incus exec anklume-instance -- bash
 ```
 
 Inside the admin container, install the required tools:
@@ -89,9 +89,9 @@ Expected output:
 ```
 Generating files for 2 domain(s)...
   Written: group_vars/all.yml
-  Written: inventory/admin.yml
-  Written: group_vars/admin.yml
-  Written: host_vars/admin-ansible.yml
+  Written: inventory/anklume.yml
+  Written: group_vars/anklume.yml
+  Written: host_vars/anklume-instance.yml
   Written: inventory/lab.yml
   Written: group_vars/lab.yml
   Written: host_vars/lab-server.yml
@@ -168,11 +168,11 @@ After your initial setup, the daily workflow is:
   constraints (unique names, unique subnets, valid IPs) before writing.
   Read the error message for the specific constraint that failed.
 - **Incus socket not found**: Verify the proxy device is configured with
-  `incus config device show admin-ansible`
+  `incus config device show anklume-instance`
 - **Container fails to start after reboot**: The `/var/run/incus/`
   directory may not exist. See ADR-019 in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **make apply hangs**: Check Incus is running (`systemctl status incus`)
-  and the socket is accessible (`incus list` from inside admin-ansible).
+  and the socket is accessible (`incus list` from inside anklume-instance).
 
 ## Next steps
 

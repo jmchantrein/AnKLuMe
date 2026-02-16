@@ -12,7 +12,7 @@ TRANSFER_SH = Path(__file__).resolve().parent.parent / "scripts" / "transfer.sh"
 
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
-    {"name": "admin-ansible", "project": "admin", "status": "Running"},
+    {"name": "anklume-instance", "project": "anklume", "status": "Running"},
     {"name": "pro-dev", "project": "pro", "status": "Running"},
     {"name": "perso-desktop", "project": "perso", "status": "Running"},
 ])
@@ -135,18 +135,18 @@ class TestCopy:
     def test_copy_requires_colon_format(self, mock_env):
         """copy with invalid format fails."""
         env, _, _ = mock_env
-        result = run_transfer(["copy", "pro-dev", "admin-ansible:/tmp/x"], env)
+        result = run_transfer(["copy", "pro-dev", "anklume-instance:/tmp/x"], env)
         assert result.returncode != 0
         assert "Invalid format" in result.stderr
 
     def test_copy_between_instances(self, mock_env):
         """copy pipes file pull to file push with correct projects."""
         env, log, _ = mock_env
-        result = run_transfer(["copy", "pro-dev:/etc/hosts", "admin-ansible:/tmp/hosts"], env)
+        result = run_transfer(["copy", "pro-dev:/etc/hosts", "anklume-instance:/tmp/hosts"], env)
         assert result.returncode == 0
         cmds = read_log(log)
         assert any("file pull" in c and "--project pro" in c for c in cmds)
-        assert any("file push" in c and "--project admin" in c for c in cmds)
+        assert any("file push" in c and "--project anklume" in c for c in cmds)
 
     def test_copy_unknown_instance(self, mock_env):
         """copy with unknown instance fails."""
@@ -170,10 +170,10 @@ class TestBackup:
     def test_backup_creates_file(self, mock_env):
         """backup exports instance to backups/ directory."""
         env, log, tmp = mock_env
-        result = run_transfer(["backup", "admin-ansible", "--output", str(tmp / "backups")], env)
+        result = run_transfer(["backup", "anklume-instance", "--output", str(tmp / "backups")], env)
         assert result.returncode == 0
         cmds = read_log(log)
-        assert any("export admin-ansible" in c and "--project admin" in c for c in cmds)
+        assert any("export anklume-instance" in c and "--project anklume" in c for c in cmds)
 
     def test_backup_unknown_instance(self, mock_env):
         """backup with unknown instance fails."""
@@ -249,14 +249,14 @@ class TestParseInstancePath:
     def test_missing_path(self, mock_env):
         """instance: without path fails."""
         env, _, _ = mock_env
-        result = run_transfer(["copy", "pro-dev:", "admin-ansible:/tmp/x"], env)
+        result = run_transfer(["copy", "pro-dev:", "anklume-instance:/tmp/x"], env)
         assert result.returncode != 0
         assert "Invalid format" in result.stderr or "ERROR" in result.stderr
 
     def test_missing_instance(self, mock_env):
         """:/path without instance fails."""
         env, _, _ = mock_env
-        result = run_transfer(["copy", ":/etc/hosts", "admin-ansible:/tmp/x"], env)
+        result = run_transfer(["copy", ":/etc/hosts", "anklume-instance:/tmp/x"], env)
         assert result.returncode != 0
         assert "Invalid format" in result.stderr or "ERROR" in result.stderr
 

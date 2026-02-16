@@ -7,7 +7,7 @@
 #
 # See docs/SPEC.md section 5 for the full format reference.
 
-# AnKLuMe developer: admin domain + dev-test domain with nesting
+# AnKLuMe developer: anklume domain + dev-test domain with nesting
 # enabled for Incus-in-Incus testing (Phase 12).
 
 project_name: anklume-dev
@@ -19,7 +19,7 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     ephemeral: false

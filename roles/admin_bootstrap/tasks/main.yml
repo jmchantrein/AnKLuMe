@@ -1,5 +1,5 @@
 ---
-# AdminBootstrap | Provisioning specific to admin-ansible
+# AdminBootstrap | Provisioning specific to anklume-instance
 #
 # Deploys the incus-socket-dir systemd service (ADR-019) so the container
 # survives restarts, and ensures Ansible + git are installed.

@@ -61,7 +61,7 @@
     - name: Verify | Contains inter-domain drop rules with logging
       ansible.builtin.assert:
         that:
-          - "'FW-DENY-ADMIN' in verify_rules"
+          - "'FW-DENY-ANKLUME' in verify_rules"
           - "'FW-DENY-PERSO' in verify_rules"
           - "'FW-DENY-PRO' in verify_rules"
         fail_msg: "Missing inter-domain deny rules with logging"
@@ -105,7 +105,7 @@
         firewall_router_log_prefix: "FW"
         firewall_router_interfaces:
           - name: eth0
-            bridge: net-admin
+            bridge: net-anklume
             subnet: "10.100.0.0/24"
             gateway_ip: "10.100.0.254"
           - name: eth1

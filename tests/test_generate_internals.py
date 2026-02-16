@@ -267,12 +267,12 @@ class TestLoadInfraEdgeCases:
             "global": {"base_subnet": "10.100"},
         }))
         (d / "domains").mkdir()
-        (d / "domains" / "admin.yml").write_text(yaml.dump({
-            "admin": {"subnet_id": 0, "machines": {}},
+        (d / "domains" / "anklume.yml").write_text(yaml.dump({
+            "anklume": {"subnet_id": 0, "machines": {}},
         }))
         data = load_infra(d)
         assert data["project_name"] == "test"
-        assert "admin" in data["domains"]
+        assert "anklume" in data["domains"]
 
     def test_load_directory_with_policies(self, tmp_path):
         """load_infra merges policies.yml from directory."""
@@ -369,19 +369,19 @@ class TestLoadInfraEdgeCases:
         }))
         domains_dir = d / "domains"
         domains_dir.mkdir()
-        # Two files defining the same domain "admin"
-        (domains_dir / "01-admin.yml").write_text(yaml.dump({
-            "admin": {"subnet_id": 0, "machines": {}},
+        # Two files defining the same domain "anklume"
+        (domains_dir / "01-anklume.yml").write_text(yaml.dump({
+            "anklume": {"subnet_id": 0, "machines": {}},
         }))
-        (domains_dir / "02-admin.yml").write_text(yaml.dump({
-            "admin": {"subnet_id": 1, "machines": {}},
+        (domains_dir / "02-anklume.yml").write_text(yaml.dump({
+            "anklume": {"subnet_id": 1, "machines": {}},
         }))
         data = load_infra(d)
         captured = capsys.readouterr()
         assert "WARNING" in captured.err
-        assert "admin" in captured.err
+        assert "anklume" in captured.err
         # Second file wins (sorted alphabetically: 02 after 01)
-        assert data["domains"]["admin"]["subnet_id"] == 1
+        assert data["domains"]["anklume"]["subnet_id"] == 1
 
     def test_load_dir_policies_without_network_policies_key(self, tmp_path):
         """policies.yml without network_policies key does not add policies."""
@@ -421,10 +421,10 @@ class TestEnrichInfra:
         """Enrichment is no-op when firewall_mode is 'host'."""
         infra = {
             "global": {"firewall_mode": "host", "base_subnet": "10.100"},
-            "domains": {"admin": {"subnet_id": 0, "machines": {}}},
+            "domains": {"anklume": {"subnet_id": 0, "machines": {}}},
         }
         enrich_infra(infra)
-        assert "sys-firewall" not in infra["domains"]["admin"].get(
+        assert "sys-firewall" not in infra["domains"]["anklume"].get(
             "machines", {},
         )
 
@@ -433,7 +433,7 @@ class TestEnrichInfra:
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "admin-ctrl": {
@@ -444,8 +444,8 @@ class TestEnrichInfra:
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert fw["type"] == "vm"
         assert fw["ip"] == "10.100.0.253"
 
@@ -454,7 +454,7 @@ class TestEnrichInfra:
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "sys-firewall": {
@@ -466,7 +466,7 @@ class TestEnrichInfra:
             },
         }
         enrich_infra(infra)
-        assert infra["domains"]["admin"]["machines"]["sys-firewall"]["ip"] == "10.100.0.250"
+        assert infra["domains"]["anklume"]["machines"]["sys-firewall"]["ip"] == "10.100.0.250"
 
     def test_enrich_ai_access_creates_policy(self):
         """Enrichment creates network policy for exclusive AI access."""
@@ -531,7 +531,7 @@ class TestDetectOrphansEdges:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "admin-ctrl": {
@@ -551,7 +551,7 @@ class TestDetectOrphansEdges:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "admin-ctrl": {
@@ -574,7 +574,7 @@ class TestDetectOrphansEdges:
         infra = {
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
-            "domains": {"admin": {"subnet_id": 0, "machines": {}}},
+            "domains": {"anklume": {"subnet_id": 0, "machines": {}}},
         }
         # Don't generate, so host_vars doesn't exist
         orphans = detect_orphans(infra, tmp_path)
@@ -627,7 +627,7 @@ class TestValidationEdgeCases:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "admin-vm": {
@@ -653,7 +653,7 @@ class TestValidationEdgeCases:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "description": "",
                     "subnet_id": 0,
                     "machines": {
@@ -672,7 +672,7 @@ class TestValidationEdgeCases:
             "project_name": "test",
             "global": {"base_subnet": "10.100"},
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {
                         "dhcp-host": {"type": "lxc"},
@@ -1170,14 +1170,14 @@ class TestEnrichIdempotency:
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
+                "anklume": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
         enrich_infra(infra)
         # Should still have exactly one sys-firewall, not two
-        fw_count = sum(1 for m in infra["domains"]["admin"]["machines"] if m == "sys-firewall")
+        fw_count = sum(1 for m in infra["domains"]["anklume"]["machines"] if m == "sys-firewall")
         assert fw_count == 1
 
     def test_ai_access_enrichment_idempotent(self):
@@ -1236,7 +1236,7 @@ class TestNetworkPolicyValidation:
 
     def _base(self, policies, extra_domains=None):
         domains = {
-            "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
+            "anklume": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc", "ip": "10.100.0.10"}}},
             "pro": {"subnet_id": 1, "machines": {"dev": {"type": "lxc", "ip": "10.100.1.10"}}},
         }
         if extra_domains:
@@ -1251,7 +1251,7 @@ class TestNetworkPolicyValidation:
     def test_valid_policy_no_errors(self):
         """A valid network policy produces no errors."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [8080], "protocol": "tcp"},
+            {"from": "anklume", "to": "pro", "ports": [8080], "protocol": "tcp"},
         ])
         errors = validate(infra)
         assert errors == []
@@ -1259,7 +1259,7 @@ class TestNetworkPolicyValidation:
     def test_policy_port_zero_invalid(self):
         """Port 0 is invalid (must be 1-65535)."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [0], "protocol": "tcp"},
+            {"from": "anklume", "to": "pro", "ports": [0], "protocol": "tcp"},
         ])
         errors = validate(infra)
         assert any("invalid port 0" in e for e in errors)
@@ -1267,7 +1267,7 @@ class TestNetworkPolicyValidation:
     def test_policy_port_65536_invalid(self):
         """Port 65536 is invalid (must be 1-65535)."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [65536], "protocol": "tcp"},
+            {"from": "anklume", "to": "pro", "ports": [65536], "protocol": "tcp"},
         ])
         errors = validate(infra)
         assert any("invalid port 65536" in e for e in errors)
@@ -1275,7 +1275,7 @@ class TestNetworkPolicyValidation:
     def test_policy_port_negative_invalid(self):
         """Negative port is invalid."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [-1], "protocol": "tcp"},
+            {"from": "anklume", "to": "pro", "ports": [-1], "protocol": "tcp"},
         ])
         errors = validate(infra)
         assert any("invalid port -1" in e for e in errors)
@@ -1283,7 +1283,7 @@ class TestNetworkPolicyValidation:
     def test_policy_ports_all_valid(self):
         """ports: 'all' is a valid value."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": "all"},
+            {"from": "anklume", "to": "pro", "ports": "all"},
         ])
         errors = validate(infra)
         assert errors == []
@@ -1291,7 +1291,7 @@ class TestNetworkPolicyValidation:
     def test_policy_ports_string_invalid(self):
         """ports as a non-'all' string is invalid (must be list or 'all')."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": "8080"},
+            {"from": "anklume", "to": "pro", "ports": "8080"},
         ])
         errors = validate(infra)
         assert any("ports must be a list" in e for e in errors)
@@ -1299,7 +1299,7 @@ class TestNetworkPolicyValidation:
     def test_policy_protocol_invalid(self):
         """Invalid protocol value is rejected."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [80], "protocol": "icmp"},
+            {"from": "anklume", "to": "pro", "ports": [80], "protocol": "icmp"},
         ])
         errors = validate(infra)
         assert any("protocol must be 'tcp' or 'udp'" in e for e in errors)
@@ -1315,7 +1315,7 @@ class TestNetworkPolicyValidation:
     def test_policy_missing_to(self):
         """Missing 'to' field is caught."""
         infra = self._base([
-            {"from": "admin", "ports": [80]},
+            {"from": "anklume", "ports": [80]},
         ])
         errors = validate(infra)
         assert any("missing 'to'" in e for e in errors)
@@ -1331,7 +1331,7 @@ class TestNetworkPolicyValidation:
     def test_policy_unknown_to_reference(self):
         """Unknown 'to' reference is caught."""
         infra = self._base([
-            {"from": "admin", "to": "nowhere", "ports": [80]},
+            {"from": "anklume", "to": "nowhere", "ports": [80]},
         ])
         errors = validate(infra)
         assert any("nowhere" in e and "not a known" in e for e in errors)
@@ -1355,7 +1355,7 @@ class TestNetworkPolicyValidation:
     def test_policy_bidirectional_accepted(self):
         """bidirectional: true is accepted without error."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": "all", "bidirectional": True},
+            {"from": "anklume", "to": "pro", "ports": "all", "bidirectional": True},
         ])
         errors = validate(infra)
         assert errors == []
@@ -1369,7 +1369,7 @@ class TestNetworkPolicyValidation:
     def test_multiple_valid_ports(self):
         """Multiple valid ports in a single policy accepted."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [80, 443, 8080, 11434]},
+            {"from": "anklume", "to": "pro", "ports": [80, 443, 8080, 11434]},
         ])
         errors = validate(infra)
         assert errors == []
@@ -1377,7 +1377,7 @@ class TestNetworkPolicyValidation:
     def test_mixed_valid_and_invalid_ports(self):
         """Mixed valid and invalid ports: each invalid port reported."""
         infra = self._base([
-            {"from": "admin", "to": "pro", "ports": [80, 0, 70000]},
+            {"from": "anklume", "to": "pro", "ports": [80, 0, 70000]},
         ])
         errors = validate(infra)
         assert any("invalid port 0" in e for e in errors)
@@ -1454,9 +1454,9 @@ class TestAIAccessPolicyDetailed:
         infra = self._ai_infra()
         infra["network_policies"] = [
             {"from": "pro", "to": "ai-tools", "ports": "all"},
-            {"from": "admin", "to": "ai-tools", "ports": [8080]},
+            {"from": "anklume", "to": "ai-tools", "ports": [8080]},
         ]
-        infra["domains"]["admin"] = {"subnet_id": 0, "machines": {}}
+        infra["domains"]["anklume"] = {"subnet_id": 0, "machines": {}}
         errors = validate(infra)
         assert any("2 network_policies target ai-tools" in e for e in errors)
 
@@ -1876,12 +1876,12 @@ class TestGenerateOutput:
 class TestEnrichFirewallDetailed:
     """Additional edge cases for firewall VM enrichment."""
 
-    def test_sys_firewall_in_non_admin_domain_blocks_auto_creation(self):
+    def test_sys_firewall_in_non_anklume_domain_blocks_auto_creation(self):
         """User-defined sys-firewall in any domain prevents auto-creation."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc"}}},
+                "anklume": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc"}}},
                 "other": {
                     "subnet_id": 1,
                     "machines": {"sys-firewall": {"type": "vm", "ip": "10.100.1.250"}},
@@ -1889,19 +1889,19 @@ class TestEnrichFirewallDetailed:
             },
         }
         enrich_infra(infra)
-        # sys-firewall should NOT be auto-created in admin since user defined it in 'other'
-        assert "sys-firewall" not in infra["domains"]["admin"]["machines"]
+        # sys-firewall should NOT be auto-created in anklume since user defined it in 'other'
+        assert "sys-firewall" not in infra["domains"]["anklume"]["machines"]
 
     def test_auto_created_firewall_has_correct_roles(self):
         """Auto-created sys-firewall has base_system and firewall_router roles."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {"subnet_id": 0, "machines": {}},
+                "anklume": {"subnet_id": 0, "machines": {}},
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert "base_system" in fw["roles"]
         assert "firewall_router" in fw["roles"]
 
@@ -1910,42 +1910,42 @@ class TestEnrichFirewallDetailed:
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {"subnet_id": 0, "machines": {}},
+                "anklume": {"subnet_id": 0, "machines": {}},
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert fw["ephemeral"] is False
 
     def test_firewall_mode_default_is_host(self):
         """Default firewall_mode is 'host' (no auto-creation)."""
         infra = {
             "global": {"base_subnet": "10.100"},
-            "domains": {"admin": {"subnet_id": 0, "machines": {}}},
+            "domains": {"anklume": {"subnet_id": 0, "machines": {}}},
         }
         enrich_infra(infra)
-        assert "sys-firewall" not in infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" not in infra["domains"]["anklume"]["machines"]
 
     def test_firewall_custom_base_subnet(self):
         """Auto-created sys-firewall uses custom base_subnet."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "192.168"},
             "domains": {
-                "admin": {"subnet_id": 5, "machines": {}},
+                "anklume": {"subnet_id": 5, "machines": {}},
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["admin"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
         assert fw["ip"] == "192.168.5.253"
 
     def test_firewall_machines_none_creates_dict(self):
-        """When admin.machines is None, enrich creates the dict."""
+        """When anklume.machines is None, enrich creates the dict."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
-                "admin": {"subnet_id": 0, "machines": None},
+                "anklume": {"subnet_id": 0, "machines": None},
             },
         }
         enrich_infra(infra)
-        assert isinstance(infra["domains"]["admin"]["machines"], dict)
-        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
+        assert isinstance(infra["domains"]["anklume"]["machines"], dict)
+        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]

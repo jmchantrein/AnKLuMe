@@ -867,20 +867,20 @@ class TestExampleReadmeContent:
             )
 
 
-class TestExampleHasAdminDomain:
-    """Every example should have an admin domain for orchestration."""
+class TestExampleHasAnklumeDomain:
+    """Every example should have an anklume domain for orchestration."""
 
     @pytest.mark.parametrize(
         "example_path",
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_has_admin_domain(self, example_path):
-        """Each example must have an 'admin' domain."""
+    def test_has_anklume_domain(self, example_path):
+        """Each example must have an 'anklume' domain."""
         infra = load_infra(str(example_path))
         domains = infra.get("domains") or {}
-        assert "admin" in domains, (
-            f"Missing 'admin' domain in {example_path}"
+        assert "anklume" in domains, (
+            f"Missing 'anklume' domain in {example_path}"
         )
 
     @pytest.mark.parametrize(
@@ -888,12 +888,12 @@ class TestExampleHasAdminDomain:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_admin_domain_has_subnet_0(self, example_path):
-        """The admin domain should use subnet_id 0."""
+    def test_anklume_domain_has_subnet_0(self, example_path):
+        """The anklume domain should use subnet_id 0."""
         infra = load_infra(str(example_path))
-        admin = (infra.get("domains") or {}).get("admin", {})
-        assert admin.get("subnet_id") == 0, (
-            f"Admin domain subnet_id != 0 in {example_path}"
+        anklume = (infra.get("domains") or {}).get("anklume", {})
+        assert anklume.get("subnet_id") == 0, (
+            f"Anklume domain subnet_id != 0 in {example_path}"
         )
 
     @pytest.mark.parametrize(
@@ -901,12 +901,12 @@ class TestExampleHasAdminDomain:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_admin_domain_not_ephemeral(self, example_path):
-        """The admin domain should not be ephemeral."""
+    def test_anklume_domain_not_ephemeral(self, example_path):
+        """The anklume domain should not be ephemeral."""
         infra = load_infra(str(example_path))
-        admin = (infra.get("domains") or {}).get("admin", {})
-        eph = admin.get("ephemeral", False)
-        assert eph is False, f"Admin domain is ephemeral in {example_path}"
+        anklume = (infra.get("domains") or {}).get("anklume", {})
+        eph = anklume.get("ephemeral", False)
+        assert eph is False, f"Anklume domain is ephemeral in {example_path}"
 
 
 class TestExampleGatewayConvention:
@@ -1384,15 +1384,15 @@ class TestStudentSysadminExample:
 
     def test_has_two_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "lab"}
+        assert set(domains.keys()) == {"anklume", "lab"}
 
     def test_lab_domain_is_ephemeral(self):
         infra = self._load()
         assert infra["domains"]["lab"]["ephemeral"] is True
 
-    def test_admin_domain_not_ephemeral(self):
+    def test_anklume_domain_not_ephemeral(self):
         infra = self._load()
-        assert infra["domains"]["admin"]["ephemeral"] is False
+        assert infra["domains"]["anklume"]["ephemeral"] is False
 
     def test_has_three_machines(self):
         infra = self._load()
@@ -1424,7 +1424,7 @@ class TestStudentSysadminExample:
 
     def test_sa_admin_has_nesting(self):
         infra = self._load()
-        cfg = infra["domains"]["admin"]["machines"]["sa-admin"].get("config", {})
+        cfg = infra["domains"]["anklume"]["machines"]["sa-admin"].get("config", {})
         assert cfg.get("security.nesting") == "true"
 
 
@@ -1494,7 +1494,7 @@ class TestProWorkstationExample:
 
     def test_has_four_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "perso", "pro", "homelab"}
+        assert set(domains.keys()) == {"anklume", "perso", "pro", "homelab"}
 
     def test_homelab_has_gpu_profile(self):
         infra = self._load()
@@ -1549,7 +1549,7 @@ class TestSandboxIsolationExample:
 
     def test_has_two_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "sandbox"}
+        assert set(domains.keys()) == {"anklume", "sandbox"}
 
     def test_sandbox_is_ephemeral(self):
         infra = self._load()
@@ -1614,7 +1614,7 @@ class TestLlmSupervisorExample:
 
     def test_has_four_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "llm-alpha", "llm-beta", "supervisor"}
+        assert set(domains.keys()) == {"anklume", "llm-alpha", "llm-beta", "supervisor"}
 
     def test_gpu_policy_shared(self):
         infra = self._load()
@@ -1674,7 +1674,7 @@ class TestDeveloperExample:
 
     def test_has_two_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "dev-test"}
+        assert set(domains.keys()) == {"anklume", "dev-test"}
 
     def test_dev_test_is_ephemeral(self):
         infra = self._load()
@@ -1716,7 +1716,7 @@ class TestAiToolsExample:
 
     def test_has_two_domains(self):
         domains = self._load()["domains"]
-        assert set(domains.keys()) == {"admin", "ai-tools"}
+        assert set(domains.keys()) == {"anklume", "ai-tools"}
 
     def test_ai_tools_has_four_machines(self):
         infra = self._load()
@@ -1767,13 +1767,13 @@ class TestAiToolsExample:
         infra = self._load()
         assert infra["domains"]["ai-tools"]["subnet_id"] == 4
 
-    def test_network_policy_admin_to_ai_tools(self):
-        """There should be a policy allowing admin to access ai-tools."""
+    def test_network_policy_anklume_to_ai_tools(self):
+        """There should be a policy allowing anklume to access ai-tools."""
         infra = self._load()
         policies = infra.get("network_policies") or []
-        admin_to_ai = [p for p in policies
-                       if p.get("from") == "admin" and p.get("to") == "ai-tools"]
-        assert len(admin_to_ai) >= 1
+        anklume_to_ai = [p for p in policies
+                         if p.get("from") == "anklume" and p.get("to") == "ai-tools"]
+        assert len(anklume_to_ai) >= 1
 
     def test_network_policy_host_to_ollama(self):
         """There should be a policy allowing host to access ai-ollama."""

@@ -20,9 +20,10 @@ def sample_infra():
             "default_os_image": "images:debian/13",
         },
         "domains": {
-            "admin": {
+            "anklume": {
                 "description": "Administration",
                 "subnet_id": 0,
+                "trust_level": "admin",
                 "machines": {
                     "admin-ctrl": {
                         "description": "Controller",
@@ -54,14 +55,16 @@ def sample_infra():
 
 
 def test_infer_trust_level_admin():
-    """Domain name containing 'admin' infers admin trust level."""
+    """Domain name containing 'admin' or 'anklume' infers admin trust level."""
     assert console.infer_trust_level("admin", {}) == "admin"
+    assert console.infer_trust_level("anklume", {}) == "admin"
 
 
 def test_infer_trust_level_contains_admin():
-    """Domain name containing 'admin' infers admin trust level."""
+    """Domain name containing 'admin' or 'anklume' infers admin trust level."""
     assert console.infer_trust_level("my-admin", {}) == "admin"
     assert console.infer_trust_level("admin-tools", {}) == "admin"
+    assert console.infer_trust_level("my-anklume", {}) == "admin"
 
 
 def test_infer_trust_level_ephemeral():
@@ -92,16 +95,16 @@ def test_build_session_config(sample_infra):
     """Build session config from sample infra."""
     config = console.build_session_config(sample_infra)
 
-    assert len(config) == 2  # admin + lab
+    assert len(config) == 2  # anklume + lab
 
     # Admin window
     admin_window = config[0]
-    assert admin_window["name"] == "admin"
+    assert admin_window["name"] == "anklume"
     assert admin_window["trust"] == "admin"
     assert admin_window["color"] == "dark blue"
     assert len(admin_window["panes"]) == 1
     assert admin_window["panes"][0]["machine"] == "admin-ctrl"
-    assert "incus exec admin-ctrl --project admin -- bash" in admin_window["panes"][0]["command"]
+    assert "incus exec admin-ctrl --project anklume -- bash" in admin_window["panes"][0]["command"]
 
     # Lab window
     lab_window = config[1]
@@ -154,11 +157,11 @@ def test_dry_run_output(sample_infra, capsys):
 
     assert "Session: test-session" in output
     assert "prefix: C-a" in output
-    assert "Window [0] admin" in output
+    assert "Window [0] anklume" in output
     assert "trust: admin" in output
     assert "color: dark blue" in output
     assert "Pane: admin-ctrl" in output
-    assert "incus exec admin-ctrl --project admin -- bash" in output
+    assert "incus exec admin-ctrl --project anklume -- bash" in output
     assert "Window [1] lab" in output
     assert "trust: disposable" in output
 
@@ -179,7 +182,7 @@ def test_explicit_trust_level_overrides_heuristic():
     """Domain with explicit trust_level uses that value, not heuristic."""
     infra = {
         "domains": {
-            "admin": {
+            "anklume": {
                 "subnet_id": 0,
                 "trust_level": "untrusted",  # Override heuristic
                 "machines": {
@@ -199,7 +202,7 @@ def test_explicit_trust_level_overrides_heuristic():
 
     config = console.build_session_config(infra)
 
-    admin_window = [w for w in config if w["name"] == "admin"][0]
+    admin_window = [w for w in config if w["name"] == "anklume"][0]
     assert admin_window["trust"] == "untrusted"  # Not "admin"
 
     lab_window = [w for w in config if w["name"] == "lab"][0]

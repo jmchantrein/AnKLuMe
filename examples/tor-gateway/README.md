@@ -15,7 +15,7 @@ do not need any Tor-specific configuration.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Ansible controller (protected) |
+| anklume | 0 | Ansible controller (protected) |
 | tor-gateway | 5 | Tor transparent proxy |
 | anonymous | 6 | Domain routed through Tor |
 
@@ -23,7 +23,7 @@ do not need any Tor-specific configuration.
 
 | Machine | Domain | Type | IP | Role |
 |---------|--------|------|-----|------|
-| admin-ansible | admin | lxc | 10.100.0.10 | Ansible controller |
+| anklume-instance | anklume | lxc | 10.100.0.10 | Ansible controller |
 | tor-gw | tor-gateway | lxc | 10.100.5.10 | Tor transparent proxy |
 | anon-browser | anonymous | lxc | 10.100.6.10 | Anonymous browsing |
 

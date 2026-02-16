@@ -23,7 +23,7 @@ def mock_env(tmp_path):
         type filter hook forward priority -1; policy accept;
         ct state established,related accept
         ct state invalid drop
-        iifname "net-admin" oifname "net-admin" accept
+        iifname "net-anklume" oifname "net-anklume" accept
         iifname "net-work" oifname "net-work" accept
         drop
     }
@@ -40,7 +40,7 @@ echo "incus $@" >> "{log_file}"
 # project list --format csv (pre-flight)
 if [[ "$1" == "project" && "$2" == "list" ]]; then
     echo "default"
-    echo "admin"
+    echo "anklume"
     exit 0
 fi
 
@@ -209,8 +209,8 @@ class TestDeployCommandSequence:
 
 
 class TestFindProjectFunction:
-    def test_container_found_in_admin_project(self, tmp_path):
-        """find_project returns 'admin' when container is in admin project."""
+    def test_container_found_in_anklume_project(self, tmp_path):
+        """find_project returns 'anklume' when container is in anklume project."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
         log_file = tmp_path / "cmds.log"
@@ -223,10 +223,10 @@ class TestFindProjectFunction:
 echo "incus $@" >> "{log_file}"
 if [[ "$1" == "project" && "$2" == "list" ]]; then
     echo "default"
-    echo "admin"
+    echo "anklume"
     exit 0
 fi
-if [[ "$1" == "info" && "$3" == "--project" && "$4" == "admin" ]]; then
+if [[ "$1" == "info" && "$3" == "--project" && "$4" == "anklume" ]]; then
     exit 0
 fi
 if [[ "$1" == "file" && "$2" == "pull" ]]; then
@@ -268,10 +268,10 @@ exit 0
 
         result = run_deploy([], env, script=patched_deploy)
         assert result.returncode == 0
-        assert "Found in project: admin" in result.stdout
+        assert "Found in project: anklume" in result.stdout
 
     def test_multi_project_search_fallback(self, tmp_path):
-        """When container not in admin project, searches all projects via JSON."""
+        """When container not in anklume project, searches all projects via JSON."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
         log_file = tmp_path / "cmds.log"
@@ -284,18 +284,18 @@ exit 0
 echo "incus $@" >> "{log_file}"
 if [[ "$1" == "project" && "$2" == "list" ]]; then
     echo "default"
-    echo "admin"
+    echo "anklume"
     echo "custom"
     exit 0
 fi
-if [[ "$1" == "info" && "$3" == "--project" && "$4" == "admin" ]]; then
+if [[ "$1" == "info" && "$3" == "--project" && "$4" == "anklume" ]]; then
     exit 1
 fi
 if [[ "$1" == "info" ]]; then
     exit 0
 fi
 if [[ "$1" == "list" && "$2" == "--all-projects" ]]; then
-    echo '[{{"name": "admin-ansible", "project": "custom"}}]'
+    echo '[{{"name": "anklume-instance", "project": "custom"}}]'
     exit 0
 fi
 if [[ "$1" == "file" && "$2" == "pull" ]]; then

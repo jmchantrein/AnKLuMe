@@ -42,7 +42,7 @@ def git_workspace(tmp_path):
         "  admin:\n"
         "    subnet_id: 0\n"
         "    machines:\n"
-        "      admin-ansible:\n"
+        "      anklume-instance:\n"
         "        type: lxc\n"
         "        ip: '10.100.0.10'\n"
     )
@@ -154,7 +154,7 @@ class TestUpgradeInfraDirectory:
             "admin:\n"
             "  subnet_id: 0\n"
             "  machines:\n"
-            "    admin-ansible:\n"
+            "    anklume-instance:\n"
             "      type: lxc\n"
             "      ip: '10.100.0.10'\n"
         )
@@ -201,7 +201,7 @@ class TestUpgradeInfraDirectoryDetection:
             "admin:\n"
             "  subnet_id: 0\n"
             "  machines:\n"
-            "    admin-ansible:\n"
+            "    anklume-instance:\n"
             "      type: lxc\n"
             "      ip: '10.100.0.10'\n"
         )
@@ -313,7 +313,7 @@ class TestUpgradeMergeConflict:
             "  admin:\n"
             "    subnet_id: 0\n"
             "    machines:\n"
-            "      admin-ansible:\n"
+            "      anklume-instance:\n"
             "        type: lxc\n"
             "        ip: '10.100.0.10'\n"
         )
@@ -454,7 +454,7 @@ class TestUpgradeRegenerationOutput:
         """After upgrade, host_vars/<machine>.yml is created."""
         result = run_upgrade(git_workspace)
         assert result.returncode == 0
-        assert (git_workspace / "host_vars" / "admin-ansible.yml").exists()
+        assert (git_workspace / "host_vars" / "anklume-instance.yml").exists()
 
     def test_regenerated_files_contain_managed_markers(self, git_workspace):
         """Regenerated files contain MANAGED section markers."""
@@ -548,7 +548,7 @@ class TestUpgradePreservesUserContent:
     def test_host_vars_user_content_preserved(self, git_workspace):
         """Custom content in host_vars outside managed section is preserved."""
         run_upgrade(git_workspace)
-        hv_file = git_workspace / "host_vars" / "admin-ansible.yml"
+        hv_file = git_workspace / "host_vars" / "anklume-instance.yml"
         assert hv_file.exists()
         original = hv_file.read_text()
         custom = "\n# Host-specific user override\nhost_custom: my_value\n"

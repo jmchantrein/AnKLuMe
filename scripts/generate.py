@@ -633,20 +633,20 @@ def _enrich_firewall(infra):
             if mname == "sys-firewall":
                 return
 
-    # Require admin domain
-    if "admin" not in domains:
-        print("ERROR: firewall_mode is 'vm' but no 'admin' domain exists. "
+    # Require anklume domain
+    if "anklume" not in domains:
+        print("ERROR: firewall_mode is 'vm' but no 'anklume' domain exists. "
               "Cannot auto-create sys-firewall.", file=sys.stderr)
         sys.exit(1)
 
-    admin_domain = domains["admin"]
+    anklume_domain = domains["anklume"]
     base_subnet = g.get("base_subnet", "10.100")
-    admin_subnet_id = admin_domain.get("subnet_id", 0)
+    anklume_subnet_id = anklume_domain.get("subnet_id", 0)
 
     sys_fw = {
         "description": "Centralized firewall VM (auto-created by generator)",
         "type": "vm",
-        "ip": f"{base_subnet}.{admin_subnet_id}.253",
+        "ip": f"{base_subnet}.{anklume_subnet_id}.253",
         "config": {
             "limits.cpu": "2",
             "limits.memory": "2GiB",
@@ -655,11 +655,11 @@ def _enrich_firewall(infra):
         "ephemeral": False,
     }
 
-    if "machines" not in admin_domain or admin_domain["machines"] is None:
-        admin_domain["machines"] = {}
-    admin_domain["machines"]["sys-firewall"] = sys_fw
+    if "machines" not in anklume_domain or anklume_domain["machines"] is None:
+        anklume_domain["machines"] = {}
+    anklume_domain["machines"]["sys-firewall"] = sys_fw
 
-    print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in admin domain "
+    print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain "
           f"(ip: {sys_fw['ip']})", file=sys.stderr)
 
 

@@ -8,7 +8,7 @@ traffic.
 
 ## How domain isolation works
 
-Each AnKLuMe domain has its own bridge (e.g., `net-admin`, `net-pro`,
+Each AnKLuMe domain has its own bridge (e.g., `net-anklume`, `net-pro`,
 `net-perso`, `net-homelab`). Without isolation rules, the Linux kernel
 forwards packets between these bridges freely.
 
@@ -17,12 +17,12 @@ The nftables rules enforce:
 1. **Same-bridge traffic**: allowed (containers within a domain can
    communicate)
 2. **All inter-bridge traffic**: dropped (e.g., `net-perso` cannot
-   reach `net-pro`, and `net-admin` cannot reach other domains either)
+   reach `net-pro`, and `net-anklume` cannot reach other domains either)
 3. **Internet access**: unaffected (NAT rules from Incus are preserved)
 4. **Return traffic**: stateful tracking allows response packets back
    through established connections
 
-The admin container does not need a network exception because it
+The anklume container does not need a network exception because it
 communicates with all instances via the Incus socket (mounted
 read/write inside the container), not via the network. Ansible uses
 the `community.general.incus` connection plugin, which calls
@@ -72,10 +72,10 @@ connections. Invalid packets are dropped.
 ## Two-step workflow
 
 Generating and deploying nftables rules is a two-step process because
-AnKLuMe runs inside the admin container but nftables rules must be
+AnKLuMe runs inside the anklume container but nftables rules must be
 applied on the host.
 
-### Step 1: Generate rules (inside admin container)
+### Step 1: Generate rules (inside anklume container)
 
 ```bash
 make nftables
@@ -87,7 +87,7 @@ This runs the `incus_nftables` Ansible role, which:
 2. Filters for AnKLuMe bridges (names starting with `net-`)
 3. Templates the nftables rules to `/opt/anklume/nftables-isolation.nft`
 
-The generated file is stored inside the admin container and can be
+The generated file is stored inside the anklume container and can be
 reviewed before deployment.
 
 ### Step 2: Deploy rules (on the host)
@@ -99,7 +99,7 @@ make nftables-deploy
 This runs `scripts/deploy-nftables.sh` **on the host** (not inside the
 container). The script:
 
-1. Pulls the rules file from the admin container via `incus file pull`
+1. Pulls the rules file from the anklume container via `incus file pull`
 2. Validates syntax with `nft -c -f` (dry-run)
 3. Copies to `/etc/nftables.d/anklume-isolation.nft`
 4. Applies the rules with `nft -f`
@@ -113,7 +113,7 @@ scripts/deploy-nftables.sh --dry-run
 ### Why two steps?
 
 AnKLuMe follows ADR-004: Ansible does not modify the host directly.
-The admin container drives Incus via the socket, but nftables must be
+The anklume container drives Incus via the socket, but nftables must be
 applied on the host kernel. Splitting generation (safe, inside container)
 from deployment (requires host access) maintains this boundary while
 giving the operator a chance to review the rules before applying them.
@@ -139,15 +139,15 @@ After deploying, verify the rules are active:
 # List the AnKLuMe table
 nft list table inet anklume
 
-# Test isolation: from a non-admin container, try to ping another domain
+# Test isolation: from a non-anklume container, try to ping another domain
 incus exec perso-desktop -- ping -c1 10.100.2.10   # Should fail (pro)
 incus exec perso-desktop -- ping -c1 10.100.1.254  # Should work (own gateway)
 
-# Test admin isolation: admin cannot reach other domains via network
-incus exec admin-ansible -- ping -c1 10.100.2.10   # Should fail (dropped)
+# Test anklume isolation: anklume cannot reach other domains via network
+incus exec anklume-instance -- ping -c1 10.100.2.10   # Should fail (dropped)
 
-# Verify admin can still manage instances via Incus socket
-incus exec admin-ansible -- incus list             # Should work (socket, not network)
+# Verify anklume can still manage instances via Incus socket
+incus exec anklume-instance -- incus list             # Should work (socket, not network)
 
 # Test internet: from any container
 incus exec perso-desktop -- ping -c1 1.1.1.1       # Should work
@@ -184,6 +184,6 @@ rm /etc/nftables.d/anklume-isolation.nft  # Remove installed file
 
 ```bash
 make sync && make apply-infra    # Create new domain resources
-make nftables                    # Regenerate rules (inside admin)
+make nftables                    # Regenerate rules (inside anklume)
 make nftables-deploy             # Deploy updated rules (on host)
 ```

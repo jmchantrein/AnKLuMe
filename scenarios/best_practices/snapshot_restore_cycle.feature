@@ -11,10 +11,10 @@ Feature: Snapshot and restore cycle
     Then exit code is 0
 
   Scenario: Snapshot an instance before risky operation
-    When I run "scripts/snap.sh create admin-ansible before-change"
+    When I run "scripts/snap.sh create anklume-instance before-change"
     Then exit code is 0
-    When I run "scripts/snap.sh list admin-ansible"
+    When I run "scripts/snap.sh list anklume-instance"
     Then exit code is 0
     And output contains "before-change"
-    When I run "scripts/snap.sh delete admin-ansible before-change"
+    When I run "scripts/snap.sh delete anklume-instance before-change"
     Then exit code is 0

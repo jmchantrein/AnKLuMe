@@ -33,7 +33,7 @@ def _base_infra(**global_overrides):
         "project_name": "integration-test",
         "global": {"base_subnet": "10.200", **GLOBAL_DEFAULTS, **global_overrides},
         "domains": {
-            "admin": {
+            "anklume": {
                 "subnet_id": 0,
                 "machines": {"admin-ctrl": {"type": "lxc", "ip": "10.200.0.10"}},
             },
@@ -62,7 +62,7 @@ def _ai_infra(**extra_global):
             **extra_global,
         },
         "domains": {
-            "admin": {
+            "anklume": {
                 "subnet_id": 0,
                 "machines": {"admin-ctrl": {"type": "lxc", "ip": "10.201.0.10"}},
             },
@@ -112,7 +112,7 @@ class TestKitchenSinkInfra:
                 "ai_access_default": "pro",
             },
             "domains": {
-                "admin": {
+                "anklume": {
                     "subnet_id": 0,
                     "machines": {"admin-ctrl": {"type": "lxc", "ip": "10.200.0.10"}},
                 },
@@ -182,7 +182,7 @@ class TestKitchenSinkInfra:
         infra = self._kitchen_sink()
         _full_pipeline(infra, tmp_path)
 
-        for domain in ("admin", "pro", "perso", "ai-tools", "homelab"):
+        for domain in ("anklume", "pro", "perso", "ai-tools", "homelab"):
             assert (tmp_path / "inventory" / f"{domain}.yml").exists()
             assert (tmp_path / "group_vars" / f"{domain}.yml").exists()
 
@@ -330,7 +330,7 @@ class TestAIAccessWithPolicies:
         infra = _ai_infra(firewall_mode="vm")
         generate.enrich_infra(infra)
 
-        assert "sys-firewall" in infra["domains"]["admin"]["machines"]
+        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
         assert any(p.get("to") == "ai-tools" for p in infra.get("network_policies", []))
 
 
@@ -571,7 +571,7 @@ class TestMultiDomainConsistency:
 
         _full_pipeline(infra, tmp_path)
 
-        for domain in ("admin", "pro", "perso", "sandbox", "lab"):
+        for domain in ("anklume", "pro", "perso", "sandbox", "lab"):
             assert (tmp_path / "inventory" / f"{domain}.yml").exists()
             gv = yaml.safe_load((tmp_path / "group_vars" / f"{domain}.yml").read_text())
             assert "incus_network" in gv

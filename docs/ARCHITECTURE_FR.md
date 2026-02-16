@@ -189,7 +189,7 @@ profil de chaque projet.
 ## ADR-015 : Le playbook utilise hosts:all avec connection:local
 
 **Contexte** : Toutes les commandes Incus doivent s'executer sur le controleur
-Ansible (`admin-ansible`) qui a le socket Incus monte. Les autres hotes de
+Ansible (`anklume-instance`) qui a le socket Incus monte. Les autres hotes de
 l'inventaire n'ont pas acces a Incus et n'existent pas encore lorsque les
 roles d'infrastructure s'executent.
 
@@ -305,9 +305,9 @@ opter explicitement pour l'acces GPU partage.
 
 ---
 
-## ADR-019 : Resilience du socket proxy admin-ansible au demarrage
+## ADR-019 : Resilience du socket proxy anklume-instance au demarrage
 
-**Contexte :** Le container `admin-ansible` a un peripherique proxy Incus qui
+**Contexte :** Le container `anklume-instance` a un peripherique proxy Incus qui
 mappe le socket Incus de l'hote (`/var/lib/incus/unix.socket`) vers
 `/var/run/incus/unix.socket` dans le container. Lorsque le container est
 redemarre, le repertoire `/var/run/` est ephemere (tmpfs) et le
@@ -323,11 +323,11 @@ Le contournement actuel est manuel : retirer le peripherique proxy, demarrer le
 container, creer le repertoire, re-ajouter le peripherique proxy. Cela doit etre
 automatise.
 
-**Decision :** Ajouter un service systemd oneshot dans le container `admin-ansible`
+**Decision :** Ajouter un service systemd oneshot dans le container `anklume-instance`
 qui cree `/var/run/incus/` avant que le peripherique proxy ne demarre. Ce service
 s'execute tot au demarrage (`Before=network.target`, `After=local-fs.target`).
 
-Implementation dans le role `base_admin` (ou provisionnement pour admin-ansible) :
+Implementation dans le role `base_admin` (ou provisionnement pour anklume-instance) :
 
 ```ini
 # /etc/systemd/system/incus-socket-dir.service
@@ -352,8 +352,8 @@ container, il necessite de connaitre le chemin du rootfs et s'execute en root
 sur l'hote -- ce qui entre en conflit avec notre principe que Ansible ne modifie
 pas l'hote (ADR-004). Un service systemd dans le container est autonome et portable.
 
-**Portee :** Cette correction s'applique UNIQUEMENT a `admin-ansible`. Les autres
+**Portee :** Cette correction s'applique UNIQUEMENT a `anklume-instance`. Les autres
 containers n'ont pas le peripherique proxy et ne sont pas affectes.
 
-**Consequence :** `admin-ansible` survit aux redemarrages sans intervention manuelle.
+**Consequence :** `anklume-instance` survit aux redemarrages sans intervention manuelle.
 Le service systemd est idempotent (mkdir -p).

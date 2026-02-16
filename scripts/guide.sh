@@ -243,9 +243,9 @@ step_2_use_case() {
     echo ""
 
     select_option "Select your use case:" \
-        "Student sysadmin — 2 domains (admin + lab)" \
-        "Teacher lab — admin + N student domains" \
-        "Pro workstation — admin/work with isolation" \
+        "Student sysadmin — 2 domains (anklume + lab)" \
+        "Teacher lab — anklume + N student domains" \
+        "Pro workstation — anklume/work with isolation" \
         "Custom — start from the default template"
 
     case "$SELECTED" in

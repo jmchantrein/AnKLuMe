@@ -13,7 +13,7 @@ avant que la phase N ne soit complete et validee.
 
 **Livrables** :
 - `scripts/generate.py` -- le generateur PSOT
-- `infra.yml` -- fichier PSOT avec 4 domaines (admin, pro, perso, homelab)
+- `infra.yml` -- fichier PSOT avec 4 domaines (anklume, pro, perso, homelab)
 - Inventaire genere dans `inventory/`
 - group_vars et host_vars generes avec sections gerees
 - Validation des contraintes (noms uniques, sous-reseaux uniques, IPs valides)
@@ -62,12 +62,12 @@ avant que la phase N ne soit complete et validee.
 
 **Livrables** :
 - Commiter les corrections manuelles (failed_when images remote)
-- Service systemd pour le socket proxy admin-ansible (ADR-019)
+- Service systemd pour le socket proxy anklume-instance (ADR-019)
 - ADR-017, ADR-018, ADR-019 documentes dans ARCHITECTURE.md
 - Tests Molecule mis a jour pour les corrections
 
 **Criteres de validation** :
-- [x] admin-ansible redemarre sans intervention manuelle
+- [x] anklume-instance redemarre sans intervention manuelle
 - [x] `ansible-playbook site.yml` idempotent apres corrections
 - [x] `make lint` passe
 - [x] ADR-017 a ADR-019 presents dans ARCHITECTURE.md
@@ -150,11 +150,11 @@ La Phase 12 fournira une isolation appropriee via Incus-in-Incus.
 - `docs/gpu-llm.md` -- guide GPU
 - Repertoire `examples/` avec des fichiers infra.yml documentes :
   - `examples/student-sysadmin.infra.yml` -- Etudiant sysadmin : 2 domaines
-    simples (admin + lab), pas de GPU, reseau isole pour exercices de TP
-  - `examples/teacher-lab.infra.yml` -- Enseignant : 1 domaine admin + N
+    simples (anklume + lab), pas de GPU, reseau isole pour exercices de TP
+  - `examples/teacher-lab.infra.yml` -- Enseignant : 1 domaine anklume + N
     domaines etudiants generes dynamiquement, snapshots pre-TP
   - `examples/pro-workstation.infra.yml` -- Poste de travail pro :
-    admin/perso/pro/homelab, GPU sur homelab, isolation reseau stricte
+    anklume/perso/pro/homelab, GPU sur homelab, isolation reseau stricte
   - `examples/sandbox-isolation.infra.yml` -- Test de logiciels non fiables
     (ex. OpenClaw) : isolation maximale, pas de reseau externe, snapshot
     avant chaque execution
@@ -179,21 +179,21 @@ l'isolation reseau.
 
 **Livrables** :
 - `roles/incus_nftables/` -- regles d'isolation inter-bridges
-- Regles : DROP tout trafic entre net-X et net-Y par defaut
-- Exception : admin -> tous (pour Ansible et la supervision)
+- Regles : DROP tout trafic inter-bridges (anklume inclus -- D-034)
+- Anklume communique via le socket Incus, pas le reseau
 - Integration dans site.yml (tag `nftables`)
 - `scripts/deploy-nftables.sh` -- script de deploiement cote hote
 - Documentation `docs/network-isolation.md`
 
 **Criteres de validation** :
-- [x] Trafic entre domaines non-admin bloque (ex. perso -> pro)
-- [x] Trafic de l'admin vers tous les domaines autorise (Ansible, supervision)
+- [x] Tout trafic inter-bridges bloque (ex. perso -> pro, anklume -> pro)
+- [x] Anklume gere les instances via le socket Incus (pas le reseau -- D-034)
 - [x] NAT vers Internet fonctionnel depuis tous les bridges
 - [x] Idempotent (regles nftables appliquees une seule fois)
 
 **Decisions de conception** :
 - nftables priorite -1 (avant les chaines Incus a priorite 0)
-- Flux de travail en deux etapes : generer dans le container admin, deployer sur l'hote
+- Flux de travail en deux etapes : generer dans le container anklume, deployer sur l'hote
 - Regles d'acceptation intra-bridge pour la compatibilite br_netfilter
 - Remplacement atomique de la table (supprimer + recreer)
 - Exception ADR-004 : le script de deploiement s'execute sur l'hote, pas via Ansible
@@ -274,7 +274,7 @@ noyau, contrairement aux containers LXC qui partagent le noyau de l'hote).
 - Validation `global.firewall_mode: host|vm` dans le generateur PSOT
 - `roles/incus_firewall_vm/` : role d'infrastructure -- creation du profil multi-NIC
 - `roles/firewall_router/` : role de provisionnement -- forwarding IP + nftables dans la VM
-- Template nftables (`firewall-router.nft.j2`) avec politique admin/non-admin + journalisation
+- Template nftables (`firewall-router.nft.j2`) avec politique anklume/non-anklume + journalisation
 - `site.yml` mis a jour avec les deux roles (phases infra + provisionnement)
 - `docs/firewall-vm.md` -- guide architecture, configuration, depannage
 - 4 tests de mode pare-feu dans test_generate.py
@@ -287,7 +287,7 @@ noyau, contrairement aux containers LXC qui partagent le noyau de l'hote).
 
 **Decisions de conception** :
 - Architecture a deux roles : infra (profil multi-NIC) + provisionnement (nftables dans la VM)
-- Bridge admin toujours eth0, autres bridges tries alphabetiquement
+- Bridge anklume toujours eth0, autres bridges tries alphabetiquement
 - Le generateur valide firewall_mode mais pas la topologie de deploiement (KISS)
 - Les modes hote + VM peuvent coexister pour une securite en couches
 
@@ -953,7 +953,7 @@ les VMs Incus imbriquees pour eviter les telechargements redondants.
 
 | Domaine | Container | IP | Reseau | Statut |
 |---------|-----------|-----|--------|--------|
-| admin | admin-ansible | 10.100.0.10 | net-admin | En fonctionnement |
+| anklume | anklume-instance | 10.100.0.10 | net-anklume | En fonctionnement |
 | perso | perso-desktop | 10.100.1.10 | net-perso | En fonctionnement |
 | pro | pro-dev | 10.100.2.10 | net-pro | En fonctionnement |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | En fonctionnement |

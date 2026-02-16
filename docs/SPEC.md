@@ -94,7 +94,7 @@ restore, delete.
 └─────────────────────────────────────────────────────────┘
 ```
 
-The admin container:
+The anklume container:
 - Has the host's Incus socket mounted read/write
 - Contains Ansible, the git repo, and drives everything via `incus` CLI
 - Never modifies the host directly
@@ -255,17 +255,17 @@ adapt behavior based on domain trust posture.
 ### Auto-creation of sys-firewall (firewall_mode: vm)
 
 When `global.firewall_mode` is set to `vm`, the generator automatically
-creates a `sys-firewall` machine in the admin domain if one is not already
+creates a `sys-firewall` machine in the anklume domain if one is not already
 declared. This enrichment step (`enrich_infra()`) runs after validation but
 before file generation. The auto-created machine uses:
-- type: `vm`, ip: `<base_subnet>.<admin_subnet_id>.253`
+- type: `vm`, ip: `<base_subnet>.<anklume_subnet_id>.253`
 - config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
 - roles: `[base_system, firewall_router]`
 - ephemeral: `false`
 
 If the user declares `sys-firewall` explicitly (in any domain), their
 definition takes precedence and no auto-creation occurs. If `firewall_mode`
-is `vm` but no `admin` domain exists, the generator exits with an error.
+is `vm` but no `anklume` domain exists, the generator exits with an error.
 
 ### Security policy (privileged containers)
 
@@ -401,7 +401,7 @@ directory:
 infra/
 ├── base.yml                 # project_name + global settings
 ├── domains/
-│   ├── admin.yml            # One file per domain
+│   ├── anklume.yml          # One file per domain
 │   ├── ai-tools.yml
 │   ├── pro.yml
 │   └── perso.yml
@@ -550,7 +550,7 @@ resolution.
 ### "self" keyword
 
 When `I=self`, the script uses `hostname` to detect the current instance name.
-Works from any instance with access to the Incus socket (typically the admin
+Works from any instance with access to the Incus socket (typically the anklume
 container). Fails with a clear error if the hostname is not found.
 
 ### Self-restore safety

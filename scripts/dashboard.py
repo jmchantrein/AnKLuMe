@@ -97,7 +97,7 @@ def infer_trust_level(domain_name, domain_config):
     trust = domain_config.get("trust_level")
     if trust:
         return trust
-    if "admin" in domain_name.lower():
+    if "admin" in domain_name.lower() or "anklume" in domain_name.lower():
         return "admin"
     if domain_config.get("ephemeral", False):
         return "disposable"

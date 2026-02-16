@@ -38,12 +38,12 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration and orchestration"
     subnet_id: 0
     ephemeral: false  # Protected — cannot be accidentally deleted
     machines:
-      admin-ansible:
+      anklume-instance:
         description: "Ansible controller — drives the whole infra"
         type: lxc
         ip: "10.100.0.10"

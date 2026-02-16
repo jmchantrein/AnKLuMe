@@ -26,11 +26,11 @@ global:
   default_user: root
 
 domains:
-  admin:
+  anklume:
     description: "Administration domain"
     subnet_id: 0
     machines:
-      admin-ansible:
+      anklume-instance:
         description: "Ansible controller"
         type: lxc
         ip: "10.100.0.10"
@@ -71,7 +71,7 @@ domains:
 
 network_policies:
   - description: "Admin accesses AI chat UIs"
-    from: admin
+    from: anklume
     to: ai-tools
     ports: [3000, 3210, 4096]
     protocol: tcp

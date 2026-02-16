@@ -13,7 +13,7 @@ reset environments between sessions.
 
 | Domain | subnet_id | Description |
 |--------|-----------|-------------|
-| admin | 0 | Teacher administration |
+| anklume | 0 | Teacher administration |
 | student-01 | 1 | Student 1 isolated lab |
 | student-02 | 2 | Student 2 isolated lab |
 | student-03 | 3 | Student 3 isolated lab |
@@ -22,7 +22,7 @@ reset environments between sessions.
 
 | Machine | Domain | IP | Role |
 |---------|--------|-----|------|
-| lab-admin | admin | 10.100.0.10 | Ansible controller |
+| lab-admin | anklume | 10.100.0.10 | Ansible controller |
 | s01-web | student-01 | 10.100.1.10 | Student 1 web server |
 | s01-client | student-01 | 10.100.1.11 | Student 1 client |
 | s02-web | student-02 | 10.100.2.10 | Student 2 web server |
