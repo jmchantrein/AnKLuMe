@@ -10,5 +10,5 @@ Feature: Duplicate IPs in infra.yml
     Given infra.yml with two machines sharing "10.100.200.10"
     When I run "make sync" and it may fail
     Then exit code is non-zero
-    And output contains "duplicate"
+    And output contains "already used"
     And file "inventory/test-a.yml" does not exist
