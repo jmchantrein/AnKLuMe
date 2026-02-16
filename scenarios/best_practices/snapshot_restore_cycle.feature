@@ -10,9 +10,11 @@ Feature: Snapshot and restore cycle
     When I run "scripts/snap.sh list"
     Then exit code is 0
 
-  Scenario: Snapshot before risky operation
-    When I run "scripts/snap.sh create self before-change"
+  Scenario: Snapshot an instance before risky operation
+    When I run "scripts/snap.sh create admin-ansible before-change"
     Then exit code is 0
-    When I run "scripts/snap.sh list self"
+    When I run "scripts/snap.sh list admin-ansible"
     Then exit code is 0
     And output contains "before-change"
+    When I run "scripts/snap.sh delete admin-ansible before-change"
+    Then exit code is 0

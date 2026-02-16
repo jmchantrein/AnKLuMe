@@ -22,18 +22,14 @@ def mock_env(tmp_path):
     mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
 
-# project list --format json
-if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format json"* ]]; then
-    echo '[{{"name":"default"}},{{"name":"admin"}},{{"name":"work"}}]'
-    exit 0
-fi
-# project list --format csv (pre-flight check)
+# project list --format csv -c n (used by _list_projects and pre-flight)
 if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then
     echo "default"
     echo "admin"
+    echo "work"
     exit 0
 fi
-# list instances --format csv
+# list instances --format csv -c n
 if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then
     if [[ "$*" == *"--project admin"* ]]; then
         echo "admin-ctrl"
@@ -48,10 +44,21 @@ fi
 if [[ "$1" == "delete" ]]; then
     exit 0
 fi
+# image list / image delete
+if [[ "$1" == "image" && "$2" == "list" ]]; then
+    exit 0
+fi
+if [[ "$1" == "image" && "$2" == "delete" ]]; then
+    exit 0
+fi
 # profile list --format csv
 if [[ "$1" == "profile" && "$2" == "list" ]]; then
     echo "default"
     echo "nesting"
+    exit 0
+fi
+# profile device list / profile device remove
+if [[ "$1" == "profile" && "$2" == "device" ]]; then
     exit 0
 fi
 # profile delete

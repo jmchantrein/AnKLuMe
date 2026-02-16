@@ -6,6 +6,26 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 
+def pytest_configure(config):
+    """Disable host subnet conflict detection in tests.
+
+    The host subnet conflict detection is a runtime safety feature that
+    depends on the specific host's network interfaces. Tests use synthetic
+    infra data (typically base_subnet 10.100) which may conflict with the
+    test host. Disabling this check ensures tests are portable across hosts.
+    """
+    import os
+
+    import generate
+
+    # Monkeypatch for in-process calls
+    generate._detect_host_subnets_orig = generate._detect_host_subnets
+    generate._detect_host_subnets = lambda: []
+
+    # Environment variable for subprocess calls (test_generate_cli.py)
+    os.environ["ANKLUME_SKIP_HOST_SUBNET_CHECK"] = "1"
+
+
 def pytest_collection_modifyitems(items):
     """Allow classes with ``pytestmark = []`` to bypass the module-level skip.
 

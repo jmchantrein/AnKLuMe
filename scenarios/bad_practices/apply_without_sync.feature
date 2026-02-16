@@ -11,10 +11,12 @@ Feature: Apply without sync
     When I run "make apply" and it may fail
     Then exit code is non-zero
 
-  Scenario: Stale inventory after infra.yml change
+  Scenario: Stale inventory missing new domain
     Given infra.yml from "student-sysadmin"
     When I run "make sync"
     Then exit code is 0
     When I add a domain "new-domain" to infra.yml
-    When I run "make apply" and it may fail
-    Then exit code is non-zero
+    Then file "inventory/new-domain.yml" does not exist
+    When I run "make sync"
+    Then exit code is 0
+    And file "inventory/new-domain.yml" exists

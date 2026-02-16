@@ -14,7 +14,8 @@ Feature: Sync idempotency
     Then exit code is 0
 
   Scenario: Dry-run previews without writing
-    Given infra.yml from "student-sysadmin"
+    Given no generated files exist
+    And infra.yml from "student-sysadmin"
     When I run "make sync-dry"
     Then exit code is 0
     And file "inventory/admin.yml" does not exist

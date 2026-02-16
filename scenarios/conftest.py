@@ -12,6 +12,8 @@ Usage:
 
 import json
 import logging
+import os
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -24,6 +26,57 @@ from pytest_bdd import given, parsers, then, when
 logger = logging.getLogger("anklume.scenarios")
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+# Skip host subnet conflict detection — examples use 10.100 which may
+# conflict with host interfaces.  The env var is checked by generate.py.
+os.environ["ANKLUME_SKIP_HOST_SUBNET_CHECK"] = "1"
+
+# Skip network safety checks — scenario tests may run in sandboxes without
+# internet connectivity.  The env var is checked by the Makefile.
+os.environ["ANKLUME_SKIP_NETWORK_CHECK"] = "1"
+
+# Persistent backup directory — survives crashes so next run can restore.
+SESSION_BACKUP_DIR = PROJECT_DIR / ".scenario-session-backup"
+
+# Directories and files that scenarios may modify.
+PROTECTED_FILES = ["infra.yml"]
+PROTECTED_DIRS = ["inventory", "group_vars", "host_vars"]
+
+
+def _backup_state(src_root: Path, dest_root: Path) -> None:
+    """Copy protected files and dirs from src_root to dest_root."""
+    dest_root.mkdir(parents=True, exist_ok=True)
+    for name in PROTECTED_FILES:
+        src = src_root / name
+        if src.exists():
+            shutil.copy2(src, dest_root / name)
+    for name in PROTECTED_DIRS:
+        src = src_root / name
+        dest = dest_root / name
+        if src.exists():
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(src, dest)
+
+
+def _restore_state(backup_root: Path, dest_root: Path) -> None:
+    """Restore protected files and dirs from backup_root into dest_root."""
+    for name in PROTECTED_FILES:
+        backup = backup_root / name
+        dest = dest_root / name
+        if backup.exists():
+            shutil.copy2(backup, dest)
+        elif dest.exists():
+            dest.unlink()
+    for name in PROTECTED_DIRS:
+        backup = backup_root / name
+        dest = dest_root / name
+        if backup.exists():
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(backup, dest)
+        elif dest.exists():
+            shutil.rmtree(dest)
 
 
 # ── Data classes ─────────────────────────────────────────────────
@@ -176,27 +229,143 @@ class Sandbox:
                     pairs.append((src_name, dst_name, dst_ip))
         return pairs
 
+    def has_incus(self) -> bool:
+        """Check if Incus daemon is available."""
+        result = self.run("incus info 2>/dev/null")
+        return result.returncode == 0
+
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
 
+@pytest.fixture(scope="session")
+def _session_backup():
+    """Session-level crash-safe backup of project state.
+
+    On session start: if a leftover backup exists (previous crash), restore it.
+    Then create a fresh backup. On session end: restore from backup.
+    """
+    # Crash recovery: restore from previous session if backup exists
+    if SESSION_BACKUP_DIR.exists():
+        logger.warning("Restoring from previous scenario session crash backup")
+        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
+        shutil.rmtree(SESSION_BACKUP_DIR)
+
+    # Create session backup
+    _backup_state(PROJECT_DIR, SESSION_BACKUP_DIR)
+
+    yield
+
+    # Session teardown: always restore original state
+    if SESSION_BACKUP_DIR.exists():
+        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
+        shutil.rmtree(SESSION_BACKUP_DIR)
+
+
 @pytest.fixture()
-def sandbox():
+def sandbox(_session_backup):
     """Provide a sandbox instance for scenario steps."""
     return Sandbox(project_dir=PROJECT_DIR)
 
 
-@pytest.fixture()
-def infra_backup(sandbox):
-    """Backup infra.yml before test and restore after."""
-    infra_path = sandbox.project_dir / "infra.yml"
-    backup_path = sandbox.project_dir / "infra.yml.scenario-backup"
-    if infra_path.exists():
-        backup_path.write_text(infra_path.read_text())
+@pytest.fixture(autouse=True)
+def scenario_state_restore(_session_backup):
+    """Per-test state restoration from session backup.
+
+    After each test, restore files from the session backup so the next
+    test starts clean.  No per-test backup needed — the session backup
+    is the reference.
+    """
     yield
-    if backup_path.exists():
-        infra_path.write_text(backup_path.read_text())
-        backup_path.unlink()
+    # Clean up any stash directories left by test steps.
+    stash = PROJECT_DIR / ".scenario-stash-inventory"
+    if stash.exists():
+        shutil.rmtree(stash)
+    # Restore from session backup (not per-test — session backup is the
+    # single source of truth for pre-test state).
+    if SESSION_BACKUP_DIR.exists():
+        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
+
+
+@pytest.fixture()
+def infra_backup():
+    """Legacy fixture — now handled by scenario_state_restore (autouse)."""
+    yield
+
+
+@pytest.fixture()
+def clean_generated_files(sandbox):
+    """Remove all generated files (inventory, group_vars, host_vars).
+
+    Use this fixture for scenarios that need a clean slate, e.g. to verify
+    that sync-dry does NOT create files.
+    """
+    for dirname in PROTECTED_DIRS:
+        d = sandbox.project_dir / dirname
+        if d.exists():
+            shutil.rmtree(d)
+    yield
+
+
+# ── Helpers ──────────────────────────────────────────────────────
+
+
+def _clean_incus_state(sandbox: Sandbox) -> None:
+    """Remove all AnKLuMe Incus resources (instances, profiles, projects, networks).
+
+    Used by deploy scenarios to ensure a clean starting state.
+    Follows the correct deletion order: instances → images → profiles → projects → networks.
+    """
+    # Get non-default projects
+    result = sandbox.run("incus project list --format csv -c n 2>/dev/null")
+    if result.returncode != 0:
+        return
+    projects = [
+        p.replace(" (current)", "").strip()
+        for p in result.stdout.strip().splitlines()
+        if p.strip() and "default" not in p
+    ]
+
+    for proj in projects:
+        # Delete instances
+        r = sandbox.run(f"incus list --project {proj} --format csv -c n 2>/dev/null")
+        for inst in r.stdout.strip().splitlines():
+            inst = inst.strip()
+            if inst:
+                sandbox.run(f"incus delete -f {inst} --project {proj}")
+        # Delete images
+        r = sandbox.run(f"incus image list --project {proj} --format csv -c f 2>/dev/null")
+        for img in r.stdout.strip().splitlines():
+            img = img.strip()
+            if img:
+                sandbox.run(f"incus image delete {img} --project {proj}")
+        # Delete custom profiles
+        r = sandbox.run(f"incus profile list --project {proj} --format csv -c n 2>/dev/null")
+        for profile in r.stdout.strip().splitlines():
+            profile = profile.strip()
+            if profile and profile != "default":
+                sandbox.run(f"incus profile delete {profile} --project {proj}")
+        # Reset default profile devices
+        r = sandbox.run(f"incus profile device list default --project {proj} 2>/dev/null")
+        for dev in r.stdout.strip().splitlines():
+            dev = dev.strip()
+            if dev:
+                sandbox.run(f"incus profile device remove default {dev} --project {proj}")
+        # Delete project
+        sandbox.run(f"incus project delete {proj}")
+
+    # Delete net-* bridges
+    result = sandbox.run("incus network list --format csv -c n 2>/dev/null")
+    for net in result.stdout.strip().splitlines():
+        net = net.strip()
+        if net.startswith("net-"):
+            sandbox.run(f"incus network delete {net}")
+
+    # Clean generated Ansible files
+    for dirname in ["inventory", "group_vars", "host_vars"]:
+        d = sandbox.project_dir / dirname
+        if d.exists():
+            shutil.rmtree(d)
 
 
 # ── Given steps ──────────────────────────────────────────────────
@@ -213,9 +382,39 @@ def clean_sandbox(sandbox):
 @given("images are pre-cached via shared repository")
 def precache_images(sandbox):
     """Ensure images are available locally (skip if no Incus)."""
-    result = sandbox.run("incus info 2>/dev/null")
-    if result.returncode != 0:
+    if not sandbox.has_incus():
         pytest.skip("No Incus daemon available")
+
+
+@given("Incus daemon is available")
+def incus_available(sandbox):
+    """Skip if no Incus daemon is accessible."""
+    if not sandbox.has_incus():
+        pytest.skip("No Incus daemon available")
+
+
+@given("we are in a sandbox environment")
+def in_sandbox(sandbox):
+    """Skip if not inside an Incus-in-Incus sandbox.
+
+    Deploy scenarios that run 'make apply' with example infra.yml files
+    must only run in a sandbox to avoid creating conflicting bridges on
+    the host (e.g. 10.100.* bridges when the host is on 10.100.0.0/24).
+
+    Also cleans Incus state so each deploy scenario starts fresh.
+    """
+    marker = Path("/etc/anklume/absolute_level")
+    if not marker.exists():
+        pytest.skip("Not in a sandbox — deploy scenarios skipped to avoid network conflicts")
+    try:
+        level = int(marker.read_text().strip())
+        if level < 1:
+            pytest.skip("Not nested — deploy scenarios skipped to avoid network conflicts")
+    except (ValueError, OSError):
+        pytest.skip("Cannot read nesting level")
+
+    # Clean Incus state so deploy starts from scratch
+    _clean_incus_state(sandbox)
 
 
 @given(parsers.parse('infra.yml from "{example}"'))
@@ -239,27 +438,43 @@ def infra_without_inventory(sandbox, infra_backup):
             infra_path.write_text(example.read_text())
     inv_dir = sandbox.project_dir / "inventory"
     if inv_dir.exists():
+        # Move files to a temp location outside inventory/ — renaming
+        # within the dir still lets Ansible discover them.
+        stash = sandbox.project_dir / ".scenario-stash-inventory"
+        stash.mkdir(exist_ok=True)
         for f in inv_dir.glob("*.yml"):
-            f.rename(f.with_suffix(".yml.scenario-hidden"))
+            shutil.move(str(f), str(stash / f.name))
 
 
 @given("a running infrastructure")
 def running_infra(sandbox):
-    """Verify that instances are running."""
+    """Verify that instances are running; rebuild if destroyed (e.g. by flush test)."""
+    if not sandbox.has_incus():
+        pytest.skip("No Incus daemon available")
     result = sandbox.run("incus list --all-projects --format json 2>/dev/null")
     if result.returncode != 0:
         pytest.skip("No Incus daemon available")
     try:
         instances = json.loads(result.stdout)
         running = [i for i in instances if i.get("status") == "Running"]
-        if not running:
-            pytest.skip("No running instances found")
+        if running:
+            return  # Infrastructure is up
     except (json.JSONDecodeError, TypeError):
-        pytest.skip("Cannot parse Incus output")
+        pass
+    # No running instances — rebuild from current infra.yml.
+    # The session backup fixture ensures infra.yml is the original one
+    # (safe 10.200 subnets), not a modified test copy.
+    logger.info("No running instances — rebuilding infrastructure via make sync && make apply")
+    r = sandbox.run("make sync", timeout=120)
+    if r.returncode != 0:
+        pytest.skip(f"Cannot rebuild: make sync failed (rc={r.returncode})")
+    r = sandbox.run("make apply", timeout=600)
+    if r.returncode != 0:
+        pytest.skip(f"Cannot rebuild: make apply failed (rc={r.returncode})")
 
 
 @given(parsers.parse('infra.yml with two machines sharing "{ip}"'))
-def infra_with_duplicate_ip(sandbox, ip, tmp_path):
+def infra_with_duplicate_ip(sandbox, ip):
     """Create an infra.yml with duplicate IPs."""
     infra = {
         "project_name": "scenario-test",
@@ -290,6 +505,11 @@ def infra_with_managed_content(sandbox, filename):
     assert path.exists(), f"File not found: {path}"
 
 
+@given("no generated files exist")
+def no_generated_files(sandbox, clean_generated_files):
+    """Remove all generated Ansible files."""
+
+
 # ── When steps ───────────────────────────────────────────────────
 
 
@@ -309,6 +529,7 @@ def run_command_may_fail(sandbox, command):
 def add_domain_to_infra(sandbox, domain):
     """Add a new domain to the current infra.yml."""
     infra = sandbox.load_infra()
+    base = infra.get("global", {}).get("base_subnet", "10.200")
     max_subnet = max(
         d.get("subnet_id", 0) for d in infra.get("domains", {}).values()
     )
@@ -317,7 +538,7 @@ def add_domain_to_infra(sandbox, domain):
         "machines": {
             f"{domain}-test": {
                 "type": "lxc",
-                "ip": f"10.100.{max_subnet + 1}.10",
+                "ip": f"{base}.{max_subnet + 1}.10",
             }
         },
     }
