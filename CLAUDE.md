@@ -94,6 +94,20 @@ CI must pass all of them before merge.
 - `pytest` for the generator (`scripts/generate.py`)
 - Review via `.claude/agents/reviewer.md` before committing
 
+## LLM operating mode
+
+At the start of each session or after a /clear, you MUST ask the user:
+
+> Mode de fonctionnement ?
+> 1. **Local (défaut)** — Je supervise, les LLM locaux (Ollama) codent
+> 2. **Externe** — Je fais tout moi-même (consomme plus de tokens)
+
+- Local mode is the default. If the user doesn't answer or says "ok", use local mode.
+- In local mode, use the MCP `ollama-coder` tools for code generation/fixing.
+  Delegate to the `local-coder` agent or call MCP tools directly.
+- In external mode, work normally without delegation.
+- The mode can be changed mid-session with "passe en mode local" or "passe en mode externe".
+
 ## Context files
 
 For details, read these files with `@path`:
