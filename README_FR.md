@@ -22,7 +22,9 @@
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
 [![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
 
-> **⚠️ Ce projet est une preuve de concept en cours de développement actif. Il n’est PAS prêt pour la production. Utilisation à vos risques et périls.**
+> **⚠️ Ce projet est une preuve de concept en cours de développement actif. Il n'est PAS prêt pour la production. Utilisation à vos risques et périls.**
+
+> **🤖 Ce projet est co-développé avec des LLM** (Claude Code, Aider). Les décisions d'architecture, le code, les tests et la documentation sont produits en collaboration humain-IA. Toutes les contributions sont revues par le mainteneur.
 
 **Une interface declarative haut niveau pour Incus.**
 
