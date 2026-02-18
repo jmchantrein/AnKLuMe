@@ -1497,6 +1497,12 @@ a) **`bootstrap.sh`** — Phase 0 script:
    - Run first `make sync && make apply`
    - Configure host networking (IP forwarding, NAT, DHCP checksum)
    - Run `host/boot/setup-boot-services.sh` for uinput/udev/autostart
+   - **GPU detection**: if NVIDIA GPU present, offer to deploy the
+     AI-tools domain (Ollama, STT, WebUI) and download models
+     (see Phase 23b)
+   - **Interactive prompts**: ask user which domains to deploy,
+     whether to enable AI services, preferred LLM model size
+     (based on detected VRAM)
    - Wrapped in a function (K3s pattern: prevents partial execution)
    - `set -euo pipefail`, checksum verification, HTTPS-only
 
@@ -1518,6 +1524,86 @@ c) **Host Makefile wrapper** (future):
 - [ ] Bind mount allows editing on host, running in container
 - [ ] STT scripts functional from `host/stt/` location
 - [ ] Network (NAT, IP forwarding) configured automatically
+
+---
+
+## Phase 23b: Sandboxed AI Coding Environment
+
+**Goal**: From bootstrap, offer a ready-to-use, isolated environment
+for AI coding assistants (Claude Code, Gemini CLI, Aider, etc.) with
+automatic local LLM model provisioning.
+
+**Prerequisites**: Phase 23 (host bootstrap), Phase 5 (Ollama).
+
+**Context**: AI coding assistants like Claude Code and Gemini CLI
+run on the host and have broad filesystem access. They should be
+sandboxed in a dedicated container with controlled access to the
+codebase. When a GPU is available, the bootstrap should also
+pre-download appropriate LLM models so local delegation (Phase 28)
+works out of the box.
+
+**Architecture**:
+
+```
+Host
+├── AnKLuMe/                      ← User's projects and framework
+│
+├── Container: ai-coder           ← Sandboxed coding environment
+│   ├── Claude Code CLI           ← API-based, supervised
+│   ├── Gemini CLI                ← API-based, alternative
+│   ├── Aider                     ← Local or API LLM coding tool
+│   ├── Bind mount: ~/projects/   ← Controlled codebase access
+│   └── Network: Ollama + API     ← Can reach local LLM + cloud APIs
+│
+├── Container: ollama             ← Local LLM inference (GPU)
+│   ├── Pre-downloaded models     ← Selected at bootstrap time
+│   └── API: :11434              ← Accessible from ai-coder
+│
+└── Container: anklume-instance   ← Framework management
+```
+
+**Bootstrap GPU detection and model provisioning**:
+
+```
+bootstrap.sh detects GPU:
+  ├── No GPU → skip AI model download, API-only mode
+  └── GPU found → detect VRAM:
+      ├── <= 8GB  → qwen2.5-coder:7b, nomic-embed-text
+      ├── 8-16GB  → qwen2.5-coder:14b, nomic-embed-text
+      ├── 16-24GB → qwen2.5-coder:32b, nomic-embed-text
+      └── > 24GB  → deepseek-coder-v2:latest, qwen2.5-coder:32b
+      User can override model selection interactively.
+```
+
+**Deliverables**:
+
+a) **AI coding container** (`ai-coder`):
+   - Incus container with Claude Code, Gemini CLI, Aider installed
+   - Bind mount of user's project directories (read-write)
+   - Network policy: can reach Ollama container + internet (for APIs)
+   - Cannot reach other domains (pro, perso, etc.)
+   - SSH key forwarding for git operations
+   - Declared in `infra.yml` with `ai_coding: true` flag
+
+b) **Bootstrap model provisioning**:
+   - GPU detection via `nvidia-smi` or `lspci`
+   - VRAM-based model recommendation (interactive, user confirms)
+   - `ollama pull` of selected models during bootstrap
+   - Progress display during download
+   - Skip option for users without GPU or who prefer API-only
+
+c) **Host-side wrapper**:
+   - `anklume code [project-dir]` — opens Claude Code inside the
+     ai-coder container with the project bind-mounted
+   - `anklume shell [instance]` — opens a shell in any container
+   - These wrappers live in `host/bin/` and can be added to PATH
+
+**Validation criteria**:
+- [ ] Bootstrap detects GPU and recommends appropriate models
+- [ ] Models downloaded automatically (with user confirmation)
+- [ ] `anklume code .` launches Claude Code in sandboxed container
+- [ ] AI coder container can reach Ollama but not other domains
+- [ ] Works without GPU (API-only mode, no model download)
 
 ---
 
@@ -1666,7 +1752,8 @@ audio changes earlier words, making word-level diff unreliable.
 LLMs (via Ollama) to reduce API credit consumption while maintaining
 quality through supervision.
 
-**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams).
+**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams),
+Phase 23b (sandboxed AI coding environment).
 
 **Context**: Claude Code (Opus/Sonnet) is powerful but expensive.
 Many sub-tasks (linting, simple refactoring, test generation,
@@ -1674,25 +1761,27 @@ documentation, code review of small changes) can be handled by
 local LLMs running on the host GPU via Ollama. Claude Code would
 act as a supervisor: delegating tasks to local models, reviewing
 their output, and only using the API for complex reasoning.
+Models are pre-downloaded during bootstrap (Phase 23b).
 
 **Architecture**:
 
 ```
-Claude Code (API) ── supervisor ──┐
-                                  │
-    ┌─────────────────────────────┤
-    │                             │
-    ▼                             ▼
-Local LLM (Ollama)          Claude API
-via Ollama API              (complex tasks)
-10.100.3.1:11434
-
-Tasks:                       Tasks:
-- Lint fixes                 - Architecture decisions
-- Simple refactoring         - Complex debugging
-- Test generation            - Multi-file refactoring
-- Documentation              - Security review
-- Code formatting            - Novel feature design
+ai-coder container
+├── Claude Code (API) ── supervisor ──┐
+│                                     │
+│     ┌───────────────────────────────┤
+│     │                               │
+│     ▼                               ▼
+│   Local LLM (Ollama)          Claude API
+│   via Ollama container        (complex tasks)
+│   (auto-discovered)
+│
+│   Delegated tasks:             API tasks:
+│   - Lint fixes                 - Architecture decisions
+│   - Simple refactoring         - Complex debugging
+│   - Test generation            - Multi-file refactoring
+│   - Documentation              - Security review
+│   - Code formatting            - Novel feature design
 ```
 
 **Approach options** (to be evaluated):
@@ -1712,7 +1801,7 @@ Tasks:                       Tasks:
   ```yaml
   ai_delegation:
     local_model: "qwen2.5-coder:32b"
-    ollama_url: "http://10.100.3.1:11434"
+    ollama_url: "auto"  # Auto-discovered from Incus network
     delegate_tasks:
       - lint_fixes
       - test_generation
@@ -1728,6 +1817,324 @@ Tasks:                       Tasks:
 - [ ] Measurable reduction in API credit consumption
 - [ ] No quality regression on delegated tasks
 - [ ] Fallback to API if local model unavailable
+
+---
+
+## Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
+
+**Goal**: Install and sandbox [OpenClaw](https://github.com/openclaw/openclaw)
+within AnKLuMe infrastructure, following best practices for
+self-hosted AI assistants.
+
+**Prerequisites**: Phase 23b (sandboxed AI coding environment),
+Phase 5 (Ollama).
+
+**Context**: [OpenClaw](https://openclaw.ai/) is an open-source,
+self-hosted personal AI assistant that connects to multiple
+messaging platforms (WhatsApp, Telegram, Signal, Discord, Slack,
+Matrix, Teams, iMessage) and drives LLMs (Claude, GPT, local
+models via Ollama). Running it inside AnKLuMe provides:
+- Network isolation (the bot only reaches authorized services)
+- Controlled messaging access (policy-based)
+- Local LLM delegation for privacy-sensitive queries
+- Easy deployment via the bootstrap process
+
+**Architecture**:
+
+```
+Host
+├── Container: openclaw            ← Sandboxed OpenClaw instance
+│   ├── Node.js 22+ runtime
+│   ├── OpenClaw daemon (systemd)
+│   ├── Messaging bridges          ← WhatsApp, Telegram, Signal...
+│   └── Network policy:
+│       ├── Can reach: ollama (local LLM), internet (APIs)
+│       └── Cannot reach: other domains (pro, perso, etc.)
+│
+├── Container: ollama              ← Local LLM inference (GPU)
+│   └── API: :11434               ← Used by OpenClaw for local queries
+│
+└── Container: anklume-instance    ← Framework management
+```
+
+**Deliverables**:
+
+a) **Ansible role `openclaw_server`**:
+   - Install Node.js 22+ (via nodesource or distro repo)
+   - Install OpenClaw (`npm install -g openclaw@latest`)
+   - Run `openclaw onboard` with preseed configuration
+   - Configure systemd service for daemon mode
+   - Set up Ollama as local LLM backend
+   - Network policy: allow messaging APIs + Ollama, deny rest
+
+b) **infra.yml integration**:
+   ```yaml
+   instances:
+     openclaw:
+       type: container
+       os_image: debian/13
+       roles: [base_system, openclaw_server]
+       openclaw_llm_provider: "ollama"  # or "anthropic", "openai"
+       openclaw_channels: [telegram, signal]  # enabled channels
+   ```
+
+c) **Bootstrap option**:
+   - `bootstrap.sh` asks: "Deploy AI assistant (OpenClaw)? [y/N]"
+   - If yes, creates the openclaw container and runs onboarding
+   - Guided channel setup (QR code for WhatsApp, bot token for
+     Telegram, etc.)
+
+d) **Security considerations**:
+   - Messaging credentials stored in encrypted Incus storage
+   - Network policy restricts outbound connections
+   - Audit log of all assistant interactions
+   - Optional: pairing-based access control (OpenClaw native)
+
+**Validation criteria**:
+- [ ] OpenClaw installed and running in isolated container
+- [ ] At least one messaging channel functional (Telegram or Signal)
+- [ ] Local LLM (Ollama) used for queries when configured
+- [ ] Network isolation verified (cannot reach other domains)
+- [ ] Daemon survives container restart
+
+---
+
+## Phase 29: Codebase Simplification and Real-World Testing
+
+**Goal**: Reduce code complexity, eliminate redundant tests, and
+replace synthetic Molecule tests with real-world integration tests
+where possible.
+
+**Prerequisites**: Phase 22 (BDD scenarios).
+
+**Context**: The codebase has grown through 22 phases of development,
+accumulating layers of abstraction, defensive code, and synthetic
+tests. A simplification pass is needed to:
+- Reduce total lines of code without losing functionality
+- Remove redundant or overlapping tests
+- Replace Molecule synthetic tests with real BDD scenarios where
+  the synthetic test adds no value beyond what the scenario covers
+- Identify dead code (leveraging Phase 19 code analysis tools)
+- Simplify role logic where Incus defaults handle the common case
+
+**Principles**:
+1. **User-friendliness first** — but never at the expense of security
+2. **Less code = fewer bugs** — delete before refactoring
+3. **Real tests > synthetic tests** — a BDD scenario that deploys
+   on real Incus is worth more than a Molecule mock
+4. **Measure before cutting** — use code coverage and call graphs
+   to identify what is actually used
+
+**Deliverables**:
+
+a) **Code audit**:
+   - Dead code detection report (Phase 19 tools)
+   - Test redundancy analysis: map each Molecule test to BDD scenarios
+     that cover the same behavior
+   - Complexity metrics per role (lines, cyclomatic complexity)
+   - Identify roles that could be merged or simplified
+
+b) **Simplification**:
+   - Remove dead code and unused variables
+   - Merge roles that handle closely related concerns
+   - Simplify Jinja2 templates where defaults suffice
+   - Reduce generator (`scripts/generate.py`) complexity
+   - Target: -20% lines of code with zero functionality loss
+
+c) **Test rationalization**:
+   - Keep Molecule for fast unit-level role testing
+   - Replace redundant Molecule scenarios with BDD E2E tests
+   - Add real-world smoke tests: `make smoke` runs a minimal
+     deployment on real Incus and verifies core functionality
+   - Target: fewer tests, better coverage of real user workflows
+
+**Validation criteria**:
+- [ ] Code audit report produced with actionable items
+- [ ] At least 20% reduction in total lines of code
+- [ ] No functionality regression (all BDD scenarios pass)
+- [ ] `make smoke` runs a real deployment in under 5 minutes
+- [ ] Test suite runs faster than before simplification
+
+---
+
+## Phase 30: Educational Platform and Guided Labs
+
+**Goal**: Turn AnKLuMe into a learning platform where students or
+self-learners can follow guided tutorials and execute commands in
+sandboxed environments.
+
+**Prerequisites**: Phase 22 (BDD scenarios), Phase 23 (bootstrap),
+Phase 12 (Incus-in-Incus).
+
+**Context**: AnKLuMe's architecture (declarative YAML, isolated
+domains, reproducible environments) makes it a natural fit for
+teaching system administration, networking, and security. The
+existing `make guide` and example configurations provide a starting
+point, but a full educational experience requires structured labs,
+sandboxed execution, and progress tracking.
+
+**Long-term vision**:
+
+```
+Student flow:
+  1. Clone AnKLuMe, run bootstrap
+  2. Select a lab: make lab LIST → choose "Networking 101"
+  3. Lab creates sandboxed environment (Incus-in-Incus)
+  4. Student follows guided steps with validation at each step
+  5. Lab auto-grades and provides feedback
+  6. Student can reset and retry without affecting other labs
+```
+
+**Deliverables**:
+
+a) **Lab framework** (`labs/`):
+   - Each lab is a directory with:
+     - `lab.yml` — metadata (title, difficulty, prerequisites, duration)
+     - `infra.yml` — lab-specific infrastructure
+     - `steps/` — ordered step files with instructions + validation
+     - `solution/` — reference solution (hidden by default)
+   - Labs run in Incus-in-Incus sandbox (Phase 12)
+   - Each step has a validation command that checks completion
+
+b) **Example labs**:
+   - **Lab 01**: First deployment (create 2 containers, verify
+     connectivity)
+   - **Lab 02**: Network isolation (set up 2 domains, verify
+     nftables blocks cross-domain traffic)
+   - **Lab 03**: Snapshots and recovery (create, break, restore)
+   - **Lab 04**: GPU passthrough and AI services (deploy Ollama,
+     run inference)
+   - **Lab 05**: Security audit (find and fix misconfigurations)
+
+c) **Make targets**:
+   ```makefile
+   make lab-list          ## List available labs
+   make lab-start L=01    ## Start lab 01 (creates sandbox)
+   make lab-check L=01    ## Validate current step
+   make lab-hint L=01     ## Show hint for current step
+   make lab-reset L=01    ## Reset lab to initial state
+   make lab-solution L=01 ## Show solution (marks lab as assisted)
+   ```
+
+d) **Teacher mode**:
+   - `make lab-deploy N=30 L=02` — deploy lab 02 for 30 students
+   - Each student gets their own Incus-in-Incus sandbox
+   - Teacher dashboard shows progress per student
+   - Automatic grading and report generation
+
+**Validation criteria**:
+- [ ] At least 3 labs implemented and tested
+- [ ] Labs run in isolated sandbox (no impact on host infra)
+- [ ] Step validation provides clear pass/fail feedback
+- [ ] `make lab-reset` fully restores initial state
+- [ ] Teacher mode deploys N isolated lab instances
+
+---
+
+## Phase 31: Live OS with Encrypted Persistent Storage
+
+**Goal**: Provide a bootable AnKLuMe image (USB/SD card) with an
+immutable OS that mounts an encrypted ZFS or BTRFS pool on a
+separate disk for all container data.
+
+**Prerequisites**: Phase 23 (bootstrap), Phase 29 (simplification).
+
+**Context**: The current deployment requires a full Linux
+installation. A live OS approach would allow:
+- Booting AnKLuMe from a USB stick or SD card on any compatible
+  machine
+- Loading the OS entirely in RAM (optional, for speed and wear)
+- Mounting an encrypted storage pool (ZFS/BTRFS) on a separate
+  disk for all Incus data (containers, images, volumes)
+- The same encrypted disk can be used with different base OS
+  versions (ISO updates don't affect user data)
+- Portable, secure, disposable: unplug the USB and nothing remains
+  on the machine (Tails-like property)
+
+**Inspiration**: Tails OS (amnesic live system), IncusOS (immutable
+Incus host with A/B updates), Fedora Silverblue (immutable +
+persistent).
+
+**Architecture**:
+
+```
+Boot media (USB/SD/disk):
+├── EFI partition (FAT32)
+├── OS partition (read-only squashfs or dm-verity)
+│   ├── Minimal Linux (Debian/Arch minimal)
+│   ├── Incus daemon
+│   ├── AnKLuMe framework
+│   └── bootstrap (first-boot auto-detection)
+└── Optional: swap partition (encrypted)
+
+Separate disk (HDD/SSD/NVMe):
+└── LUKS-encrypted partition
+    └── ZFS pool or BTRFS volume
+        ├── Incus storage pool (containers, VMs, images)
+        ├── User configuration (infra.yml, host_vars, etc.)
+        └── Secrets (GPG keys, messaging tokens, etc.)
+```
+
+**Boot flow**:
+
+```
+1. BIOS/UEFI boots from USB/SD
+2. OS loads into RAM (if configured) or runs from media
+3. User enters LUKS passphrase for encrypted disk
+4. ZFS/BTRFS pool imported automatically
+5. Incus starts with storage pool on encrypted disk
+6. AnKLuMe ready — all previous containers and data intact
+```
+
+**Storage backend choice**:
+
+| Feature | ZFS | BTRFS |
+|---------|-----|-------|
+| Incus recommendation | Primary | Supported |
+| CoW snapshots | Native | Native |
+| Encryption | Native (dataset-level) | Via LUKS (block-level) |
+| Quotas | Native per dataset | Via qgroups |
+| Compression | lz4/zstd (transparent) | zstd (transparent) |
+| Stability | Very mature | Improving (some features still evolving) |
+| RAM usage | Higher (ARC cache) | Lower |
+| Bootstrap default | Recommended | Alternative |
+
+`bootstrap.sh` should detect available disks, ask the user which
+backend to use (default: ZFS), and handle pool creation +
+encryption setup.
+
+**Deliverables**:
+
+a) **Image builder** (`scripts/build-image.sh`):
+   - Build a minimal bootable ISO/image with Incus + AnKLuMe
+   - Support Debian and Arch base
+   - Option to load OS into RAM at boot
+   - A/B partition scheme for safe updates (IncusOS-inspired)
+
+b) **First-boot wizard**:
+   - Detect available disks
+   - Ask user: create new encrypted pool or mount existing one
+   - LUKS + ZFS/BTRFS setup with secure passphrase
+   - Run `bootstrap.sh` to set up AnKLuMe infrastructure
+   - Store minimal config (selected disks, backend) on boot media
+
+c) **Update mechanism**:
+   - Flash new OS image to boot media (A/B partitions)
+   - User data on encrypted disk is untouched
+   - Version compatibility check at boot
+   - Rollback to previous OS version if new one fails
+
+d) **Documentation**:
+   - `docs/live-os.md` — how to build and use the live OS
+   - Hardware compatibility notes
+   - Performance comparison: RAM mode vs disk mode
+
+**Validation criteria**:
+- [ ] Bootable image created for at least one base distro
+- [ ] Encrypted pool setup works (ZFS and BTRFS)
+- [ ] OS update does not affect user data
+- [ ] Containers survive OS reboot
+- [ ] Optional RAM mode functional
 
 ---
 
@@ -1759,12 +2166,17 @@ Tasks:                       Tasks:
 
 **Next**:
 - Phase 22: End-to-End Scenario Testing (BDD) — in progress
-- Phase 23: Host Bootstrap and Thin Host Layer — planned
+- Phase 23: Host Bootstrap and Thin Host Layer — planned (short-term)
+- Phase 23b: Sandboxed AI Coding Environment — planned (short-term)
 - Phase 24: Snapshot-Before-Apply and Rollback — planned
 - Phase 25: XDG Desktop Portal for Cross-Domain File Access — planned
 - Phase 26: Native App Export (distrobox-export Style) — planned
 - Phase 27: Streaming STT (Real-Time Transcription) — long-term
 - Phase 28: Local LLM Delegation for Claude Code — planned
+- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) — planned
+- Phase 29: Codebase Simplification and Real-World Testing — planned (short-term)
+- Phase 30: Educational Platform and Guided Labs — long-term
+- Phase 31: Live OS with Encrypted Persistent Storage — long-term
 
 **Deployed infrastructure**:
 
