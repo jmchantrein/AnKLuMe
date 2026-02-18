@@ -1497,6 +1497,12 @@ a) **`bootstrap.sh`** — Phase 0 script:
    - Run first `make sync && make apply`
    - Configure host networking (IP forwarding, NAT, DHCP checksum)
    - Run `host/boot/setup-boot-services.sh` for uinput/udev/autostart
+   - **GPU detection**: if NVIDIA GPU present, offer to deploy the
+     AI-tools domain (Ollama, STT, WebUI) and download models
+     (see Phase 23b)
+   - **Interactive prompts**: ask user which domains to deploy,
+     whether to enable AI services, preferred LLM model size
+     (based on detected VRAM)
    - Wrapped in a function (K3s pattern: prevents partial execution)
    - `set -euo pipefail`, checksum verification, HTTPS-only
 
@@ -1518,6 +1524,86 @@ c) **Host Makefile wrapper** (future):
 - [ ] Bind mount allows editing on host, running in container
 - [ ] STT scripts functional from `host/stt/` location
 - [ ] Network (NAT, IP forwarding) configured automatically
+
+---
+
+## Phase 23b: Sandboxed AI Coding Environment
+
+**Goal**: From bootstrap, offer a ready-to-use, isolated environment
+for AI coding assistants (Claude Code, Gemini CLI, Aider, etc.) with
+automatic local LLM model provisioning.
+
+**Prerequisites**: Phase 23 (host bootstrap), Phase 5 (Ollama).
+
+**Context**: AI coding assistants like Claude Code and Gemini CLI
+run on the host and have broad filesystem access. They should be
+sandboxed in a dedicated container with controlled access to the
+codebase. When a GPU is available, the bootstrap should also
+pre-download appropriate LLM models so local delegation (Phase 28)
+works out of the box.
+
+**Architecture**:
+
+```
+Host
+├── AnKLuMe/                      ← User's projects and framework
+│
+├── Container: ai-coder           ← Sandboxed coding environment
+│   ├── Claude Code CLI           ← API-based, supervised
+│   ├── Gemini CLI                ← API-based, alternative
+│   ├── Aider                     ← Local or API LLM coding tool
+│   ├── Bind mount: ~/projects/   ← Controlled codebase access
+│   └── Network: Ollama + API     ← Can reach local LLM + cloud APIs
+│
+├── Container: ollama             ← Local LLM inference (GPU)
+│   ├── Pre-downloaded models     ← Selected at bootstrap time
+│   └── API: :11434              ← Accessible from ai-coder
+│
+└── Container: anklume-instance   ← Framework management
+```
+
+**Bootstrap GPU detection and model provisioning**:
+
+```
+bootstrap.sh detects GPU:
+  ├── No GPU → skip AI model download, API-only mode
+  └── GPU found → detect VRAM:
+      ├── <= 8GB  → qwen2.5-coder:7b, nomic-embed-text
+      ├── 8-16GB  → qwen2.5-coder:14b, nomic-embed-text
+      ├── 16-24GB → qwen2.5-coder:32b, nomic-embed-text
+      └── > 24GB  → deepseek-coder-v2:latest, qwen2.5-coder:32b
+      User can override model selection interactively.
+```
+
+**Deliverables**:
+
+a) **AI coding container** (`ai-coder`):
+   - Incus container with Claude Code, Gemini CLI, Aider installed
+   - Bind mount of user's project directories (read-write)
+   - Network policy: can reach Ollama container + internet (for APIs)
+   - Cannot reach other domains (pro, perso, etc.)
+   - SSH key forwarding for git operations
+   - Declared in `infra.yml` with `ai_coding: true` flag
+
+b) **Bootstrap model provisioning**:
+   - GPU detection via `nvidia-smi` or `lspci`
+   - VRAM-based model recommendation (interactive, user confirms)
+   - `ollama pull` of selected models during bootstrap
+   - Progress display during download
+   - Skip option for users without GPU or who prefer API-only
+
+c) **Host-side wrapper**:
+   - `anklume code [project-dir]` — opens Claude Code inside the
+     ai-coder container with the project bind-mounted
+   - `anklume shell [instance]` — opens a shell in any container
+   - These wrappers live in `host/bin/` and can be added to PATH
+
+**Validation criteria**:
+- [ ] Bootstrap detects GPU and recommends appropriate models
+- [ ] Models downloaded automatically (with user confirmation)
+- [ ] `anklume code .` launches Claude Code in sandboxed container
+- [ ] AI coder container can reach Ollama but not other domains
+- [ ] Works without GPU (API-only mode, no model download)
 
 ---
 
@@ -1666,7 +1752,8 @@ audio changes earlier words, making word-level diff unreliable.
 LLMs (via Ollama) to reduce API credit consumption while maintaining
 quality through supervision.
 
-**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams).
+**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams),
+Phase 23b (sandboxed AI coding environment).
 
 **Context**: Claude Code (Opus/Sonnet) is powerful but expensive.
 Many sub-tasks (linting, simple refactoring, test generation,
@@ -1674,25 +1761,27 @@ documentation, code review of small changes) can be handled by
 local LLMs running on the host GPU via Ollama. Claude Code would
 act as a supervisor: delegating tasks to local models, reviewing
 their output, and only using the API for complex reasoning.
+Models are pre-downloaded during bootstrap (Phase 23b).
 
 **Architecture**:
 
 ```
-Claude Code (API) ── supervisor ──┐
-                                  │
-    ┌─────────────────────────────┤
-    │                             │
-    ▼                             ▼
-Local LLM (Ollama)          Claude API
-via Ollama API              (complex tasks)
-10.100.3.1:11434
-
-Tasks:                       Tasks:
-- Lint fixes                 - Architecture decisions
-- Simple refactoring         - Complex debugging
-- Test generation            - Multi-file refactoring
-- Documentation              - Security review
-- Code formatting            - Novel feature design
+ai-coder container
+├── Claude Code (API) ── supervisor ──┐
+│                                     │
+│     ┌───────────────────────────────┤
+│     │                               │
+│     ▼                               ▼
+│   Local LLM (Ollama)          Claude API
+│   via Ollama container        (complex tasks)
+│   (auto-discovered)
+│
+│   Delegated tasks:             API tasks:
+│   - Lint fixes                 - Architecture decisions
+│   - Simple refactoring         - Complex debugging
+│   - Test generation            - Multi-file refactoring
+│   - Documentation              - Security review
+│   - Code formatting            - Novel feature design
 ```
 
 **Approach options** (to be evaluated):
@@ -1712,7 +1801,7 @@ Tasks:                       Tasks:
   ```yaml
   ai_delegation:
     local_model: "qwen2.5-coder:32b"
-    ollama_url: "http://10.100.3.1:11434"
+    ollama_url: "auto"  # Auto-discovered from Incus network
     delegate_tasks:
       - lint_fixes
       - test_generation
@@ -1759,7 +1848,8 @@ Tasks:                       Tasks:
 
 **Next**:
 - Phase 22: End-to-End Scenario Testing (BDD) — in progress
-- Phase 23: Host Bootstrap and Thin Host Layer — planned
+- Phase 23: Host Bootstrap and Thin Host Layer — planned (short-term)
+- Phase 23b: Sandboxed AI Coding Environment — planned (short-term)
 - Phase 24: Snapshot-Before-Apply and Rollback — planned
 - Phase 25: XDG Desktop Portal for Cross-Domain File Access — planned
 - Phase 26: Native App Export (distrobox-export Style) — planned
