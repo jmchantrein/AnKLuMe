@@ -19,6 +19,10 @@
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
 [![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
 
+> **\u26A0\uFE0F This project is a proof of concept under active development. It is NOT production-ready. Use at your own risk.**
+
+> **⚠️ This project is a proof of concept under active development. It is NOT production-ready. Use at your own risk.**
+
 **A declarative high-level interface to Incus.**
 
 QubesOS-like isolation using native Linux kernel features (KVM/LXC),

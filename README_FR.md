@@ -22,6 +22,8 @@
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
 [![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
 
+> **⚠️ Ce projet est une preuve de concept en cours de développement actif. Il n’est PAS prêt pour la production. Utilisation à vos risques et périls.**
+
 **Une interface declarative haut niveau pour Incus.**
 
 Isolation type QubesOS utilisant les fonctionnalites natives du noyau
