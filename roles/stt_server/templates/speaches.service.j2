@@ -7,17 +7,18 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/speaches \
+WorkingDirectory=/opt/speaches
+Environment=WHISPER__MODEL={{ stt_server_model }}
+Environment=WHISPER__COMPUTE_TYPE={{ stt_server_effective_compute }}
+{% if stt_server_language | length > 0 %}
+Environment=WHISPER__LANGUAGE={{ stt_server_language }}
+{% endif %}
+{% if stt_server_gpu_check.rc == 0 %}
+Environment=LD_LIBRARY_PATH=/opt/speaches/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/opt/speaches/.venv/lib/python3.12/site-packages/nvidia/cublas/lib:/opt/speaches/.venv/lib/python3.12/site-packages/nvidia/curand/lib:/opt/speaches/.venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/speaches/.venv/lib/python3.12/site-packages/ctranslate2.libs
+{% endif %}
+ExecStart=/opt/speaches/.venv/bin/uvicorn speaches.main:create_app --factory \
   --host {{ stt_server_host }} \
   --port {{ stt_server_port }}
-{% if stt_server_language | length > 0 %}
-Environment=WHISPER__MODEL={{ stt_server_model }}
-Environment=WHISPER__COMPUTE_TYPE={{ stt_server_quantization }}
-Environment=WHISPER__LANGUAGE={{ stt_server_language }}
-{% else %}
-Environment=WHISPER__MODEL={{ stt_server_model }}
-Environment=WHISPER__COMPUTE_TYPE={{ stt_server_quantization }}
-{% endif %}
 Restart=always
 RestartSec=5
 

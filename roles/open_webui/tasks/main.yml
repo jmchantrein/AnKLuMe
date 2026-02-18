@@ -4,6 +4,9 @@
 # Applied via the provisioning play (connection: community.general.incus).
 # Runs INSIDE the target container — typically a separate container from Ollama.
 #
+# Uses uv to create a Python 3.12 virtualenv because open-webui
+# requires Python <3.13 and Debian 13 ships Python 3.13.
+#
 # Input variables (from defaults, overridable in host_vars):
 #   - open_webui_port (int): port to listen on
 #   - open_webui_ollama_url (string): URL of the Ollama API server
@@ -12,14 +15,23 @@
   ansible.builtin.apt:
     name:
       - python3-pip
-      - python3-venv
     state: present
 
-- name: OpenWebUI | Install Open WebUI via pip
+- name: OpenWebUI | Install uv package manager
   ansible.builtin.pip:
-    name: open-webui
+    name: uv
     state: present
     extra_args: --break-system-packages
+
+- name: OpenWebUI | Create virtualenv with Python 3.12
+  ansible.builtin.command:
+    cmd: uv venv --python 3.12 /opt/open-webui-venv
+    creates: /opt/open-webui-venv/bin/python
+
+- name: OpenWebUI | Install Open WebUI in virtualenv
+  ansible.builtin.command:
+    cmd: uv pip install --python /opt/open-webui-venv/bin/python open-webui
+    creates: /opt/open-webui-venv/bin/open-webui
 
 - name: OpenWebUI | Create systemd service
   ansible.builtin.copy:
@@ -31,9 +43,9 @@
 
       [Service]
       Type=simple
-      ExecStart=/usr/local/bin/open-webui serve --port {{ open_webui_port }}
+      ExecStart=/opt/open-webui-venv/bin/open-webui serve --port {{ open_webui_port }}
       Environment="OLLAMA_BASE_URL={{ open_webui_ollama_url }}"
-      {% if open_webui_stt_url | default('') | length > 0 %}
+      {% if open_webui_stt_url | default() | length > 0 %}
       Environment="AUDIO_STT_ENGINE=openai"
       Environment="AUDIO_STT_OPENAI_API_BASE_URL={{ open_webui_stt_url }}"
       {% endif %}

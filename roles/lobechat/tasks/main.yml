@@ -40,7 +40,7 @@
 
 - name: LobeChat | Install dependencies  # noqa: no-handler
   ansible.builtin.command:
-    cmd: pnpm install --frozen-lockfile
+    cmd: pnpm install --no-frozen-lockfile
     chdir: /opt/lobechat
   when: lobechat_git_clone is changed
   changed_when: true
