@@ -244,6 +244,10 @@ ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
 	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
 	scripts/ai-develop.sh "$(TASK)"
 
+# ── Local LLM Dev Assistant ──────────────────────────────
+ollama-dev: ## Interactive local LLM dev assistant (no API credits needed)
+	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
+
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
 	python3 scripts/mine-experiences.py
@@ -390,7 +394,7 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
-.PHONY: sync sync-dry sync-clean console lint lint-yaml lint-ansible lint-shell \
+.PHONY: sync sync-dry sync-clean console ollama-dev lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         export-images \
