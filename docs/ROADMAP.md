@@ -1431,6 +1431,306 @@ def check_isolation(sandbox):
 
 ---
 
+## Phase 23: Host Bootstrap and Thin Host Layer
+
+**Goal**: Zero-prerequisite installation from a bare Linux host.
+Formalize the host/container separation with a `host/` directory
+in the repository.
+
+**Prerequisites**: Functional framework (Phases 1-21).
+
+**Context**: The current documentation assumes the user has already
+installed Incus, created anklume-instance, and mounted the Incus
+socket. This is too many manual steps. Additionally, host-side
+scripts (STT, boot services, network recovery) had no canonical
+location. The repository now includes a `host/` directory for all
+host-side components.
+
+**Architecture**:
+
+```
+AnKLuMe/                           ← Cloned on the host
+├── bootstrap.sh                   ← Phase 0: installs Incus, creates container,
+│                                     sets up bind mount, runs first make apply
+├── host/
+│   ├── boot/
+│   │   ├── setup-boot-services.sh ← uinput module, udev rules, container autostart
+│   │   └── network-recovery.sh    ← Emergency network restore
+│   ├── stt/
+│   │   ├── stt-push-to-talk.sh    ← Push-to-talk STT (Meta+S toggle)
+│   │   ├── stt-azerty-type.py     ← AZERTY keycode typing helper
+│   │   └── stt-streaming.py       ← Streaming STT (experimental, roadmap)
+│   └── desktop/                   ← Future: .desktop exports, Waypipe, shortcuts
+├── roles/                         ← Ansible roles (run inside the container)
+├── Makefile                       ← Used by the container
+└── ...
+```
+
+The repo lives on the host and is bind-mounted into the container:
+
+```
+/home/user/AnKLuMe/ ──disk device──> /root/AnKLuMe/ (in container)
+```
+
+**Two bootstrap paths** (K3s-inspired):
+
+```bash
+# Quick path
+curl -sfL https://raw.githubusercontent.com/.../bootstrap.sh | bash
+
+# Verify-first path
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe && bash bootstrap.sh
+```
+
+**Deliverables**:
+
+a) **`bootstrap.sh`** — Phase 0 script:
+   - Detect host distro (Arch/Debian/Ubuntu/Fedora)
+   - Install Incus from appropriate repo (Zabbly for Debian/Ubuntu,
+     distro package for Arch/Fedora)
+   - Initialize Incus (`incus admin init --minimal` or preseed)
+   - Create anklume-instance (LXC container)
+   - Set up Incus socket proxy device
+   - Add disk device (bind mount of the repo)
+   - Install Ansible + dependencies inside the container
+   - Run first `make sync && make apply`
+   - Configure host networking (IP forwarding, NAT, DHCP checksum)
+   - Run `host/boot/setup-boot-services.sh` for uinput/udev/autostart
+   - Wrapped in a function (K3s pattern: prevents partial execution)
+   - `set -euo pipefail`, checksum verification, HTTPS-only
+
+b) **`host/` directory** — Host-side scripts:
+   - `host/boot/setup-boot-services.sh` — uinput, udev, autostart
+   - `host/boot/network-recovery.sh` — emergency network restore
+   - `host/stt/stt-push-to-talk.sh` — push-to-talk STT
+   - `host/stt/stt-azerty-type.py` — AZERTY keycode typing
+   - `host/stt/stt-streaming.py` — streaming STT (experimental)
+
+c) **Host Makefile wrapper** (future):
+   - `make apply` on host → `incus exec anklume-instance -- make apply`
+   - Transparent delegation to the container
+
+**Validation criteria**:
+- [ ] `bootstrap.sh` runs on Arch (CachyOS) from a fresh host
+- [ ] `bootstrap.sh` runs on Debian 13 (Trixie) from a fresh host
+- [ ] After bootstrap, `make apply` works without manual intervention
+- [ ] Bind mount allows editing on host, running in container
+- [ ] STT scripts functional from `host/stt/` location
+- [ ] Network (NAT, IP forwarding) configured automatically
+
+---
+
+## Phase 24: Snapshot-Before-Apply and Rollback
+
+**Goal**: Automatic safety snapshots before each `make apply`,
+with one-command rollback if something breaks.
+
+**Prerequisites**: Phase 4 (snapshots), Phase 23 (host layer).
+
+**Inspiration**: NixOS generations, Flatcar A/B partitions, IncusOS
+A/B update mechanism.
+
+**Deliverables**:
+- `make apply` automatically snapshots all affected instances
+  before applying changes (snapshot name: `pre-apply-<timestamp>`)
+- `make rollback` restores the most recent pre-apply snapshot
+- `make rollback T=<timestamp>` restores a specific pre-apply snapshot
+- Configurable retention: keep last N pre-apply snapshots
+  (`pre_apply_snapshot_keep: 3` in `infra.yml`)
+- Skip with `make apply SKIP_SNAPSHOT=1` for speed when developing
+
+**Validation criteria**:
+- [ ] Pre-apply snapshots created automatically
+- [ ] `make rollback` restores previous state
+- [ ] Old snapshots cleaned up per retention policy
+- [ ] Snapshot skippable for development speed
+
+---
+
+## Phase 25: XDG Desktop Portal for Cross-Domain File Access
+
+**Goal**: Replace manual `incus file push/pull` with a native file
+chooser dialog for controlled file sharing between domains.
+
+**Prerequisites**: Phase 21 (desktop integration).
+
+**Inspiration**: Spectrum OS (XDG Portal for VM file access),
+Flatpak portal sandboxing.
+
+**Context**: The current file transfer mechanism
+(`scripts/transfer.sh`, `make file-copy`) works but requires
+CLI commands. XDG Desktop Portal would provide a native file
+picker dialog: when a container app requests a file, the host
+shows a file chooser restricted to authorized paths. This is
+the same mechanism Flatpak uses for sandboxed app file access.
+
+**Deliverables**:
+- Portal daemon running on the host, serving requests from containers
+- Per-domain file access policies in `infra.yml`:
+  ```yaml
+  domains:
+    pro:
+      file_portal:
+        allowed_paths: ["/shared/pro", "/home/user/Documents"]
+        read_only: false
+    perso:
+      file_portal:
+        allowed_paths: ["/shared/perso"]
+        read_only: false
+  ```
+- Native file chooser integration (KDE/GNOME)
+- Audit log of all cross-domain file transfers
+
+**Validation criteria**:
+- [ ] File chooser dialog appears when container app opens file
+- [ ] Access restricted to configured paths per domain
+- [ ] Transfers logged for audit
+
+---
+
+## Phase 26: Native App Export (distrobox-export Style)
+
+**Goal**: Make container applications appear as native host
+applications in the desktop environment's app launcher.
+
+**Prerequisites**: Phase 21 (desktop integration), Phase 23 (host layer).
+
+**Inspiration**: Distrobox `distrobox-export`, but with isolation
+preserved (Waypipe or virtio-gpu for display, PipeWire socket for
+audio, controlled filesystem access via Phase 25 portals).
+
+**Deliverables**:
+- `make export-app I=<instance> APP=<app>` — generates a `.desktop`
+  file on the host that launches the app inside its container with
+  Waypipe display forwarding
+- `make export-list` — lists all exported apps
+- `make export-remove I=<instance> APP=<app>` — removes the export
+- Auto-export via `infra.yml`:
+  ```yaml
+  instances:
+    pro-dev:
+      export_apps: [code, firefox, thunderbird]
+  ```
+- App icons extracted from container and installed on host
+- Window titles prefixed with domain name and colored border
+  (QubesOS style)
+
+**Validation criteria**:
+- [ ] Exported app appears in host app launcher
+- [ ] App runs inside container with display forwarded to host
+- [ ] Audio works via PipeWire socket sharing
+- [ ] Window visually identified by domain (color, prefix)
+
+---
+
+## Phase 27: Streaming STT (Real-Time Transcription)
+
+**Goal**: Real-time speech-to-text that types words as they are
+spoken, without waiting for the end of the recording.
+
+**Prerequisites**: Phase 14 (STT service), Phase 23 (host layer).
+
+**Context**: The current push-to-talk mode works well but requires
+waiting for the full recording before transcription. A streaming
+mode was prototyped (`host/stt/stt-streaming.py`) but abandoned
+due to Whisper's batch-mode limitation: re-transcribing cumulative
+audio changes earlier words, making word-level diff unreliable.
+
+**Approach options** (to be evaluated):
+1. **Whisper streaming backends**: whisper-streaming, faster-whisper
+   with VAD-based chunking, or Speaches WebSocket endpoint
+2. **Non-Whisper alternatives**: Vosk (offline, streaming-native),
+   DeepSpeech, or Moonshine (streaming by design)
+3. **Hybrid**: use Whisper for final transcription, streaming engine
+   for real-time preview (two-pass approach)
+
+**Deliverables**:
+- Evaluate streaming STT backends compatible with local GPU
+- Implement streaming mode in `host/stt/stt-push-to-talk.sh`
+  (Meta+S long-press = streaming, Meta+S tap = toggle as today)
+- Anti-loop protections preserved from current prototype
+- Latency target: < 500ms from speech to typed text
+
+**Validation criteria**:
+- [ ] Words appear as they are spoken (< 500ms latency)
+- [ ] No text duplication or hallucination loops
+- [ ] Clean switch between toggle and streaming modes
+- [ ] GPU acceleration via Incus container
+
+---
+
+## Phase 28: Local LLM Delegation for Claude Code
+
+**Goal**: Claude Code CLI delegates routine tasks to local open-source
+LLMs (via Ollama) to reduce API credit consumption while maintaining
+quality through supervision.
+
+**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams).
+
+**Context**: Claude Code (Opus/Sonnet) is powerful but expensive.
+Many sub-tasks (linting, simple refactoring, test generation,
+documentation, code review of small changes) can be handled by
+local LLMs running on the host GPU via Ollama. Claude Code would
+act as a supervisor: delegating tasks to local models, reviewing
+their output, and only using the API for complex reasoning.
+
+**Architecture**:
+
+```
+Claude Code (API) ── supervisor ──┐
+                                  │
+    ┌─────────────────────────────┤
+    │                             │
+    ▼                             ▼
+Local LLM (Ollama)          Claude API
+via Ollama API              (complex tasks)
+10.100.3.1:11434
+
+Tasks:                       Tasks:
+- Lint fixes                 - Architecture decisions
+- Simple refactoring         - Complex debugging
+- Test generation            - Multi-file refactoring
+- Documentation              - Security review
+- Code formatting            - Novel feature design
+```
+
+**Approach options** (to be evaluated):
+1. **Claude Code MCP server**: expose Ollama as an MCP tool that
+   Claude Code can call for sub-tasks
+2. **Agent Teams with local model**: spawn team agents that use
+   Ollama instead of the API (requires Claude Code SDK support)
+3. **Pre/post hooks**: Claude Code hooks that run local LLM
+   checks before/after API calls (linting, formatting, review)
+4. **Hybrid routing**: a proxy that routes simple requests to
+   Ollama and complex ones to the API based on task classification
+
+**Deliverables**:
+- Evaluate which approach is supported by Claude Code SDK/API
+- Implement the chosen delegation mechanism
+- Configuration in AnKLuMe to declare which tasks are delegated:
+  ```yaml
+  ai_delegation:
+    local_model: "qwen2.5-coder:32b"
+    ollama_url: "http://10.100.3.1:11434"
+    delegate_tasks:
+      - lint_fixes
+      - test_generation
+      - documentation
+      - simple_refactoring
+    supervisor_review: true  # Claude reviews local LLM output
+  ```
+- Metrics: API calls saved, local model accuracy, review rejection rate
+
+**Validation criteria**:
+- [ ] Routine tasks handled by local LLM without API calls
+- [ ] Claude Code supervises and corrects local LLM output
+- [ ] Measurable reduction in API credit consumption
+- [ ] No quality regression on delegated tasks
+- [ ] Fallback to API if local model unavailable
+
+---
+
 ## Current State
 
 **Completed**:
@@ -1459,6 +1759,12 @@ def check_isolation(sandbox):
 
 **Next**:
 - Phase 22: End-to-End Scenario Testing (BDD) — in progress
+- Phase 23: Host Bootstrap and Thin Host Layer — planned
+- Phase 24: Snapshot-Before-Apply and Rollback — planned
+- Phase 25: XDG Desktop Portal for Cross-Domain File Access — planned
+- Phase 26: Native App Export (distrobox-export Style) — planned
+- Phase 27: Streaming STT (Real-Time Transcription) — long-term
+- Phase 28: Local LLM Delegation for Claude Code — planned
 
 **Deployed infrastructure**:
 
