@@ -1820,6 +1820,138 @@ ai-coder container
 
 ---
 
+## Phase 29: Codebase Simplification and Real-World Testing
+
+**Goal**: Reduce code complexity, eliminate redundant tests, and
+replace synthetic Molecule tests with real-world integration tests
+where possible.
+
+**Prerequisites**: Phase 22 (BDD scenarios).
+
+**Context**: The codebase has grown through 22 phases of development,
+accumulating layers of abstraction, defensive code, and synthetic
+tests. A simplification pass is needed to:
+- Reduce total lines of code without losing functionality
+- Remove redundant or overlapping tests
+- Replace Molecule synthetic tests with real BDD scenarios where
+  the synthetic test adds no value beyond what the scenario covers
+- Identify dead code (leveraging Phase 19 code analysis tools)
+- Simplify role logic where Incus defaults handle the common case
+
+**Principles**:
+1. **User-friendliness first** — but never at the expense of security
+2. **Less code = fewer bugs** — delete before refactoring
+3. **Real tests > synthetic tests** — a BDD scenario that deploys
+   on real Incus is worth more than a Molecule mock
+4. **Measure before cutting** — use code coverage and call graphs
+   to identify what is actually used
+
+**Deliverables**:
+
+a) **Code audit**:
+   - Dead code detection report (Phase 19 tools)
+   - Test redundancy analysis: map each Molecule test to BDD scenarios
+     that cover the same behavior
+   - Complexity metrics per role (lines, cyclomatic complexity)
+   - Identify roles that could be merged or simplified
+
+b) **Simplification**:
+   - Remove dead code and unused variables
+   - Merge roles that handle closely related concerns
+   - Simplify Jinja2 templates where defaults suffice
+   - Reduce generator (`scripts/generate.py`) complexity
+   - Target: -20% lines of code with zero functionality loss
+
+c) **Test rationalization**:
+   - Keep Molecule for fast unit-level role testing
+   - Replace redundant Molecule scenarios with BDD E2E tests
+   - Add real-world smoke tests: `make smoke` runs a minimal
+     deployment on real Incus and verifies core functionality
+   - Target: fewer tests, better coverage of real user workflows
+
+**Validation criteria**:
+- [ ] Code audit report produced with actionable items
+- [ ] At least 20% reduction in total lines of code
+- [ ] No functionality regression (all BDD scenarios pass)
+- [ ] `make smoke` runs a real deployment in under 5 minutes
+- [ ] Test suite runs faster than before simplification
+
+---
+
+## Phase 30: Educational Platform and Guided Labs
+
+**Goal**: Turn AnKLuMe into a learning platform where students or
+self-learners can follow guided tutorials and execute commands in
+sandboxed environments.
+
+**Prerequisites**: Phase 22 (BDD scenarios), Phase 23 (bootstrap),
+Phase 12 (Incus-in-Incus).
+
+**Context**: AnKLuMe's architecture (declarative YAML, isolated
+domains, reproducible environments) makes it a natural fit for
+teaching system administration, networking, and security. The
+existing `make guide` and example configurations provide a starting
+point, but a full educational experience requires structured labs,
+sandboxed execution, and progress tracking.
+
+**Long-term vision**:
+
+```
+Student flow:
+  1. Clone AnKLuMe, run bootstrap
+  2. Select a lab: make lab LIST → choose "Networking 101"
+  3. Lab creates sandboxed environment (Incus-in-Incus)
+  4. Student follows guided steps with validation at each step
+  5. Lab auto-grades and provides feedback
+  6. Student can reset and retry without affecting other labs
+```
+
+**Deliverables**:
+
+a) **Lab framework** (`labs/`):
+   - Each lab is a directory with:
+     - `lab.yml` — metadata (title, difficulty, prerequisites, duration)
+     - `infra.yml` — lab-specific infrastructure
+     - `steps/` — ordered step files with instructions + validation
+     - `solution/` — reference solution (hidden by default)
+   - Labs run in Incus-in-Incus sandbox (Phase 12)
+   - Each step has a validation command that checks completion
+
+b) **Example labs**:
+   - **Lab 01**: First deployment (create 2 containers, verify
+     connectivity)
+   - **Lab 02**: Network isolation (set up 2 domains, verify
+     nftables blocks cross-domain traffic)
+   - **Lab 03**: Snapshots and recovery (create, break, restore)
+   - **Lab 04**: GPU passthrough and AI services (deploy Ollama,
+     run inference)
+   - **Lab 05**: Security audit (find and fix misconfigurations)
+
+c) **Make targets**:
+   ```makefile
+   make lab-list          ## List available labs
+   make lab-start L=01    ## Start lab 01 (creates sandbox)
+   make lab-check L=01    ## Validate current step
+   make lab-hint L=01     ## Show hint for current step
+   make lab-reset L=01    ## Reset lab to initial state
+   make lab-solution L=01 ## Show solution (marks lab as assisted)
+   ```
+
+d) **Teacher mode**:
+   - `make lab-deploy N=30 L=02` — deploy lab 02 for 30 students
+   - Each student gets their own Incus-in-Incus sandbox
+   - Teacher dashboard shows progress per student
+   - Automatic grading and report generation
+
+**Validation criteria**:
+- [ ] At least 3 labs implemented and tested
+- [ ] Labs run in isolated sandbox (no impact on host infra)
+- [ ] Step validation provides clear pass/fail feedback
+- [ ] `make lab-reset` fully restores initial state
+- [ ] Teacher mode deploys N isolated lab instances
+
+---
+
 ## Current State
 
 **Completed**:
@@ -1855,6 +1987,8 @@ ai-coder container
 - Phase 26: Native App Export (distrobox-export Style) — planned
 - Phase 27: Streaming STT (Real-Time Transcription) — long-term
 - Phase 28: Local LLM Delegation for Claude Code — planned
+- Phase 29: Codebase Simplification and Real-World Testing — planned (short-term)
+- Phase 30: Educational Platform and Guided Labs — long-term
 
 **Deployed infrastructure**:
 
