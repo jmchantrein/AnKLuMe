@@ -2039,102 +2039,244 @@ separate disk for all container data.
 
 **Prerequisites**: Phase 23 (bootstrap), Phase 29 (simplification).
 
-**Context**: The current deployment requires a full Linux
-installation. A live OS approach would allow:
-- Booting AnKLuMe from a USB stick or SD card on any compatible
-  machine
-- Loading the OS entirely in RAM (optional, for speed and wear)
-- Mounting an encrypted storage pool (ZFS/BTRFS) on a separate
-  disk for all Incus data (containers, images, volumes)
-- The same encrypted disk can be used with different base OS
-  versions (ISO updates don't affect user data)
-- Portable, secure, disposable: unplug the USB and nothing remains
-  on the machine (Tails-like property)
-
 **Inspiration**: Tails OS (amnesic live system), IncusOS (immutable
 Incus host with A/B updates), Fedora Silverblue (immutable +
 persistent).
 
-**Architecture**:
+### Design rationale
+
+The current deployment requires a full Linux installation. A live
+OS approach separates the **OS** (small, immutable, disposable)
+from the **data** (large, encrypted, persistent). This yields:
+
+- **Portability** (Tails-like): carry AnKLuMe on a USB stick, boot
+  on any compatible machine, unplug and nothing remains
+- **Immutability** (IncusOS-like): OS cannot be corrupted at
+  runtime, impossible to tamper with
+- **Resilience**: if the boot media dies, flash a new one and
+  remount the encrypted pool — zero data loss
+- **Clean updates**: flash a new OS image, data untouched
+- **Security**: data encrypted at rest, OS integrity verified
+
+The OS itself is small (~1-2 GB): kernel + systemd + Incus +
+nftables + AnKLuMe framework. All the actual value (containers,
+VMs, images, user configuration, secrets) lives on the encrypted
+data pool on a separate disk.
+
+### Architecture
 
 ```
-Boot media (USB/SD/disk):
-├── EFI partition (FAT32)
-├── OS partition (read-only squashfs or dm-verity)
-│   ├── Minimal Linux (Debian/Arch minimal)
+Boot media (USB / SD card / small disk):
+├── EFI partition (FAT32, ~512 MB)
+│   └── Signed bootloader (Secure Boot)
+├── OS-A partition (read-only squashfs, ~1.5 GB)
+│   ├── Minimal Linux (Debian or Arch)
 │   ├── Incus daemon
 │   ├── AnKLuMe framework
-│   └── bootstrap (first-boot auto-detection)
-└── Optional: swap partition (encrypted)
+│   ├── All hardware drivers (modules)
+│   └── dm-verity hash tree (integrity)
+├── OS-B partition (read-only squashfs, ~1.5 GB)
+│   └── Previous OS version (rollback target)
+├── Persistent partition (ext4, ~100 MB)
+│   ├── Machine-specific config (network, hostname)
+│   ├── SSH host keys
+│   ├── Pool mount config (which disk, which backend)
+│   └── A/B boot state (which partition is active)
+└── Optional: encrypted swap
 
-Separate disk (HDD/SSD/NVMe):
+Data disk (HDD / SSD / NVMe — separate physical disk):
 └── LUKS-encrypted partition
     └── ZFS pool or BTRFS volume
         ├── Incus storage pool (containers, VMs, images)
         ├── User configuration (infra.yml, host_vars, etc.)
-        └── Secrets (GPG keys, messaging tokens, etc.)
+        └── Secrets (GPG keys, API tokens, messaging creds)
 ```
 
-**Boot flow**:
+### Loading the OS entirely in RAM (toram mode)
 
-```
-1. BIOS/UEFI boots from USB/SD
-2. OS loads into RAM (if configured) or runs from media
-3. User enters LUKS passphrase for encrypted disk
-4. ZFS/BTRFS pool imported automatically
-5. Incus starts with storage pool on encrypted disk
-6. AnKLuMe ready — all previous containers and data intact
-```
+The OS squashfs image can be copied to a tmpfs at boot time.
+This is controlled by a kernel parameter (`anklume.toram=1`).
 
-**Storage backend choice**:
+**Why this matters**:
+- I/O at RAM speed instead of USB 2.0/3.0 (orders of magnitude
+  faster, especially for Incus metadata operations)
+- Zero wear on the boot media (USB sticks and SD cards have
+  limited write cycles — running an OS directly from them
+  degrades them over months)
+- The boot media can be **physically removed** after boot —
+  nothing to steal, nothing to tamper with
+- The OS is intrinsically immutable (read-only image in RAM)
+
+**Cost**: 1-2 GB of RAM dedicated to the OS image. On a
+workstation with 16-64 GB, this is negligible. Containers
+themselves stay on the data disk, NOT in RAM.
+
+**Persistence despite toram**: the small persistent partition
+(~100 MB) on the boot media is mounted read-write for:
+- Network configuration for this specific machine
+- SSH host keys (stable across reboots)
+- A/B update state
+- Pointer to the encrypted data disk
+This partition is rarely written, so media wear is minimal.
+
+### Three-layer encryption model
+
+Each layer has a different security objective:
+
+| Layer | Protects against | Approach |
+|-------|-----------------|----------|
+| **1. OS integrity** | Evil maid (modified OS) | dm-verity + UEFI Secure Boot |
+| **2. Data at rest** | Disk theft / seizure | LUKS + ZFS native or LUKS + BTRFS |
+| **3. RAM contents** | Cold boot attack (frozen RAM) | AMD SME/SEV or Intel TME |
+
+**Layer 1 — OS integrity (NOT encryption)**:
+The AnKLuMe code is open source — there is nothing secret in the
+OS image. The goal is **integrity** (detect tampering), not
+confidentiality. dm-verity computes a Merkle hash tree of every
+block; any modification is detected at read time. UEFI Secure Boot
+prevents booting a tampered image. This is the IncusOS approach.
+Full disk encryption of the OS partition would add complexity
+(passphrase before OS loads, or TPM binding) with no security
+benefit since the OS contents are public.
+
+**Layer 2 — Data encryption (essential)**:
+This is where all sensitive data lives (containers, secrets,
+user configuration). Two options depending on storage backend:
+
+- **ZFS native encryption** (`aes-256-gcm`):
+  - Per-dataset granularity (different keys per domain possible)
+  - Key loaded at pool import time (passphrase or keyfile)
+  - Can encrypt some datasets and leave others unencrypted
+  - Deduplication works across encrypted datasets (metadata
+    is not encrypted — only data blocks are)
+  - Best choice for multi-domain isolation (each domain
+    could have its own encryption key)
+
+- **LUKS + BTRFS** (block-level):
+  - Entire block device encrypted before BTRFS sees it
+  - All-or-nothing: everything encrypted with one key
+  - Simpler setup, widely supported
+  - Slightly less granular but perfectly adequate
+
+ZFS native encryption is recommended for AnKLuMe because the
+per-dataset granularity aligns with the per-domain isolation model.
+A compromised domain key does not expose other domains' data.
+
+**Layer 3 — RAM encryption (hardware-dependent)**:
+Modern CPUs support transparent memory encryption:
+- AMD: SME (Secure Memory Encryption) or SEV (Secure Encrypted
+  Virtualization) — enabled via kernel parameter `mem_encrypt=on`
+- Intel: TME (Total Memory Encryption) or MKTME (Multi-Key TME)
+This protects against physical attacks where an attacker freezes
+RAM modules to extract encryption keys (cold boot attack). It is
+transparent to software and has minimal performance impact (<2%).
+AnKLuMe should enable this when hardware supports it.
+
+### Storage backend comparison
 
 | Feature | ZFS | BTRFS |
 |---------|-----|-------|
 | Incus recommendation | Primary | Supported |
-| CoW snapshots | Native | Native |
-| Encryption | Native (dataset-level) | Via LUKS (block-level) |
-| Quotas | Native per dataset | Via qgroups |
+| CoW snapshots | Native, instant | Native, instant |
+| Encryption | Native per-dataset | Via LUKS (block-level) |
+| Quotas | Native per dataset | Via qgroups (less mature) |
 | Compression | lz4/zstd (transparent) | zstd (transparent) |
-| Stability | Very mature | Improving (some features still evolving) |
-| RAM usage | Higher (ARC cache) | Lower |
-| Bootstrap default | Recommended | Alternative |
+| Stability with Incus | Very mature, battle-tested | Good but fewer production deployments |
+| RAM usage | Higher (ARC cache, tunable) | Lower |
+| Scrub / self-healing | Native (checksums + redundancy) | Native (checksums, needs RAID for healing) |
+| License | CDDL (kernel module, not in mainline) | GPL (in mainline kernel) |
+| Bootstrap default | **Recommended** | Alternative |
 
-`bootstrap.sh` should detect available disks, ask the user which
-backend to use (default: ZFS), and handle pool creation +
-encryption setup.
+ZFS is the recommended default because:
+1. Incus upstream recommends it as the primary backend
+2. Per-dataset encryption aligns with per-domain isolation
+3. `incus copy` uses ZFS clones (instant, near-zero space)
+4. Scrub + checksums provide data integrity guarantees
+5. ARC cache improves Incus performance significantly
 
-**Deliverables**:
+BTRFS remains supported as an alternative for users who prefer
+a GPL-only stack or have constraints on kernel modules.
+
+### Boot flow (detailed)
+
+```
+1. BIOS/UEFI → Secure Boot verifies OS image signature
+2. Bootloader reads persistent partition for A/B state
+3. Active OS partition (A or B) selected
+4. Kernel + initramfs load
+5. initramfs checks anklume.toram= kernel parameter:
+   ├── toram=1 → copy squashfs to tmpfs, mount from RAM
+   └── toram=0 → mount squashfs directly from media
+6. dm-verity activates, verifying every block read
+7. systemd starts, mounts persistent partition (rw)
+8. Reads pool config from persistent partition
+9. Prompts for LUKS passphrase (or TPM + PIN)
+10. ZFS pool imported / BTRFS volume mounted
+11. Incus daemon starts with storage on encrypted pool
+12. AnKLuMe containers resume — system operational
+```
+
+If the data disk is not present (first boot or new machine):
+```
+8b. First-boot wizard launches:
+    - Detect available disks
+    - Ask: create new encrypted pool or mount existing
+    - Select backend (ZFS recommended, BTRFS alternative)
+    - LUKS setup + pool creation
+    - Run AnKLuMe bootstrap
+    - Store config in persistent partition
+```
+
+### Deliverables
 
 a) **Image builder** (`scripts/build-image.sh`):
    - Build a minimal bootable ISO/image with Incus + AnKLuMe
    - Support Debian and Arch base
-   - Option to load OS into RAM at boot
+   - toram mode configurable via kernel parameter
    - A/B partition scheme for safe updates (IncusOS-inspired)
+   - dm-verity hash tree generation
+   - Secure Boot signing (self-signed or custom CA)
 
 b) **First-boot wizard**:
-   - Detect available disks
-   - Ask user: create new encrypted pool or mount existing one
-   - LUKS + ZFS/BTRFS setup with secure passphrase
+   - Detect available disks and their characteristics
+   - Interactive: create new pool or mount existing one
+   - Backend selection (ZFS/BTRFS) with recommendation
+   - LUKS + pool setup with secure passphrase
+   - GPU detection for AI services (Phase 23b integration)
    - Run `bootstrap.sh` to set up AnKLuMe infrastructure
-   - Store minimal config (selected disks, backend) on boot media
+   - Store minimal config in persistent partition
 
 c) **Update mechanism**:
-   - Flash new OS image to boot media (A/B partitions)
-   - User data on encrypted disk is untouched
-   - Version compatibility check at boot
-   - Rollback to previous OS version if new one fails
+   - `anklume update` downloads new OS image to inactive
+     partition (A/B swap)
+   - Version compatibility check before committing the update
+   - Automatic rollback: if new OS fails to boot 3 times,
+     bootloader reverts to previous partition
+   - User data on encrypted disk is never touched
 
-d) **Documentation**:
-   - `docs/live-os.md` — how to build and use the live OS
-   - Hardware compatibility notes
-   - Performance comparison: RAM mode vs disk mode
+d) **RAM encryption enablement**:
+   - Detect AMD SME/SEV or Intel TME/MKTME support
+   - Enable via kernel parameter if available
+   - Report status in `anklume status` output
 
-**Validation criteria**:
+e) **Documentation**:
+   - `docs/live-os.md` — architecture, build, and usage guide
+   - Hardware compatibility notes and tested configurations
+   - Performance comparison: toram vs direct, ZFS vs BTRFS
+   - Security model explanation (three-layer encryption)
+
+### Validation criteria
+
 - [ ] Bootable image created for at least one base distro
-- [ ] Encrypted pool setup works (ZFS and BTRFS)
-- [ ] OS update does not affect user data
-- [ ] Containers survive OS reboot
-- [ ] Optional RAM mode functional
+- [ ] Encrypted pool setup works (both ZFS and BTRFS)
+- [ ] toram mode functional (OS runs from RAM)
+- [ ] Boot media can be physically removed after toram boot
+- [ ] OS update via A/B swap does not affect user data
+- [ ] Automatic rollback on failed OS update
+- [ ] Containers survive OS reboot with data intact
+- [ ] dm-verity detects tampered OS blocks
+- [ ] RAM encryption enabled when hardware supports it
+- [ ] First-boot wizard handles both new pool and existing pool
 
 ---
 
