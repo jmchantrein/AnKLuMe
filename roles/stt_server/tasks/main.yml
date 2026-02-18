@@ -4,6 +4,8 @@
 # Installs faster-whisper and the Speaches API server, which provides
 # an OpenAI-compatible /v1/audio/transcriptions endpoint.
 # Designed for GPU-accelerated transcription with Whisper models.
+#
+# Speaches requires Python 3.12 and is installed from source via uv sync.
 
 - name: SttServer | Detect GPU availability
   ansible.builtin.command:
@@ -12,29 +14,68 @@
   changed_when: false
   failed_when: false
 
+- name: SttServer | Set compute type based on GPU availability
+  ansible.builtin.set_fact:
+    stt_server_effective_compute: >-
+      {{ 'float16' if stt_server_gpu_check.rc == 0 else 'int8' }}
+
 - name: SttServer | Report GPU status
   ansible.builtin.debug:
     msg: >-
-      {{ 'GPU available — faster-whisper will use CUDA acceleration'
+      {{ "GPU available — using " ~ stt_server_effective_compute ~ " compute"
          if stt_server_gpu_check.rc == 0
-         else 'No GPU detected — faster-whisper will use CPU mode' }}
+         else "No GPU detected — falling back to int8 CPU mode" }}
 
 - name: SttServer | Install system dependencies
   ansible.builtin.apt:
     name:
       - python3-pip
-      - python3-venv
       - ffmpeg
+      - git
     state: present
     update_cache: true
 
-- name: SttServer | Install speaches via pip
+- name: SttServer | Install uv package manager
   ansible.builtin.pip:
-    name: speaches
+    name: uv
     state: present
     extra_args: --break-system-packages
-  register: stt_server_pip_install
-  changed_when: "'Successfully installed' in (stt_server_pip_install.stdout | default(''))"
+
+- name: SttServer | Clone speaches repository
+  ansible.builtin.git:
+    repo: https://github.com/speaches-ai/speaches.git
+    dest: /opt/speaches
+    version: master
+    force: true
+    depth: 1
+  register: stt_server_git_clone
+
+- name: SttServer | Remove uv version pin from pyproject.toml
+  ansible.builtin.lineinfile:
+    path: /opt/speaches/pyproject.toml
+    regexp: '^required-version\s*='
+    state: absent
+
+- name: SttServer | Install speaches dependencies via uv sync  # noqa: no-handler
+  ansible.builtin.command:
+    cmd: uv sync
+    chdir: /opt/speaches
+  when: stt_server_git_clone is changed
+  changed_when: true
+
+- name: SttServer | Ensure venv exists (idempotent)
+  ansible.builtin.command:
+    cmd: uv sync
+    chdir: /opt/speaches
+    creates: /opt/speaches/.venv/bin/uvicorn
+
+- name: SttServer | Install CUDA runtime libraries for GPU support
+  ansible.builtin.command:
+    cmd: >-
+      uv pip install --python /opt/speaches/.venv/bin/python
+      nvidia-cudnn-cu12 nvidia-cublas-cu12 nvidia-curand-cu12 nvidia-cuda-runtime-cu12
+    creates: /opt/speaches/.venv/lib/python3.12/site-packages/nvidia/cudnn
+  when: stt_server_gpu_check.rc == 0
 
 - name: SttServer | Deploy systemd service
   ansible.builtin.template:

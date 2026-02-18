@@ -363,7 +363,7 @@ quickstart: ## Copy example infra.yml and generate Ansible files
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	ansible-galaxy collection install -r requirements.yml
-	pip install --user pyyaml pytest molecule ruff
+	pip install --user --break-system-packages pyyaml pytest molecule ruff
 	@echo "---"
 	@echo "Also install system packages: ansible-lint yamllint shellcheck"
 	@echo "  Arch:   pacman -S ansible-lint yamllint shellcheck"

@@ -58,7 +58,9 @@
 
 - name: IncusNftables | Resolve network policies to bridge names
   ansible.builtin.set_fact:
-    incus_nftables_resolved_policies: >-
+    incus_nftables_resolved_policies: "{{ _resolved_json | from_json }}"
+  vars:
+    _resolved_json: >-
       {% set resolved = [] %}
       {% for policy in (network_policies | default([])) %}
       {% set from_ref = policy['from'] %}
@@ -82,12 +84,14 @@
       }) %}
       {% endif %}
       {% endfor %}
-      {{ resolved }}
+      {{ resolved | to_json }}
   when: network_policies is defined and (network_policies | length > 0)
 
 - name: IncusNftables | Apply AI access override to resolved policies
   ansible.builtin.set_fact:
-    incus_nftables_resolved_policies: >-
+    incus_nftables_resolved_policies: "{{ _override_json | from_json }}"
+  vars:
+    _override_json: >-
       {% set override = incus_nftables_ai_override %}
       {% set policies = incus_nftables_resolved_policies | default([]) %}
       {% set new_policies = [] %}
@@ -104,7 +108,7 @@
         'protocol': override.protocol | default('tcp'),
         'bidirectional': true
       }) %}
-      {{ new_policies }}
+      {{ new_policies | to_json }}
   when: incus_nftables_ai_override | default({}) | length > 0
 
 - name: IncusNftables | Create output directory

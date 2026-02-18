@@ -133,6 +133,7 @@
     ansible_user: root
     ansible_incus_project: "{{ incus_project }}"
     ansible_host: "{{ inventory_hostname }}"
+    ansible_python_interpreter: /usr/bin/python3
 
   pre_tasks:
     - name: Provisioning | Bootstrap Python on target
