@@ -59,6 +59,9 @@ Thumbs.db
 # AI config with secrets
 /anklume.conf.yml
 
+# MCP config (contains user-specific IPs)
+/.mcp.json
+
 # AnKLuMe dev mode marker (bypass pre-commit hook)
 .anklume-no-verify
 
