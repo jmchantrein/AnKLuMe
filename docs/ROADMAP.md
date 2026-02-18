@@ -1820,6 +1820,85 @@ ai-coder container
 
 ---
 
+## Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
+
+**Goal**: Install and sandbox [OpenClaw](https://github.com/openclaw/openclaw)
+within AnKLuMe infrastructure, following best practices for
+self-hosted AI assistants.
+
+**Prerequisites**: Phase 23b (sandboxed AI coding environment),
+Phase 5 (Ollama).
+
+**Context**: [OpenClaw](https://openclaw.ai/) is an open-source,
+self-hosted personal AI assistant that connects to multiple
+messaging platforms (WhatsApp, Telegram, Signal, Discord, Slack,
+Matrix, Teams, iMessage) and drives LLMs (Claude, GPT, local
+models via Ollama). Running it inside AnKLuMe provides:
+- Network isolation (the bot only reaches authorized services)
+- Controlled messaging access (policy-based)
+- Local LLM delegation for privacy-sensitive queries
+- Easy deployment via the bootstrap process
+
+**Architecture**:
+
+```
+Host
+├── Container: openclaw            ← Sandboxed OpenClaw instance
+│   ├── Node.js 22+ runtime
+│   ├── OpenClaw daemon (systemd)
+│   ├── Messaging bridges          ← WhatsApp, Telegram, Signal...
+│   └── Network policy:
+│       ├── Can reach: ollama (local LLM), internet (APIs)
+│       └── Cannot reach: other domains (pro, perso, etc.)
+│
+├── Container: ollama              ← Local LLM inference (GPU)
+│   └── API: :11434               ← Used by OpenClaw for local queries
+│
+└── Container: anklume-instance    ← Framework management
+```
+
+**Deliverables**:
+
+a) **Ansible role `openclaw_server`**:
+   - Install Node.js 22+ (via nodesource or distro repo)
+   - Install OpenClaw (`npm install -g openclaw@latest`)
+   - Run `openclaw onboard` with preseed configuration
+   - Configure systemd service for daemon mode
+   - Set up Ollama as local LLM backend
+   - Network policy: allow messaging APIs + Ollama, deny rest
+
+b) **infra.yml integration**:
+   ```yaml
+   instances:
+     openclaw:
+       type: container
+       os_image: debian/13
+       roles: [base_system, openclaw_server]
+       openclaw_llm_provider: "ollama"  # or "anthropic", "openai"
+       openclaw_channels: [telegram, signal]  # enabled channels
+   ```
+
+c) **Bootstrap option**:
+   - `bootstrap.sh` asks: "Deploy AI assistant (OpenClaw)? [y/N]"
+   - If yes, creates the openclaw container and runs onboarding
+   - Guided channel setup (QR code for WhatsApp, bot token for
+     Telegram, etc.)
+
+d) **Security considerations**:
+   - Messaging credentials stored in encrypted Incus storage
+   - Network policy restricts outbound connections
+   - Audit log of all assistant interactions
+   - Optional: pairing-based access control (OpenClaw native)
+
+**Validation criteria**:
+- [ ] OpenClaw installed and running in isolated container
+- [ ] At least one messaging channel functional (Telegram or Signal)
+- [ ] Local LLM (Ollama) used for queries when configured
+- [ ] Network isolation verified (cannot reach other domains)
+- [ ] Daemon survives container restart
+
+---
+
 ## Phase 29: Codebase Simplification and Real-World Testing
 
 **Goal**: Reduce code complexity, eliminate redundant tests, and
@@ -1952,6 +2031,113 @@ d) **Teacher mode**:
 
 ---
 
+## Phase 31: Live OS with Encrypted Persistent Storage
+
+**Goal**: Provide a bootable AnKLuMe image (USB/SD card) with an
+immutable OS that mounts an encrypted ZFS or BTRFS pool on a
+separate disk for all container data.
+
+**Prerequisites**: Phase 23 (bootstrap), Phase 29 (simplification).
+
+**Context**: The current deployment requires a full Linux
+installation. A live OS approach would allow:
+- Booting AnKLuMe from a USB stick or SD card on any compatible
+  machine
+- Loading the OS entirely in RAM (optional, for speed and wear)
+- Mounting an encrypted storage pool (ZFS/BTRFS) on a separate
+  disk for all Incus data (containers, images, volumes)
+- The same encrypted disk can be used with different base OS
+  versions (ISO updates don't affect user data)
+- Portable, secure, disposable: unplug the USB and nothing remains
+  on the machine (Tails-like property)
+
+**Inspiration**: Tails OS (amnesic live system), IncusOS (immutable
+Incus host with A/B updates), Fedora Silverblue (immutable +
+persistent).
+
+**Architecture**:
+
+```
+Boot media (USB/SD/disk):
+├── EFI partition (FAT32)
+├── OS partition (read-only squashfs or dm-verity)
+│   ├── Minimal Linux (Debian/Arch minimal)
+│   ├── Incus daemon
+│   ├── AnKLuMe framework
+│   └── bootstrap (first-boot auto-detection)
+└── Optional: swap partition (encrypted)
+
+Separate disk (HDD/SSD/NVMe):
+└── LUKS-encrypted partition
+    └── ZFS pool or BTRFS volume
+        ├── Incus storage pool (containers, VMs, images)
+        ├── User configuration (infra.yml, host_vars, etc.)
+        └── Secrets (GPG keys, messaging tokens, etc.)
+```
+
+**Boot flow**:
+
+```
+1. BIOS/UEFI boots from USB/SD
+2. OS loads into RAM (if configured) or runs from media
+3. User enters LUKS passphrase for encrypted disk
+4. ZFS/BTRFS pool imported automatically
+5. Incus starts with storage pool on encrypted disk
+6. AnKLuMe ready — all previous containers and data intact
+```
+
+**Storage backend choice**:
+
+| Feature | ZFS | BTRFS |
+|---------|-----|-------|
+| Incus recommendation | Primary | Supported |
+| CoW snapshots | Native | Native |
+| Encryption | Native (dataset-level) | Via LUKS (block-level) |
+| Quotas | Native per dataset | Via qgroups |
+| Compression | lz4/zstd (transparent) | zstd (transparent) |
+| Stability | Very mature | Improving (some features still evolving) |
+| RAM usage | Higher (ARC cache) | Lower |
+| Bootstrap default | Recommended | Alternative |
+
+`bootstrap.sh` should detect available disks, ask the user which
+backend to use (default: ZFS), and handle pool creation +
+encryption setup.
+
+**Deliverables**:
+
+a) **Image builder** (`scripts/build-image.sh`):
+   - Build a minimal bootable ISO/image with Incus + AnKLuMe
+   - Support Debian and Arch base
+   - Option to load OS into RAM at boot
+   - A/B partition scheme for safe updates (IncusOS-inspired)
+
+b) **First-boot wizard**:
+   - Detect available disks
+   - Ask user: create new encrypted pool or mount existing one
+   - LUKS + ZFS/BTRFS setup with secure passphrase
+   - Run `bootstrap.sh` to set up AnKLuMe infrastructure
+   - Store minimal config (selected disks, backend) on boot media
+
+c) **Update mechanism**:
+   - Flash new OS image to boot media (A/B partitions)
+   - User data on encrypted disk is untouched
+   - Version compatibility check at boot
+   - Rollback to previous OS version if new one fails
+
+d) **Documentation**:
+   - `docs/live-os.md` — how to build and use the live OS
+   - Hardware compatibility notes
+   - Performance comparison: RAM mode vs disk mode
+
+**Validation criteria**:
+- [ ] Bootable image created for at least one base distro
+- [ ] Encrypted pool setup works (ZFS and BTRFS)
+- [ ] OS update does not affect user data
+- [ ] Containers survive OS reboot
+- [ ] Optional RAM mode functional
+
+---
+
 ## Current State
 
 **Completed**:
@@ -1987,8 +2173,10 @@ d) **Teacher mode**:
 - Phase 26: Native App Export (distrobox-export Style) — planned
 - Phase 27: Streaming STT (Real-Time Transcription) — long-term
 - Phase 28: Local LLM Delegation for Claude Code — planned
+- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) — planned
 - Phase 29: Codebase Simplification and Real-World Testing — planned (short-term)
 - Phase 30: Educational Platform and Guided Labs — long-term
+- Phase 31: Live OS with Encrypted Persistent Storage — long-term
 
 **Deployed infrastructure**:
 
