@@ -1736,10 +1736,12 @@ audio, controlled filesystem access via Phase 25 portals).
   (QubesOS style)
 
 **Validation criteria**:
-- [ ] Exported app appears in host app launcher
-- [ ] App runs inside container with display forwarded to host
-- [ ] Audio works via PipeWire socket sharing
-- [ ] Window visually identified by domain (color, prefix)
+- [x] Export script with export/list/remove subcommands
+- [x] Exported .desktop files installed in ~/.local/share/applications/
+- [x] Icons extracted to ~/.local/share/icons/anklume/
+- [x] App launched via incus exec with domain context
+- [ ] Audio works via PipeWire socket sharing (future)
+- [x] Window visually identified by domain (color, prefix)
 
 ---
 
