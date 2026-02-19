@@ -288,6 +288,134 @@ Add kernel parameter: `anklume.toram=1`
 - Requires nftables rules for network isolation (see `make nftables`)
 - Trust domain separation ensures untrusted containers can't access admin filesystem
 
+## Arch Linux Support
+
+AnKLuMe Live OS can be built with Arch Linux as the base OS, providing a lightweight alternative to Debian.
+
+### Build with Arch
+
+```bash
+# Build Arch-based Live OS image
+make build-image OUT=anklume-arch.img BASE=arch
+
+# Specify architecture
+make build-image OUT=anklume-arch-arm64.img BASE=arch ARCH=arm64
+```
+
+### When to Choose Arch vs Debian
+
+**Arch is recommended for machines with recent GPUs** (NVIDIA 40xx/50xx, AMD RDNA 3/4, Intel Arc).
+Arch ships the latest Mesa, `linux-firmware`, and kernel drivers out of the box, so recent
+hardware is supported immediately. Debian Stable freezes driver versions at release time,
+which means GPUs released after the freeze often lack proper support (no Wayland acceleration,
+missing firmware blobs, fallback to software rendering).
+
+This also matters for **local AI inference**: recent GPUs with CUDA or ROCm support
+can run large language models (7B–70B parameters) via Ollama or llama.cpp. Without
+up-to-date drivers, GPU acceleration is unavailable and inference falls back to CPU.
+Note that small models (1B–3B parameters) can run on **CPU only** with acceptable
+performance on recent processors (Intel 12th gen+, AMD Zen 4+) thanks to AVX-512
+and AMX instruction sets — but the inference libraries (llama.cpp, GGML) must be
+compiled against recent toolchains to leverage these instructions, which Arch
+provides naturally while Debian Stable may ship older versions.
+
+For servers or headless machines where GPU support and local AI are irrelevant,
+Debian Stable remains the safer choice thanks to its predictable update cycle
+and longer security support.
+
+### Key Differences vs Debian
+
+| Aspect | Arch | Debian |
+|--------|------|--------|
+| **Bootstrap** | `pacstrap` | `debootstrap` |
+| **Initramfs** | `mkinitcpio` | `initramfs-tools` |
+| **Release cycle** | Rolling release | Stable snapshots |
+| **Package sync** | Always latest | Fixed versions |
+| **GPU drivers** | Latest (Mesa, firmware, kernel) | Frozen at release |
+
+### Rolling Release Implications
+
+- Arch updates frequently (new kernel versions, glibc updates)
+- Live OS inherits base OS state at build time
+- Recommended: Rebuild monthly to capture latest patches
+
+### Recommended Filesystem
+
+BTRFS is the recommended default for Arch-based images:
+
+- BTRFS is stable in the mainline kernel, no external modules needed
+- ZFS requires the `archzfs` repo and `zfs-dkms` package
+- ZFS may break on kernel updates (rolling release vs DKMS compatibility)
+
+### Host Prerequisites
+
+To build Arch-based images on CachyOS/Arch hosts:
+
+```bash
+sudo pacman -S arch-install-scripts  # provides pacstrap
+sudo pacman -S btrfs-progs           # for BTRFS pool creation
+```
+
+## Ventoy Compatibility
+
+AnKLuMe Live OS images (both Arch and Debian) are fully compatible with [Ventoy](https://www.ventoy.net/), a USB boot manager that simplifies multiboot setups.
+
+### Multiboot USB
+
+Ventoy allows multiple ISO/IMG files on a single USB device:
+
+```
+USB Device (Ventoy):
+├── anklume-live-debian.img
+├── anklume-live-arch.img
+└── other-distro.iso
+```
+
+- Boot menu appears on startup; select desired OS
+- No need to rewrite USB for each image
+
+### Data Disk Independence
+
+The encrypted data disk is **completely independent** of boot media:
+
+- Can boot Arch image one day, Debian the next, using the same data disk
+- `mount-data.sh` and `umount-data.sh` are distro-agnostic
+- LUKS passphrase remains valid across boot method changes
+- ZFS/BTRFS pools automatically recognized on next boot
+
+### Copy-to-RAM Default
+
+By default, `anklume.toram=1` is active in bootloader configuration:
+
+- OS copied to RAM during boot (~30-60 seconds)
+- USB can be safely ejected after boot completes
+- Requires 2-3 GB free RAM
+
+## Checksums
+
+AnKLuMe Live OS builds automatically generate SHA256 checksums.
+
+### Automatic Generation
+
+During build, a `.sha256` checksum file is created alongside the image:
+
+```
+Build output:
+├── anklume-live.img          (image file)
+└── anklume-live.img.sha256   (checksum file)
+```
+
+### Verify Image Integrity
+
+```bash
+# Verify against checksum file
+sha256sum -c anklume-live.img.sha256
+# Output: anklume-live.img: OK
+
+# Or manually compute and compare
+sha256sum anklume-live.img
+```
+
 ## FAQ / Troubleshooting
 
 ### Q: Boot fails after update

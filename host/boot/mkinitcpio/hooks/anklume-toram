@@ -1,0 +1,75 @@
+#!/usr/bin/ash
+# shellcheck shell=dash
+# anklume-toram: Copy squashfs root image to RAM during early boot
+# This hook enables loading the root filesystem into RAM for faster performance
+# Set kernel parameter anklume.toram=1 to enable
+
+run_hook() {
+    # Check if anklume.toram is enabled in kernel command line
+    if ! grep -q "anklume.toram=1" /proc/cmdline; then
+        return 0
+    fi
+
+    msg "AnKLuMe: Detected anklume.toram=1, copying root to RAM..."
+
+    # Create tmpfs mount point
+    if ! [ -d /run/anklume-toram ]; then
+        if ! mkdir -p /run/anklume-toram; then
+            warn "AnKLuMe: Failed to create /run/anklume-toram directory"
+            return 1
+        fi
+    fi
+
+    # Mount tmpfs with appropriate size
+    if ! mount -t tmpfs -o mode=755,size=70% tmpfs /run/anklume-toram; then
+        warn "AnKLuMe: Failed to mount tmpfs at /run/anklume-toram"
+        return 1
+    fi
+
+    msg "AnKLuMe: tmpfs mounted at /run/anklume-toram"
+
+    # Find and copy the squashfs root image
+    ROOT_IMAGE=""
+
+    # Search for squashfs images in common boot locations
+    for location in /boot /cdrom /media /mnt; do
+        if [ -d "$location" ]; then
+            for image in "$location"/*.squashfs "$location"/*.img; do
+                if [ -f "$image" ] && file "$image" | grep -q "Squashfs"; then
+                    ROOT_IMAGE="$image"
+                    break 2
+                fi
+            done
+        fi
+    done
+
+    if [ -z "$ROOT_IMAGE" ]; then
+        warn "AnKLuMe: No squashfs root image found in boot media"
+        umount /run/anklume-toram
+        return 1
+    fi
+
+    msg "AnKLuMe: Found root image at $ROOT_IMAGE"
+    msg "AnKLuMe: Copying $ROOT_IMAGE to RAM (this may take a moment)..."
+
+    # Copy the squashfs image to tmpfs
+    if ! cp "$ROOT_IMAGE" /run/anklume-toram/root.squashfs 2>/dev/null; then
+        warn "AnKLuMe: Failed to copy root image to tmpfs"
+        umount /run/anklume-toram
+        return 1
+    fi
+
+    msg "AnKLuMe: Root image copied to /run/anklume-toram/root.squashfs"
+
+    # Update ROOT environment variable to point to the RAM-based copy
+    export ROOT="/run/anklume-toram/root.squashfs"
+    msg "AnKLuMe: ROOT updated to use RAM copy"
+
+    # Store configuration for rootfs script to use
+    mkdir -p /conf
+    echo "ANKLUME_TORAM_ROOT=/run/anklume-toram/root.squashfs" >> /conf/anklume.conf
+
+    msg "AnKLuMe: Boot-to-RAM setup complete"
+
+    return 0
+}

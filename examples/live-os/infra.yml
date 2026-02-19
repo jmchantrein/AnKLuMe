@@ -17,6 +17,8 @@
 # Live OS boot media configuration
 live_os:
   base: debian
+  # Alternative: Arch Linux base (lighter ~300MB, rolling release)
+  # base: arch
   version: "13"
   hostname: anklume-live
   kernel_version: latest

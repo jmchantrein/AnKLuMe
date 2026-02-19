@@ -1,0 +1,70 @@
+#!/usr/bin/ash
+# shellcheck shell=dash
+# anklume-verity: dm-verity Hook for mkinitcpio
+# Sets up dm-verity root filesystem protection during early boot
+# Reads kernel cmdline: anklume.verity_hash=<hash> anklume.slot=A|B
+
+run_hook() {
+    # Read kernel cmdline parameters
+    VERITY_HASH=""
+    SLOT="A"
+
+    # cmdline is space-separated words, not lines — word splitting is intentional
+    # shellcheck disable=SC2013
+    for param in $(cat /proc/cmdline); do
+        case "$param" in
+            anklume.verity_hash=*)
+                VERITY_HASH="${param#anklume.verity_hash=}"
+                ;;
+            anklume.slot=*)
+                SLOT="${param#anklume.slot=}"
+                ;;
+        esac
+    done
+
+    # Validate parameters
+    if [ -z "$VERITY_HASH" ]; then
+        warn "AnKLuMe: No verity hash specified in kernel cmdline"
+        return 0
+    fi
+
+    # Determine OS partition based on slot
+    case "$SLOT" in
+        A)
+            OS_PARTITION_NAME="ANKLUME-OS-A"
+            ;;
+        B)
+            OS_PARTITION_NAME="ANKLUME-OS-B"
+            ;;
+        *)
+            warn "AnKLuMe: Invalid slot '$SLOT' (expected A or B)"
+            return 1
+            ;;
+    esac
+
+    # Find the OS partition using blkid
+    msg "AnKLuMe: Setting up dm-verity for slot $SLOT"
+
+    OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
+    if [ -z "$OS_PARTITION" ]; then
+        warn "AnKLuMe: Could not find partition '$OS_PARTITION_NAME'"
+        return 1
+    fi
+
+    msg "AnKLuMe: Found OS partition at $OS_PARTITION"
+
+    # Activate dm-verity using veritysetup
+    if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
+        --hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
+        warn "AnKLuMe: Failed to activate dm-verity device"
+        return 1
+    fi
+
+    msg "AnKLuMe: dm-verity device activated successfully"
+
+    # Set root device to the verity device mapping
+    export ROOT="/dev/mapper/anklume-root"
+
+    msg "AnKLuMe: Root device set to $ROOT"
+    return 0
+}
