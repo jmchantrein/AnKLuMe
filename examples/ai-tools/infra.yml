@@ -39,6 +39,9 @@ domains:
   ai-tools:
     description: "AI services domain — LLM, chat, coding, STT"
     subnet_id: 4
+    file_portal:
+      allowed_paths: ["/shared/ai-tools", "/tmp/portal"]
+      read_only: false
     profiles:
       nvidia-compute:
         devices:
