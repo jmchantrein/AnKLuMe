@@ -21,12 +21,38 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DISTRO DETECTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Detect host distribution for package manager guidance
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        case "$ID" in
+            arch|cachyos|endeavouros|manjaro) echo "arch" ;;
+            debian|ubuntu|linuxmint)          echo "debian" ;;
+            *)                                echo "unknown" ;;
+        esac
+    else
+        echo "unknown"
+    fi
+}
+
+HOST_DISTRO="$(detect_distro)"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
 
 declare -r SCRIPT_VERSION="1.0.0"
 declare -r ANKLUME_REPO="${ANKLUME_REPO:-$PROJECT_ROOT}"
-declare -r BOOTSTRAP_IMAGE="${BOOTSTRAP_IMAGE:-images:debian/12/amd64}"
+declare -r BOOTSTRAP_IMAGE="${BOOTSTRAP_IMAGE:-$(
+    case "$HOST_DISTRO" in
+        arch)   echo "images:archlinux/current/amd64" ;;
+        *)      echo "images:debian/12/amd64" ;;
+    esac
+)}"
 declare -r POOL_NAME="anklume-data"
 declare -r INCUS_DIR="/var/lib/incus"
 declare -r LUKS_NAME="anklume-crypt"
@@ -309,9 +335,12 @@ setup_luks() {
 setup_zfs_pool() {
     info "Setting up ZFS pool: $POOL_NAME"
 
-    # Verify zfsutils-linux is installed
+    # Verify zfsutils is installed
     if ! command -v zpool &>/dev/null; then
-        die "zfsutils-linux not found. Install it with: apt install zfsutils-linux"
+        case "$HOST_DISTRO" in
+            arch)   die "zfsutils not found. Install from archzfs repo or use BTRFS backend." ;;
+            *)      die "zfsutils-linux not found. Install it with: apt install zfsutils-linux" ;;
+        esac
     fi
 
     local pool_device="$DISK"
@@ -353,7 +382,10 @@ setup_btrfs_pool() {
 
     # Verify btrfs-progs is installed
     if ! command -v mkfs.btrfs &>/dev/null; then
-        die "btrfs-progs not found. Install it with: apt install btrfs-progs"
+        case "$HOST_DISTRO" in
+            arch)   die "btrfs-progs not found. Install it with: pacman -S btrfs-progs" ;;
+            *)      die "btrfs-progs not found. Install it with: apt install btrfs-progs" ;;
+        esac
     fi
 
     local pool_device="$DISK"

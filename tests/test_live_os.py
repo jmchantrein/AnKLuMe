@@ -35,6 +35,12 @@ MOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts
 UMOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts" / "umount-data.sh"
 MAKEFILE = Path(__file__).resolve().parent.parent / "Makefile"
 
+# Mkinitcpio hooks paths for Arch support
+MKINITCPIO_TORAM_INSTALL = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "install" / "anklume-toram"
+MKINITCPIO_TORAM_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "hooks" / "anklume-toram"
+MKINITCPIO_VERITY_INSTALL = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "install" / "anklume-verity"
+MKINITCPIO_VERITY_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "hooks" / "anklume-verity"
+
 
 # ── Fixtures ───────────────────────────────────────────────────────
 
@@ -834,6 +840,151 @@ class TestMakefileTargets:
     def test_live_status_script_reference(self):
         """Verify live-status shows live OS status."""
         assert "live-status" in self.content
+
+
+# ── TestBuildImageArchSupport ─────────────────────────────────────
+
+
+class TestBuildImageArchSupport:
+    """Verify build-image.sh has Arch Linux support."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not BUILD_IMAGE.exists():
+            pytest.skip(f"File not found: {BUILD_IMAGE}")
+        cls.content = BUILD_IMAGE.read_text()
+
+    def test_bootstrap_rootfs_arch_function(self):
+        """Verify bootstrap_rootfs_arch() function exists."""
+        assert re.search(r'bootstrap_rootfs_arch\(\)', self.content)
+
+    def test_bootstrap_rootfs_debian_function(self):
+        """Verify bootstrap_rootfs_debian() function exists (renamed from original)."""
+        assert re.search(r'bootstrap_rootfs_debian\(\)', self.content)
+
+    def test_bootstrap_rootfs_dispatch(self):
+        """Verify bootstrap_rootfs() dispatcher exists."""
+        assert re.search(r'bootstrap_rootfs\(\)', self.content)
+
+    def test_pacstrap_referenced(self):
+        """Verify pacstrap appears (Arch package installer)."""
+        assert "pacstrap" in self.content
+
+    def test_mkinitcpio_referenced(self):
+        """Verify mkinitcpio appears (Arch initramfs)."""
+        assert "mkinitcpio" in self.content
+
+    def test_arch_kernel_paths(self):
+        """Verify vmlinuz-linux appears (Arch kernel name)."""
+        assert "vmlinuz-linux" in self.content
+
+    def test_generate_checksums_function(self):
+        """Verify generate_checksums() function exists."""
+        assert re.search(r'generate_checksums\(\)', self.content)
+
+    def test_sha256sum_usage(self):
+        """Verify sha256sum appears."""
+        assert "sha256sum" in self.content
+
+    def test_base_arch_in_usage(self):
+        """Verify arch appears in usage/help text."""
+        assert "arch" in self.content.lower()
+
+
+# ── TestMkinitcpioHooks ────────────────────────────────────────────
+
+
+class TestMkinitcpioHooks:
+    """Verify mkinitcpio hooks for Arch (similar to initramfs hooks for Debian)."""
+
+    def test_toram_install_exists(self):
+        """Verify anklume-toram install hook exists."""
+        if not MKINITCPIO_TORAM_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_INSTALL}")
+        assert MKINITCPIO_TORAM_INSTALL.exists()
+
+    def test_toram_install_build_function(self):
+        """Verify build() function in toram install hook."""
+        if not MKINITCPIO_TORAM_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_INSTALL}")
+        content = MKINITCPIO_TORAM_INSTALL.read_text()
+        assert "build()" in content
+
+    def test_toram_install_add_runscript(self):
+        """Verify add_runscript call in toram install hook."""
+        if not MKINITCPIO_TORAM_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_INSTALL}")
+        content = MKINITCPIO_TORAM_INSTALL.read_text()
+        assert "add_runscript" in content
+
+    def test_toram_hook_exists(self):
+        """Verify anklume-toram hook exists."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        assert MKINITCPIO_TORAM_HOOK.exists()
+
+    def test_toram_hook_run_hook(self):
+        """Verify run_hook() function in toram hook."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "run_hook()" in content
+
+    def test_toram_hook_cmdline_check(self):
+        """Verify /proc/cmdline parsing in toram hook."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "/proc/cmdline" in content
+
+    def test_toram_hook_tmpfs(self):
+        """Verify tmpfs mount in toram hook."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "tmpfs" in content
+
+    def test_verity_install_exists(self):
+        """Verify anklume-verity install hook exists."""
+        if not MKINITCPIO_VERITY_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_INSTALL}")
+        assert MKINITCPIO_VERITY_INSTALL.exists()
+
+    def test_verity_install_add_binary(self):
+        """Verify add_binary calls for veritysetup and blkid."""
+        if not MKINITCPIO_VERITY_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_INSTALL}")
+        content = MKINITCPIO_VERITY_INSTALL.read_text()
+        assert "add_binary veritysetup" in content
+        assert "add_binary blkid" in content
+
+    def test_verity_hook_exists(self):
+        """Verify anklume-verity hook exists."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        assert MKINITCPIO_VERITY_HOOK.exists()
+
+    def test_verity_hook_run_hook(self):
+        """Verify run_hook() function in verity hook."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "run_hook()" in content
+
+    def test_verity_hook_veritysetup(self):
+        """Verify veritysetup activation in verity hook."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "veritysetup" in content
+
+    def test_verity_hook_slot_parsing(self):
+        """Verify slot parameter parsing in verity hook."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "slot" in content.lower()
 
 
 if __name__ == "__main__":

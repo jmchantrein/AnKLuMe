@@ -2350,6 +2350,7 @@ e) **Documentation**:
 
 ### Validation criteria
 
+- [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
 - [ ] Bootable image created for at least one base distro
 - [ ] Encrypted pool setup works (both ZFS and BTRFS)
 - [ ] toram mode functional (OS runs from RAM)

@@ -68,15 +68,16 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --output FILE     Output image file (default: anklume-live.img)"
-    echo "  --base DISTRO     Base distribution (default: debian)"
+    echo "  --base DISTRO     Base distribution (default: debian, arch)"
     echo "  --arch ARCH       Architecture (default: amd64)"
     echo "  --size SIZE_GB    Total image size in GB (default: 4)"
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
     echo "  --help            Show this help"
     echo ""
-    echo "Example:"
+    echo "Examples:"
     echo "  $(basename "$0") --output my-image.img --size 6 --arch amd64"
+    echo "  $(basename "$0") --base arch --output anklume-arch.img"
     exit 0
 }
 
@@ -94,11 +95,27 @@ check_dependencies() {
     info "Checking dependencies..."
 
     local missing=()
-    local cmds=(
-        "debootstrap" "mksquashfs" "veritysetup" "sgdisk"
+    local cmds_common=(
+        "mksquashfs" "veritysetup" "sgdisk"
         "mkfs.fat" "mkfs.ext4" "losetup" "mount" "umount"
         "bootctl" "curl" "jq" "dd"
     )
+    local cmds_distro=()
+
+    case "$BASE" in
+        debian|stable)
+            cmds_distro=("debootstrap")
+            ;;
+        arch)
+            cmds_distro=("pacstrap" "pacman")
+            ;;
+        *)
+            err "Unsupported base: $BASE"
+            exit 1
+            ;;
+    esac
+
+    local cmds=("${cmds_common[@]}" "${cmds_distro[@]}")
 
     for cmd in "${cmds[@]}"; do
         if ! command -v "$cmd" &>/dev/null; then
@@ -143,12 +160,14 @@ create_disk_image() {
     info "Re-attached with partscan: $LOOP_DEVICE"
 
     # Wait for partition devices to appear
-    sleep 1
+    sleep 2
+    blockdev --rereadpt "$LOOP_DEVICE" 2>/dev/null || true
     partprobe "$LOOP_DEVICE" 2>/dev/null || true
+    udevadm settle 2>/dev/null || true
     for i in 1 2 3 4; do
         local retries=0
-        while [ ! -e "${LOOP_DEVICE}p${i}" ] && [ $retries -lt 10 ]; do
-            sleep 0.5
+        while [ ! -e "${LOOP_DEVICE}p${i}" ] && [ $retries -lt 15 ]; do
+            sleep 1
             partprobe "$LOOP_DEVICE" 2>/dev/null || true
             retries=$((retries + 1))
         done
@@ -182,8 +201,8 @@ format_partitions() {
     ok "Partitions formatted"
 }
 
-# ── Bootstrap rootfs ──
-bootstrap_rootfs() {
+# ── Bootstrap rootfs (Debian) ──
+bootstrap_rootfs_debian() {
     info "Bootstrapping Debian rootfs..."
 
     ROOTFS_DIR="$WORK_DIR/rootfs"
@@ -284,6 +303,125 @@ FSTAB
     ok "Rootfs bootstrap complete"
 }
 
+# ── Bootstrap rootfs (Arch) ──
+bootstrap_rootfs_arch() {
+    info "Bootstrapping Arch rootfs..."
+
+    ROOTFS_DIR="$WORK_DIR/rootfs"
+    mkdir -p "$ROOTFS_DIR"
+
+    # Run pacstrap
+    pacstrap -K "$ROOTFS_DIR" base linux openssh curl jq python nftables cryptsetup btrfs-progs
+
+    info "  Pacstrap complete"
+
+    # Bind-mount pseudo-filesystems for chroot operations
+    mount --bind /proc "$ROOTFS_DIR/proc"
+    mount --bind /sys "$ROOTFS_DIR/sys"
+    mount --bind /dev "$ROOTFS_DIR/dev"
+    mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
+    MOUNTED_PATHS+=("$ROOTFS_DIR/dev/pts" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/proc")
+
+    # Configure hostname
+    echo "anklume" > "$ROOTFS_DIR/etc/hostname"
+    info "  Hostname configured"
+
+    # Create fstab for dm-verity
+    cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
+# AnKLuMe Live OS fstab
+/dev/dm-0  /  squashfs  ro,defaults  0  0
+tmpfs      /tmp  tmpfs  mode=1777,nosuid,nodev,noexec  0  0
+tmpfs      /run  tmpfs  mode=0755,nosuid,nodev  0  0
+FSTAB
+    info "  fstab configured"
+
+    # Configure locale
+    sed -i 's/#en_US.UTF-8/en_US.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
+    chroot "$ROOTFS_DIR" locale-gen >/dev/null 2>&1 || true
+    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/locale.conf"
+    info "  Locale configured"
+
+    # Configure timezone
+    ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
+    info "  Timezone configured"
+
+    # Copy AnKLuMe framework files
+    mkdir -p "$ROOTFS_DIR/opt/anklume"
+    if [ -d "$PROJECT_ROOT/scripts" ]; then
+        cp -r "$PROJECT_ROOT/scripts" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+    fi
+    if [ -d "$PROJECT_ROOT/ansible" ]; then
+        cp -r "$PROJECT_ROOT/ansible" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+    fi
+    info "  AnKLuMe framework files copied"
+
+    # Copy mkinitcpio hooks
+    # ZFS not included by default on Arch (requires archzfs repo). Use BTRFS.
+    if [ -d "$PROJECT_ROOT/host/boot/mkinitcpio" ]; then
+        mkdir -p "$ROOTFS_DIR/etc/initcpio/hooks"
+        mkdir -p "$ROOTFS_DIR/etc/initcpio/install"
+        if [ -d "$PROJECT_ROOT/host/boot/mkinitcpio/hooks" ]; then
+            cp "$PROJECT_ROOT/host/boot/mkinitcpio/hooks"/* "$ROOTFS_DIR/etc/initcpio/hooks/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initcpio/hooks"/* 2>/dev/null || true
+        fi
+        if [ -d "$PROJECT_ROOT/host/boot/mkinitcpio/install" ]; then
+            cp "$PROJECT_ROOT/host/boot/mkinitcpio/install"/* "$ROOTFS_DIR/etc/initcpio/install/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initcpio/install"/* 2>/dev/null || true
+        fi
+        info "  mkinitcpio hooks installed"
+    fi
+
+    # Configure mkinitcpio
+    if grep -q "^HOOKS=" "$ROOTFS_DIR/etc/mkinitcpio.conf"; then
+        sed -i 's/^\(HOOKS=([^)]*\)/\1 anklume-verity anklume-toram/' "$ROOTFS_DIR/etc/mkinitcpio.conf"
+    else
+        echo "HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont anklume-verity anklume-toram filesystems fsck)" >> "$ROOTFS_DIR/etc/mkinitcpio.conf"
+    fi
+    info "  mkinitcpio configured"
+
+    # Copy systemd services
+    if [ -d "$PROJECT_ROOT/host/boot/systemd" ]; then
+        mkdir -p "$ROOTFS_DIR/etc/systemd/system"
+        cp "$PROJECT_ROOT/host/boot/systemd"/*.service "$ROOTFS_DIR/etc/systemd/system/" 2>/dev/null || true
+        info "  Systemd services installed"
+    fi
+
+    # Enable AnKLuMe services in chroot
+    chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    info "  AnKLuMe services enabled"
+
+    # Generate initramfs in chroot
+    chroot "$ROOTFS_DIR" mkinitcpio -P >/dev/null 2>&1 || true
+    info "  Initramfs generated"
+
+    # Unmount pseudo-filesystems before creating squashfs
+    umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
+    umount "$ROOTFS_DIR/dev" 2>/dev/null || true
+    umount "$ROOTFS_DIR/sys" 2>/dev/null || true
+    umount "$ROOTFS_DIR/proc" 2>/dev/null || true
+    # Remove them from MOUNTED_PATHS to avoid double-unmount in cleanup
+    MOUNTED_PATHS=()
+
+    ok "Rootfs bootstrap complete"
+}
+
+# ── Dispatch bootstrap_rootfs ──
+bootstrap_rootfs() {
+    case "$BASE" in
+        debian|stable)
+            bootstrap_rootfs_debian
+            ;;
+        arch)
+            bootstrap_rootfs_arch
+            ;;
+        *)
+            err "Unsupported base: $BASE"
+            exit 1
+            ;;
+    esac
+}
+
 # ── Create squashfs ──
 create_squashfs() {
     info "Creating SquashFS image..."
@@ -330,6 +468,31 @@ setup_verity() {
     ok "Verity hash: $VERITY_HASH"
 }
 
+# ── Generate checksums ──
+generate_checksums() {
+    info "Unmounting partitions and detaching loop device before checksum..."
+
+    # Unmount all mounted partitions (reverse order) so the loop device is fully released
+    for ((i=${#MOUNTED_PATHS[@]}-1; i>=0; i--)); do
+        local mp="${MOUNTED_PATHS[$i]}"
+        if mountpoint -q "$mp" 2>/dev/null; then
+            umount -R "$mp" 2>/dev/null || true
+        fi
+    done
+    MOUNTED_PATHS=()
+
+    sync
+
+    if [ -n "$LOOP_DEVICE" ] && losetup -a | grep -q "$LOOP_DEVICE"; then
+        losetup -d "$LOOP_DEVICE"
+        LOOP_DEVICE=""
+    fi
+
+    info "Generating checksums..."
+    sha256sum "$OUTPUT" > "${OUTPUT}.sha256"
+    ok "SHA256: $(cat "${OUTPUT}.sha256")"
+}
+
 # ── Install bootloader ──
 install_bootloader() {
     info "Installing systemd-boot..."
@@ -369,11 +532,20 @@ console-mode auto
 LOADER
     info "  Loader configuration created"
 
-    # Copy kernel and initramfs
+    # Copy kernel and initramfs based on distro
     local vmlinuz
-    vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f | head -1)
     local initrd
-    initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f | head -1)
+
+    case "$BASE" in
+        debian|stable)
+            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f | head -1)
+            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f | head -1)
+            ;;
+        arch)
+            vmlinuz="$ROOTFS_DIR/boot/vmlinuz-linux"
+            initrd="$ROOTFS_DIR/boot/initramfs-linux.img"
+            ;;
+    esac
 
     if [ -f "$vmlinuz" ] && [ -f "$initrd" ]; then
         cp "$vmlinuz" "$efi_mount/vmlinuz"
@@ -451,10 +623,12 @@ print_summary() {
     echo "=== AnKLuMe Live OS Build Complete ==="
     echo "Image file:      $OUTPUT"
     echo "Image size:      $((img_size / 1024 / 1024 / 1024))GB ($img_size bytes)"
+    echo "Base distro:     $BASE"
     echo "Verity hash:     $VERITY_HASH"
     echo "Boot slots:      A (active), B (fallback)"
     echo "Boot timeout:    3 seconds"
     echo "ToRAM enabled:   yes (loads OS into memory)"
+    echo "Checksum:        ${OUTPUT}.sha256"
     echo ""
     echo "Boot entries:"
     echo "  - anklume-a.conf  (default)"
@@ -499,6 +673,7 @@ main() {
     install_bootloader
     setup_persistent
     write_squashfs_to_partition
+    generate_checksums
 
     print_summary
 }
