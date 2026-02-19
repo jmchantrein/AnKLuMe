@@ -26,10 +26,10 @@ TRUST_LABELS = {
     "disposable": "dark magenta",
 }
 
-# Default prefix for the anklume session. Using Ctrl-a (screen-style) avoids
-# conflict with the standard Ctrl-b prefix, so users can run tmux inside
-# containers without prefix collision (nested tmux comfort).
-DEFAULT_PREFIX = "C-a"
+# Default prefix for the anklume session. Standard Ctrl-b is kept as default.
+# When running tmux inside containers (nested tmux), use Ctrl-a on the inner
+# session to avoid prefix collision.
+DEFAULT_PREFIX = "C-b"
 
 
 def infer_trust_level(domain_name, domain_config):
@@ -66,8 +66,25 @@ def build_session_config(infra):
     windows = []
     domains = infra.get("domains", {})
 
-    for domain_name in sorted(domains.keys()):
-        domain_config = domains[domain_name]
+    # Window 0: anklume-instance (the controller) — always present
+    windows.append({
+        "name": "anklume",
+        "subnet_id": 0,
+        "trust": "admin",
+        "color": TRUST_LABELS["admin"],
+        "panes": [{
+            "machine": "anklume-instance",
+            "command": "bash",  # Already inside anklume-instance
+        }],
+    })
+
+    # Remaining windows sorted by subnet_id
+    sorted_domains = sorted(
+        domains.items(),
+        key=lambda item: item[1].get("subnet_id", 0),
+    )
+
+    for domain_name, domain_config in sorted_domains:
         machines = domain_config.get("machines", {})
 
         if not machines:
@@ -79,6 +96,7 @@ def build_session_config(infra):
             trust_level = infer_trust_level(domain_name, domain_config)
 
         color_label = TRUST_LABELS.get(trust_level, "unknown")
+        subnet_id = domain_config.get("subnet_id", 0)
 
         panes = []
         for machine_name in sorted(machines.keys()):
@@ -89,6 +107,7 @@ def build_session_config(infra):
 
         windows.append({
             "name": domain_name,
+            "subnet_id": subnet_id,
             "trust": trust_level,
             "color": color_label,
             "panes": panes,
@@ -101,7 +120,8 @@ def print_dry_run(config, session_name="anklume", prefix=DEFAULT_PREFIX):
     """Print dry-run summary of the session configuration."""
     print(f"Session: {session_name} (prefix: {prefix})")
     for idx, window in enumerate(config):
-        print(f"  Window [{idx}] {window['name']} (trust: {window['trust']}, color: {window['color']})")
+        sid = window.get("subnet_id", "?")
+        print(f"  Window [{idx}] {window['name']} (subnet: {sid}, trust: {window['trust']}, color: {window['color']})")
         for pane in window["panes"]:
             print(f"    Pane: {pane['machine']} → {pane['command']}")
 
@@ -113,7 +133,7 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
         config: list of window dicts from build_session_config()
         session_name: tmux session name
         attach: whether to attach after creation
-        prefix: tmux prefix key for this session (default: Ctrl-a)
+        prefix: tmux prefix key for this session (default: Ctrl-b)
     """
     import libtmux
 
@@ -129,14 +149,16 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
     # Create new session
     session = server.new_session(session_name=session_name, attach=False)
 
-    # Set prefix key to avoid conflict with tmux inside containers.
-    # Default Ctrl-a (screen-style) leaves Ctrl-b free for inner tmux.
+    # Set prefix key for this session
     session.cmd("set-option", "prefix", prefix)
     session.cmd("set-option", "prefix2", "None")
 
     # Enable pane border labels (server-side, containers cannot spoof)
     session.cmd("set-option", "pane-border-status", "top")
     session.cmd("set-option", "pane-border-format", " #{pane_title} ")
+
+    # Status bar base style
+    session.cmd("set-option", "status-style", "bg=black,fg=white")
 
     for window_idx, window_config in enumerate(config):
         if window_idx == 0:
@@ -148,6 +170,10 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
 
         panes = window_config["panes"]
         color_code = TRUST_COLORS.get(window_config["trust"], "default")
+
+        # Color the window tab in the status bar (server-side, cannot be spoofed)
+        window.cmd("set-window-option", "window-status-style", f"bg={color_code},fg=white")
+        window.cmd("set-window-option", "window-status-current-style", f"bg={color_code},fg=white,bold")
 
         for pane_idx, pane_config in enumerate(panes):
             # Use existing first pane or split to create additional panes
@@ -204,8 +230,8 @@ def main(argv=None):
     parser.add_argument(
         "--prefix",
         default=DEFAULT_PREFIX,
-        help="Tmux prefix key for the session (default: C-a). "
-        "Uses Ctrl-a to avoid conflict with Ctrl-b inside containers.",
+        help="Tmux prefix key for the session (default: C-b). "
+        "Use C-a for nested tmux inside containers.",
     )
     parser.add_argument("--kill", action="store_true", help="Kill existing session before creating new one")
 

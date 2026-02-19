@@ -31,14 +31,12 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     exit 1
 fi
 
-# Check for uncommitted changes
+# Check for uncommitted changes — auto-stash if needed
+STASHED=false
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "WARNING: Uncommitted changes detected."
-    read -rp "Continue anyway? [y/N] " confirm
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo "Aborted. Commit or stash changes first."
-        exit 0
-    fi
+    echo "Uncommitted changes detected — stashing automatically."
+    git stash push -m "anklume-upgrade-$(date +%Y%m%d-%H%M%S)"
+    STASHED=true
 fi
 
 # Detect locally modified framework files
@@ -68,6 +66,9 @@ if git remote | grep -q origin; then
     git merge "origin/$CURRENT_BRANCH" --no-edit || {
         echo "ERROR: Merge conflict detected. Resolve manually."
         echo "Backups of modified files have been created (.bak)."
+        if $STASHED; then
+            echo "Your stashed changes can be restored with: git stash pop"
+        fi
         exit 1
     }
 else
@@ -86,6 +87,16 @@ if [ -f "$INFRA_SRC" ] || [ -d "$INFRA_SRC" ]; then
     echo "Managed sections regenerated."
 else
     echo "WARNING: No infra.yml or infra/ found. Skipping regeneration."
+fi
+
+# Restore stashed changes
+if $STASHED; then
+    echo "--- Restoring stashed changes ---"
+    if git stash pop; then
+        echo "Local changes restored."
+    else
+        echo "WARNING: Stash pop had conflicts. Resolve with: git stash show -p | git apply"
+    fi
 fi
 
 echo ""
