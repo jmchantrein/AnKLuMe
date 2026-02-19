@@ -330,6 +330,19 @@ ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
 ollama-dev: ## Interactive local LLM dev assistant (no API credits needed)
 	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
 
+# ── LLM Backend Management ──────────────────────────────
+switch-llama: ## Switch to llama-server backend (MODEL=<name>, default: qwen2.5-coder:32b)
+	scripts/llm-switch.sh llama $(MODEL)
+
+switch-ollama: ## Switch to Ollama backend (dynamic model loading)
+	scripts/llm-switch.sh ollama
+
+llm-status: ## Show active LLM backend, model, and VRAM usage
+	scripts/llm-switch.sh status
+
+llm-bench: ## Benchmark LLM inference (MODEL=<name|all> COMPARE=1)
+	scripts/llm-bench.sh $(if $(MODEL),--model $(MODEL)) $(if $(COMPARE),--compare)
+
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
 	python3 scripts/mine-experiences.py
@@ -560,4 +573,5 @@ help: ## Show this help
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
         export-app export-list export-remove \
+        switch-llama switch-ollama llm-status llm-bench \
         guide quickstart init install-hooks help
