@@ -14,6 +14,7 @@ ROLES_DIR = Path(__file__).resolve().parent.parent / "roles"
 EXPECTED_ROLES = sorted([
     "admin_bootstrap",
     "base_system",
+    "code_sandbox",
     "dev_agent_runner",
     "dev_test_runner",
     "firewall_router",
@@ -27,6 +28,7 @@ EXPECTED_ROLES = sorted([
     "incus_snapshots",
     "lobechat",
     "ollama_server",
+    "openclaw_server",
     "opencode_server",
     "open_webui",
     "stt_server",
