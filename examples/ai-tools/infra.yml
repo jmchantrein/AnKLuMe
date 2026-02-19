@@ -81,6 +81,8 @@ domains:
         description: "OpenClaw self-hosted AI assistant"
         type: lxc
         ip: "10.100.4.60"
+        config:
+          security.nesting: "true"
         roles: [base_system, openclaw_server]
 
 network_policies:
