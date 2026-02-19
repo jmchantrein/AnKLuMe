@@ -114,45 +114,57 @@ check_dependencies() {
     ok "All dependencies available"
 }
 
-# ── Create disk image ──
+# ── Create disk image and setup loop device ──
 create_disk_image() {
     info "Creating disk image: $OUTPUT (${IMAGE_SIZE_GB}GB)..."
 
-    # Create sparse image
-    dd if=/dev/zero of="$OUTPUT" bs=1M count=$((IMAGE_SIZE_GB * 1024)) status=progress 2>&1 | tail -1
+    # Create image file (truncate for sparse)
+    truncate -s "${IMAGE_SIZE_GB}G" "$OUTPUT"
+    ok "Image file created (sparse ${IMAGE_SIZE_GB}GB)"
 
-    # Create GPT partition table
-    sgdisk --clear "$OUTPUT"
+    # Attach as loop device BEFORE partitioning — sgdisk needs a block device
+    LOOP_DEVICE=$(losetup --find --show "$OUTPUT")
+    info "Attached loop device: $LOOP_DEVICE"
 
-    # Create partitions
+    # Create GPT partition table and partitions on the block device
+    sgdisk --clear "$LOOP_DEVICE"
     sgdisk \
-        --new=1:2048:+512M --typecode=1:EF00 --change-name=1:"ANKLUME-EFI" \
-        --new=2:0:+1536M --typecode=2:8300 --change-name=2:"ANKLUME-OS-A" \
-        --new=3:0:+1536M --typecode=3:8300 --change-name=3:"ANKLUME-OS-B" \
-        --new=4:0:0 --typecode=4:8300 --change-name=4:"ANKLUME-PERSISTENT" \
-        "$OUTPUT" >/dev/null 2>&1
+        --new=1:2048:+${EFI_SIZE_MB}M   --typecode=1:EF00 --change-name=1:"$ANKLUME_EFI_LABEL" \
+        --new=2:0:+${OS_SIZE_MB}M       --typecode=2:8300 --change-name=2:"$ANKLUME_OSA_LABEL" \
+        --new=3:0:+${OS_SIZE_MB}M       --typecode=3:8300 --change-name=3:"$ANKLUME_OSB_LABEL" \
+        --new=4:0:0                      --typecode=4:8300 --change-name=4:"$ANKLUME_PERSIST_LABEL" \
+        "$LOOP_DEVICE"
 
-    ok "Disk image created with 4 partitions"
-}
+    ok "GPT partition table created"
 
-# ── Setup loop device ──
-setup_loop_device() {
-    info "Setting up loop device..."
-
+    # Detach and re-attach with --partscan so the kernel discovers partitions
+    losetup -d "$LOOP_DEVICE"
     LOOP_DEVICE=$(losetup --find --show --partscan "$OUTPUT")
-    info "Using loop device: $LOOP_DEVICE"
+    info "Re-attached with partscan: $LOOP_DEVICE"
 
-    # Wait for partitions to be available
+    # Wait for partition devices to appear
     sleep 1
+    partprobe "$LOOP_DEVICE" 2>/dev/null || true
     for i in 1 2 3 4; do
         local retries=0
         while [ ! -e "${LOOP_DEVICE}p${i}" ] && [ $retries -lt 10 ]; do
             sleep 0.5
+            partprobe "$LOOP_DEVICE" 2>/dev/null || true
             retries=$((retries + 1))
         done
+        if [ ! -e "${LOOP_DEVICE}p${i}" ]; then
+            err "Partition ${LOOP_DEVICE}p${i} did not appear"
+            exit 1
+        fi
     done
 
-    ok "Loop device configured"
+    ok "Loop device configured with 4 partitions"
+}
+
+# setup_loop_device merged into create_disk_image
+setup_loop_device() {
+    # Loop device already configured by create_disk_image
+    ok "Loop device already set up"
 }
 
 # ── Format partitions ──
@@ -177,20 +189,35 @@ bootstrap_rootfs() {
     ROOTFS_DIR="$WORK_DIR/rootfs"
     mkdir -p "$ROOTFS_DIR"
 
+    # Resolve suite codename from BASE
+    local suite="$BASE"
+    case "$BASE" in
+        debian)  suite="trixie" ;;
+        stable)  suite="bookworm" ;;
+    esac
+
     # Run debootstrap
     local debootstrap_opts="--arch=$ARCH"
     debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,openssh-server,curl,jq,python3"
 
     if [ -n "$MIRROR" ]; then
-        debootstrap_opts="$debootstrap_opts --mirror=$MIRROR"
+        debootstrap $debootstrap_opts "$suite" "$ROOTFS_DIR" "$MIRROR"
+    else
+        debootstrap $debootstrap_opts "$suite" "$ROOTFS_DIR"
     fi
-
-    debootstrap $debootstrap_opts "$BASE" "$ROOTFS_DIR" >/dev/null 2>&1
     info "  Debootstrap complete"
 
+    # Bind-mount pseudo-filesystems for chroot operations
+    mount --bind /proc "$ROOTFS_DIR/proc"
+    mount --bind /sys "$ROOTFS_DIR/sys"
+    mount --bind /dev "$ROOTFS_DIR/dev"
+    mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
+    MOUNTED_PATHS+=("$ROOTFS_DIR/dev/pts" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/proc")
+
     # Install additional packages via chroot
-    local packages="incus nftables zfsutils-linux cryptsetup btrfs-progs firmware-linux debootstrap squashfs-tools veritysetup"
-    chroot "$ROOTFS_DIR" apt-get install -y -qq $packages >/dev/null 2>&1 || true
+    local packages="nftables cryptsetup btrfs-progs squashfs-tools"
+    chroot "$ROOTFS_DIR" apt-get update -qq
+    chroot "$ROOTFS_DIR" apt-get install -y -qq $packages 2>&1 | tail -5
     info "  Additional packages installed"
 
     # Configure system
@@ -246,6 +273,14 @@ FSTAB
     chroot "$ROOTFS_DIR" update-initramfs -c -k all >/dev/null 2>&1 || true
     info "  Initramfs generated"
 
+    # Unmount pseudo-filesystems before creating squashfs
+    umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
+    umount "$ROOTFS_DIR/dev" 2>/dev/null || true
+    umount "$ROOTFS_DIR/sys" 2>/dev/null || true
+    umount "$ROOTFS_DIR/proc" 2>/dev/null || true
+    # Remove them from MOUNTED_PATHS to avoid double-unmount in cleanup
+    MOUNTED_PATHS=()
+
     ok "Rootfs bootstrap complete"
 }
 
@@ -255,10 +290,12 @@ create_squashfs() {
 
     local squashfs_file="$WORK_DIR/rootfs.squashfs"
 
-    # Create squashfs with compression
+    # Create squashfs with zstd compression (fast, good ratio)
+    # Exclude pseudo-filesystem mount points just in case
     mksquashfs "$ROOTFS_DIR" "$squashfs_file" \
-        -comp xz -Xbcj x86 -b 1M \
-        -progress >/dev/null 2>&1
+        -comp zstd -Xcompression-level 15 -b 256K \
+        -no-exports -no-xattrs \
+        -e proc sys dev run tmp
 
     local size
     size=$(du -h "$squashfs_file" | cut -f1)
