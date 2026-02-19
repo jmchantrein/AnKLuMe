@@ -83,6 +83,17 @@ export-remove: ## Remove exported app (I=<instance> APP=<app>)
 	@test -n "$(APP)" || { echo "ERROR: APP required."; exit 1; }
 	scripts/export-app.sh remove $(I) $(APP)
 
+# ── Live OS (Phase 31) ───────────────────────────────────
+build-image: ## Build bootable AnKLuMe live OS image (OUT=output.img)
+	scripts/build-image.sh $(if $(OUT),--output $(OUT)) $(if $(BASE),--base $(BASE)) $(if $(ARCH),--arch $(ARCH))
+
+live-update: ## Download and apply A/B update (URL=<image-url>)
+	@test -n "$(URL)" || { echo "ERROR: URL required. Usage: make live-update URL=<image-url>"; exit 1; }
+	scripts/live-update.sh --url $(URL)
+
+live-status: ## Show live OS status (active slot, boot count, data pool)
+	@scripts/live-os-lib.sh status
+
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
 
@@ -489,6 +500,7 @@ help: ## Show this help
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
+        build-image live-update live-status \
         flush upgrade import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
