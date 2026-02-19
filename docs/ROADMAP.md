@@ -1614,11 +1614,11 @@ c) **Host-side wrapper**:
    - These wrappers live in `host/bin/` and can be added to PATH
 
 **Validation criteria**:
-- [ ] Bootstrap detects GPU and recommends appropriate models
-- [ ] Models downloaded automatically (with user confirmation)
-- [ ] `anklume code .` launches Claude Code in sandboxed container
+- [x] Bootstrap detects GPU and recommends appropriate models
+- [x] Models downloaded automatically (with user confirmation)
+- [x] `anklume code .` launches Claude Code in sandboxed container
 - [ ] AI coder container can reach Ollama but not other domains
-- [ ] Works without GPU (API-only mode, no model download)
+- [x] Works without GPU (API-only mode, no model download)
 
 ---
 

@@ -1,0 +1,20 @@
+---
+# Default variables for code_sandbox
+# Override in group_vars or host_vars as needed.
+
+# Enable/disable individual AI coding tools
+code_sandbox_claude_code: true
+code_sandbox_aider: true
+code_sandbox_gemini_cli: false
+
+# Node.js version for CLI tools
+code_sandbox_node_version: "22"
+
+# Ollama API URL (default: ai-ollama on the same ai-tools bridge)
+code_sandbox_ollama_url: "http://10.100.4.10:11434"
+
+# SSH agent socket path (for forwarded agent)
+code_sandbox_ssh_agent_socket: "/tmp/ssh-agent.socket"
+
+# Root projects directory
+code_sandbox_projects_path: "/root/projects"
