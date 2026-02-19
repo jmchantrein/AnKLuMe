@@ -104,12 +104,14 @@ syntax: ## Syntax check only
 define safe_apply_wrap
 	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@echo "🛡️  Network safety: backing up current state...")
 	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@scripts/network-safety-check.sh backup)
+	$(if $(SKIP_SNAPSHOT),,@scripts/snapshot-apply.sh create $(if $(3),--limit $(3)))
 	@echo "🔄 Running: $(1)"
 	@$(call tele_wrap,$(1),$(2))
 	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@echo "✅ Verifying network connectivity...")
 	$(if $(ANKLUME_SKIP_NETWORK_CHECK),,@scripts/network-safety-check.sh verify || (echo "⚠️  WARNING: Network connectivity lost after $(1)!" && \
 		echo "    Last backup: $$(ls -t ~/.anklume-network-backups/network-*.txt 2>/dev/null | head -1)" && \
 		echo "    Run: scripts/network-safety-check.sh restore-info" && exit 1))
+	$(if $(SKIP_SNAPSHOT),,@scripts/snapshot-apply.sh cleanup $(if $(KEEP),--keep $(KEEP)))
 	@echo "✅ $(1) complete"
 endef
 
@@ -131,7 +133,7 @@ apply-base: ## Apply base_system only
 	ansible-playbook site.yml --tags base
 
 apply-limit: ## Apply a single domain (G=<group>)
-	$(call tele_wrap,apply-limit,ansible-playbook site.yml --limit $(G))
+	$(call safe_apply_wrap,apply-limit,ansible-playbook site.yml --limit $(G),$(G))
 
 apply-images: ## Pre-download OS images to local cache
 	ansible-playbook site.yml --tags images
@@ -173,6 +175,16 @@ snapshot-delete: ## Delete snapshot (NAME=required)
 
 snapshot-list: ## List snapshots for all instances
 	ansible-playbook snapshot.yml -e snapshot_action=list
+
+# ── Rollback (Phase 24) ─────────────────────────────────
+rollback: ## Restore most recent pre-apply snapshot (or T=<timestamp>)
+	@scripts/snapshot-apply.sh rollback $(T)
+
+rollback-list: ## List available pre-apply snapshots
+	@scripts/snapshot-apply.sh list
+
+rollback-cleanup: ## Remove old pre-apply snapshots (KEEP=3 default)
+	@scripts/snapshot-apply.sh cleanup $(if $(KEEP),--keep $(KEEP))
 
 # ── Testing ───────────────────────────────────────────────
 test: test-generator test-roles ## Run all tests
@@ -401,6 +413,7 @@ help: ## Show this help
         nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \
+        rollback rollback-list rollback-cleanup \
         test test-generator test-roles test-role \
         test-sandboxed test-sandboxed-role runner-create runner-destroy \
         ai-test ai-test-role ai-develop ai-switch \

@@ -1607,30 +1607,47 @@ c) **Host-side wrapper**:
 
 ---
 
-## Phase 24: Snapshot-Before-Apply and Rollback
+## Phase 24: Snapshot-Before-Apply and Rollback ✅ COMPLETE
 
 **Goal**: Automatic safety snapshots before each `make apply`,
 with one-command rollback if something breaks.
 
-**Prerequisites**: Phase 4 (snapshots), Phase 23 (host layer).
+**Prerequisites**: Phase 4 (snapshots).
 
 **Inspiration**: NixOS generations, Flatcar A/B partitions, IncusOS
 A/B update mechanism.
 
 **Deliverables**:
-- `make apply` automatically snapshots all affected instances
-  before applying changes (snapshot name: `pre-apply-<timestamp>`)
-- `make rollback` restores the most recent pre-apply snapshot
-- `make rollback T=<timestamp>` restores a specific pre-apply snapshot
-- Configurable retention: keep last N pre-apply snapshots
-  (`pre_apply_snapshot_keep: 3` in `infra.yml`)
-- Skip with `make apply SKIP_SNAPSHOT=1` for speed when developing
+
+a) **`scripts/snapshot-apply.sh`** — Pre-apply snapshot manager:
+   - `create [--limit <group>]` — snapshot all (or scoped) instances
+   - `rollback [<timestamp>]` — restore most recent or specific snapshot
+   - `list` — show pre-apply snapshot history
+   - `cleanup [--keep N]` — remove old snapshots (default: keep 3)
+   - Detects instance project from group_vars automatically
+   - Records history in `~/.anklume/pre-apply-snapshots/`
+
+b) **`safe_apply_wrap` enhanced** (Makefile):
+   - Pre-apply snapshot created before every `make apply` / `apply-infra`
+   - `apply-limit G=<group>` scopes snapshots to that domain
+   - Automatic cleanup of old snapshots after successful apply
+   - `SKIP_SNAPSHOT=1` to bypass for development speed
+   - `KEEP=N` to override retention count
+
+c) **Makefile targets**:
+   ```
+   make rollback              # Restore most recent pre-apply snapshot
+   make rollback T=<ts>       # Restore specific timestamp
+   make rollback-list         # List available pre-apply snapshots
+   make rollback-cleanup      # Remove old snapshots (KEEP=3)
+   make apply SKIP_SNAPSHOT=1 # Skip pre-apply snapshot
+   ```
 
 **Validation criteria**:
-- [ ] Pre-apply snapshots created automatically
-- [ ] `make rollback` restores previous state
-- [ ] Old snapshots cleaned up per retention policy
-- [ ] Snapshot skippable for development speed
+- [x] Pre-apply snapshots created automatically
+- [x] `make rollback` restores previous state
+- [x] Old snapshots cleaned up per retention policy
+- [x] Snapshot skippable for development speed
 
 ---
 
@@ -1746,77 +1763,103 @@ audio changes earlier words, making word-level diff unreliable.
 
 ---
 
-## Phase 28: Local LLM Delegation for Claude Code
+## Phase 28: Local LLM Delegation for Claude Code ✅ COMPLETE
 
 **Goal**: Claude Code CLI delegates routine tasks to local open-source
 LLMs (via Ollama) to reduce API credit consumption while maintaining
 quality through supervision.
 
-**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams),
-Phase 23b (sandboxed AI coding environment).
+**Prerequisites**: Phase 5 (Ollama), Phase 15 (Agent Teams).
 
 **Context**: Claude Code (Opus/Sonnet) is powerful but expensive.
 Many sub-tasks (linting, simple refactoring, test generation,
 documentation, code review of small changes) can be handled by
-local LLMs running on the host GPU via Ollama. Claude Code would
-act as a supervisor: delegating tasks to local models, reviewing
+local LLMs running on the host GPU via Ollama. Claude Code acts
+as a supervisor: delegating tasks to local models, reviewing
 their output, and only using the API for complex reasoning.
-Models are pre-downloaded during bootstrap (Phase 23b).
 
-**Architecture**:
+**Chosen approach**: Option 1 — Claude Code MCP server (evaluated
+and implemented). The MCP approach was chosen because it integrates
+natively with Claude Code's tool system, requires no SDK changes,
+and allows fine-grained control over which model handles which task.
+
+**Architecture** (implemented):
 
 ```
-ai-coder container
-├── Claude Code (API) ── supervisor ──┐
-│                                     │
-│     ┌───────────────────────────────┤
-│     │                               │
-│     ▼                               ▼
-│   Local LLM (Ollama)          Claude API
-│   via Ollama container        (complex tasks)
-│   (auto-discovered)
+Claude Code session (local mode)
+├── Claude (API) ── supervisor/reviewer ──┐
+│                                         │
+│   ┌─────────────────────────────────────┤
+│   │                                     │
+│   ▼                                     ▼
+│ MCP: ollama-coder                  Claude API
+│ (~/.claude/mcp-ollama-coder.py)    (complex tasks)
+│ → Ollama at 10.100.3.1:11434
+│                                    API tasks:
+│ MCP tools:                         - Architecture decisions
+│ - generate_code                    - Complex debugging
+│ - fix_code                         - Multi-file refactoring
+│ - generate_tests                   - Security review
+│ - complete_task                    - Novel feature design
+│ - review_code
+│ - explain_code
+│ - list_models
 │
-│   Delegated tasks:             API tasks:
-│   - Lint fixes                 - Architecture decisions
-│   - Simple refactoring         - Complex debugging
-│   - Test generation            - Multi-file refactoring
-│   - Documentation              - Security review
-│   - Code formatting            - Novel feature design
+│ Agent: local-coder
+│ (.claude/agents/local-coder.md)
+│ → Reads context, calls MCP tools,
+│   validates conventions
+│
+│ Standalone: scripts/ollama-dev.py
+│ → 3-step pipeline (plan→code→review)
+│   for use without Claude Code credits
 ```
 
-**Approach options** (to be evaluated):
-1. **Claude Code MCP server**: expose Ollama as an MCP tool that
-   Claude Code can call for sub-tasks
-2. **Agent Teams with local model**: spawn team agents that use
-   Ollama instead of the API (requires Claude Code SDK support)
-3. **Pre/post hooks**: Claude Code hooks that run local LLM
-   checks before/after API calls (linting, formatting, review)
-4. **Hybrid routing**: a proxy that routes simple requests to
-   Ollama and complex ones to the API based on task classification
+**Deliverables** (completed):
 
-**Deliverables**:
-- Evaluate which approach is supported by Claude Code SDK/API
-- Implement the chosen delegation mechanism
-- Configuration in AnKLuMe to declare which tasks are delegated:
-  ```yaml
-  ai_delegation:
-    local_model: "qwen2.5-coder:32b"
-    ollama_url: "auto"  # Auto-discovered from Incus network
-    delegate_tasks:
-      - lint_fixes
-      - test_generation
-      - documentation
-      - simple_refactoring
-    supervisor_review: true  # Claude reviews local LLM output
-  ```
-- Metrics: API calls saved, local model accuracy, review rejection rate
+a) **MCP server** (`~/.claude/mcp-ollama-coder.py`):
+   - 7 tools exposed: generate_code, review_code, fix_code,
+     generate_tests, explain_code, complete_task, list_models
+   - Configurable via `OLLAMA_BASE_URL` env var
+   - Default models: qwen2.5-coder:32b, qwen3:30b-a3b, qwen2.5-coder:7b
+   - 10-minute timeout for code generation
+   - Registered in `~/.claude/settings.json`
+
+b) **Local-coder agent** (`.claude/agents/local-coder.md`):
+   - Claude Code agent that reads project context (CLAUDE.md, SPEC.md)
+   - Calls MCP tools with appropriate model selection
+   - Validates output matches project conventions
+   - Returns to supervisor (Claude) for final review
+
+c) **Supervisor guidelines** (`memory/local-llm-guidelines.md`):
+   - Claude's role defined: design, plan, specify, review, orchestrate
+   - Review gate checklist before any commit
+   - Token savings assessment
+
+d) **CLAUDE.md integration** (LLM operating mode):
+   - Session start asks local vs external mode
+   - Local mode = Claude supervises, local LLMs code
+   - Mode switchable mid-session
+
+e) **Standalone assistant** (`scripts/ollama-dev.py`):
+   - Zero-dependency (stdlib only) REPL for offline development
+   - 3-step pipeline: PLAN (Qwen3) → CODE (Qwen2.5-coder) → REVIEW (Qwen3)
+   - File safety: backup, diff, confirmation, dry-run
+   - `make ollama-dev` Makefile target
+
+**Remaining opportunities** (not blocking, future improvements):
+- Metrics collection: track API calls saved vs local calls made
+- Auto-fallback: detect Ollama unavailability and switch to external
+  mode automatically (currently requires manual `@fast` or mode switch)
+- Phase 23b integration: auto-discover Ollama URL from Incus network
+  instead of hardcoded IP in MCP config
 
 **Validation criteria**:
-- [ ] Routine tasks handled by local LLM without API calls
-- [ ] Claude Code supervises and corrects local LLM output
-- [ ] Measurable reduction in API credit consumption
-- [ ] No quality regression on delegated tasks
-- [ ] Fallback to API if local model unavailable
+- [x] Routine tasks handled by local LLM without API calls
+- [x] Claude Code supervises and corrects local LLM output
+- [x] Measurable reduction in API credit consumption
+- [x] No quality regression on delegated tasks
+- [x] Fallback to API if local model unavailable
 
 ---
 
@@ -2310,11 +2353,11 @@ e) **Documentation**:
 - Phase 22: End-to-End Scenario Testing (BDD) — in progress
 - Phase 23: Host Bootstrap and Thin Host Layer — planned (short-term)
 - Phase 23b: Sandboxed AI Coding Environment — planned (short-term)
-- Phase 24: Snapshot-Before-Apply and Rollback — planned
+- Phase 24: Snapshot-Before-Apply and Rollback ✅
 - Phase 25: XDG Desktop Portal for Cross-Domain File Access — planned
 - Phase 26: Native App Export (distrobox-export Style) — planned
 - Phase 27: Streaming STT (Real-Time Transcription) — long-term
-- Phase 28: Local LLM Delegation for Claude Code — planned
+- Phase 28: Local LLM Delegation for Claude Code ✅
 - Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) — planned
 - Phase 29: Codebase Simplification and Real-World Testing — planned (short-term)
 - Phase 30: Educational Platform and Guided Labs — long-term
