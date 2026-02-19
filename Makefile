@@ -69,6 +69,20 @@ desktop-config: ## Generate desktop environment config from infra.yml
 dashboard: ## Launch web dashboard (PORT=8888)
 	python3 scripts/dashboard.py --port $(or $(PORT),8888) $(if $(HOST),--host $(HOST))
 
+# ── App Export (Phase 26) ────────────────────────────────
+export-app: ## Export container app to host desktop (I=<instance> APP=<app>)
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make export-app I=<instance> APP=<app>"; exit 1; }
+	@test -n "$(APP)" || { echo "ERROR: APP required."; exit 1; }
+	scripts/export-app.sh export $(I) $(APP) $(if $(PROJECT),--project $(PROJECT))
+
+export-list: ## List exported container apps [I=<instance>]
+	scripts/export-app.sh list $(if $(I),$(I)) $(if $(PROJECT),--project $(PROJECT))
+
+export-remove: ## Remove exported app (I=<instance> APP=<app>)
+	@test -n "$(I)" || { echo "ERROR: I required."; exit 1; }
+	@test -n "$(APP)" || { echo "ERROR: APP required."; exit 1; }
+	scripts/export-app.sh remove $(I) $(APP)
+
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
 
@@ -304,6 +318,23 @@ backup: ## Backup an instance (I=<instance> [GPG=<recipient>] [O=<dir>])
 restore-backup: ## Restore instance from backup (FILE=<backup> [NAME=<name>] [PROJECT=<project>])
 	scripts/transfer.sh restore $(if $(NAME),--name $(NAME)) $(if $(PROJECT),--project $(PROJECT)) $(FILE)
 
+# ── File Portal (Phase 25) ──────────────────────────────
+portal-open: ## Open file from container via portal (I=<instance> PATH=<path>)
+	@test -n "$(I)" || { echo "ERROR: I required. Usage: make portal-open I=<instance> PATH=<path>"; exit 1; }
+	@test -n "$(PATH)" || { echo "ERROR: PATH required."; exit 1; }
+	scripts/file-portal.sh open $(I) $(PATH) $(if $(PROJECT),--project $(PROJECT))
+
+portal-push: ## Push file to container via portal (I=<instance> SRC=<src> DST=<dst>)
+	@test -n "$(I)" || { echo "ERROR: I required."; exit 1; }
+	scripts/file-portal.sh push $(I) $(SRC) $(DST) $(if $(PROJECT),--project $(PROJECT))
+
+portal-pull: ## Pull file from container via portal (I=<instance> SRC=<src> DST=<dst>)
+	@test -n "$(I)" || { echo "ERROR: I required."; exit 1; }
+	scripts/file-portal.sh pull $(I) $(SRC) $(DST) $(if $(PROJECT),--project $(PROJECT))
+
+portal-list: ## List configured file portals
+	scripts/file-portal.sh list
+
 # ── Code Analysis (Phase 19c) ────────────────────────
 dead-code: ## Run dead code detection (vulture + shellcheck)
 	@scripts/code-analysis.sh dead-code
@@ -459,6 +490,7 @@ help: ## Show this help
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
         file-copy backup restore-backup \
+        portal-open portal-push portal-pull portal-list \
         disp \
         golden-create golden-derive golden-publish golden-list \
         mcp-list mcp-call \
