@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  role_name: openclaw_server
+  author: anklume
+  description: Install and configure OpenClaw as a self-hosted AI assistant
+  license: AGPL-3.0
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Debian
+      versions:
+        - trixie
+dependencies: []
