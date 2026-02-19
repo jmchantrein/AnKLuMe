@@ -1,0 +1,148 @@
+# Phase 31 Example: Live OS with Encrypted Persistent Storage
+#
+# This example demonstrates AnKLuMe configured for boot-from-USB with encrypted data disk.
+# Ideal for:
+#   - Portable secure workstation (boot USB + external SSD)
+#   - Live environment that persists across reboots
+#   - Ephemeral OS with persistent application state
+#
+# Setup:
+#   1. Build image: make build-image OUT=anklume-live.img
+#   2. Write to USB: dd if=anklume-live.img of=/dev/sdX bs=1M
+#   3. Boot from USB, run first-boot wizard
+#   4. Specify data disk (e.g., /dev/nvme0n1)
+#   5. Configure LUKS passphrase and ZFS pool name
+#
+
+# Live OS boot media configuration
+live_os:
+  base: debian
+  version: "13"
+  hostname: anklume-live
+  kernel_version: latest
+
+  # Boot into RAM after initial load (requires 2-3 GB RAM)
+  # Once in RAM, USB can be safely ejected for reuse
+  toram: true
+
+  # Encrypted persistent data disk configuration
+  data_disk:
+    # Which filesystem backend for container storage
+    backend: zfs        # Options: zfs, btrfs
+
+    # Encryption method for data disk
+    encryption: luks2   # Options: luks2, luks, none (not recommended)
+
+    # Require user to enter passphrase on each boot
+    # Alternative: use --key-file /path/to/keyfile (requires pre-shared key)
+    passphrase_prompt: true
+
+  # Optional: Enable RAM encryption for sensitive data
+  # Requires CPU support (AMD SME, Intel TME)
+  # ram_encryption: true
+
+
+# Domain definitions: trust-based container compartmentalization
+# Each domain is a separate namespace with isolated networking
+domains:
+
+  # Personal domain: Low-risk applications (web browsing, media)
+  - name: personal
+    trust: trusted
+    description: "Personal applications and browsing"
+    instances:
+      - name: browser
+        image: debian/13
+        type: container
+        cpu: 4
+        memory: 2GB
+        profiles:
+          - default
+          - browser-profile  # Custom profile for X11 forwarding, GPU access
+
+  # Work domain: Semi-isolated development environment
+  - name: work
+    trust: semi-trusted
+    description: "Development and work tools"
+    instances:
+      - name: dev
+        image: debian/13
+        type: container
+        cpu: 8
+        memory: 4GB
+        profiles:
+          - default
+          - dev-profile      # Dev tools, editor, compilers
+
+  # AI tools domain: GPU-accelerated LLM inference
+  # Includes local Ollama instance with multiple models
+  - name: ai-tools
+    trust: trusted
+    description: "Local LLM and AI model inference"
+    gpu: passthrough     # Pass through GPU device(s) to container
+    instances:
+      - name: ollama
+        image: debian/13
+        type: container
+        cpu: 16
+        memory: 32GB
+        storage_size: 100GB  # Large size for model weights
+        profiles:
+          - default
+          - gpu-profile       # GPU device mapping, optimized for inference
+
+
+# Storage pools: Where container volumes live
+# This will be automatically created on the encrypted data disk during first-boot
+storage:
+  # Primary storage pool for container filesystems
+  pool_name: anklume-data
+  pool_type: zfs          # ZFS enables snapshots, compression, dedup
+  compression: zstd       # Fast, high-ratio compression
+  mount_point: /var/lib/incus/storage-pools/anklume-data
+
+
+# Networking: Isolation rules between domains
+networks:
+  # Bridge network for containers
+  - name: anklume-br0
+    type: bridge
+    ipv4_address: auto
+    ipv4_nat: true        # Enable NAT for outbound traffic
+
+  # Optional: VLAN for additional isolation
+  # - name: anklume-vlan100
+  #   type: macvlan
+  #   parent: eth0
+  #   ipv4_address: auto
+
+
+# Comments for users:
+#
+# 1. GPU Passthrough:
+#    If ai-tools domain has gpu: passthrough, the GPU device will be directly
+#    accessible inside the ollama container for faster inference.
+#    Note: Only one domain can have exclusive GPU access at a time.
+#
+# 2. Encrypted Data Disk:
+#    During first-boot, you'll be prompted to:
+#    - Select the data disk (e.g., /dev/nvme0n1)
+#    - Enter LUKS passphrase (16+ chars recommended)
+#    - Choose ZFS pool name (e.g., "datapool")
+#    - Confirm Incus storage pool configuration
+#
+# 3. Persistent Boot State:
+#    The ANKLUME-PERSIST partition (100 MB, unencrypted) stores:
+#    - A/B slot state (which OS image is active)
+#    - Boot counter (for rollback detection)
+#    - Pool configuration metadata (pool name, device UUID, encryption flags)
+#
+# 4. Updates:
+#    To update the live OS to a newer version:
+#      make live-update URL=https://cdn.example.com/anklume-v1.2.img
+#    The update downloads to the inactive slot, verifies integrity, and reboots.
+#    If boot fails 3 times, automatically rolls back to previous version.
+#
+# 5. Reusing the Boot USB:
+#    With toram: true, after initial boot (~30 seconds), the entire OS is in RAM.
+#    You can then eject the USB and use it for other purposes, or boot other systems.
