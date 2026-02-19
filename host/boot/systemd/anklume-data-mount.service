@@ -1,0 +1,15 @@
+[Unit]
+Description=AnKLuMe Data Pool Mount
+ConditionPathExists=/mnt/anklume-persist/pool.conf
+After=local-fs.target
+Before=incus.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/anklume/scripts/mount-data.sh
+ExecStop=/opt/anklume/scripts/umount-data.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

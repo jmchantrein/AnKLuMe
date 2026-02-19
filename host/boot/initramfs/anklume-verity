@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# AnKLuMe dm-verity Hook for initramfs-tools
+# Sets up dm-verity root filesystem protection during early boot
+# Reads kernel cmdline: anklume.verity_hash=<hash> anklume.slot=A|B
+
+PREREQ=""
+
+prereq() {
+	echo "$PREREQ"
+}
+
+go() {
+	# Read kernel cmdline parameters
+	VERITY_HASH=""
+	SLOT="A"
+
+	for param in $(cat /proc/cmdline); do
+		case "$param" in
+			anklume.verity_hash=*)
+				VERITY_HASH="${param#anklume.verity_hash=}"
+				;;
+			anklume.slot=*)
+				SLOT="${param#anklume.slot=}"
+				;;
+		esac
+	done
+
+	# Validate parameters
+	if [ -z "$VERITY_HASH" ]; then
+		log_warning_msg "AnKLuMe: No verity hash specified in kernel cmdline"
+		return 0
+	fi
+
+	# Determine OS partition based on slot
+	case "$SLOT" in
+		A)
+			OS_PARTITION_NAME="ANKLUME-OS-A"
+			;;
+		B)
+			OS_PARTITION_NAME="ANKLUME-OS-B"
+			;;
+		*)
+			log_failure_msg "AnKLuMe: Invalid slot '$SLOT' (expected A or B)"
+			return 1
+			;;
+	esac
+
+	# Find the OS partition using blkid
+	log_begin_msg "AnKLuMe: Setting up dm-verity for slot $SLOT"
+
+	OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
+	if [ -z "$OS_PARTITION" ]; then
+		log_failure_msg "AnKLuMe: Could not find partition '$OS_PARTITION_NAME'"
+		return 1
+	fi
+
+	log_success_msg "AnKLuMe: Found OS partition at $OS_PARTITION"
+
+	# Activate dm-verity using veritysetup
+	# Format: veritysetup create <name> <data_device> <hash_device> <root_hash>
+	if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
+		--hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
+		log_failure_msg "AnKLuMe: Failed to activate dm-verity device"
+		return 1
+	fi
+
+	log_success_msg "AnKLuMe: dm-verity device activated successfully"
+
+	# Set root device to the verity device mapping
+	export ROOT="/dev/mapper/anklume-root"
+
+	log_success_msg "AnKLuMe: Root device set to $ROOT"
+	return 0
+}
+
+case $1 in
+	prereq)
+		prereq
+		;;
+	go)
+		go
+		;;
+	*)
+		echo "Usage: $0 {prereq|go}"
+		exit 1
+		;;
+esac
