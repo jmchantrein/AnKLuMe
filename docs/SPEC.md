@@ -794,3 +794,79 @@ To avoid redundant image downloads in nested Incus environments:
 
 No network access required for nested image imports. Read-only mount
 preserves isolation.
+
+## 16. Code audit (scripts/code-audit.py)
+
+A Python script that produces a structured codebase audit report.
+
+**Usage**:
+```bash
+make audit          # Terminal report
+make audit-json     # JSON to reports/audit.json
+scripts/code-audit.py --json --output FILE
+```
+
+**Report contents**:
+- Line count per file type (Python impl, Python tests, Shell, YAML roles)
+- Test-to-implementation ratio per module
+- Scripts without test coverage identified
+- Roles sorted by size with simplification candidates flagged (>200 lines)
+- Dead code detection (delegates to `scripts/code-analysis.sh dead-code`)
+- Overall summary (total impl lines, test lines, ratio)
+
+**JSON output**: `--json` flag produces machine-readable output for CI
+integration or trend tracking.
+
+## 17. Incus network guard (scripts/incus-guard.sh)
+
+Consolidated guard script that prevents Incus bridges from breaking host
+network connectivity when bridge subnets conflict with the host's real
+network.
+
+**Subcommands**:
+```bash
+scripts/incus-guard.sh start       # Safe startup with bridge watcher
+scripts/incus-guard.sh post-start  # Systemd ExecStartPost hook
+scripts/incus-guard.sh install     # Install as systemd drop-in
+```
+
+**`start`**: Detects host network, runs a kernel-level bridge watcher
+(deletes conflicting bridges every 100ms), starts Incus, cleans Incus
+database, restores default route if lost, verifies gateway connectivity.
+
+**`post-start`**: Runs after every Incus startup via systemd. Uses only
+local kernel calls (`ip link`) — works even if network is broken. Scans
+all bridges for subnet conflicts, removes conflicting ones, cleans Incus
+database, restores default route.
+
+**`install`**: Copies the guard script to `/opt/anklume/incus-guard.sh`,
+creates a systemd drop-in for `incus.service` with
+`ExecStartPost=/opt/anklume/incus-guard.sh post-start`, reloads systemd.
+
+**Design principles**:
+- Non-blocking: `post-start` exits 0 even on errors (never blocks Incus)
+- Comprehensive: checks all bridges, not just `net-*` prefixed ones
+- Defensive: saves host interface to `/run/incus-guard-host-dev` for
+  recovery when default route is already lost
+- Logs to `/var/log/incus-network-guard.log` with timestamps
+
+## 18. Smoke testing
+
+Minimal real-world deployment test that verifies core AnKLuMe
+functionality on actual Incus infrastructure (not mocked).
+
+**Usage**:
+```bash
+make smoke    # Requires running Incus daemon
+```
+
+**Test flow** (5 steps):
+1. `make sync-dry` — verify generator works on real `infra.yml`
+2. `make check` — dry-run apply (no actual changes)
+3. `make lint` — all validators pass
+4. `snapshot-list` — snapshot infrastructure responds
+5. `incus list` — Incus daemon reachable
+
+**Purpose**: Quick validation that the entire toolchain works end-to-end
+on the host. Catches integration issues that unit tests cannot detect
+(missing packages, broken Incus state, config drift).

@@ -314,6 +314,38 @@ dep-graph: ## Generate module dependency graph (SVG in reports/)
 code-graph: ## Run all static code analysis tools
 	@scripts/code-analysis.sh all
 
+audit: ## Produce codebase audit report (dead code, metrics, coverage)
+	@python3 scripts/code-audit.py
+
+audit-json: ## Produce audit report as JSON (to reports/audit.json)
+	@python3 scripts/code-audit.py --json --output reports/audit.json
+
+# ── Smoke Testing (Phase 29) ────────────────────────────
+smoke: ## Real-world smoke test (requires running Incus daemon)
+	@echo "=== AnKLuMe Smoke Test ==="
+	@echo ""
+	@echo "--- Step 1/5: Generator (make sync-dry) ---"
+	@python3 scripts/generate.py $(INFRA_SRC) --dry-run
+	@echo "PASS: Generator works"
+	@echo ""
+	@echo "--- Step 2/5: Dry-run apply (make check) ---"
+	@ansible-playbook site.yml --check --diff
+	@echo "PASS: Dry-run apply succeeds"
+	@echo ""
+	@echo "--- Step 3/5: Linting (make lint) ---"
+	@$(MAKE) lint
+	@echo "PASS: All linters pass"
+	@echo ""
+	@echo "--- Step 4/5: Snapshot listing ---"
+	@ansible-playbook snapshot.yml -e snapshot_action=list
+	@echo "PASS: Snapshot infrastructure responds"
+	@echo ""
+	@echo "--- Step 5/5: Incus connectivity ---"
+	@incus list --format csv | head -5 || { echo "FAIL: incus list failed"; exit 1; }
+	@echo "PASS: Incus daemon reachable"
+	@echo ""
+	@echo "=== All smoke tests passed ==="
+
 # ── Disposable Instances (Phase 20a) ────────────────────
 disp: ## Launch disposable ephemeral instance (IMAGE=... CMD=... DOMAIN=... VM=1)
 	scripts/disp.sh $(if $(IMAGE),--image $(IMAGE)) $(if $(DOMAIN),--domain $(DOMAIN)) $(if $(CMD),--cmd "$(CMD)") $(if $(VM),--vm)
@@ -428,6 +460,7 @@ help: ## Show this help
         mcp-list mcp-call \
         apply-tor apply-print \
         dead-code call-graph dep-graph code-graph \
+        audit audit-json smoke \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
         guide quickstart init install-hooks help
