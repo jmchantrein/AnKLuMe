@@ -164,6 +164,9 @@ apply-ai: ## Apply AI tools roles (Ollama + WebUI + LobeChat + OpenCode)
 apply-code-sandbox: ## Apply code_sandbox role (sandboxed AI coding)
 	ansible-playbook site.yml --tags code_sandbox
 
+apply-openclaw: ## Apply openclaw_server role (self-hosted AI assistant)
+	ansible-playbook site.yml --tags openclaw
+
 export-images: ## Export images for nested Incus sharing
 	ansible-playbook site.yml --tags images -e incus_images_export_for_nesting=true
 
@@ -485,7 +488,7 @@ help: ## Show this help
         ai-test ai-test-role ai-develop ai-switch \
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
-        apply-code-sandbox \
+        apply-code-sandbox apply-openclaw \
         flush upgrade import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \

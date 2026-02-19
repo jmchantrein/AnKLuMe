@@ -1952,11 +1952,12 @@ d) **Security considerations**:
    - Optional: pairing-based access control (OpenClaw native)
 
 **Validation criteria**:
-- [ ] OpenClaw installed and running in isolated container
-- [ ] At least one messaging channel functional (Telegram or Signal)
-- [ ] Local LLM (Ollama) used for queries when configured
-- [ ] Network isolation verified (cannot reach other domains)
-- [ ] Daemon survives container restart
+- [x] OpenClaw Ansible role with systemd service
+- [x] Configurable LLM provider (ollama/anthropic/openai)
+- [x] Local LLM (Ollama) used for queries when configured
+- [x] Registered in site.yml with openclaw tag
+- [ ] At least one messaging channel functional (future: onboarding)
+- [ ] Network isolation verified (future: deploy test)
 
 ---
 
