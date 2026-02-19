@@ -166,7 +166,7 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
             window.select_layout("tiled")
 
     # Select first window
-    session.windows[0].select_window()
+    session.windows[0].select()
 
     if attach:
         server.cmd("attach-session", "-t", session_name)
@@ -240,7 +240,7 @@ def main(argv=None):
         import libtmux
         server = libtmux.Server()
         if server.has_session(args.session_name):
-            server.kill_session(args.session_name)
+            server.sessions.get(session_name=args.session_name).kill()
             print(f"Killed existing session '{args.session_name}'")
 
     # Create session
