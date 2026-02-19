@@ -3,10 +3,13 @@
 # Usage: scripts/guide.sh [--step N] [--auto]
 #
 # Walks the user through setting up anklume from scratch.
+# Works from the HOST (auto-detects and delegates to anklume-instance)
+# or from inside the admin container.
+#
 # Each step: explain -> execute -> validate (green/red) -> pause.
 #
 # Options:
-#   --step N   Resume from step N (default: 1)
+#   --step N   Resume from step N (0-10)
 #   --auto     Non-interactive mode for CI (no prompts, exit on failure)
 
 set -euo pipefail
@@ -22,11 +25,12 @@ DIM='\033[2m'
 RESET='\033[0m'
 
 # ── Globals ──────────────────────────────────────────────
-START_STEP=1
+START_STEP=0
 AUTO=false
-TOTAL_STEPS=9
+TOTAL_STEPS=10
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONTAINER_NAME="anklume-instance"
 
 # ── Argument parsing ─────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -43,8 +47,11 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [--step N] [--auto]"
             echo ""
             echo "Options:"
-            echo "  --step N   Resume from step N (1-$TOTAL_STEPS)"
+            echo "  --step N   Resume from step N (0-$TOTAL_STEPS)"
             echo "  --auto     Non-interactive CI mode (no prompts)"
+            echo ""
+            echo "Step 0 detects your environment (host or container)."
+            echo "Run from the host or from inside anklume-instance."
             exit 0
             ;;
         *)
@@ -55,8 +62,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$START_STEP" -lt 1 || "$START_STEP" -gt "$TOTAL_STEPS" ]]; then
-    echo "Step must be between 1 and $TOTAL_STEPS"
+if [[ "$START_STEP" -lt 0 || "$START_STEP" -gt "$TOTAL_STEPS" ]]; then
+    echo "Step must be between 0 and $TOTAL_STEPS"
     exit 1
 fi
 
@@ -66,7 +73,7 @@ header() {
     clear 2>/dev/null || true
     echo -e "${CYAN}${BOLD}"
     echo "  ┌─────────────────────────────────────────┐"
-    echo "  │           anklume Setup Guide             │"
+    echo "  │         AnKLuMe Setup Guide              │"
     echo "  │   Infrastructure Compartmentalization    │"
     echo "  └─────────────────────────────────────────┘"
     echo -e "${RESET}"
@@ -159,7 +166,134 @@ run_cmd() {
     fi
 }
 
+# Detect if running on the host (not inside a container/VM)
+# Note: systemd-detect-virt returns exit code 1 when NOT virtualized,
+# so we must suppress the exit code separately from capturing stdout.
+is_on_host() {
+    local virt
+    virt="$(systemd-detect-virt 2>/dev/null)" || true
+    [[ "$virt" == "none" ]]
+}
+
+# Check if anklume-instance container exists and is running
+# Note: avoid 'incus info | grep -q' — grep -q causes SIGPIPE with pipefail.
+container_running() {
+    incus list "$CONTAINER_NAME" --format csv -c s 2>/dev/null | grep -q RUNNING
+}
+
 # ── Step functions ───────────────────────────────────────
+
+step_0_environment() {
+    step_header 0 "Environment Detection"
+
+    echo "  AnKLuMe uses an admin container (${CONTAINER_NAME}) as its"
+    echo "  control center. All infrastructure management happens from inside it."
+    echo ""
+
+    if is_on_host; then
+        ok "You are on the host machine"
+        echo ""
+
+        # Check if Incus is available
+        if ! command -v incus &>/dev/null; then
+            fail "Incus not found on host"
+            echo ""
+            echo "  Run bootstrap.sh first to install Incus and create"
+            echo "  the admin container:"
+            echo ""
+            echo -e "    ${CYAN}bash bootstrap.sh${RESET}"
+            echo ""
+            if [[ "$AUTO" == "true" ]]; then
+                exit 1
+            fi
+            exit 1
+        fi
+
+        # Check if anklume-instance exists
+        if ! container_running; then
+            fail "${CONTAINER_NAME} is not running"
+            echo ""
+            echo "  The admin container does not exist or is stopped."
+            echo "  Run bootstrap.sh to create it:"
+            echo ""
+            echo -e "    ${CYAN}bash bootstrap.sh${RESET}"
+            echo ""
+            echo "  Or start it if it already exists:"
+            echo ""
+            echo -e "    ${CYAN}incus start ${CONTAINER_NAME}${RESET}"
+            echo ""
+            if [[ "$AUTO" == "true" ]]; then
+                exit 1
+            fi
+            exit 1
+        fi
+
+        ok "${CONTAINER_NAME} is running"
+        echo ""
+
+        # Offer to delegate to the container
+        echo "  The guide will now continue inside ${CONTAINER_NAME}."
+        echo "  This is where all AnKLuMe commands run."
+        echo ""
+
+        if [[ "$AUTO" == "true" ]]; then
+            info "Auto-mode: delegating to container"
+            local step_arg=""
+            if [[ "$START_STEP" -gt 0 ]]; then
+                step_arg="--step $((START_STEP))"
+            else
+                step_arg="--step 1"
+            fi
+            # shellcheck disable=SC2086
+            exec incus exec "$CONTAINER_NAME" -- bash -c \
+                "cd /root/AnKLuMe && bash scripts/guide.sh --auto $step_arg"
+        fi
+
+        echo -e "  ${BOLD}How to enter the admin container manually:${RESET}"
+        echo ""
+        echo -e "    ${CYAN}incus exec ${CONTAINER_NAME} -- bash${RESET}"
+        echo -e "    ${CYAN}cd /root/AnKLuMe${RESET}"
+        echo ""
+
+        if confirm "Continue the guide inside ${CONTAINER_NAME}?"; then
+            local step_arg="--step 1"
+            exec incus exec "$CONTAINER_NAME" -- bash -c \
+                "cd /root/AnKLuMe && bash scripts/guide.sh $step_arg"
+        else
+            echo ""
+            info "To resume later from inside the container:"
+            echo -e "    ${CYAN}incus exec ${CONTAINER_NAME} -- bash${RESET}"
+            echo -e "    ${CYAN}cd /root/AnKLuMe && make guide${RESET}"
+            exit 0
+        fi
+    else
+        ok "You are inside a container"
+        echo ""
+
+        if [[ "$(hostname 2>/dev/null)" == "$CONTAINER_NAME" ]] || \
+           [[ -d /root/AnKLuMe ]]; then
+            ok "This looks like the admin container — good!"
+        else
+            warn "This does not look like ${CONTAINER_NAME}"
+            info "The guide expects to run from inside the admin container."
+            info "Run: incus exec ${CONTAINER_NAME} -- bash"
+        fi
+
+        # Check Incus socket access
+        if incus info &>/dev/null 2>&1; then
+            ok "Incus socket accessible"
+        else
+            fail "Cannot access Incus socket"
+            echo ""
+            echo "  The admin container needs the Incus socket mounted."
+            echo "  This is normally set up by bootstrap.sh."
+            if [[ "$AUTO" == "true" ]]; then
+                exit 1
+            fi
+        fi
+        pause
+    fi
+}
 
 step_1_prerequisites() {
     step_header 1 "Prerequisites Check"
@@ -229,7 +363,12 @@ step_1_prerequisites() {
     echo ""
     if confirm "Run 'make init' to install Ansible dependencies?"; then
         echo ""
-        (cd "$PROJECT_DIR" && make init) || warn "make init had warnings (non-fatal)"
+        info "Installing dependencies (output in /tmp/anklume-init.log)..."
+        if (cd "$PROJECT_DIR" && make init > /tmp/anklume-init.log 2>&1); then
+            ok "Dependencies installed"
+        else
+            warn "make init had warnings (see /tmp/anklume-init.log)"
+        fi
     fi
 
     ok "All prerequisites satisfied"
@@ -238,7 +377,7 @@ step_1_prerequisites() {
 
 step_2_use_case() {
     step_header 2 "Use Case Selection"
-    echo "  anklume ships with example configurations for common use cases."
+    echo "  AnKLuMe ships with example configurations for common use cases."
     echo "  Each example includes a ready-to-use infra.yml."
     echo ""
 
@@ -281,13 +420,48 @@ step_3_infra_yml() {
     local dest="$PROJECT_DIR/infra.yml"
 
     if [[ -f "$dest" ]]; then
-        warn "infra.yml already exists"
-        echo ""
-        if confirm "Overwrite with the selected example?"; then
-            cp "$INFRA_SRC" "$dest"
-            ok "Replaced infra.yml"
+        # Check if infra is already deployed (inventory files exist)
+        local deployed=false
+        if [[ -d "$PROJECT_DIR/inventory" ]] && ls "$PROJECT_DIR/inventory"/*.yml >/dev/null 2>&1; then
+            deployed=true
+        fi
+
+        if [[ "$deployed" == "true" ]]; then
+            warn "infra.yml already exists AND inventory files are present"
+            warn "An infrastructure appears to be deployed from this file."
+            echo ""
+            info "Current project: $(grep 'project_name:' "$dest" 2>/dev/null | awk '{print $2}' || echo 'unknown')"
+            echo ""
+
+            if [[ "$AUTO" == "true" ]]; then
+                ok "Keeping existing infra.yml (deployed infrastructure detected)"
+                INFRA_SRC=""
+            elif confirm "Keep existing infra.yml (recommended)?"; then
+                ok "Keeping existing infra.yml"
+                INFRA_SRC=""
+            else
+                warn "Overwriting will disconnect from the deployed infrastructure!"
+                if confirm "Are you sure? A backup will be saved as infra.yml.bak"; then
+                    cp "$dest" "${dest}.bak"
+                    ok "Backup saved: infra.yml.bak"
+                    cp "$INFRA_SRC" "$dest"
+                    ok "Replaced infra.yml"
+                else
+                    ok "Keeping existing infra.yml"
+                    INFRA_SRC=""
+                fi
+            fi
         else
-            ok "Keeping existing infra.yml"
+            warn "infra.yml already exists (no deployed infrastructure detected)"
+            echo ""
+            if confirm "Overwrite with the selected example?"; then
+                cp "$dest" "${dest}.bak"
+                ok "Backup saved: infra.yml.bak"
+                cp "$INFRA_SRC" "$dest"
+                ok "Replaced infra.yml"
+            else
+                ok "Keeping existing infra.yml"
+            fi
         fi
     else
         cp "$INFRA_SRC" "$dest"
@@ -361,8 +535,6 @@ step_5_validate() {
     echo "  Running linters and syntax checks."
     echo ""
 
-    local has_errors=false
-
     echo "  YAML lint:"
     if (cd "$PROJECT_DIR" && yamllint -c .yamllint.yml . 2>&1) | sed 's/^/    /'; then
         ok "yamllint passed"
@@ -384,11 +556,9 @@ step_5_validate() {
         ok "Syntax check passed"
     else
         fail "Syntax check failed"
-        has_errors=true
-    fi
-
-    if [[ "$has_errors" == "true" && "$AUTO" == "true" ]]; then
-        exit 1
+        if [[ "$AUTO" == "true" ]]; then
+            exit 1
+        fi
     fi
 
     pause
@@ -467,9 +637,9 @@ step_7_verify() {
     echo ""
     echo "  Networks:"
     if incus network list --format compact 2>/dev/null | grep "net-" | sed 's/^/    /'; then
-        ok "anklume networks found"
+        ok "AnKLuMe networks found"
     else
-        warn "No anklume networks found (net-* pattern)"
+        warn "No AnKLuMe networks found (net-* pattern)"
     fi
 
     pause
@@ -511,9 +681,51 @@ step_8_snapshot() {
     pause
 }
 
-step_9_next_steps() {
-    step_header 9 "Next Steps"
-    echo "  Your anklume infrastructure is set up. Here is what to explore next:"
+step_9_access() {
+    step_header 9 "Access Your Infrastructure"
+    echo "  Your containers are running. Here is how to access them."
+    echo ""
+
+    echo -e "  ${BOLD}Enter any container from the admin container:${RESET}"
+    echo ""
+    info "  incus exec <machine-name> --project <domain> -- bash"
+    echo ""
+
+    # Show available instances
+    if incus info &>/dev/null 2>&1; then
+        echo "  Your instances:"
+        echo ""
+        incus list --all-projects --format json 2>/dev/null | \
+            python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for i in sorted(data, key=lambda x: x.get('project','')):
+    if i['status'] != 'Running': continue
+    p = i.get('project','')
+    n = i['name']
+    if n == '$(hostname 2>/dev/null)': continue
+    print(f'    incus exec {n} --project {p} -- bash')
+" 2>/dev/null || true
+        echo ""
+    fi
+
+    echo -e "  ${BOLD}Or use the tmux console (colored by domain):${RESET}"
+    echo ""
+    info "  make console"
+    info "  (requires: pip install libtmux)"
+    echo ""
+
+    echo -e "  ${BOLD}From the host (without entering the admin container):${RESET}"
+    echo ""
+    info "  incus exec <machine-name> --project <domain> -- bash"
+    info "  (works because Incus runs on the host)"
+
+    pause
+}
+
+step_10_next_steps() {
+    step_header 10 "Next Steps"
+    echo "  Your AnKLuMe infrastructure is set up. Here is what to explore next:"
     echo ""
     echo -e "  ${CYAN}Network isolation${RESET}"
     info "  Block traffic between domains with nftables"
@@ -548,7 +760,7 @@ step_9_next_steps() {
 cd "$PROJECT_DIR"
 header
 
-if [[ "$START_STEP" -gt 1 ]]; then
+if [[ "$START_STEP" -gt 0 ]]; then
     info "Resuming from step $START_STEP"
     echo ""
 fi
@@ -560,14 +772,16 @@ SELECTED=0
 
 for step in $(seq "$START_STEP" "$TOTAL_STEPS"); do
     case "$step" in
-        1) step_1_prerequisites ;;
-        2) step_2_use_case ;;
-        3) step_3_infra_yml ;;
-        4) step_4_generate ;;
-        5) step_5_validate ;;
-        6) step_6_apply ;;
-        7) step_7_verify ;;
-        8) step_8_snapshot ;;
-        9) step_9_next_steps ;;
+        0)  step_0_environment ;;
+        1)  step_1_prerequisites ;;
+        2)  step_2_use_case ;;
+        3)  step_3_infra_yml ;;
+        4)  step_4_generate ;;
+        5)  step_5_validate ;;
+        6)  step_6_apply ;;
+        7)  step_7_verify ;;
+        8)  step_8_snapshot ;;
+        9)  step_9_access ;;
+        10) step_10_next_steps ;;
     esac
 done

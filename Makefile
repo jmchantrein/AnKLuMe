@@ -1,16 +1,41 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# ── Host guard ──────────────────────────────────────────────
+# Detects if running on the host instead of inside anklume-instance.
+# Container-only targets call $(require_container) to block with a helpful message.
+# Detection: systemd-detect-virt returns "none" on the host.
+define require_container
+	@if [ "$$(systemd-detect-virt 2>/dev/null)" = "none" ]; then \
+		echo "" >&2; \
+		echo "  ERROR: This command must be run inside anklume-instance." >&2; \
+		echo "" >&2; \
+		echo "  You are on the host. AnKLuMe commands run from the admin container." >&2; \
+		echo "  Enter the container first:" >&2; \
+		echo "" >&2; \
+		echo "    incus exec anklume-instance -- bash" >&2; \
+		echo "    cd /root/AnKLuMe" >&2; \
+		echo "    make $(1)" >&2; \
+		echo "" >&2; \
+		echo "  Or run the interactive guide: make guide" >&2; \
+		echo "" >&2; \
+		exit 1; \
+	fi
+endef
+
 # ── PSOT Generator ────────────────────────────────────────
 INFRA_SRC := $(if $(wildcard infra/base.yml),infra,infra.yml)
 
 sync: ## Generate/update Ansible files from infra.yml or infra/
+	$(call require_container,sync)
 	$(call tele_wrap,sync,python3 scripts/generate.py $(INFRA_SRC))
 
 sync-dry: ## Preview changes without writing
+	$(call require_container,sync-dry)
 	python3 scripts/generate.py $(INFRA_SRC) --dry-run
 
 sync-clean: ## Remove orphan files without confirmation
+	$(call require_container,sync-clean)
 	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
 
 # ── Telemetry (Phase 19b) ────────────────────────────────
@@ -47,8 +72,8 @@ telemetry-report: ## Terminal charts of usage patterns
 	@python3 scripts/telemetry.py report
 
 # ── Console (Phase 19a) ───────────────────────────────────
-console: ## Launch tmux console with domain-colored panes
-	python3 scripts/console.py $(if $(KILL),--kill) $(if $(DRY_RUN),--dry-run)
+console: ## Launch tmux console with domain-colored panes (works from host)
+	@bash scripts/console.sh $(if $(KILL),--kill) $(if $(DRY_RUN),--dry-run)
 
 # ── Desktop Integration (Phase 21) ──────────────────────
 clipboard-to: ## Copy host clipboard INTO container (I=<instance> [PROJECT=<p>])
@@ -118,9 +143,11 @@ lint-python: ## Validate Python files
 	fi
 
 check: ## Dry-run (ansible-playbook --check --diff)
+	$(call require_container,check)
 	ansible-playbook site.yml --check --diff
 
 syntax: ## Syntax check only
+	$(call require_container,syntax)
 	ansible-playbook site.yml --syntax-check
 
 # ── Network Safety Wrapper ───────────────────────────────
@@ -142,6 +169,7 @@ endef
 
 # ── Apply ─────────────────────────────────────────────────
 apply: ## Apply full infrastructure + provisioning
+	$(call require_container,apply)
 	@if [ ! -d inventory ] || [ -z "$$(ls inventory/*.yml 2>/dev/null)" ]; then \
 		echo "ERROR: No inventory files found. Run 'make sync' first to generate them from infra.yml." >&2; \
 		exit 1; \
@@ -149,33 +177,43 @@ apply: ## Apply full infrastructure + provisioning
 	$(call safe_apply_wrap,apply,ansible-playbook site.yml)
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
+	$(call require_container,apply-infra)
 	$(call safe_apply_wrap,apply-infra,ansible-playbook site.yml --tags infra)
 
 apply-provision: ## Apply provisioning only (packages, services)
+	$(call require_container,apply-provision)
 	$(call tele_wrap,apply-provision,ansible-playbook site.yml --tags provision)
 
 apply-base: ## Apply base_system only
+	$(call require_container,apply-base)
 	ansible-playbook site.yml --tags base
 
 apply-limit: ## Apply a single domain (G=<group>)
+	$(call require_container,apply-limit)
 	$(call safe_apply_wrap,apply-limit,ansible-playbook site.yml --limit $(G),$(G))
 
 apply-images: ## Pre-download OS images to local cache
+	$(call require_container,apply-images)
 	ansible-playbook site.yml --tags images
 
 apply-llm: ## Apply LLM roles (Ollama + Open WebUI)
+	$(call require_container,apply-llm)
 	ansible-playbook site.yml --tags llm
 
 apply-stt: ## Apply STT role (Speaches + faster-whisper)
+	$(call require_container,apply-stt)
 	ansible-playbook site.yml --tags stt
 
 apply-ai: ## Apply AI tools roles (Ollama + WebUI + LobeChat + OpenCode)
+	$(call require_container,apply-ai)
 	ansible-playbook site.yml --tags llm,stt,lobechat,opencode
 
 apply-code-sandbox: ## Apply code_sandbox role (sandboxed AI coding)
+	$(call require_container,apply-code-sandbox)
 	ansible-playbook site.yml --tags code_sandbox
 
 apply-openclaw: ## Apply openclaw_server role (self-hosted AI assistant)
+	$(call require_container,apply-openclaw)
 	ansible-playbook site.yml --tags openclaw
 
 export-images: ## Export images for nested Incus sharing
@@ -183,6 +221,7 @@ export-images: ## Export images for nested Incus sharing
 
 # ── nftables Isolation ───────────────────────────────────
 nftables: ## Generate nftables isolation rules
+	$(call require_container,nftables)
 	ansible-playbook site.yml --tags nftables
 
 nftables-deploy: ## Deploy nftables rules on host (run FROM host)
@@ -368,6 +407,10 @@ audit: ## Produce codebase audit report (dead code, metrics, coverage)
 audit-json: ## Produce audit report as JSON (to reports/audit.json)
 	@python3 scripts/code-audit.py --json --output reports/audit.json
 
+# ── Doctor (infrastructure health checker) ──────────────
+doctor: ## Diagnose infrastructure health (FIX=1 to auto-fix, CHECK=network|instances|config|deps)
+	@bash scripts/doctor.sh $(if $(FIX),--fix) $(if $(CHECK),--check $(CHECK)) $(if $(VERBOSE),--verbose)
+
 # ── Smoke Testing (Phase 29) ────────────────────────────
 smoke: ## Real-world smoke test (requires running Incus daemon)
 	@echo "=== AnKLuMe Smoke Test ==="
@@ -438,6 +481,7 @@ apply-print: ## Setup CUPS print service in container (I=<instance> [PROJECT=<pr
 
 # ── Lifecycle ─────────────────────────────────────────────
 flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
+	$(call require_container,flush)
 	@scripts/flush.sh $(if $(FORCE),--force)
 
 upgrade: ## Safe framework update with conflict detection
@@ -458,6 +502,7 @@ quickstart: ## Copy example infra.yml and generate Ansible files
 
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
+	$(call require_container,init)
 	ansible-galaxy collection install -r requirements.yml
 	pip install --user --break-system-packages pyyaml pytest molecule ruff
 	@echo "---"
