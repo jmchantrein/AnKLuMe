@@ -499,4 +499,5 @@ help: ## Show this help
         audit audit-json smoke \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
+        export-app export-list export-remove \
         guide quickstart init install-hooks help

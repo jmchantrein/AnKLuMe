@@ -71,6 +71,7 @@ domains:
         type: lxc
         ip: "10.100.4.40"
         roles: [base_system, opencode_server]
+        export_apps: [opencode]
       ai-coder:
         description: "Sandboxed AI coding (Claude Code, Aider)"
         type: lxc
