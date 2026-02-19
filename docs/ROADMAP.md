@@ -1460,7 +1460,9 @@ AnKLuMe/                           ← Cloned on the host
 │   │   ├── stt-push-to-talk.sh    ← Push-to-talk STT (Meta+S toggle)
 │   │   ├── stt-azerty-type.py     ← AZERTY keycode typing helper
 │   │   └── stt-streaming.py       ← Streaming STT (experimental, roadmap)
-│   └── desktop/                   ← Future: .desktop exports, Waypipe, shortcuts
+│   └── desktop/
+│       ├── export-desktops.sh    ← Install .desktop files to user menu
+│       └── domain-menu.sh        ← dmenu/rofi/fuzzel domain launcher
 ├── roles/                         ← Ansible roles (run inside the container)
 ├── Makefile                       ← Used by the container
 └── ...
@@ -1518,12 +1520,25 @@ c) **Host Makefile wrapper** (future):
    - Transparent delegation to the container
 
 **Validation criteria**:
-- [ ] `bootstrap.sh` runs on Arch (CachyOS) from a fresh host
+- [x] `bootstrap.sh` runs on Arch (CachyOS) from a fresh host
 - [ ] `bootstrap.sh` runs on Debian 13 (Trixie) from a fresh host
-- [ ] After bootstrap, `make apply` works without manual intervention
-- [ ] Bind mount allows editing on host, running in container
-- [ ] STT scripts functional from `host/stt/` location
-- [ ] Network (NAT, IP forwarding) configured automatically
+- [x] After bootstrap, `make apply` works without manual intervention
+- [x] Bind mount allows editing on host, running in container
+- [x] STT scripts functional from `host/stt/` location
+- [x] Network (NAT, IP forwarding) configured automatically
+- [x] `scripts/bootstrap.sh` detects distro (arch/cachyos/debian/ubuntu/fedora)
+- [x] `scripts/bootstrap.sh` creates anklume-instance container (idempotent)
+- [x] `scripts/bootstrap.sh` sets up socket proxy + bind mount devices
+- [x] `scripts/bootstrap.sh` provisions container (ansible, deps)
+- [x] `scripts/bootstrap.sh` runs `make sync && make apply`
+- [x] `scripts/bootstrap.sh` configures host networking (NAT, DHCP fix)
+- [x] `scripts/bootstrap.sh` detects GPU and offers AI-tools deployment
+- [x] `scripts/bootstrap.sh` calls setup-boot-services.sh
+- [x] `scripts/bootstrap.sh` wrapped in main() function
+- [x] `host/desktop/export-desktops.sh` installs/removes .desktop files
+- [x] `host/desktop/domain-menu.sh` supports fuzzel/rofi/dmenu with fallback
+- [x] All scripts pass `bash -n` syntax check
+- [x] 78 tests pass (27 existing + 51 new Phase 23 tests)
 
 ---
 
