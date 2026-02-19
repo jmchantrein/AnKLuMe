@@ -1,0 +1,21 @@
+---
+# Default variables for openclaw_server
+# Override in group_vars or host_vars as needed.
+
+# Port for OpenClaw web interface
+openclaw_server_port: 3100
+
+# LLM provider: ollama, anthropic, or openai
+openclaw_server_llm_provider: "ollama"
+
+# URL of the Ollama server
+openclaw_server_ollama_url: "http://10.100.4.10:11434"
+
+# Default model for local LLM queries
+openclaw_server_model: "qwen2.5-coder:32b"
+
+# Messaging channels to enable
+openclaw_server_channels: []
+
+# Enable and start the systemd service
+openclaw_server_enabled: true

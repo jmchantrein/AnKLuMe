@@ -39,6 +39,9 @@ domains:
   ai-tools:
     description: "AI services domain — LLM, chat, coding, STT"
     subnet_id: 4
+    file_portal:
+      allowed_paths: ["/shared/ai-tools", "/tmp/portal"]
+      read_only: false
     profiles:
       nvidia-compute:
         devices:
@@ -73,6 +76,11 @@ domains:
         type: lxc
         ip: "10.100.4.50"
         roles: [base_system, code_sandbox]
+      ai-openclaw:
+        description: "OpenClaw self-hosted AI assistant"
+        type: lxc
+        ip: "10.100.4.60"
+        roles: [base_system, openclaw_server]
 
 network_policies:
   - description: "Admin accesses AI chat UIs"

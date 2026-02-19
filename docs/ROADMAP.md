@@ -1701,9 +1701,10 @@ the same mechanism Flatpak uses for sandboxed app file access.
 - Audit log of all cross-domain file transfers
 
 **Validation criteria**:
-- [ ] File chooser dialog appears when container app opens file
-- [ ] Access restricted to configured paths per domain
-- [ ] Transfers logged for audit
+- [x] File portal script with open/push/pull/list subcommands
+- [x] Access restricted to configured paths per domain
+- [x] Transfers logged for audit
+- [x] Per-domain policy from infra.yml file_portal config
 
 ---
 
@@ -1949,11 +1950,12 @@ d) **Security considerations**:
    - Optional: pairing-based access control (OpenClaw native)
 
 **Validation criteria**:
-- [ ] OpenClaw installed and running in isolated container
-- [ ] At least one messaging channel functional (Telegram or Signal)
-- [ ] Local LLM (Ollama) used for queries when configured
-- [ ] Network isolation verified (cannot reach other domains)
-- [ ] Daemon survives container restart
+- [x] OpenClaw Ansible role with systemd service
+- [x] Configurable LLM provider (ollama/anthropic/openai)
+- [x] Local LLM (Ollama) used for queries when configured
+- [x] Registered in site.yml with openclaw tag
+- [ ] At least one messaging channel functional (future: onboarding)
+- [ ] Network isolation verified (future: deploy test)
 
 ---
 

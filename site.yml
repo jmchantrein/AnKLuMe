@@ -248,6 +248,18 @@
         - code_sandbox
         - provision
 
+    - name: Provisioning | Apply openclaw_server
+      ansible.builtin.include_role:
+        name: openclaw_server
+        apply:
+          tags:
+            - openclaw
+            - provision
+      when: "'openclaw_server' in (instance_roles | default([]))"
+      tags:
+        - openclaw
+        - provision
+
     - name: Provisioning | Apply firewall_router
       ansible.builtin.include_role:
         name: firewall_router

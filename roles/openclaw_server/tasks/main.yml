@@ -1,0 +1,61 @@
+---
+# OpenclawServer | Install and configure OpenClaw AI assistant
+#
+# Applied via the provisioning play (connection: community.general.incus).
+# Runs INSIDE the target container.
+#
+# OpenClaw is a self-hosted AI assistant that connects to messaging
+# platforms and drives local/remote LLMs.
+#
+# Input variables (from defaults, overridable in host_vars):
+#   - openclaw_server_port (int): web interface port
+#   - openclaw_server_llm_provider (string): llm backend
+#   - openclaw_server_ollama_url (string): Ollama API URL
+#   - openclaw_server_model (string): default model name
+#   - openclaw_server_channels (list): enabled messaging channels
+#   - openclaw_server_enabled (bool): enable systemd service
+
+- name: OpenclawServer | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: OpenclawServer | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - git
+    state: present
+    update_cache: true
+
+- name: OpenclawServer | Install OpenClaw
+  ansible.builtin.command:
+    cmd: npm install -g openclaw
+    creates: /usr/local/bin/openclaw
+
+- name: OpenclawServer | Create config directory
+  ansible.builtin.file:
+    path: /root/.config/openclaw
+    state: directory
+    mode: "0755"
+
+- name: OpenclawServer | Deploy OpenClaw configuration
+  ansible.builtin.template:
+    src: openclaw-config.json.j2
+    dest: /root/.config/openclaw/config.json
+    mode: "0644"
+  notify: OpenclawServer | Restart OpenClaw
+
+- name: OpenclawServer | Deploy systemd service
+  ansible.builtin.template:
+    src: openclaw.service.j2
+    dest: /etc/systemd/system/openclaw.service
+    mode: "0644"
+  notify: OpenclawServer | Restart OpenClaw
+
+- name: OpenclawServer | Enable and start OpenClaw service
+  ansible.builtin.systemd:
+    name: openclaw
+    enabled: "{{ openclaw_server_enabled }}"
+    state: started
+    daemon_reload: true
