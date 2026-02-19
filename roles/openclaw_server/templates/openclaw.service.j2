@@ -1,12 +1,12 @@
 [Unit]
-Description=OpenClaw AI Assistant
+Description=OpenClaw AI Assistant Gateway
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/openclaw serve --port {{ openclaw_server_port }}
-Environment="OPENCLAW_LLM_PROVIDER={{ openclaw_server_llm_provider }}"
-Environment="OPENCLAW_OLLAMA_URL={{ openclaw_server_ollama_url }}"
+ExecStart=/usr/bin/openclaw gateway --allow-unconfigured
+Environment="HOME=/root"
+Environment="OLLAMA_API_KEY={{ openclaw_server_ollama_api_key }}"
 Restart=always
 RestartSec=5
 

@@ -5,15 +5,18 @@
 # Runs INSIDE the target container.
 #
 # OpenClaw is a self-hosted AI assistant that connects to messaging
-# platforms and drives local/remote LLMs.
+# platforms and drives local/remote LLMs via its gateway daemon.
 #
 # Input variables (from defaults, overridable in host_vars):
-#   - openclaw_server_port (int): web interface port
-#   - openclaw_server_llm_provider (string): llm backend
-#   - openclaw_server_ollama_url (string): Ollama API URL
-#   - openclaw_server_model (string): default model name
-#   - openclaw_server_channels (list): enabled messaging channels
+#   - openclaw_server_ollama_url (string): Ollama API base URL
+#   - openclaw_server_ollama_api_key (string): Ollama API key (any value)
 #   - openclaw_server_enabled (bool): enable systemd service
+
+- name: OpenclawServer | Install curl for nodesource setup
+  ansible.builtin.apt:
+    name: curl
+    state: present
+    update_cache: true
 
 - name: OpenclawServer | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
   ansible.builtin.shell:
@@ -25,26 +28,27 @@
     name:
       - nodejs
       - git
-    state: present
+    state: latest
     update_cache: true
 
 - name: OpenclawServer | Install OpenClaw
   ansible.builtin.command:
-    cmd: npm install -g openclaw
-    creates: /usr/local/bin/openclaw
+    cmd: npm install -g openclaw@latest
+    creates: /usr/bin/openclaw
+  changed_when: false
 
-- name: OpenclawServer | Create config directory
+- name: OpenclawServer | Create data directory
   ansible.builtin.file:
-    path: /root/.config/openclaw
+    path: /root/.openclaw
     state: directory
     mode: "0755"
 
-- name: OpenclawServer | Deploy OpenClaw configuration
-  ansible.builtin.template:
-    src: openclaw-config.json.j2
-    dest: /root/.config/openclaw/config.json
-    mode: "0644"
-  notify: OpenclawServer | Restart OpenClaw
+- name: OpenclawServer | Configure Ollama provider
+  ansible.builtin.command:
+    cmd: >-
+      openclaw config set --json models.providers.ollama
+      '{"baseUrl":"{{ openclaw_server_ollama_url }}","apiKey":"{{ openclaw_server_ollama_api_key }}","models":[{"id":"default","name":"Default Model"}]}'
+  changed_when: false
 
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:

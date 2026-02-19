@@ -44,9 +44,6 @@ class TestOpenclawRole:
     def test_service_template_exists(self):
         assert (ROLE_DIR / "templates" / "openclaw.service.j2").is_file()
 
-    def test_config_template_exists(self):
-        assert (ROLE_DIR / "templates" / "openclaw-config.json.j2").is_file()
-
 
 # -- openclaw_server defaults -----------------------------------------
 
@@ -58,20 +55,11 @@ class TestOpenclawDefaults:
     def setup_class(cls):
         cls.content = (ROLE_DIR / "defaults" / "main.yml").read_text()
 
-    def test_port_var(self):
-        assert "openclaw_server_port" in self.content
-
-    def test_llm_provider_var(self):
-        assert "openclaw_server_llm_provider" in self.content
-
     def test_ollama_url_var(self):
         assert "openclaw_server_ollama_url" in self.content
 
-    def test_model_var(self):
-        assert "openclaw_server_model" in self.content
-
-    def test_channels_var(self):
-        assert "openclaw_server_channels" in self.content
+    def test_ollama_api_key_var(self):
+        assert "openclaw_server_ollama_api_key" in self.content
 
     def test_enabled_var(self):
         assert "openclaw_server_enabled" in self.content
@@ -96,17 +84,18 @@ class TestOpenclawTasks:
     def test_system_deps_nodejs(self):
         assert "nodejs" in self.content
 
-    def test_system_deps_git(self):
-        assert "git" in self.content
-
     def test_openclaw_install(self):
         assert "npm install -g openclaw" in self.content
 
-    def test_config_directory(self):
-        assert "/root/.config/openclaw" in self.content
+    def test_data_directory(self):
+        assert "/root/.openclaw" in self.content
 
-    def test_config_template(self):
-        assert "openclaw-config.json.j2" in self.content
+    def test_ollama_config_provider(self):
+        assert "models.providers.ollama" in self.content
+
+    def test_ollama_config_json(self):
+        assert "baseUrl" in self.content
+        assert "apiKey" in self.content
 
     def test_service_template(self):
         assert "openclaw.service.j2" in self.content
@@ -150,40 +139,24 @@ class TestOpenclawTemplates:
     @classmethod
     def setup_class(cls):
         cls.service = (ROLE_DIR / "templates" / "openclaw.service.j2").read_text()
-        cls.config = (ROLE_DIR / "templates" / "openclaw-config.json.j2").read_text()
 
     def test_service_description(self):
         assert "Description" in self.service
 
-    def test_service_execstart(self):
-        assert "ExecStart" in self.service
+    def test_service_execstart_gateway(self):
+        assert "openclaw gateway" in self.service
+
+    def test_service_allow_unconfigured(self):
+        assert "--allow-unconfigured" in self.service
 
     def test_service_wantedby(self):
         assert "WantedBy" in self.service
 
-    def test_service_port_variable(self):
-        assert "openclaw_server_port" in self.service
+    def test_service_ollama_api_key_env(self):
+        assert "OLLAMA_API_KEY" in self.service
 
-    def test_config_provider(self):
-        assert "provider" in self.config
-
-    def test_config_ollama(self):
-        assert "ollama" in self.config
-
-    def test_config_port(self):
-        assert "port" in self.config
-
-    def test_config_channels(self):
-        assert "channels" in self.config
-
-    def test_config_model(self):
-        assert "openclaw_server_model" in self.config
-
-    def test_service_llm_provider_env(self):
-        assert "OPENCLAW_LLM_PROVIDER" in self.service
-
-    def test_service_ollama_url_env(self):
-        assert "OPENCLAW_OLLAMA_URL" in self.service
+    def test_service_home_env(self):
+        assert 'HOME=/root' in self.service
 
 
 # -- site.yml registration --------------------------------------------
@@ -211,12 +184,6 @@ class TestSiteYmlRegistration:
             re.DOTALL,
         )
         assert match, "openclaw_server block not found in site.yml"
-
-    def test_appears_after_code_sandbox(self):
-        """openclaw_server appears after code_sandbox in site.yml."""
-        sandbox_pos = self.content.index("code_sandbox")
-        openclaw_pos = self.content.index("openclaw_server")
-        assert openclaw_pos > sandbox_pos
 
 
 # -- infra.yml ai-openclaw machine ------------------------------------
