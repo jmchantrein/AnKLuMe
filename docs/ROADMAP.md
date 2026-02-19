@@ -1421,13 +1421,14 @@ def check_isolation(sandbox):
 ```
 
 **Validation criteria**:
-- [ ] `make scenario-test` runs all scenarios in sandbox
-- [ ] Best-practice scenarios pass on clean deployment
-- [ ] Bad-practice scenarios verify error detection and guidance
-- [ ] Guide enhanced with pitfall warnings from bad-practice scenarios
-- [ ] Failure reports logged in structured format for debugging
-- [ ] Scenarios use pre-cached images (no redundant downloads)
-- [ ] Scenarios annotated with behavior matrix IDs where applicable
+- [x] `make scenario-test` runs all scenarios in sandbox
+- [x] Best-practice scenarios pass on clean deployment
+- [x] Bad-practice scenarios verify error detection and guidance
+- [x] Guide enhanced with pitfall warnings from bad-practice scenarios
+- [x] Failure reports logged in structured format for debugging
+- [x] Scenarios use pre-cached images (no redundant downloads)
+- [x] Scenarios annotated with behavior matrix IDs where applicable
+- [x] Step definitions modularized (conftest.py → steps/{given,when,then}.py)
 
 ---
 
@@ -2389,16 +2390,16 @@ e) **Documentation**:
 - Phase 21: Desktop Integration (clipboard, Sway, dashboard)
 
 **Next**:
-- Phase 22: End-to-End Scenario Testing (BDD) — in progress
-- Phase 23: Host Bootstrap and Thin Host Layer — planned (short-term)
-- Phase 23b: Sandboxed AI Coding Environment — planned (short-term)
+- Phase 22: End-to-End Scenario Testing (BDD) ✅
+- Phase 23: Host Bootstrap and Thin Host Layer ✅
+- Phase 23b: Sandboxed AI Coding Environment ✅
 - Phase 24: Snapshot-Before-Apply and Rollback ✅
-- Phase 25: XDG Desktop Portal for Cross-Domain File Access — planned
-- Phase 26: Native App Export (distrobox-export Style) — planned
+- Phase 25: XDG Desktop Portal for Cross-Domain File Access ✅
+- Phase 26: Native App Export (distrobox-export Style) ✅
 - Phase 27: Streaming STT (Real-Time Transcription) — long-term
 - Phase 28: Local LLM Delegation for Claude Code ✅
-- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) — planned
-- Phase 29: Codebase Simplification and Real-World Testing — partial (audit, guard consolidation, smoke done; simplification deferred)
+- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) ✅
+- Phase 29: Codebase Simplification and Real-World Testing ✅
 - Phase 30: Educational Platform and Guided Labs — long-term
 - Phase 31: Live OS with Encrypted Persistent Storage — long-term
 
