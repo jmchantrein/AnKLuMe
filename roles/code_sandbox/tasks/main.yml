@@ -1,0 +1,77 @@
+---
+# CodeSandbox | Install and configure sandboxed AI coding environment
+#
+# Applied via the provisioning play (connection: community.general.incus).
+# Runs INSIDE the target container.
+#
+# Installs Claude Code, Aider, and optionally Gemini CLI in an
+# isolated container with access to the Ollama LLM server on the
+# same ai-tools bridge. No services — tools run interactively.
+#
+# Input variables (from defaults, overridable in host_vars):
+#   - code_sandbox_claude_code (bool): install Claude Code CLI
+#   - code_sandbox_aider (bool): install Aider
+#   - code_sandbox_gemini_cli (bool): install Gemini CLI
+#   - code_sandbox_node_version (string): Node.js major version
+#   - code_sandbox_ollama_url (string): Ollama API URL
+#   - code_sandbox_ssh_agent_socket (string): SSH agent socket path
+#   - code_sandbox_projects_path (string): projects directory
+
+- name: CodeSandbox | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://deb.nodesource.com/setup_{{ code_sandbox_node_version }}.x | bash -
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: CodeSandbox | Install system dependencies
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - git
+      - python3
+      - python3-pip
+      - python3-venv
+      - curl
+      - tmux
+      - openssh-client
+    state: present
+    update_cache: true
+
+- name: CodeSandbox | Install Claude Code  # noqa: no-changed-when
+  ansible.builtin.command:
+    cmd: npm install -g @anthropic-ai/claude-code
+    creates: /usr/lib/node_modules/@anthropic-ai/claude-code
+  when: code_sandbox_claude_code
+
+- name: CodeSandbox | Install Aider  # noqa: no-changed-when
+  ansible.builtin.command:
+    cmd: pip install --break-system-packages aider-chat
+    creates: /usr/local/bin/aider
+  when: code_sandbox_aider
+
+- name: CodeSandbox | Install Gemini CLI  # noqa: no-changed-when
+  ansible.builtin.command:
+    cmd: npm install -g @google/gemini-cli
+    creates: /usr/lib/node_modules/@google/gemini-cli
+  when: code_sandbox_gemini_cli
+
+- name: CodeSandbox | Configure SSH_AUTH_SOCK in bashrc
+  ansible.builtin.lineinfile:
+    path: /root/.bashrc
+    line: "export SSH_AUTH_SOCK={{ code_sandbox_ssh_agent_socket }}"
+    regexp: '^export SSH_AUTH_SOCK='
+    create: true
+    mode: "0644"
+
+- name: CodeSandbox | Configure OLLAMA_API_BASE in bashrc
+  ansible.builtin.lineinfile:
+    path: /root/.bashrc
+    line: "export OLLAMA_API_BASE={{ code_sandbox_ollama_url }}"
+    regexp: '^export OLLAMA_API_BASE='
+    create: true
+    mode: "0644"
+
+- name: CodeSandbox | Create projects directory
+  ansible.builtin.file:
+    path: "{{ code_sandbox_projects_path }}"
+    state: directory
+    mode: "0755"

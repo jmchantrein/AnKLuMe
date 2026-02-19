@@ -286,6 +286,71 @@ SYSCTL
     fi
 }
 
+# ── Model recommendation (VRAM-based) ────────────────────
+
+recommend_models() {
+    local vram_mb="${1:-0}"
+
+    # No GPU or empty VRAM
+    if [ -z "$vram_mb" ] || [ "$vram_mb" -eq 0 ] 2>/dev/null; then
+        echo ""
+        return 0
+    fi
+
+    if [ "$vram_mb" -le 8192 ]; then
+        echo "qwen2.5-coder:7b nomic-embed-text"
+    elif [ "$vram_mb" -le 16384 ]; then
+        echo "qwen2.5-coder:14b nomic-embed-text"
+    elif [ "$vram_mb" -le 24576 ]; then
+        echo "qwen2.5-coder:32b nomic-embed-text"
+    else
+        echo "deepseek-coder-v2:latest qwen2.5-coder:32b nomic-embed-text"
+    fi
+}
+
+# ── Model provisioning ──────────────────────────────────
+
+provision_models() {
+    local vram_mb="${1:-0}"
+    local ollama_instance="${2:-ai-ollama}"
+    local project="${3:-default}"
+
+    local recommended
+    recommended=$(recommend_models "$vram_mb")
+
+    if [ -z "$recommended" ]; then
+        info "No GPU detected — skipping model provisioning"
+        return 0
+    fi
+
+    info "Recommended models for ${vram_mb} MiB VRAM: $recommended"
+
+    local models="$recommended"
+    local answer
+    answer=$(ask "Use recommended models? (or type your own list) [y/n]" "y")
+    if echo "$answer" | grep -qi "^y"; then
+        info "Using recommended models"
+    elif echo "$answer" | grep -qi "^n"; then
+        info "Skipping model provisioning"
+        return 0
+    else
+        # User typed a custom model list
+        models="$answer"
+        info "Using custom models: $models"
+    fi
+
+    # Pull each model
+    for model in $models; do
+        info "Pulling model: $model ..."
+        if incus exec "$ollama_instance" --project "$project" -- ollama pull "$model" 2>/dev/null; then
+            ok "Model $model pulled"
+        else
+            warn "Could not pull $model — Ollama may not be running yet in $ollama_instance"
+            warn "Pull manually later: incus exec $ollama_instance --project $project -- ollama pull $model"
+        fi
+    done
+}
+
 # ── GPU detection ─────────────────────────────────────────
 
 detect_gpu() {
@@ -310,6 +375,15 @@ detect_gpu() {
         answer=$(ask "Deploy AI-tools domain (stt_server, ollama)? [y/n]" "y")
         if echo "$answer" | grep -qi "^y"; then
             info "AI-tools will be deployed on next 'make apply'"
+
+            # Offer model provisioning if VRAM was detected
+            if [ -n "$vram" ] && [ "$vram" -gt 0 ] 2>/dev/null; then
+                local provision_answer
+                provision_answer=$(ask "Pre-download AI models based on GPU VRAM? [y/n]" "y")
+                if echo "$provision_answer" | grep -qi "^y"; then
+                    provision_models "$vram"
+                fi
+            fi
         else
             info "Skipping AI-tools deployment"
         fi

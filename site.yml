@@ -236,6 +236,18 @@
         - opencode
         - provision
 
+    - name: Provisioning | Apply code_sandbox
+      ansible.builtin.include_role:
+        name: code_sandbox
+        apply:
+          tags:
+            - code_sandbox
+            - provision
+      when: "'code_sandbox' in (instance_roles | default([]))"
+      tags:
+        - code_sandbox
+        - provision
+
     - name: Provisioning | Apply firewall_router
       ansible.builtin.include_role:
         name: firewall_router

@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# anklume — Host-side CLI for AnKLuMe sandboxed environments
+#
+# Usage:
+#   anklume code [dir]        Launch Claude Code in the ai-coder container
+#   anklume shell [instance]  Open a shell in a container
+#   anklume help              Show usage
+#
+# Phase 23b: Sandboxed AI Coding Environment
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# ── Helpers ──────────────────────────────────────────────
+
+info()  { echo -e "\033[0;34m[anklume]\033[0m $*"; }
+err()   { echo -e "\033[0;31m[anklume]\033[0m $*" >&2; }
+
+usage() {
+    cat <<'EOF'
+anklume — Host-side CLI for AnKLuMe sandboxed environments
+
+Usage:
+  anklume code [dir]        Launch Claude Code in the ai-coder container
+  anklume shell [instance]  Open a shell in a container
+  anklume help              Show this help
+
+Subcommands:
+
+  code [dir]
+    Launch Claude Code inside the ai-coder sandbox container.
+    If [dir] is given, that directory is bind-mounted and used as the
+    working directory. Defaults to the current directory.
+
+    SSH agent forwarding is enabled if SSH_AUTH_SOCK is set.
+
+    Examples:
+      anklume code                    # current directory
+      anklume code ~/projects/myapp   # specific project
+
+  shell [instance]
+    Open an interactive shell in a container. If no instance is given,
+    defaults to "ai-coder".
+
+    Examples:
+      anklume shell                   # shell in ai-coder
+      anklume shell ai-ollama         # shell in Ollama container
+
+  help
+    Show this help message.
+
+EOF
+    exit 0
+}
+
+# ── Resolve project for infra.yml ────────────────────────
+
+resolve_project() {
+    # Try to find the Incus project from infra.yml or group_vars
+    local project="default"
+
+    # Check group_vars for incus_project
+    local group_vars_dir="$PROJECT_ROOT/inventory/group_vars"
+    if [ -d "$group_vars_dir" ]; then
+        local project_file
+        project_file=$(grep -rl "incus_project:" "$group_vars_dir" 2>/dev/null | head -1)
+        if [ -n "$project_file" ]; then
+            project=$(grep "incus_project:" "$project_file" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+        fi
+    fi
+
+    echo "${project:-default}"
+}
+
+# ── Ensure container is running ──────────────────────────
+
+ensure_running() {
+    local instance="$1"
+    local project="$2"
+
+    if ! incus info "$instance" --project "$project" &>/dev/null 2>&1; then
+        err "Container '$instance' not found in project '$project'."
+        err "Run 'make sync && make apply' to create it."
+        exit 1
+    fi
+
+    local state
+    state=$(incus info "$instance" --project "$project" 2>/dev/null | grep -i "^Status:" | awk '{print $2}')
+    if [ "$state" != "RUNNING" ] && [ "$state" != "Running" ]; then
+        info "Starting container $instance..."
+        incus start "$instance" --project "$project"
+        sleep 2
+    fi
+}
+
+# ── Subcommand: code ─────────────────────────────────────
+
+cmd_code() {
+    local dir="${1:-.}"
+    local instance="ai-coder"
+    local project
+    project=$(resolve_project)
+
+    # Resolve to absolute path
+    dir=$(cd "$dir" 2>/dev/null && pwd) || {
+        err "Directory not found: $1"
+        exit 1
+    }
+
+    local dirname
+    dirname=$(basename "$dir")
+    local container_path="/root/projects/$dirname"
+
+    ensure_running "$instance" "$project"
+
+    # Add dynamic bind-mount for the project directory
+    local device_name="project-$dirname"
+    if ! incus config device show "$instance" --project "$project" 2>/dev/null | grep -q "$device_name:"; then
+        info "Bind-mounting $dir -> $container_path"
+        incus config device add "$instance" "$device_name" disk \
+            source="$dir" \
+            path="$container_path" \
+            --project "$project"
+    fi
+
+    # Build environment variables
+    local env_args=()
+    env_args+=("OLLAMA_API_BASE=http://10.100.4.10:11434")
+    if [ -n "${SSH_AUTH_SOCK:-}" ]; then
+        env_args+=("SSH_AUTH_SOCK=/tmp/ssh-agent.socket")
+    fi
+
+    info "Launching Claude Code in $instance ($container_path)..."
+    incus exec "$instance" --project "$project" -- \
+        env "${env_args[@]}" \
+        bash -c "cd '$container_path' && claude"
+}
+
+# ── Subcommand: shell ────────────────────────────────────
+
+cmd_shell() {
+    local instance="${1:-ai-coder}"
+    local project
+    project=$(resolve_project)
+
+    # Try domain-exec.sh first for domain context
+    local domain_exec="$PROJECT_ROOT/scripts/domain-exec.sh"
+    if [ -x "$domain_exec" ]; then
+        exec "$domain_exec" "$instance" --project "$project"
+    fi
+
+    # Fallback to plain incus exec
+    ensure_running "$instance" "$project"
+    exec incus exec "$instance" --project "$project" -- bash -l
+}
+
+# ── Main dispatcher ──────────────────────────────────────
+
+main() {
+    if [ $# -eq 0 ]; then
+        usage
+    fi
+
+    local cmd="$1"
+    shift
+
+    case "$cmd" in
+        code)   cmd_code "$@" ;;
+        shell)  cmd_shell "$@" ;;
+        help|--help|-h)  usage ;;
+        *)
+            err "Unknown command: $cmd"
+            err "Run 'anklume help' for usage."
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
