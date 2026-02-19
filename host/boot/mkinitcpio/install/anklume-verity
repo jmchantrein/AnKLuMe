@@ -1,0 +1,15 @@
+#!/bin/bash
+# anklume-verity: mkinitcpio install hook
+# Sets up dm-verity integrity verification for squashfs root
+
+build() {
+    add_binary veritysetup
+    add_binary blkid
+    add_runscript
+}
+
+help() {
+    cat <<HELPEOF
+AnKLuMe: dm-verity integrity verification for squashfs root
+HELPEOF
+}

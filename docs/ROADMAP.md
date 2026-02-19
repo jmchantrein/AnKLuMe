@@ -2350,6 +2350,7 @@ e) **Documentation**:
 
 ### Validation criteria
 
+- [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
 - [ ] Bootable image created for at least one base distro
 - [ ] Encrypted pool setup works (both ZFS and BTRFS)
 - [ ] toram mode functional (OS runs from RAM)
@@ -2401,7 +2402,7 @@ e) **Documentation**:
 - Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) ✅
 - Phase 29: Codebase Simplification and Real-World Testing ✅
 - Phase 30: Educational Platform and Guided Labs — long-term
-- Phase 31: Live OS with Encrypted Persistent Storage — long-term
+- Phase 31: Live OS with Encrypted Persistent Storage — **en cours**
 
 **Deployed infrastructure**:
 

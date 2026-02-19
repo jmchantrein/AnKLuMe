@@ -1,0 +1,3 @@
+# Built images are too large for git
+*.img
+*.sha256

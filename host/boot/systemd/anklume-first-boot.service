@@ -1,0 +1,16 @@
+[Unit]
+Description=AnKLuMe First Boot Wizard
+ConditionPathExists=!/mnt/anklume-persist/pool.conf
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/anklume/scripts/first-boot.sh
+StandardInput=tty
+StandardOutput=journal+console
+StandardError=journal+console
+TTYPath=/dev/tty1
+
+[Install]
+WantedBy=multi-user.target
