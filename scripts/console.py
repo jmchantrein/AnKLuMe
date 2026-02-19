@@ -151,7 +151,7 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
 
         for pane_idx, pane_config in enumerate(panes):
             # Use existing first pane or split to create additional panes
-            pane = window.panes[0] if pane_idx == 0 else window.split_window()
+            pane = window.panes[0] if pane_idx == 0 else window.split()
 
             # Set pane background color (server-side, cannot be spoofed)
             pane.cmd("select-pane", "-P", f"bg={color_code}")
