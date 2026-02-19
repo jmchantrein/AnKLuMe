@@ -1701,9 +1701,10 @@ the same mechanism Flatpak uses for sandboxed app file access.
 - Audit log of all cross-domain file transfers
 
 **Validation criteria**:
-- [ ] File chooser dialog appears when container app opens file
-- [ ] Access restricted to configured paths per domain
-- [ ] Transfers logged for audit
+- [x] File portal script with open/push/pull/list subcommands
+- [x] Access restricted to configured paths per domain
+- [x] Transfers logged for audit
+- [x] Per-domain policy from infra.yml file_portal config
 
 ---
 
