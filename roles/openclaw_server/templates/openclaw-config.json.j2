@@ -1,0 +1,13 @@
+{
+  "llm": {
+    "provider": "{{ openclaw_server_llm_provider }}",
+    "ollama": {
+      "url": "{{ openclaw_server_ollama_url }}",
+      "model": "{{ openclaw_server_model }}"
+    }
+  },
+  "server": {
+    "port": {{ openclaw_server_port }}
+  },
+  "channels": {{ openclaw_server_channels | to_json }}
+}
