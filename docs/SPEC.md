@@ -115,7 +115,7 @@ global:
   ai_access_policy: open            # "exclusive" or "open" (default: open)
   ai_access_default: pro            # Domain with initial access (required if exclusive)
   ai_vram_flush: true               # Flush GPU VRAM on domain switch (default: true)
-  nesting_prefix: false             # Prefix Incus names with nesting level (default: false)
+  nesting_prefix: true              # Prefix Incus names with nesting level (default: true)
   resource_policy:                  # Optional: auto-allocate CPU/memory
     host_reserve:
       cpu: "20%"                    # Reserved for host (default: 20%)
@@ -212,7 +212,7 @@ collisions when running AnKLuMe nested inside another AnKLuMe instance.
 
 ```yaml
 global:
-  nesting_prefix: true   # Default: false
+  nesting_prefix: false   # Opt-out (default: true)
 ```
 
 When enabled, the generator reads `/etc/anklume/absolute_level` (created
@@ -230,8 +230,8 @@ Ansible file paths and group names remain unprefixed (`inventory/pro.yml`,
 Incus-facing names stored in variables (`incus_project`, `incus_network.name`,
 `instance_name`). Ansible roles consume these variables transparently.
 
-When `nesting_prefix: false` (default), no prefix is applied and behavior
-is identical to previous versions.
+When `nesting_prefix: false`, no prefix is applied. This is useful when
+running AnKLuMe directly on a physical host with no nesting.
 
 ### Trust levels
 
@@ -273,7 +273,7 @@ adapt behavior based on domain trust posture.
 - `resource_policy.mode`: must be `proportional` or `equal` (if present)
 - `resource_policy.cpu_mode`: must be `allowance` or `count` (if present)
 - `resource_policy.memory_enforce`: must be `soft` or `hard` (if present)
-- `nesting_prefix`: must be a boolean if present (default: false)
+- `nesting_prefix`: must be a boolean if present (default: true)
 - `resource_policy.overcommit`: must be a boolean (if present)
 - `resource_policy.host_reserve.cpu` and `.memory`: must be `"N%"` or a
   positive number (if present)
