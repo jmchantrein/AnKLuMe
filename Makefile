@@ -342,10 +342,10 @@ llm-dev: ## Interactive local LLM dev assistant (no API credits needed)
 
 # ── Host Development Mode ─────────────────────────────────
 claude-host: ## Launch Claude Code with root access + guard hook (requires sudo)
-	@$(if $(YOLO),YOLO=1) scripts/claude-host.sh
+	@scripts/claude-host.sh
 
 claude-host-resume: ## Resume last Claude Code host session
-	@$(if $(YOLO),YOLO=1) RESUME=1 scripts/claude-host.sh
+	@RESUME=1 scripts/claude-host.sh
 
 claude-host-audit: ## Show today's host-mode audit log
 	@if [ -f "$(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl" ]; then \
