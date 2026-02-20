@@ -16,6 +16,8 @@ CONTAINER="${LLM_CONTAINER:-ollama}"
 PROJECT="${LLM_PROJECT:-ai-tools}"
 LLAMA_PORT="${LLAMA_PORT:-8081}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+LLAMA_CTX="${LLAMA_CTX:-16384}"
+LLAMA_PARALLEL="${LLAMA_PARALLEL:-1}"
 DEFAULT_MODEL="qwen2.5-coder:32b-instruct-q4_K_M"
 OLLAMA_DATA="/usr/share/ollama/.ollama"
 
@@ -90,9 +92,9 @@ ExecStart=/usr/local/bin/llama-server \\
     --host 0.0.0.0 \\
     --port ${LLAMA_PORT} \\
     -ngl 999 \\
-    -c 8192 \\
+    -c ${LLAMA_CTX:-16384} \\
     --flash-attn on \\
-    --parallel 2 \\
+    --parallel ${LLAMA_PARALLEL:-1} \\
     --cache-type-k q8_0 \\
     --cache-type-v q8_0
 Environment="PATH=/usr/local/cuda-13.1/bin:/usr/local/bin:/usr/bin:/bin"

@@ -3,7 +3,8 @@
 # Usage: scripts/upgrade.sh
 #
 # Pulls upstream changes, detects modified framework files, creates backups,
-# and regenerates managed sections. User files are never touched.
+# handles untracked file conflicts, and regenerates managed sections.
+# User files are never touched.
 
 set -euo pipefail
 
@@ -23,24 +24,35 @@ USER_FILES=(
     "roles_custom/"
 )
 
-echo "=== anklume Upgrade ==="
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+info() { printf "${CYAN}%s${NC}\n" "$1"; }
+ok()   { printf "${GREEN}%s${NC}\n" "$1"; }
+warn() { printf "${YELLOW}%s${NC}\n" "$1"; }
+die()  { printf "${RED}ERROR: %s${NC}\n" "$1" >&2; exit 1; }
+
+printf "\n${BOLD}=== AnKLuMe Upgrade ===${NC}\n\n"
 
 # Check we're in a git repository
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "ERROR: Not a git repository. Cannot upgrade."
-    exit 1
+    die "Not a git repository. Cannot upgrade."
 fi
 
 # Check for uncommitted changes — auto-stash if needed
 STASHED=false
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "Uncommitted changes detected — stashing automatically."
+    warn "Uncommitted changes detected — stashing automatically."
     git stash push -m "anklume-upgrade-$(date +%Y%m%d-%H%M%S)"
     STASHED=true
 fi
 
 # Detect locally modified framework files
-echo "--- Checking for locally modified framework files ---"
+info "--- Checking for locally modified framework files ---"
 MODIFIED=()
 for file in "${FRAMEWORK_FILES[@]}"; do
     if [ -f "$file" ] && ! git diff --quiet -- "$file" 2>/dev/null; then
@@ -50,33 +62,70 @@ done
 
 # Backup modified framework files
 if [ ${#MODIFIED[@]} -gt 0 ]; then
-    echo "Modified framework files (will be backed up):"
+    warn "Modified framework files (will be backed up):"
     for file in "${MODIFIED[@]}"; do
         backup="${file}.bak.$(date +%Y%m%d-%H%M%S)"
-        echo "  $file → $backup"
+        printf "  %s → %s\n" "$file" "$backup"
         cp "$file" "$backup"
     done
 fi
 
 # Pull upstream
-echo "--- Pulling upstream changes ---"
+info "--- Pulling upstream changes ---"
 CURRENT_BRANCH=$(git branch --show-current)
+MOVED_UNTRACKED=()
+
 if git remote | grep -q origin; then
     git fetch origin
+
+    # Detect untracked files that would conflict with incoming changes
+    # git merge fails with "The following untracked working tree files would
+    # be overwritten by merge" — we handle this proactively.
+    INCOMING_FILES=$(git diff --name-only HEAD "origin/$CURRENT_BRANCH" 2>/dev/null || true)
+    if [ -n "$INCOMING_FILES" ]; then
+        while IFS= read -r file; do
+            # File exists locally, is untracked, and incoming from upstream
+            if [ -e "$file" ] && ! git ls-files --error-unmatch "$file" &>/dev/null; then
+                backup="${file}.local-backup.$(date +%Y%m%d-%H%M%S)"
+                warn "Untracked file conflicts with upstream: $file → $backup"
+                mv "$file" "$backup"
+                MOVED_UNTRACKED+=("$file|$backup")
+            fi
+        done <<< "$INCOMING_FILES"
+    fi
+
     git merge "origin/$CURRENT_BRANCH" --no-edit || {
-        echo "ERROR: Merge conflict detected. Resolve manually."
+        printf "\n${RED}ERROR: Merge conflict detected. Resolve manually.${NC}\n"
         echo "Backups of modified files have been created (.bak)."
+        if [ ${#MOVED_UNTRACKED[@]} -gt 0 ]; then
+            echo "Moved untracked files:"
+            for entry in "${MOVED_UNTRACKED[@]}"; do
+                printf "  %s\n" "${entry#*|}"
+            done
+        fi
         if $STASHED; then
             echo "Your stashed changes can be restored with: git stash pop"
         fi
         exit 1
     }
 else
-    echo "WARNING: No 'origin' remote found. Skipping pull."
+    warn "No 'origin' remote found. Skipping pull."
+fi
+
+# Report moved untracked files
+if [ ${#MOVED_UNTRACKED[@]} -gt 0 ]; then
+    printf "\n"
+    warn "Untracked files were moved to avoid conflicts:"
+    for entry in "${MOVED_UNTRACKED[@]}"; do
+        orig="${entry%%|*}"
+        backup="${entry#*|}"
+        printf "  %s → %s\n" "$orig" "$backup"
+    done
+    echo "Review and merge manually if needed."
 fi
 
 # Regenerate managed sections
-echo "--- Regenerating managed sections ---"
+info "--- Regenerating managed sections ---"
 INFRA_SRC="infra.yml"
 if [ -d "infra" ] && [ -f "infra/base.yml" ]; then
     INFRA_SRC="infra"
@@ -84,23 +133,28 @@ fi
 
 if [ -f "$INFRA_SRC" ] || [ -d "$INFRA_SRC" ]; then
     python3 scripts/generate.py "$INFRA_SRC"
-    echo "Managed sections regenerated."
+    ok "Managed sections regenerated."
 else
-    echo "WARNING: No infra.yml or infra/ found. Skipping regeneration."
+    warn "No infra.yml or infra/ found. Skipping regeneration."
 fi
 
 # Restore stashed changes
 if $STASHED; then
-    echo "--- Restoring stashed changes ---"
+    info "--- Restoring stashed changes ---"
     if git stash pop; then
-        echo "Local changes restored."
+        ok "Local changes restored."
     else
-        echo "WARNING: Stash pop had conflicts. Resolve with: git stash show -p | git apply"
+        warn "Stash pop had conflicts. Resolve with: git stash show -p | git apply"
     fi
 fi
 
-echo ""
-echo "Upgrade complete."
+# Update version marker for notification
+if [ -d "$HOME/.anklume" ]; then
+    git rev-parse HEAD > "$HOME/.anklume/last-upgrade-commit" 2>/dev/null || true
+fi
+
+printf "\n"
+ok "Upgrade complete."
 echo "User files preserved: ${USER_FILES[*]}"
 if [ ${#MODIFIED[@]} -gt 0 ]; then
     echo "Backups created for: ${MODIFIED[*]}"
