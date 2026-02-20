@@ -340,6 +340,23 @@ llm-bench: ## Benchmark LLM inference (MODEL=<name|all> COMPARE=1)
 llm-dev: ## Interactive local LLM dev assistant (no API credits needed)
 	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
 
+# ── Host Development Mode ─────────────────────────────────
+claude-host: ## Launch Claude Code with root access + guard hook (requires sudo)
+	@scripts/claude-host.sh
+
+claude-host-resume: ## Resume last Claude Code host session
+	@RESUME=1 scripts/claude-host.sh
+
+claude-host-audit: ## Show today's host-mode audit log
+	@if [ -f "$(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl" ]; then \
+		echo "=== Audit log: $$(date +%Y-%m-%d) ==="; \
+		cat "$(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl" | python3 -c "\
+import sys, json; \
+[print(f\"{e.get('ts','?')[11:19]} {e.get('action','?'):>7} {e.get('tool','Bash')}: {e.get('cmd','')[:80]}\") \
+for e in (json.loads(l) for l in sys.stdin if l.strip())]" 2>/dev/null; \
+		echo ""; echo "Total: $$(wc -l < $(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl) entries"; \
+	else echo "No audit entries today."; fi
+
 
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
@@ -556,6 +573,8 @@ help: ## Show categorized help (use help-all for all targets)
 	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-status" "Show backend, model, VRAM"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-bench" "Benchmark inference (MODEL= COMPARE=1)"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-dev" "Local LLM dev assistant (no API credits)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make claude-host" "Claude Code with root + guard hook (sudo)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make claude-host-audit" "Show today's host-mode audit log"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make apply-ai" "Deploy all AI services"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make ai-switch DOMAIN=x" "Switch exclusive AI access"
 	@printf "\n"
@@ -624,4 +643,5 @@ help-all: ## Show all available targets
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
         export-app export-list export-remove \
         llm-switch llm-status llm-bench llm-dev \
+        claude-host claude-host-resume claude-host-audit \
         guide quickstart init install-hooks help help-all
