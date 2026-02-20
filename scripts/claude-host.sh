@@ -67,6 +67,10 @@ mkdir -p "$PROJECT_DIR/.claude" "$LOG_DIR"
 
 info "Generating host-mode settings..."
 
+# Settings file: only the guard hook.
+# Permission control is handled entirely by the guard hook (exit 0/1/2).
+# --skip-permissions disables Claude Code's built-in permission system,
+# so the "permissions" section is intentionally absent.
 cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
 {
   "hooks": {
@@ -80,64 +84,6 @@ cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Read",
-      "Edit",
-      "Write",
-      "Glob",
-      "Grep",
-      "WebFetch",
-      "WebSearch",
-      "NotebookEdit",
-      "Bash(incus *)",
-      "Bash(sudo incus *)",
-      "Bash(make *)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git branch*)",
-      "Bash(git checkout*)",
-      "Bash(git stash*)",
-      "Bash(git show*)",
-      "Bash(ansible-lint*)",
-      "Bash(yamllint*)",
-      "Bash(shellcheck*)",
-      "Bash(ruff *)",
-      "Bash(pytest *)",
-      "Bash(python3 *)",
-      "Bash(molecule *)",
-      "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(grep *)",
-      "Bash(find *)",
-      "Bash(wc *)",
-      "Bash(nvidia-smi*)",
-      "Bash(systemctl status*)",
-      "Bash(systemctl is-active*)",
-      "Bash(journalctl*)",
-      "Bash(ip *)",
-      "Bash(nft *)",
-      "Bash(curl *)",
-      "Bash(sleep *)",
-      "Bash(true)",
-      "Bash(pgrep *)",
-      "Bash(ps *)",
-      "Bash(tmux *)"
-    ],
-    "deny": [
-      "Bash(rm -rf /)",
-      "Bash(dd *of=/dev/*)",
-      "Bash(mkfs*)",
-      "Bash(reboot)",
-      "Bash(shutdown*)",
-      "Bash(poweroff)"
     ]
   }
 }
@@ -158,16 +104,16 @@ info "╔═══════════════════════�
 info "║       AnKLuMe Host Development Mode             ║"
 info "╠══════════════════════════════════════════════════╣"
 info "║  Root access:     YES (infrastructure ops)      ║"
-info "║  Guard hook:      scripts/claude-host-guard.sh  ║"
+info "║  --skip-permissions + guard hook (see below)    ║"
 info "║  Audit log:       ~/.anklume/host-audit/        ║"
 printf "  ${BLUE}[AnKLuMe]${NC} ║  Sandbox:         ${SANDBOX_COLOR}%-29s${NC}║\n" "$SANDBOX_LABEL"
-info "║  Permissions:     Scoped allowlist (not bypass)  ║"
 info "╠══════════════════════════════════════════════════╣"
-info "║  Allowed: incus, nft, systemctl, make, git,     ║"
-info "║           ansible, pytest, molecule              ║"
-info "║  Blocked: rm -rf /, dd, mkfs, reboot,           ║"
-info "║           force-push to main, passwd             ║"
-info "║  Unknown: prompts for user confirmation          ║"
+info "║  Guard hook: scripts/claude-host-guard.sh       ║"
+info "║  ALLOW: incus, nft, systemctl, make, git,       ║"
+info "║         ansible, pytest, molecule, nvidia-smi   ║"
+info "║  BLOCK: rm -rf /, dd, mkfs, reboot, shutdown,   ║"
+info "║         force-push main, curl|bash, passwd      ║"
+info "║  ASK:   anything else → user confirmation       ║"
 info "╚══════════════════════════════════════════════════╝"
 
 if [ -n "$YOLO" ]; then
@@ -185,9 +131,20 @@ info "Audit entries today: ${AUDIT_COUNT}"
 echo ""
 
 # --- Launch Claude Code ---
+#
+# Permission model (explicit):
+#   --skip-permissions   : disables Claude Code's built-in permission prompts
+#   Guard hook           : AnKLuMe-specific allow/block/ask (the REAL protection)
+#   Audit log            : every Bash command logged to ~/.anklume/host-audit/
+#
+# Without YOLO: SANDBOX=1 restricts filesystem writes to CWD (bubblewrap)
+# With    YOLO: no sandbox, full filesystem access
+#
+# The guard hook is ALWAYS active regardless of YOLO.
 
 CLAUDE_ARGS=(
     "--project-dir" "$PROJECT_DIR"
+    "--skip-permissions"
 )
 
 # Resume last session if requested
@@ -210,4 +167,5 @@ export HOME="$REAL_HOME"
 export CLAUDE_CODE_SETTINGS_FILE="$SETTINGS_FILE"
 
 cd "$PROJECT_DIR"
+info "Executing: claude --skip-permissions --project-dir $PROJECT_DIR"
 exec claude "${CLAUDE_ARGS[@]}"
