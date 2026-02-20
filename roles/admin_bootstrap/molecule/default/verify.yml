@@ -3,6 +3,18 @@
   hosts: molecule-test-instance
   gather_facts: false
   tasks:
+    - name: Verify | Check tmpfiles.d config exists
+      ansible.builtin.stat:
+        path: /etc/tmpfiles.d/incus-socket.conf
+      register: verify_tmpfiles_conf
+
+    - name: Verify | tmpfiles.d config deployed
+      ansible.builtin.assert:
+        that:
+          - verify_tmpfiles_conf.stat.exists
+          - verify_tmpfiles_conf.stat.mode == '0644'
+        fail_msg: "incus-socket.conf not deployed correctly"
+
     - name: Verify | Check systemd service file exists
       ansible.builtin.stat:
         path: /etc/systemd/system/incus-socket-dir.service
