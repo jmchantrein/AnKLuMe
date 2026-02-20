@@ -39,6 +39,18 @@
           - "'enabled' in verify_service_enabled.stdout"
         fail_msg: "incus-socket-dir.service is not enabled"
 
+    - name: Verify | Check upgrade notification script exists
+      ansible.builtin.stat:
+        path: /etc/profile.d/anklume-update-check.sh
+      register: verify_update_check
+
+    - name: Verify | Upgrade notification script deployed
+      ansible.builtin.assert:
+        that:
+          - verify_update_check.stat.exists
+          - verify_update_check.stat.mode == '0644'
+        fail_msg: "anklume-update-check.sh not deployed correctly"
+
     - name: Verify | Check git is installed
       ansible.builtin.command:
         cmd: which git
