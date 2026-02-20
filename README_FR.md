@@ -20,7 +20,7 @@
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
-[![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
+[![Roles](https://img.shields.io/badge/roles-20-informational)](roles/)
 
 > **⚠️ Ce projet est une preuve de concept en cours de développement actif. Il n'est PAS prêt pour la production. Utilisation à vos risques et périls.**
 
@@ -54,7 +54,11 @@ La philosophie [QubesOS](https://www.qubes-os.org/), mais :
 
 - **Administrateurs systemes** qui veulent cloisonner leur poste de travail
   (admin, professionnel, personnel, homelab — chacun dans son reseau isole)
-- **Enseignants** deployant des TPs reseau pour N etudiants en une commande
+- **Enseignants en informatique** deployant des TPs reseau pour N etudiants
+  en une commande
+- **Etudiants en informatique** apprenant l'administration systeme, le reseau
+  et la securite dans des environnements isoles et reproductibles qu'ils
+  peuvent casser et reconstruire librement
 - **Utilisateurs avances** qui veulent l'isolation QubesOS sans les contraintes
   QubesOS
 
@@ -154,6 +158,7 @@ le socket Incus — pas besoin de SSH.
 | | Interface web multi-fournisseur LobeChat |
 | | STT Speaches (faster-whisper, API compatible OpenAI) |
 | | Serveur de code IA headless OpenCode |
+| | Assistant IA auto-heberge OpenClaw (Telegram, multi-cerveau) |
 | | Acces reseau exclusif aux outils IA avec flush VRAM |
 | **Cycle de vie** | Snapshots (manuels + automatiques avec schedule/expiry) |
 | | Images gold avec derivation CoW |
@@ -169,7 +174,7 @@ le socket Incus — pas besoin de SSH.
 | **Reseau** | Passerelle proxy transparent Tor |
 | | Serveur d'impression CUPS avec passthrough USB/reseau |
 | | Services inter-containers via MCP |
-| **Tests** | Tests Molecule pour les 18 roles |
+| **Tests** | Tests Molecule pour les 20 roles |
 | | pytest pour le generateur PSOT (2600+ tests) |
 | | Tests de scenarios BDD (bonnes/mauvaises pratiques) |
 | | Matrice comportementale avec suivi de couverture |
@@ -196,7 +201,8 @@ le socket Incus — pas besoin de SSH.
 | **Reseau** | [Isolation reseau (nftables)](docs/network-isolation.md) |
 | | [Firewall VM dedie](docs/firewall-vm.md) |
 | | [Passerelle Tor](docs/tor-gateway.md) |
-| **Services IA** | [Acces exclusif aux outils IA](docs/ai-switch.md) |
+| **Services IA** | [Assistant IA OpenClaw](docs/openclaw_FR.md) |
+| | [Acces exclusif aux outils IA](docs/ai-switch.md) |
 | | [Service Speech-to-Text](docs/stt-service.md) |
 | **Calcul** | [Guide VM](docs/vm-support.md) |
 | | [Gestion GPU et securite](docs/gpu-advanced.md) |
@@ -251,6 +257,8 @@ Configurations `infra.yml` pretes a l'emploi :
 | `lobechat` | Interface web multi-fournisseur LobeChat |
 | `opencode_server` | Serveur de code IA headless OpenCode |
 | `firewall_router` | Routage nftables dans la firewall VM |
+| `openclaw_server` | Assistant IA auto-heberge OpenClaw |
+| `code_sandbox` | Environnement de code IA sandboxe |
 | `dev_test_runner` | Provisioning sandbox Incus-dans-Incus |
 | `dev_agent_runner` | Configuration Claude Code Agent Teams |
 
