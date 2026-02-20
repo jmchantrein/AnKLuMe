@@ -11,6 +11,7 @@
 #   make claude-host                    # Interactive mode
 #   make claude-host RESUME=1           # Resume last session
 #   make claude-host CMD="fix the bug"  # One-shot prompt
+#   make claude-host YOLO=1             # Disable sandbox (full filesystem access)
 #
 # Prerequisites: Claude Code CLI installed, root/sudo access
 set -euo pipefail
@@ -21,6 +22,7 @@ SETTINGS_FILE="$PROJECT_DIR/.claude/host-settings.json"
 LOG_DIR="${HOME}/.anklume/host-audit"
 RESUME="${RESUME:-}"
 CMD="${CMD:-}"
+YOLO="${YOLO:-}"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -144,13 +146,21 @@ SETTINGS_EOF
 # --- Print status ---
 
 echo ""
+if [ -n "$YOLO" ]; then
+    SANDBOX_LABEL="DISABLED (--yolo)"
+    SANDBOX_COLOR="${RED}"
+else
+    SANDBOX_LABEL="SANDBOX=1 (base protection)"
+    SANDBOX_COLOR="${GREEN}"
+fi
+
 info "╔══════════════════════════════════════════════════╗"
 info "║       AnKLuMe Host Development Mode             ║"
 info "╠══════════════════════════════════════════════════╣"
 info "║  Root access:     YES (infrastructure ops)      ║"
 info "║  Guard hook:      scripts/claude-host-guard.sh  ║"
 info "║  Audit log:       ~/.anklume/host-audit/        ║"
-info "║  Sandbox:         SANDBOX=1 (base protection)   ║"
+printf "  ${BLUE}[AnKLuMe]${NC} ║  Sandbox:         ${SANDBOX_COLOR}%-29s${NC}║\n" "$SANDBOX_LABEL"
 info "║  Permissions:     Scoped allowlist (not bypass)  ║"
 info "╠══════════════════════════════════════════════════╣"
 info "║  Allowed: incus, nft, systemctl, make, git,     ║"
@@ -159,6 +169,11 @@ info "║  Blocked: rm -rf /, dd, mkfs, reboot,           ║"
 info "║           force-push to main, passwd             ║"
 info "║  Unknown: prompts for user confirmation          ║"
 info "╚══════════════════════════════════════════════════╝"
+
+if [ -n "$YOLO" ]; then
+    warn "YOLO mode: sandbox disabled — Claude has full filesystem access"
+    warn "Guard hook and audit logging still active"
+fi
 echo ""
 
 # Show audit log info
@@ -188,7 +203,9 @@ if [ -n "$CMD" ]; then
 fi
 
 # Set environment and launch
-export SANDBOX=1
+if [ -z "$YOLO" ]; then
+    export SANDBOX=1
+fi
 export HOME="$REAL_HOME"
 export CLAUDE_CODE_SETTINGS_FILE="$SETTINGS_FILE"
 
