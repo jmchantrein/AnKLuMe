@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
-# Launch Claude Code with root access for AnKLuMe host development.
+# Launch Claude Code as root for AnKLuMe host development.
 #
-# This script configures Claude Code with:
-#   - AnKLuMe-specific PreToolUse guard hook (allowlist/blocklist)
+# Two modes:
+#
+#   make claude-host                 # Guarded mode: guard hook + audit log
+#   make claude-host YOLO=1          # YOLO mode: no restrictions, just SANDBOX=1
+#
+# Guarded mode:
+#   - PreToolUse guard hook (allow/block/ask per command)
 #   - Full audit logging to ~/.anklume/host-audit/
-#   - Scoped permissions for infrastructure operations
-#   - Sandbox mode (SANDBOX=1) for base protection
+#   - --skip-permissions (guard hook is the permission layer)
 #
-# Usage:
-#   make claude-host                    # Interactive mode
-#   make claude-host RESUME=1           # Resume last session
-#   make claude-host CMD="fix the bug"  # One-shot prompt
+# YOLO mode:
+#   - No guard hook, no audit, no settings file
+#   - --dangerously-skip-permissions (maximum permissiveness)
+#   - SANDBOX=1 only (required to bypass Claude Code's root refusal)
+#   - This is what you use when you need Claude to just work™
+#
+# Both modes:
+#   RESUME=1   Resume last session (--continue)
+#   CMD="..."  One-shot prompt mode (--prompt)
 #
 # Prerequisites: Claude Code CLI installed, root/sudo access
 set -euo pipefail
@@ -21,12 +30,14 @@ SETTINGS_FILE="$PROJECT_DIR/.claude/host-settings.json"
 LOG_DIR="${HOME}/.anklume/host-audit"
 RESUME="${RESUME:-}"
 CMD="${CMD:-}"
+YOLO="${YOLO:-}"
 
 # --- Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 info()  { echo -e "${BLUE}[AnKLuMe]${NC} $*"; }
@@ -35,7 +46,6 @@ error() { echo -e "${RED}[AnKLuMe]${NC} $*" >&2; }
 
 # --- Pre-flight checks ---
 
-# Must be root
 if [ "$(id -u)" -ne 0 ]; then
     error "This script must be run as root (sudo -s or sudo make claude-host)"
     error ""
@@ -46,7 +56,6 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Claude Code must be installed
 if ! command -v claude &>/dev/null; then
     error "Claude Code CLI not found. Install with:"
     error "  npm install -g @anthropic-ai/claude-code"
@@ -59,17 +68,33 @@ if [ -n "${SUDO_USER:-}" ]; then
     REAL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
 fi
 
-# --- Generate settings ---
+# --- Mode-specific setup ---
 
-mkdir -p "$PROJECT_DIR/.claude" "$LOG_DIR"
+if [ -n "$YOLO" ]; then
+    # ══════════════════════════════════════════════════
+    # YOLO MODE — no restrictions
+    # ══════════════════════════════════════════════════
+    echo ""
+    warn "╔══════════════════════════════════════════════════╗"
+    warn "║       AnKLuMe Host — ${RED}${BOLD}YOLO MODE${NC}${YELLOW}                  ║"
+    warn "╠══════════════════════════════════════════════════╣"
+    warn "║  ${RED}No guard hook, no audit, no restrictions${NC}${YELLOW}        ║"
+    warn "║  SANDBOX=1 (only to allow root execution)       ║"
+    warn "║  --dangerously-skip-permissions                 ║"
+    warn "╚══════════════════════════════════════════════════╝"
+    echo ""
 
-info "Generating host-mode settings..."
+    CLAUDE_ARGS=(
+        "--project-dir" "$PROJECT_DIR"
+        "--dangerously-skip-permissions"
+    )
+else
+    # ══════════════════════════════════════════════════
+    # GUARDED MODE — guard hook + audit
+    # ══════════════════════════════════════════════════
+    mkdir -p "$PROJECT_DIR/.claude" "$LOG_DIR"
 
-# Settings file: only the guard hook.
-# Permission control is handled entirely by the guard hook (exit 0/1/2).
-# --skip-permissions disables Claude Code's built-in permission system,
-# so the "permissions" section is intentionally absent.
-cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+    cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
 {
   "hooks": {
     "PreToolUse": [
@@ -87,64 +112,52 @@ cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
 }
 SETTINGS_EOF
 
-# --- Print status ---
+    echo ""
+    info "╔══════════════════════════════════════════════════╗"
+    info "║       AnKLuMe Host — ${GREEN}${BOLD}GUARDED MODE${NC}${BLUE}              ║"
+    info "╠══════════════════════════════════════════════════╣"
+    info "║  SANDBOX=1 + --skip-permissions + guard hook    ║"
+    info "║  Audit log: ~/.anklume/host-audit/              ║"
+    info "╠══════════════════════════════════════════════════╣"
+    info "║  Guard: scripts/claude-host-guard.sh            ║"
+    info "║  ALLOW: incus, nft, systemctl, make, git,       ║"
+    info "║         ansible, pytest, molecule, nvidia-smi   ║"
+    info "║  BLOCK: rm -rf /, dd, mkfs, reboot, shutdown,   ║"
+    info "║         force-push main, curl|bash, passwd      ║"
+    info "║  ASK:   anything else → user confirmation       ║"
+    info "╚══════════════════════════════════════════════════╝"
 
-echo ""
-info "╔══════════════════════════════════════════════════╗"
-info "║       AnKLuMe Host Development Mode             ║"
-info "╠══════════════════════════════════════════════════╣"
-info "║  SANDBOX=1        (required for root execution) ║"
-info "║  --skip-permissions + guard hook (see below)    ║"
-info "║  Audit log:       ~/.anklume/host-audit/        ║"
-info "╠══════════════════════════════════════════════════╣"
-info "║  Guard hook: scripts/claude-host-guard.sh       ║"
-info "║  ALLOW: incus, nft, systemctl, make, git,       ║"
-info "║         ansible, pytest, molecule, nvidia-smi   ║"
-info "║  BLOCK: rm -rf /, dd, mkfs, reboot, shutdown,   ║"
-info "║         force-push main, curl|bash, passwd      ║"
-info "║  ASK:   anything else → user confirmation       ║"
-info "╚══════════════════════════════════════════════════╝"
-echo ""
+    AUDIT_COUNT=0
+    if [ -f "$LOG_DIR/session-$(date +%Y%m%d).jsonl" ]; then
+        AUDIT_COUNT=$(wc -l < "$LOG_DIR/session-$(date +%Y%m%d).jsonl")
+    fi
+    info "Audit entries today: ${AUDIT_COUNT}"
+    echo ""
 
-# Show audit log info
-AUDIT_COUNT=0
-if [ -f "$LOG_DIR/session-$(date +%Y%m%d).jsonl" ]; then
-    AUDIT_COUNT=$(wc -l < "$LOG_DIR/session-$(date +%Y%m%d).jsonl")
+    CLAUDE_ARGS=(
+        "--project-dir" "$PROJECT_DIR"
+        "--skip-permissions"
+    )
+
+    export CLAUDE_CODE_SETTINGS_FILE="$SETTINGS_FILE"
 fi
-info "Audit entries today: ${AUDIT_COUNT}"
-echo ""
 
-# --- Launch Claude Code ---
-#
-# Permission model (explicit):
-#   SANDBOX=1            : mandatory for root — bubblewrap restricts writes to CWD
-#   --skip-permissions   : disables Claude Code's built-in permission prompts
-#   Guard hook           : AnKLuMe-specific allow/block/ask (the REAL protection)
-#   Audit log            : every Bash command logged to ~/.anklume/host-audit/
+# --- Common options ---
 
-CLAUDE_ARGS=(
-    "--project-dir" "$PROJECT_DIR"
-    "--skip-permissions"
-)
-
-# Resume last session if requested
 if [ -n "$RESUME" ]; then
     CLAUDE_ARGS+=("--continue")
     info "Resuming last session..."
 fi
 
-# One-shot prompt mode
 if [ -n "$CMD" ]; then
     CLAUDE_ARGS+=("--prompt" "$CMD")
     info "Running: $CMD"
 fi
 
-# Set environment and launch
-# SANDBOX=1 is mandatory — Claude Code refuses to run as root without it
+# SANDBOX=1 is required — Claude Code refuses to run as root without it
 export SANDBOX=1
 export HOME="$REAL_HOME"
-export CLAUDE_CODE_SETTINGS_FILE="$SETTINGS_FILE"
 
 cd "$PROJECT_DIR"
-info "Executing: claude --skip-permissions --project-dir $PROJECT_DIR"
+info "Executing: claude ${CLAUDE_ARGS[*]}"
 exec claude "${CLAUDE_ARGS[@]}"
