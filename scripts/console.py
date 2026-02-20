@@ -176,8 +176,16 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
         window.cmd("set-window-option", "window-status-current-style", f"bg={color_code},fg=white,bold")
 
         for pane_idx, pane_config in enumerate(panes):
-            # Use existing first pane or split to create additional panes
-            pane = window.panes[0] if pane_idx == 0 else window.split()
+            if pane_idx == 0:
+                pane = window.panes[0]
+            else:
+                try:
+                    pane = window.split()
+                except Exception as exc:
+                    print(f"  Warning: cannot split pane for "
+                          f"{pane_config['machine']} ({exc}). "
+                          f"Terminal too small? Skipping.")
+                    continue
 
             # Set pane background color (server-side, cannot be spoofed)
             pane.cmd("select-pane", "-P", f"bg={color_code}")
@@ -188,7 +196,7 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
             pane.send_keys(pane_config["command"])
 
         # Set tiled layout for multi-pane windows
-        if len(panes) > 1:
+        if len(window.panes) > 1:
             window.select_layout("tiled")
 
     # Select first window
