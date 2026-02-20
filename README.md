@@ -17,7 +17,7 @@
 [![ansible-lint](https://img.shields.io/badge/ansible--lint-production-brightgreen)](https://ansible.readthedocs.io/projects/lint/)
 [![shellcheck](https://img.shields.io/badge/shellcheck-passing-brightgreen)](https://www.shellcheck.net/)
 [![ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://docs.astral.sh/ruff/)
-[![Roles](https://img.shields.io/badge/roles-18-informational)](roles/)
+[![Roles](https://img.shields.io/badge/roles-20-informational)](roles/)
 
 > **⚠️ This project is a proof of concept under active development. It is NOT production-ready. Use at your own risk.**
 
@@ -49,7 +49,9 @@ Think [QubesOS](https://www.qubes-os.org/) philosophy, but:
 
 - **Sysadmins** who want to compartmentalize their workstation (admin,
   professional, personal, homelab — each in its own isolated network)
-- **Teachers** deploying networking labs for N students with one command
+- **CS teachers** deploying networking labs for N students with one command
+- **CS students** learning system administration, networking, and security
+  in reproducible, isolated sandboxes they can break and rebuild freely
 - **Power users** who want QubesOS-like isolation without the QubesOS
   constraints
 
@@ -148,6 +150,7 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | | LobeChat multi-provider web UI |
 | | Speaches STT (faster-whisper, OpenAI-compatible API) |
 | | OpenCode headless AI coding server |
+| | OpenClaw self-hosted AI assistant (Telegram, multi-brain) |
 | | Exclusive AI-tools network access with VRAM flush |
 | **Lifecycle** | Snapshots (manual + automatic with schedule/expiry) |
 | | Golden images with CoW-based derivation |
@@ -163,7 +166,7 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | **Networking** | Tor transparent proxy gateway |
 | | CUPS print server with USB/network printer passthrough |
 | | MCP inter-container services |
-| **Testing** | Molecule tests for all 18 roles |
+| **Testing** | Molecule tests for all 20 roles |
 | | pytest for the PSOT generator (2600+ tests) |
 | | BDD scenario tests (best/bad practices) |
 | | Behavior matrix with coverage tracking |
@@ -190,7 +193,8 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | **Networking** | [Network isolation (nftables)](docs/network-isolation.md) |
 | | [Dedicated firewall VM](docs/firewall-vm.md) |
 | | [Tor gateway](docs/tor-gateway.md) |
-| **AI services** | [Exclusive AI-tools access](docs/ai-switch.md) |
+| **AI services** | [OpenClaw AI assistant](docs/openclaw.md) |
+| | [Exclusive AI-tools access](docs/ai-switch.md) |
 | | [Speech-to-Text service](docs/stt-service.md) |
 | **Compute** | [VM support guide](docs/vm-support.md) |
 | | [GPU management and security](docs/gpu-advanced.md) |
@@ -245,6 +249,8 @@ Ready-to-use `infra.yml` configurations:
 | `lobechat` | LobeChat multi-provider web UI |
 | `opencode_server` | OpenCode headless AI coding server |
 | `firewall_router` | nftables routing inside firewall VM |
+| `openclaw_server` | OpenClaw self-hosted AI assistant |
+| `code_sandbox` | Sandboxed AI coding environment |
 | `dev_test_runner` | Incus-in-Incus sandbox provisioning |
 | `dev_agent_runner` | Claude Code Agent Teams setup |
 
