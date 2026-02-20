@@ -38,6 +38,7 @@ _exec() {
 
 die() { echo -e "${RED}ERROR: $1${NC}" >&2; exit 1; }
 info() { echo -e "${CYAN}$1${NC}"; }
+warn() { echo -e "${YELLOW}$1${NC}"; }
 
 bench_endpoint() {
     # Benchmark a single endpoint+model combination

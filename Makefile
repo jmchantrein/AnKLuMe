@@ -326,22 +326,20 @@ ai-develop: ## Autonomous development (TASK="description" AI_MODE=backend)
 	ANKLUME_AI_DRY_RUN=$(or $(DRY_RUN),true) \
 	scripts/ai-develop.sh "$(TASK)"
 
-# ── Local LLM Dev Assistant ──────────────────────────────
-ollama-dev: ## Interactive local LLM dev assistant (no API credits needed)
-	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
-
 # ── LLM Backend Management ──────────────────────────────
-switch-llama: ## Switch to llama-server backend (MODEL=<name>, default: qwen2.5-coder:32b)
-	scripts/llm-switch.sh llama $(MODEL)
-
-switch-ollama: ## Switch to Ollama backend (dynamic model loading)
-	scripts/llm-switch.sh ollama
+llm-switch: ## Switch LLM backend (B=llama|ollama [MODEL=<name>])
+	@test -n "$(B)" || { echo "Usage: make llm-switch B=llama|ollama [MODEL=<name>]"; exit 1; }
+	scripts/llm-switch.sh $(B) $(MODEL)
 
 llm-status: ## Show active LLM backend, model, and VRAM usage
 	scripts/llm-switch.sh status
 
 llm-bench: ## Benchmark LLM inference (MODEL=<name|all> COMPARE=1)
 	scripts/llm-bench.sh $(if $(MODEL),--model $(MODEL)) $(if $(COMPARE),--compare)
+
+llm-dev: ## Interactive local LLM dev assistant (no API credits needed)
+	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
+
 
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
@@ -500,6 +498,12 @@ flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
 upgrade: ## Safe framework update with conflict detection
 	@scripts/upgrade.sh
 
+install-update-notifier: ## Install login notification for available updates
+	@printf '#!/bin/sh\n[ -x %s/scripts/update-check.sh ] && %s/scripts/update-check.sh %s\n' \
+		"$$(pwd)" "$$(pwd)" "$$(pwd)" > /etc/profile.d/anklume-update-check.sh
+	@chmod +x /etc/profile.d/anklume-update-check.sh
+	@echo "Update notifier installed in /etc/profile.d/anklume-update-check.sh"
+
 import-infra: ## Generate infra.yml from existing Incus state
 	@scripts/import-infra.sh $(if $(O),-o $(O))
 
@@ -530,21 +534,67 @@ install-hooks: ## Install git pre-commit hooks
 	@echo "Git hooks installed. Use --no-verify to bypass."
 
 # ── Help ──────────────────────────────────────────────────
-help: ## Show this help
-	@echo ""
-	@echo "  AnKLuMe — Infrastructure Compartmentalization"
-	@echo ""
-	@echo "  GETTING STARTED:"
-	@echo "    make init        Install Ansible dependencies"
-	@echo "    make quickstart  Copy example infra.yml and sync"
-	@echo "    make guide       Interactive step-by-step tutorial"
-	@echo ""
-	@echo "  ALL TARGETS:"
-	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | sort | \
-		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@echo ""
+help: ## Show categorized help (use help-all for all targets)
+	@printf "\n"
+	@printf "  \033[1mAnKLuMe\033[0m — Infrastructure Compartmentalization\n"
+	@printf "\n"
+	@printf "  \033[1mGETTING STARTED\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make guide" "Interactive step-by-step tutorial"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make quickstart" "Copy example infra.yml and sync"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make init" "Install Ansible dependencies"
+	@printf "\n"
+	@printf "  \033[1mINFRASTRUCTURE\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make sync" "Generate Ansible files from infra.yml"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make sync-dry" "Preview changes without writing"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make apply" "Apply full infrastructure + provisioning"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make apply-limit G=x" "Apply a single domain"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make check" "Dry-run (--check --diff)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make doctor" "Diagnose infrastructure health"
+	@printf "\n"
+	@printf "  \033[1mLLM & AI\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-switch B=x" "Switch backend (B=llama|ollama [MODEL=])"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-status" "Show backend, model, VRAM"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-bench" "Benchmark inference (MODEL= COMPARE=1)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-dev" "Local LLM dev assistant (no API credits)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make apply-ai" "Deploy all AI services"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make ai-switch DOMAIN=x" "Switch exclusive AI access"
+	@printf "\n"
+	@printf "  \033[1mSNAPSHOTS & ROLLBACK\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make snapshot" "Snapshot all instances"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make restore NAME=x" "Restore a snapshot"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make rollback" "Restore last pre-apply snapshot"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make rollback-list" "List pre-apply snapshots"
+	@printf "\n"
+	@printf "  \033[1mNETWORK & SECURITY\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make nftables" "Generate isolation rules"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make nftables-deploy" "Deploy rules on host"
+	@printf "\n"
+	@printf "  \033[1mTESTING & QUALITY\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make lint" "Run all validators"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make test" "Run all tests"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make smoke" "Real-world smoke test"
+	@printf "\n"
+	@printf "  \033[1mDESKTOP\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make console" "Launch tmux domain-colored console"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make dashboard" "Web dashboard (PORT=8888)"
+	@printf "\n"
+	@printf "  \033[1mLIFECYCLE\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make upgrade" "Safe framework update"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make flush" "Destroy all infrastructure (FORCE=true)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make import-infra" "Generate infra.yml from Incus state"
+	@printf "\n"
+	@printf "  Run \033[36mmake help-all\033[0m for all targets.\n"
+	@printf "\n"
 
-.PHONY: sync sync-dry sync-clean console ollama-dev lint lint-yaml lint-ansible lint-shell \
+help-all: ## Show all available targets
+	@printf "\n"
+	@printf "  \033[1mAnKLuMe\033[0m — All targets\n"
+	@printf "\n"
+	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | sort | \
+		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-22s\033[0m %s\n", $$1, $$2}'
+	@printf "\n"
+
+.PHONY: sync sync-dry sync-clean console lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         export-images \
@@ -559,7 +609,7 @@ help: ## Show this help
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
         build-image live-update live-status \
-        flush upgrade import-infra \
+        flush upgrade install-update-notifier import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
         file-copy backup restore-backup \
@@ -569,9 +619,9 @@ help: ## Show this help
         mcp-list mcp-call \
         apply-tor apply-print \
         dead-code call-graph dep-graph code-graph \
-        audit audit-json smoke \
+        audit audit-json smoke doctor \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
         export-app export-list export-remove \
-        switch-llama switch-ollama llm-status llm-bench \
-        guide quickstart init install-hooks help
+        llm-switch llm-status llm-bench llm-dev \
+        guide quickstart init install-hooks help help-all

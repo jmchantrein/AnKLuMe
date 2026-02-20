@@ -2364,6 +2364,103 @@ e) **Documentation**:
 
 ---
 
+## Phase 32: Makefile UX and Robustness
+
+**Goal**: Make the CLI user-friendly for end users by categorizing
+targets, fixing naming inconsistencies, and improving robustness
+of existing scripts.
+
+**Prerequisites**: Phase 28 (LLM backend switching).
+
+**Deliverables**:
+
+a) **Bug fixes** (`scripts/llm-bench.sh`):
+   - Add missing `warn()` function (crashes with `set -e`)
+   - Add `safe_switch()` helper to handle backend switch failures
+   - Protect all 4 `llm-switch.sh` calls in compare/model-all flows
+   - Show FAILED in results table instead of crashing
+
+b) **Target renaming** (Makefile):
+   - `switch-llama` + `switch-ollama` → `llm-switch` (`B=llama|ollama`)
+   - `ollama-dev` → `llm-dev`
+   - All LLM targets consistently prefixed with `llm-*`
+
+c) **Categorized help** (Makefile):
+   - `make help` shows ~28 user-facing targets, grouped by category
+     (Getting Started, Core, Snapshots, LLM, Console, Instances, Lifecycle)
+   - `make help-all` shows all 110+ targets (current behavior)
+   - Hardcoded curated help for stability, dynamic grep for help-all
+
+d) **Robust upgrade** (`scripts/upgrade.sh`):
+   - Detect untracked files conflicting with incoming merge
+   - Move conflicts to `/tmp/anklume-upgrade-backup-<timestamp>/`
+   - Report what was moved and how to restore
+
+e) **Upgrade notification** (admin_bootstrap role):
+   - `/etc/profile.d/anklume-update-check.sh` in anklume-instance
+   - On login: check for upstream commits, show colored message
+   - Non-blocking (background fetch with timeout)
+
+**Validation criteria**:
+- [ ] `make help` shows ~28 targets in categories
+- [ ] `make help-all` shows all targets
+- [ ] `make llm-switch B=llama` works
+- [ ] `make llm-bench COMPARE=1` does not crash on switch failure
+- [ ] `make upgrade` handles untracked file conflicts gracefully
+- [ ] Login to anklume-instance shows update notification when available
+
+---
+
+## Phase 33: Student Mode and Internationalization
+
+**Goal**: Make AnKLuMe a learning tool with bilingual CLI support
+and transparent command execution for educational contexts.
+
+**Prerequisites**: Phase 32 (Makefile UX), Phase 30 (educational platform).
+
+**Deliverables**:
+
+a) **CLI profiles** (`~/.anklume/mode`):
+   - `make mode-student` / `make mode-user` / `make mode-dev`
+   - Persisted in `~/.anklume/mode`, affects `make help` output
+   - User mode (default): ~28 targets
+   - Student mode: same targets + bilingual display + transparent mode
+   - Dev mode: all 110+ targets
+
+b) **Bilingual commands** (student mode):
+   - Each user-facing target shows English command + French explanation
+   - Example: `sync — Génère les fichiers Ansible depuis infra.yml`
+   - Translation file: `i18n/fr.yml` (command → description mapping)
+
+c) **Transparent mode** (student mode):
+   - When running an abstraction (e.g., `make apply`), display the
+     underlying commands as they execute with brief explanations
+   - Example output:
+     ```
+     make apply
+       → ansible-playbook site.yml
+         Applique le playbook principal sur toute l'infrastructure
+       → incus launch images:debian/13 pro-dev --project pro
+         Crée le conteneur pro-dev dans le projet Incus "pro"
+     ```
+   - Not too verbose: one line per significant step
+   - Implemented via Makefile wrapper or Ansible callback plugin
+
+d) **Internationalization (i18n)**:
+   - `ANKLUME_LANG=fr` environment variable
+   - French translations for CLI messages (help, guide, errors)
+   - Extends existing `*_FR.md` documentation convention (ADR-011)
+   - Translation files in `i18n/` directory
+
+**Validation criteria**:
+- [ ] `make mode-student` activates student mode
+- [ ] Student mode shows bilingual help
+- [ ] Transparent mode displays underlying commands during execution
+- [ ] `ANKLUME_LANG=fr make help` shows French descriptions
+- [ ] Mode persists across sessions
+
+---
+
 ## Current State
 
 **Completed**:
@@ -2403,6 +2500,8 @@ e) **Documentation**:
 - Phase 29: Codebase Simplification and Real-World Testing ✅
 - Phase 30: Educational Platform and Guided Labs — long-term
 - Phase 31: Live OS with Encrypted Persistent Storage — **en cours**
+- Phase 32: Makefile UX and Robustness — **court terme**
+- Phase 33: Student Mode and Internationalization — long-term
 
 **Deployed infrastructure**:
 
