@@ -357,6 +357,31 @@ for e in (json.loads(l) for l in sys.stdin if l.strip())]" 2>/dev/null; \
 		echo ""; echo "Total: $$(wc -l < $(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl) entries"; \
 	else echo "No audit entries today."; fi
 
+# ── MCP Dev Server (OpenClaw integration) ─────────────────
+ANKLUME_INSTANCE ?= anklume-instance
+
+mcp-dev-start: ## Start the AnKLuMe MCP dev server in anklume-instance
+	@echo "Deploying MCP dev server to $(ANKLUME_INSTANCE)..."
+	@incus file push scripts/mcp-anklume-dev.py $(ANKLUME_INSTANCE)/root/AnKLuMe/scripts/mcp-anklume-dev.py
+	@incus file push scripts/mcp-anklume-dev.service $(ANKLUME_INSTANCE)/etc/systemd/system/mcp-anklume-dev.service
+	@incus exec $(ANKLUME_INSTANCE) -- bash -c '\
+		pip install --quiet --break-system-packages --ignore-installed "mcp[cli]" 2>/dev/null || true; \
+		systemctl daemon-reload; \
+		systemctl enable --now mcp-anklume-dev.service; \
+		sleep 1; \
+		systemctl is-active mcp-anklume-dev.service'
+	@echo "MCP dev server running on $(ANKLUME_INSTANCE):9090"
+	@echo "Tools: git_status, git_log, make_target, run_tests, incus_list, incus_exec, read_file, claude_code, lint"
+
+mcp-dev-stop: ## Stop the AnKLuMe MCP dev server
+	@incus exec $(ANKLUME_INSTANCE) -- systemctl disable --now mcp-anklume-dev.service 2>/dev/null || true
+	@echo "MCP dev server stopped."
+
+mcp-dev-status: ## Show MCP dev server status
+	@incus exec $(ANKLUME_INSTANCE) -- systemctl status mcp-anklume-dev.service --no-pager 2>/dev/null || echo "MCP dev server is not running."
+
+mcp-dev-logs: ## Show MCP dev server logs
+	@incus exec $(ANKLUME_INSTANCE) -- journalctl -u mcp-anklume-dev.service --no-pager -n 50
 
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
@@ -575,6 +600,8 @@ help: ## Show categorized help (use help-all for all targets)
 	@printf "    \033[36m%-22s\033[0m %s\n" "make llm-dev" "Local LLM dev assistant (no API credits)"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make claude-host" "Claude Code with root + guard hook (sudo)"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make claude-host-audit" "Show today's host-mode audit log"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make mcp-dev-start" "Start MCP dev server (OpenClaw)"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make mcp-dev-stop" "Stop MCP dev server"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make apply-ai" "Deploy all AI services"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make ai-switch DOMAIN=x" "Switch exclusive AI access"
 	@printf "\n"
@@ -644,4 +671,5 @@ help-all: ## Show all available targets
         export-app export-list export-remove \
         llm-switch llm-status llm-bench llm-dev \
         claude-host claude-host-resume claude-host-audit \
+        mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
         guide quickstart init install-hooks help help-all
