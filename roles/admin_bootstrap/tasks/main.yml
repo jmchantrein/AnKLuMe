@@ -29,6 +29,14 @@
     enabled: true
     daemon_reload: "{{ admin_bootstrap_socket_service.changed }}"
 
+- name: AdminBootstrap | Deploy upgrade notification script
+  ansible.builtin.copy:
+    src: anklume-update-check.sh
+    dest: /etc/profile.d/anklume-update-check.sh
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: AdminBootstrap | Install admin packages
   ansible.builtin.apt:
     name: "{{ admin_bootstrap_packages }}"
