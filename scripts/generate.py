@@ -47,11 +47,11 @@ def _read_absolute_level():
 def _get_nesting_prefix(infra):
     """Compute nesting prefix string from infra config.
 
-    Returns a prefix like "001-" if nesting_prefix is enabled,
-    or "" if disabled (default).
+    Returns a prefix like "001-" if nesting_prefix is enabled (default),
+    or "" if explicitly disabled.
     """
     g = infra.get("global", {})
-    if not g.get("nesting_prefix", False):
+    if not g.get("nesting_prefix", True):
         return ""
     level = _read_absolute_level()
     if level is None:

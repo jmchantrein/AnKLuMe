@@ -1947,7 +1947,7 @@ class TestSnapshotsSchedule:
 
 
 class TestNestingPrefix:
-    """Tests for global.nesting_prefix opt-in feature."""
+    """Tests for global.nesting_prefix feature (enabled by default)."""
 
     @pytest.fixture()
     def sample_infra(self):
@@ -1970,21 +1970,23 @@ class TestNestingPrefix:
             },
         }
 
-    def test_prefix_disabled_by_default(self, sample_infra, tmp_path):
-        """Without nesting_prefix, Incus names are unprefixed."""
+    def test_prefix_enabled_by_default(self, sample_infra, tmp_path, monkeypatch):
+        """Without explicit nesting_prefix, Incus names are prefixed (default: true)."""
+        monkeypatch.setattr("generate._read_absolute_level", lambda: 1)
         generate(sample_infra, tmp_path)
         gv = (tmp_path / "group_vars" / "pro.yml").read_text()
-        assert "incus_project: pro" in gv
-        assert "name: net-pro" in gv
+        assert "incus_project: 001-pro" in gv
+        assert "name: 001-net-pro" in gv
         hv = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
-        assert "instance_name: pro-dev" in hv
+        assert "instance_name: 001-pro-dev" in hv
 
-    def test_prefix_false_no_effect(self, sample_infra, tmp_path):
-        """nesting_prefix: false has no effect (same as default)."""
+    def test_prefix_false_disables(self, sample_infra, tmp_path):
+        """nesting_prefix: false disables prefixing."""
         sample_infra["global"]["nesting_prefix"] = False
         generate(sample_infra, tmp_path)
         gv = (tmp_path / "group_vars" / "pro.yml").read_text()
         assert "incus_project: pro" in gv
+        assert "name: net-pro" in gv
 
     def test_prefix_enabled(self, sample_infra, tmp_path, monkeypatch):
         """nesting_prefix: true prefixes Incus names with nesting level."""
