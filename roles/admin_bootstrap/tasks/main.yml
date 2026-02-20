@@ -6,6 +6,14 @@
 #
 # This role is applied only to hosts in the 'admin' group.
 
+- name: AdminBootstrap | Deploy tmpfiles.d for Incus socket directory
+  ansible.builtin.copy:
+    src: incus-socket.conf
+    dest: /etc/tmpfiles.d/incus-socket.conf
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: AdminBootstrap | Deploy incus-socket-dir systemd service
   ansible.builtin.copy:
     src: incus-socket-dir.service
