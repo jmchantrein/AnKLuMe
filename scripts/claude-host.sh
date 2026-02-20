@@ -11,7 +11,6 @@
 #   make claude-host                    # Interactive mode
 #   make claude-host RESUME=1           # Resume last session
 #   make claude-host CMD="fix the bug"  # One-shot prompt
-#   make claude-host YOLO=1             # Disable sandbox (full filesystem access)
 #
 # Prerequisites: Claude Code CLI installed, root/sudo access
 set -euo pipefail
@@ -22,7 +21,6 @@ SETTINGS_FILE="$PROJECT_DIR/.claude/host-settings.json"
 LOG_DIR="${HOME}/.anklume/host-audit"
 RESUME="${RESUME:-}"
 CMD="${CMD:-}"
-YOLO="${YOLO:-}"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -92,21 +90,12 @@ SETTINGS_EOF
 # --- Print status ---
 
 echo ""
-if [ -n "$YOLO" ]; then
-    SANDBOX_LABEL="DISABLED (--yolo)"
-    SANDBOX_COLOR="${RED}"
-else
-    SANDBOX_LABEL="SANDBOX=1 (base protection)"
-    SANDBOX_COLOR="${GREEN}"
-fi
-
 info "╔══════════════════════════════════════════════════╗"
 info "║       AnKLuMe Host Development Mode             ║"
 info "╠══════════════════════════════════════════════════╣"
-info "║  Root access:     YES (infrastructure ops)      ║"
+info "║  SANDBOX=1        (required for root execution) ║"
 info "║  --skip-permissions + guard hook (see below)    ║"
 info "║  Audit log:       ~/.anklume/host-audit/        ║"
-printf "  ${BLUE}[AnKLuMe]${NC} ║  Sandbox:         ${SANDBOX_COLOR}%-29s${NC}║\n" "$SANDBOX_LABEL"
 info "╠══════════════════════════════════════════════════╣"
 info "║  Guard hook: scripts/claude-host-guard.sh       ║"
 info "║  ALLOW: incus, nft, systemctl, make, git,       ║"
@@ -115,11 +104,6 @@ info "║  BLOCK: rm -rf /, dd, mkfs, reboot, shutdown,   ║"
 info "║         force-push main, curl|bash, passwd      ║"
 info "║  ASK:   anything else → user confirmation       ║"
 info "╚══════════════════════════════════════════════════╝"
-
-if [ -n "$YOLO" ]; then
-    warn "YOLO mode: sandbox disabled — Claude has full filesystem access"
-    warn "Guard hook and audit logging still active"
-fi
 echo ""
 
 # Show audit log info
@@ -133,14 +117,10 @@ echo ""
 # --- Launch Claude Code ---
 #
 # Permission model (explicit):
+#   SANDBOX=1            : mandatory for root — bubblewrap restricts writes to CWD
 #   --skip-permissions   : disables Claude Code's built-in permission prompts
 #   Guard hook           : AnKLuMe-specific allow/block/ask (the REAL protection)
 #   Audit log            : every Bash command logged to ~/.anklume/host-audit/
-#
-# Without YOLO: SANDBOX=1 restricts filesystem writes to CWD (bubblewrap)
-# With    YOLO: no sandbox, full filesystem access
-#
-# The guard hook is ALWAYS active regardless of YOLO.
 
 CLAUDE_ARGS=(
     "--project-dir" "$PROJECT_DIR"
@@ -160,9 +140,8 @@ if [ -n "$CMD" ]; then
 fi
 
 # Set environment and launch
-if [ -z "$YOLO" ]; then
-    export SANDBOX=1
-fi
+# SANDBOX=1 is mandatory — Claude Code refuses to run as root without it
+export SANDBOX=1
 export HOME="$REAL_HOME"
 export CLAUDE_CODE_SETTINGS_FILE="$SETTINGS_FILE"
 
