@@ -7,12 +7,12 @@
 #   scripts/llm-switch.sh status          # Show active backend, model, VRAM
 #
 # Runs from anklume-instance or the host. Executes service commands
-# in the ollama container via incus exec.
+# in the gpu-server container via incus exec.
 
 set -euo pipefail
 
 # Configurable
-CONTAINER="${LLM_CONTAINER:-ollama}"
+CONTAINER="${LLM_CONTAINER:-gpu-server}"
 PROJECT="${LLM_PROJECT:-ai-tools}"
 LLAMA_PORT="${LLAMA_PORT:-8081}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"

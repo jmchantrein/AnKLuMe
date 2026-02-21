@@ -792,7 +792,7 @@ c) **infra/ directory support**:
    - Backward compatible with infra.yml
 
 d) **AI tools domain**:
-   - New `ai-tools` domain with 4 machines (ai-ollama, ai-openwebui, ai-lobechat, ai-opencode)
+   - New `ai-tools` domain with 4 machines (gpu-server, ai-openwebui, ai-lobechat, ai-opencode)
    - New roles: `lobechat` (LobeChat web UI), `opencode_server` (OpenCode headless server)
    - Example `examples/ai-tools/` with full AI stack configuration
    - `make apply-ai` target for deploying all AI roles

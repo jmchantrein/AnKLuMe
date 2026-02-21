@@ -49,7 +49,7 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      ai-ollama:
+      gpu-server:
         description: "Ollama LLM server + STT"
         type: lxc
         ip: "10.100.4.10"
@@ -94,6 +94,6 @@ network_policies:
 
   - description: "Host accesses Ollama API directly"
     from: host
-    to: ai-ollama
+    to: gpu-server
     ports: [11434]
     protocol: tcp

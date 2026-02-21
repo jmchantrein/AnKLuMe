@@ -46,7 +46,7 @@ Subcommands:
 
     Examples:
       anklume shell                   # shell in ai-coder
-      anklume shell ai-ollama         # shell in Ollama container
+      anklume shell gpu-server         # shell in GPU server container
 
   help
     Show this help message.

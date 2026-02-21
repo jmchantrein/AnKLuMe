@@ -207,7 +207,7 @@ def incus_exec(instance: str, command: str) -> str:
     """Execute a command inside an Incus instance.
 
     Args:
-        instance: Instance name (e.g., "ollama", "pw-dev")
+        instance: Instance name (e.g., "gpu-server", "pw-dev")
         command: Command to run inside the instance
     """
     # Safety: block destructive commands (match at word boundary)
@@ -703,7 +703,7 @@ _LLAMA_SERVICES = {
     "assistant": "llama-server",     # qwen2.5-coder:32b
     "local": "llama-server-chat",    # qwen3:30b-a3b
 }
-OLLAMA_CONTAINER = "ollama"
+GPU_CONTAINER = "gpu-server"
 
 OPENCLAW_CONTAINER = "openclaw"
 OPENCLAW_PROJECT = "ai-tools"
@@ -824,10 +824,10 @@ def switch_brain(mode: str) -> str:
     if "ok" not in r["stdout"]:
         return f"\u2699\ufe0f **[proxy]** Failed to update config: {r['stderr']}"
 
-    # Switch llama-server model in the ollama container
+    # Switch llama-server model in the gpu-server container
     target_svc = _LLAMA_SERVICES.get(mode, "llama-server")
     _run([
-        "incus", "exec", OLLAMA_CONTAINER, "--project", OPENCLAW_PROJECT, "--",
+        "incus", "exec", GPU_CONTAINER, "--project", OPENCLAW_PROJECT, "--",
         "bash", "-c",
         f"systemctl is-active --quiet {target_svc} || "
         f"{{ systemctl stop llama-server llama-server-chat 2>/dev/null; "

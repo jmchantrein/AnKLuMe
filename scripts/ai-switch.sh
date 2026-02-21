@@ -13,6 +13,8 @@ DRY_RUN=false
 STATE_FILE="/opt/anklume/ai-access-current"
 LOG_DIR="/var/log/anklume"
 LOG_FILE="$LOG_DIR/ai-switch.log"
+GPU_CONTAINER="${GPU_CONTAINER:-gpu-server}"
+AI_PROJECT="${AI_PROJECT:-ai-tools}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "INFO: $*"; }
@@ -137,12 +139,10 @@ fi
 
 # --- Step 1: Stop GPU services in ai-tools ---
 info "Stopping GPU services in ai-tools domain..."
-# Find the AI project (default to ai-tools)
-AI_PROJECT="ai-tools"
 
 # Try to stop services gracefully; don't fail if they don't exist
 for service in ollama speaches; do
-    incus exec ai-ollama --project "$AI_PROJECT" -- \
+    incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
         systemctl stop "$service" 2>/dev/null || true
 done
 
@@ -150,10 +150,10 @@ done
 if [[ "$FLUSH_VRAM" == "true" ]]; then
     info "Flushing VRAM..."
     # Kill remaining GPU processes via nvidia-smi
-    incus exec ai-ollama --project "$AI_PROJECT" -- \
+    incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
         bash -c 'nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | xargs -r kill -9' 2>/dev/null || true
     # Attempt GPU reset (may fail on some hardware, non-fatal)
-    incus exec ai-ollama --project "$AI_PROJECT" -- \
+    incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
         nvidia-smi --gpu-reset 2>/dev/null || warn "GPU reset not supported (non-fatal)"
     info "VRAM flush complete."
 fi
@@ -167,7 +167,7 @@ ansible-playbook site.yml --tags nftables \
 # --- Step 4: Restart GPU services ---
 info "Restarting GPU services in ai-tools domain..."
 for service in ollama speaches; do
-    incus exec ai-ollama --project "$AI_PROJECT" -- \
+    incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
         systemctl start "$service" 2>/dev/null || true
 done
 

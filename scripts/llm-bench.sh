@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configurable
-CONTAINER="${LLM_CONTAINER:-ollama}"
+CONTAINER="${LLM_CONTAINER:-gpu-server}"
 PROJECT="${LLM_PROJECT:-ai-tools}"
 LLAMA_PORT="${LLAMA_PORT:-8081}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"

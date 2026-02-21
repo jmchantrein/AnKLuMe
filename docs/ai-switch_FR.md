@@ -17,7 +17,7 @@ des modeles.
 │  net-pro ──────┐                                        │
 │                │ ✓ (actuel)       ┌──────────────┐      │
 │  net-perso ────┤ ✗ (bloque)  ──▶│ net-ai-tools │      │
-│                │                  │  ai-ollama   │      │
+│                │                  │  gpu-server   │      │
 │  net-anklume ──┘ ✗ (bloque)     │  ai-webui    │      │
 │                                   └──────────────┘      │
 │  nftables: seul net-pro <-> net-ai-tools autorise       │
@@ -44,7 +44,7 @@ domains:
   ai-tools:
     subnet_id: 10
     machines:
-      ai-ollama:
+      gpu-server:
         type: lxc
         ip: "10.100.10.10"
         gpu: true
@@ -161,6 +161,6 @@ meme tues, ce qui libere la plupart des allocations VRAM.
 Verifiez l'etat des services dans le conteneur ai-tools :
 
 ```bash
-incus exec ai-ollama --project ai-tools -- systemctl status ollama
-incus exec ai-ollama --project ai-tools -- systemctl status speaches
+incus exec gpu-server --project ai-tools -- systemctl status ollama
+incus exec gpu-server --project ai-tools -- systemctl status speaches
 ```

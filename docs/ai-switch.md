@@ -14,7 +14,7 @@ between access switches to clear residual model state.
 │  net-pro ──────┐                                        │
 │                │ ✓ (current)      ┌──────────────┐      │
 │  net-perso ────┤ ✗ (blocked)  ──▶│ net-ai-tools │      │
-│                │                  │  ai-ollama   │      │
+│                │                  │  gpu-server   │      │
 │  net-anklume ──┘ ✗ (blocked)     │  ai-webui    │      │
 │                                   └──────────────┘      │
 │  nftables: only net-pro <-> net-ai-tools allowed        │
@@ -40,7 +40,7 @@ domains:
   ai-tools:
     subnet_id: 10
     machines:
-      ai-ollama:
+      gpu-server:
         type: lxc
         ip: "10.100.10.10"
         gpu: true
@@ -156,6 +156,6 @@ which clears most VRAM allocations.
 Check service status inside the ai-tools container:
 
 ```bash
-incus exec ai-ollama --project ai-tools -- systemctl status ollama
-incus exec ai-ollama --project ai-tools -- systemctl status speaches
+incus exec gpu-server --project ai-tools -- systemctl status ollama
+incus exec gpu-server --project ai-tools -- systemctl status speaches
 ```
