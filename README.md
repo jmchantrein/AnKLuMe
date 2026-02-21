@@ -150,7 +150,7 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | | LobeChat multi-provider web UI |
 | | Speaches STT (faster-whisper, OpenAI-compatible API) |
 | | OpenCode headless AI coding server |
-| | OpenClaw self-hosted AI assistant (Telegram, multi-brain) |
+| | OpenClaw AI assistant with proxy (multi-brain, cross-container, cost tracking) |
 | | Exclusive AI-tools network access with VRAM flush |
 | **Lifecycle** | Snapshots (manual + automatic with schedule/expiry) |
 | | Golden images with CoW-based derivation |
