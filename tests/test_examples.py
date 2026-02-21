@@ -1721,20 +1721,20 @@ class TestAiToolsExample:
     def test_ai_tools_has_four_machines(self):
         infra = self._load()
         machines = infra["domains"]["ai-tools"]["machines"]
-        assert len(machines) == 4
+        assert len(machines) == 6
 
     def test_ai_tools_machine_names(self):
         infra = self._load()
         machines = set(infra["domains"]["ai-tools"]["machines"].keys())
-        assert machines == {"ai-ollama", "ai-openwebui", "ai-lobechat", "ai-opencode"}
+        assert machines == {"gpu-server", "ai-openwebui", "ai-lobechat", "ai-opencode", "ai-coder", "ai-openclaw"}
 
-    def test_ai_ollama_has_gpu(self):
+    def test_gpu_server_has_gpu(self):
         infra = self._load()
-        assert infra["domains"]["ai-tools"]["machines"]["ai-ollama"]["gpu"] is True
+        assert infra["domains"]["ai-tools"]["machines"]["gpu-server"]["gpu"] is True
 
-    def test_ai_ollama_has_stt_role(self):
+    def test_gpu_server_has_stt_role(self):
         infra = self._load()
-        roles = infra["domains"]["ai-tools"]["machines"]["ai-ollama"]["roles"]
+        roles = infra["domains"]["ai-tools"]["machines"]["gpu-server"]["roles"]
         assert "stt_server" in roles
 
     def test_ai_openwebui_has_open_webui_role(self):
@@ -1776,11 +1776,11 @@ class TestAiToolsExample:
         assert len(anklume_to_ai) >= 1
 
     def test_network_policy_host_to_ollama(self):
-        """There should be a policy allowing host to access ai-ollama."""
+        """There should be a policy allowing host to access gpu-server."""
         infra = self._load()
         policies = infra.get("network_policies") or []
         host_to_ollama = [p for p in policies
-                          if p.get("from") == "host" and p.get("to") == "ai-ollama"]
+                          if p.get("from") == "host" and p.get("to") == "gpu-server"]
         assert len(host_to_ollama) >= 1
 
 

@@ -334,7 +334,7 @@ network_policies:
 
   - description: "Host accesses Ollama"
     from: host                   # Special keyword: the physical host
-    to: ai-ollama                # Specific machine
+    to: gpu-server               # Specific machine
     ports: [11434]
     protocol: tcp
 

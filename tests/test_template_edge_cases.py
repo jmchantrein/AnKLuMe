@@ -393,7 +393,7 @@ class TestLobechatEdgeCases:
         """LobeChat template enables Ollama integration."""
         result = self._render(
             lobechat_port=3210,
-            lobechat_ollama_url="http://ai-ollama:11434",
+            lobechat_ollama_url="http://gpu-server:11434",
         )
         assert "ENABLED_OLLAMA=1" in result
 
@@ -401,7 +401,7 @@ class TestLobechatEdgeCases:
         """LobeChat service runs from /opt/lobechat."""
         result = self._render(
             lobechat_port=3210,
-            lobechat_ollama_url="http://ai-ollama:11434",
+            lobechat_ollama_url="http://gpu-server:11434",
         )
         assert "WorkingDirectory=/opt/lobechat" in result
 
@@ -409,7 +409,7 @@ class TestLobechatEdgeCases:
         """LobeChat listens on all interfaces."""
         result = self._render(
             lobechat_port=3210,
-            lobechat_ollama_url="http://ai-ollama:11434",
+            lobechat_ollama_url="http://gpu-server:11434",
         )
         assert "HOSTNAME=0.0.0.0" in result
 
@@ -1329,7 +1329,7 @@ class TestPSOTSpecialNames:
         infra["domains"]["ai-tools"] = {
             "subnet_id": 10,
             "machines": {
-                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10"},
+                "gpu-server": {"type": "lxc", "ip": "10.100.10.10"},
             },
         }
         errors = validate(infra)
@@ -2720,7 +2720,7 @@ class TestPSOTEnrichEdgeCases:
         infra["domains"]["ai-tools"] = {
             "subnet_id": 10,
             "machines": {
-                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10"},
+                "gpu-server": {"type": "lxc", "ip": "10.100.10.10"},
             },
         }
         enrich_infra(infra)
@@ -2736,7 +2736,7 @@ class TestPSOTEnrichEdgeCases:
         infra["global"]["ai_access_default"] = "test"
         infra["domains"]["ai-tools"] = {
             "subnet_id": 10,
-            "machines": {"ai-ollama": {"type": "lxc", "ip": "10.100.10.10"}},
+            "machines": {"gpu-server": {"type": "lxc", "ip": "10.100.10.10"}},
         }
         infra["network_policies"] = [{
             "description": "Existing",

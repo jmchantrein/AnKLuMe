@@ -43,7 +43,7 @@ def switch_env(tmp_path):
                 "perso-desktop": {"type": "lxc", "ip": "10.100.1.10"},
             }},
             "ai-tools": {"subnet_id": 10, "machines": {
-                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10", "gpu": True},
+                "gpu-server": {"type": "lxc", "ip": "10.100.10.10", "gpu": True},
             }},
         },
     }, sort_keys=False))
@@ -1072,10 +1072,10 @@ class TestAiSwitchFlushDetails:
         content = AI_SWITCH_SH.read_text()
         assert "xargs -r kill -9" in content
 
-    def test_flush_executes_in_ai_container(self):
-        """VRAM flush commands execute in ai-ollama container."""
+    def test_flush_executes_in_gpu_container(self):
+        """VRAM flush commands execute in GPU_CONTAINER."""
         content = AI_SWITCH_SH.read_text()
-        assert "incus exec ai-ollama" in content
+        assert 'incus exec "$GPU_CONTAINER"' in content
 
     def test_flush_uses_ai_project(self):
         """VRAM flush uses the AI_PROJECT for incus exec."""
@@ -1303,12 +1303,12 @@ class TestAiSwitchServiceManagement:
         log_content = log_file.read_text()
         assert "--project ai-tools" in log_content
 
-    def test_services_run_on_ai_ollama(self, switch_env):
-        """Service operations target the ai-ollama instance."""
+    def test_services_run_on_gpu_server(self, switch_env):
+        """Service operations target the gpu-server instance."""
         env, log_file, cwd, script = switch_env
         run_switch(["--domain", "pro"], env, cwd, script=script)
         log_content = log_file.read_text()
-        assert "ai-ollama" in log_content
+        assert "gpu-server" in log_content
 
 
 # ── State file content detail tests ───────────────────────────────

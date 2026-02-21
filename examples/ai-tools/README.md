@@ -7,18 +7,18 @@ A complete local AI stack in an isolated domain.
 ```
 ai-tools domain (net-ai-tools, 10.100.4.0/24)
 
-  ai-ollama (.10)     ai-openwebui (.20)   ai-lobechat (.30)   ai-opencode (.40)
+  gpu-server (.10)     ai-openwebui (.20)   ai-lobechat (.30)   ai-opencode (.40)
   GPU (exclusive)
   Ollama :11434        Open WebUI :3000     LobeChat :3210      OpenCode :4096
-  Speaches :8000       -> ai-ollama:11434   -> ai-ollama:11434  -> ai-ollama:11434/v1
+  Speaches :8000       -> gpu-server:11434   -> gpu-server:11434  -> gpu-server:11434/v1
 ```
 
 ## Services
 
 | Machine | Service | Port | Description |
 |---------|---------|------|-------------|
-| ai-ollama | Ollama | 11434 | LLM inference (GPU-accelerated) |
-| ai-ollama | Speaches | 8000 | Speech-to-text (OpenAI-compatible) |
+| gpu-server | Ollama | 11434 | LLM inference (GPU-accelerated) |
+| gpu-server | Speaches | 8000 | Speech-to-text (OpenAI-compatible) |
 | ai-openwebui | Open WebUI | 3000 | Chat interface with voice support |
 | ai-lobechat | LobeChat | 3210 | Multi-provider chat UI |
 | ai-opencode | OpenCode | 4096 | AI coding assistant (headless server) |

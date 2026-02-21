@@ -334,7 +334,7 @@ class TestTemplates:
 
         result = template.render(
             lobechat_port=3210,
-            lobechat_ollama_url="http://ai-ollama:11434",
+            lobechat_ollama_url="http://gpu-server:11434",
         )
         assert "[Unit]" in result
         assert "[Service]" in result
@@ -364,14 +364,14 @@ class TestTemplates:
         template = env.get_template("opencode-config.json.j2")
 
         result = template.render(
-            opencode_server_ollama_url="http://ai-ollama:11434/v1",
+            opencode_server_ollama_url="http://gpu-server:11434/v1",
             opencode_server_model="qwen2.5-coder:32b",
         )
         import json
         data = json.loads(result)
         assert "provider" in data
         assert "ollama" in data["provider"]
-        assert data["provider"]["ollama"]["options"]["baseURL"] == "http://ai-ollama:11434/v1"
+        assert data["provider"]["ollama"]["options"]["baseURL"] == "http://gpu-server:11434/v1"
         assert "qwen2.5-coder:32b" in data["provider"]["ollama"]["models"]
 
     def test_claude_settings_template(self):

@@ -905,7 +905,7 @@ class TestAIAccessPolicy:
             "description": "AI services",
             "subnet_id": 10,
             "machines": {
-                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10"},
+                "gpu-server": {"type": "lxc", "ip": "10.100.10.10"},
             },
         }
         sample_infra["global"]["ai_access_policy"] = policy
@@ -1387,7 +1387,7 @@ class TestDepth3Interactions:
             "description": "AI services",
             "subnet_id": 10,
             "machines": {
-                "ai-ollama": {"type": "lxc", "ip": "10.100.10.10", "gpu": True},
+                "gpu-server": {"type": "lxc", "ip": "10.100.10.10", "gpu": True},
             },
         }
         errors = validate(sample_infra)

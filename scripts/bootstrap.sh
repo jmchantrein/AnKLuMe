@@ -312,7 +312,7 @@ recommend_models() {
 
 provision_models() {
     local vram_mb="${1:-0}"
-    local ollama_instance="${2:-ai-ollama}"
+    local gpu_instance="${2:-gpu-server}"
     local project="${3:-default}"
 
     local recommended
@@ -342,11 +342,11 @@ provision_models() {
     # Pull each model
     for model in $models; do
         info "Pulling model: $model ..."
-        if incus exec "$ollama_instance" --project "$project" -- ollama pull "$model" 2>/dev/null; then
+        if incus exec "$gpu_instance" --project "$project" -- ollama pull "$model" 2>/dev/null; then
             ok "Model $model pulled"
         else
-            warn "Could not pull $model — Ollama may not be running yet in $ollama_instance"
-            warn "Pull manually later: incus exec $ollama_instance --project $project -- ollama pull $model"
+            warn "Could not pull $model — Ollama may not be running yet in $gpu_instance"
+            warn "Pull manually later: incus exec $gpu_instance --project $project -- ollama pull $model"
         fi
     done
 }

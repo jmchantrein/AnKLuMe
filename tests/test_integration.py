@@ -76,7 +76,7 @@ def _ai_infra(**extra_global):
             },
             "ai-tools": {
                 "subnet_id": 10,
-                "machines": {"ai-ollama": {"type": "lxc", "ip": "10.201.10.10"}},
+                "machines": {"gpu-server": {"type": "lxc", "ip": "10.201.10.10"}},
             },
         },
     }
@@ -139,7 +139,7 @@ class TestKitchenSinkInfra:
                     "subnet_id": 10,
                     "profiles": {"nvidia-compute": cls.GPU_PROFILE},
                     "machines": {
-                        "ai-ollama": {
+                        "gpu-server": {
                             "type": "lxc",
                             "ip": "10.200.10.10",
                             "gpu": True,
@@ -169,7 +169,7 @@ class TestKitchenSinkInfra:
                     "protocol": "tcp",
                     "bidirectional": True,
                 },
-                {"from": "host", "to": "ai-ollama", "ports": [11434], "protocol": "tcp"},
+                {"from": "host", "to": "gpu-server", "ports": [11434], "protocol": "tcp"},
             ],
         }
 
@@ -193,7 +193,7 @@ class TestKitchenSinkInfra:
             "pro-sandbox",
             "perso-box",
             "perso-keep",
-            "ai-ollama",
+            "gpu-server",
             "ai-webui",
             "homelab-llm",
         ]
@@ -215,7 +215,7 @@ class TestKitchenSinkInfra:
             ("pro-sandbox", "vm", False),
             ("perso-box", "lxc", True),
             ("perso-keep", "lxc", False),
-            ("ai-ollama", "lxc", False),
+            ("gpu-server", "lxc", False),
             ("homelab-llm", "lxc", False),
         }
         for host, exp_type, exp_eph in expected:
