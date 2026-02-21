@@ -186,7 +186,7 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | **Getting started** | [Quick start](docs/quickstart.md) |
 | | [Interactive guide](docs/guide.md) |
 | | [Full specification](docs/SPEC.md) |
-| **Architecture** | [Architecture decisions (ADR-001 to ADR-035)](docs/ARCHITECTURE.md) |
+| **Architecture** | [Architecture decisions (ADR-001 to ADR-036)](docs/ARCHITECTURE.md) |
 | | [Incus native feature coverage](docs/incus-coverage.md) |
 | | [Implementation roadmap](docs/ROADMAP.md) |
 | | [Decisions log](docs/decisions-log.md) |

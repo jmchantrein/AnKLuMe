@@ -147,60 +147,87 @@ internet, l'imbrication Incus (`security.nesting=true`), et un clone git
 d'AnKLuMe dans `/root/AnKLuMe/`. Cela permet le developpement complet,
 les tests et la creation de PR sans creer de conteneurs supplementaires.
 
+## Reproductibilite de l'agent (ADR-036)
+
+Toute la connaissance operationnelle de l'agent est stockee sous forme
+de templates Jinja2 dans le depot AnKLuMe
+(`roles/openclaw_server/templates/`). Chaque `make apply` deploie ces
+templates dans le workspace de l'agent, **ecrasant** les versions
+precedentes. Le depot git est la source unique de verite.
+
+### Categories de fichiers workspace
+
+| Fichier | Source | Ecrase a l'apply ? | Modifiable directement ? |
+|---------|--------|-------------------|------------------------|
+| `AGENTS.md` | Template (`AGENTS.md.j2`) | **Oui** | Non — editer le template |
+| `TOOLS.md` | Template (`TOOLS.md.j2`) | **Oui** | Non — editer le template |
+| `USER.md` | Template (`USER.md.j2`) | **Oui** | Non — editer le template |
+| `IDENTITY.md` | Template (`IDENTITY.md.j2`) | **Oui** | Non — editer le template |
+| `SOUL.md` | Cree par l'agent | Non (pas deploye) | **Oui — directement** |
+| `MEMORY.md` | Template (`MEMORY.md.j2`) | Non (`force: false`) | **Oui — directement** |
+| `memory/*.md` | Cree par l'agent | Non | **Oui — directement** |
+
+Les **fichiers operationnels** (AGENTS.md, TOOLS.md, USER.md, IDENTITY.md)
+ne sont jamais modifies directement. Pour les changer, l'agent suit le
+workflow de developpement standard : editer le template, tester, commit,
+push, PR, merge, puis `make apply` deploie le changement.
+
+**SOUL.md** (personnalite) est le seul fichier que l'agent modifie
+directement. Il est `.gitignore` globalement et jamais commite dans le depot.
+
+**MEMORY.md et memory/** persistent entre les deploys (`force: false`) mais
+sont perdus lors d'une reconstruction du conteneur. C'est acceptable — ils
+contiennent du contexte de session ephemere, pas de la connaissance
+operationnelle reproductible.
+
+### Consequence
+
+Detruire et reconstruire le conteneur `openclaw` restaure toute la
+capacite operationnelle a partir des templates du framework. Le seul
+fichier perdu de maniere permanente est `SOUL.md` (personnalite).
+
 ## Auto-amelioration
 
-Ada dispose de deux boucles d'auto-amelioration, toutes deux operant
-de maniere autonome depuis son conteneur sandboxe :
+Ada dispose de deux boucles d'auto-amelioration :
 
-### Evolution du persona
+### Contribution au framework (boucle principale)
 
-OpenClaw stocke l'identite et les connaissances d'Ada dans des fichiers
-workspace editables (`~/.openclaw/workspace/`). Ada peut les modifier
-elle-meme pour affiner son comportement au fil des sessions :
-
-| Fichier | Ce qu'Ada peut faire evoluer |
-|---------|-----------------------------|
-| `SOUL.md` | Personnalite, ton, valeurs, opinions |
-| `AGENTS.md` | Instructions operationnelles, documentation des outils |
-| `TOOLS.md` | Notes locales, references API, carte de l'infrastructure |
-| `MEMORY.md` | Connaissances curees a long terme |
-| `memory/YYYY-MM-DD.md` | Notes de session quotidiennes pour la continuite |
-
-Quand Ada apprend quelque chose d'utile pendant une conversation (un
-nouveau pattern, une preference utilisateur, un insight de debug), elle
-peut le persister dans ses fichiers memoire. Au fil du temps, son
-persona et sa base de connaissances evoluent par l'experience accumulee
-— sans intervention manuelle.
-
-### Contribution au framework
-
-Ada peut aussi ameliorer le framework AnKLuMe lui-meme. Depuis son
-conteneur `openclaw`, elle a un acces complet au depot git :
+Ada ameliore sa propre connaissance operationnelle ET le framework
+AnKLuMe en contribuant via le workflow git standard :
 
 ```
-Ada sur Telegram → comprend un bug ou une amelioration
-  → cree une branche dans /root/AnKLuMe/
-  → implemente le correctif, lance les tests (make lint, pytest)
-  → pousse et cree une PR via gh CLI
+Ada sur Telegram → identifie une amelioration
+  → clone/met a jour le depot dans son conteneur openclaw
+  → edite un template dans roles/openclaw_server/templates/
+  → lance les tests (make lint, pytest tests/test_proxy.py)
+  → commit sur une branche feature, pousse, cree une PR
   → jmc revoit et merge
+  → make apply deploie le template mis a jour dans le workspace d'Ada
 ```
 
-Cela cree une boucle recursive : l'assistant IA ameliore le framework
-d'infrastructure qui heberge l'assistant IA. Combine avec la
-bibliotheque d'experiences (Phase 18d) et les Agent Teams (Phase 15),
-cela permet une auto-amelioration continue et auditable avec une
-supervision humaine au niveau du merge.
+Cela cree une boucle vertueuse : l'assistant IA ameliore le framework
+qui definit l'assistant IA. Combine avec la bibliotheque d'experiences
+(Phase 18d) et les Agent Teams (Phase 15), cela permet une
+auto-amelioration continue et auditable avec supervision humaine au
+niveau du merge.
+
+### Evolution du persona (SOUL.md uniquement)
+
+Ada peut modifier directement son fichier de personnalite (`SOUL.md`)
+pour affiner son ton, ses valeurs et son identite. Ce fichier est prive
+(jamais commite) et est le seul fichier workspace qui ne passe pas par
+le workflow PR.
 
 ### Ce qui rend cela sur
 
 - **Isolation sandbox** : Ada tourne dans un conteneur LXC dedie sans
   acces aux autres domaines (pro, perso, etc.)
-- **Workflow git** : tous les changements passent par des branches et
-  des PR — Ada ne commite jamais directement sur main
+- **Workflow git** : tous les changements operationnels passent par des
+  branches et des PR
 - **Controle humain** : jmc revoit chaque PR avant la mise en production
-- **Les fichiers persona sont locaux** : les modifications du workspace
-  n'affectent que le comportement d'Ada, pas le framework ni les autres
-  utilisateurs
+- **Ecrasement par template** : `make apply` restaure toujours la version
+  autoritaire des fichiers operationnels — pas de derive possible
+- **SOUL.md est prive** : la personnalite ne quitte jamais le conteneur
 
 ## Valeur ajoutee par rapport a OpenClaw natif
 

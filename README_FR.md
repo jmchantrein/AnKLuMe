@@ -194,7 +194,7 @@ le socket Incus — pas besoin de SSH.
 | **Demarrage** | [Demarrage rapide](docs/quickstart.md) |
 | | [Guide interactif](docs/guide.md) |
 | | [Specification complete](docs/SPEC.md) |
-| **Architecture** | [Decisions d'architecture (ADR-001 a ADR-035)](docs/ARCHITECTURE.md) |
+| **Architecture** | [Decisions d'architecture (ADR-001 a ADR-036)](docs/ARCHITECTURE.md) |
 | | [Couverture des fonctionnalites Incus](docs/incus-coverage.md) |
 | | [Feuille de route](docs/ROADMAP.md) |
 | | [Journal des decisions](docs/decisions-log.md) |

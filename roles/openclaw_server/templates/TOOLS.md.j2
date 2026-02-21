@@ -1,0 +1,66 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# TOOLS.md - Local Notes
+
+## AnKLuMe Development Server
+
+An MCP/REST server runs in `anklume-instance` ({{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}),
+giving you full access to the AnKLuMe infrastructure and codebase.
+
+### REST API (simple HTTP calls)
+
+Base URL: `http://{{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}`
+
+**List all tools:**
+```bash
+curl http://{{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}/api
+```
+
+**Call a tool (GET for no args, POST with JSON for args):**
+
+| Tool | Description | Example |
+|------|-------------|---------|
+| `git_status` | Show git status | `curl .../api/git_status` |
+| `git_log` | Recent commits | `curl -X POST .../api/git_log -d '{"count": 5}'` |
+| `git_diff` | Show changes | `curl -X POST .../api/git_diff -d '{"staged": true}'` |
+| `make_target` | Run make target | `curl -X POST .../api/make_target -d '{"target": "sync-dry"}'` |
+| `run_tests` | Run pytest | `curl -X POST .../api/run_tests -d '{"scope": "generator"}'` |
+| `incus_list` | List instances | `curl .../api/incus_list` |
+| `incus_exec` | Run in instance | `curl -X POST .../api/incus_exec -d '{"instance": "pw-dev", "command": "hostname"}'` |
+| `read_file` | Read repo file | `curl -X POST .../api/read_file -d '{"path": "infra.yml"}'` |
+| `claude_code` | Run Claude Code | `curl -X POST .../api/claude_code -d '{"prompt": "Fix lint errors"}'` |
+| `lint` | Run linters | `curl .../api/lint` |
+| `web_search` | Search the web | `curl -X POST .../api/web_search -d '{"query": "...", "count": 5}'` |
+| `web_fetch` | Fetch a URL | `curl -X POST .../api/web_fetch -d '{"url": "https://..."}'` |
+| `switch_brain` | Change brain mode | `curl -X POST .../api/switch_brain -d '{"mode": "anklume"}'` |
+| `usage` | Token usage stats | `curl .../api/usage` |
+| `self_upgrade` | Framework upgrade | `curl -X POST .../api/self_upgrade -d '{"action": "check"}'` |
+
+### MCP Protocol (for MCP-native clients)
+
+SSE endpoint: `http://{{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}/sse`
+Same tools, accessible via standard MCP protocol.
+
+### Safety
+
+Blocked make targets: `flush`, `nftables-deploy`, `claude-host`
+Blocked incus commands: `rm -rf /`, `dd`, `mkfs`, `reboot`, `shutdown`
+File reads restricted to the AnKLuMe repository.
+
+### Workflow
+
+To develop and test AnKLuMe:
+1. `read_file` to understand current code
+2. `git_status` / `git_diff` to see current state
+3. `make_target` with `sync-dry` to preview changes
+4. `run_tests` to validate
+5. `lint` to check code quality
+6. `claude_code` for complex tasks (launches Claude Code CLI)
+
+### Infrastructure
+
+| Container | IP | Description |
+|-----------|-----|-------------|
+| anklume-instance | {{ openclaw_server_proxy_ip }} | Admin + Ansible + MCP server |
+| ollama | {{ openclaw_server_ollama_ip }} | LLM inference (GPU) |
+| openclaw | {{ openclaw_server_openclaw_ip }} | OpenClaw (you) |

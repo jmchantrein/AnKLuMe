@@ -71,3 +71,6 @@ Thumbs.db
 # Scenario test backups (crash recovery)
 .scenario-session-backup/
 .scenario-backup/
+
+# Agent personality (never tracked — ADR-036 reproducibility constraint)
+SOUL.md

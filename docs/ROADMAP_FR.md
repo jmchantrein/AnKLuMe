@@ -958,6 +958,6 @@ les VMs Incus imbriquees pour eviter les telechargements redondants.
 | pro | pro-dev | 10.100.2.10 | net-pro | En fonctionnement |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | En fonctionnement |
 
-**ADRs actifs** : ADR-001 a ADR-035
+**ADRs actifs** : ADR-001 a ADR-036
 
 **Problemes connus** : Aucun

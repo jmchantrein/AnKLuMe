@@ -47,7 +47,7 @@ Read these files in order to understand the project:
 
 1. `CLAUDE.md` — Non-negotiable coding conventions and commands
 2. `docs/SPEC.md` — Full specification (formats, roles, validation)
-3. `docs/ARCHITECTURE.md` — Architecture decisions (ADR-001 to ADR-035)
+3. `docs/ARCHITECTURE.md` — Architecture decisions (ADR-001 to ADR-036)
 4. `docs/ROADMAP.md` — Implementation phases (1-18, all complete)
 5. `docs/decisions-log.md` — Recent autonomous decisions
 
