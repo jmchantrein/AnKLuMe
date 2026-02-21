@@ -27,7 +27,13 @@ To modify your operational knowledge:
 2. Edit the template in `roles/openclaw_server/templates/<file>.j2`
 3. Test: `make lint && pytest tests/test_proxy.py`
 4. Commit to a feature branch, push, create a PR
-5. Once merged, `make apply` deploys the changes to your workspace
+5. Once {{ openclaw_server_user_name }} merges the PR, call `self_upgrade(action="update-self")`
+   — this pulls the latest main and redeploys your workspace files
+
+You can also use these actions separately:
+- `self_upgrade(action="check")` — check for available updates
+- `self_upgrade(action="upgrade")` — full framework upgrade + sync
+- `self_upgrade(action="apply-openclaw")` — redeploy without pulling
 
 **Exception — SOUL.md**: Your personality file (`~/.openclaw/workspace/SOUL.md`)
 is the ONLY file you modify directly. It is NEVER committed to git, NEVER

@@ -850,8 +850,9 @@ def self_upgrade(action: str = "check") -> str:
 
     Args:
         action: "check" to see if updates are available,
-                "upgrade" to pull updates and re-provision,
-                "apply-openclaw" to re-provision the openclaw container only
+                "upgrade" to pull updates and re-sync,
+                "apply-openclaw" to re-provision the openclaw container only,
+                "update-self" to pull latest main AND re-provision (use after PR merge)
     """
     if action == "check":
         # Check for upstream updates
@@ -888,7 +889,27 @@ def self_upgrade(action: str = "check") -> str:
             output += f"\n(exit code: {r['exit_code']})"
         return output
 
-    return f"ERROR: unknown action '{action}'. Use: check, upgrade, apply-openclaw"
+    if action == "update-self":
+        # Pull latest main (typically after Ada's own PR was merged)
+        pull = _run(["git", "pull", "origin", "main"], timeout=60)
+        output = f"--- git pull ---\n{pull['stdout']}"
+        if pull["exit_code"] != 0:
+            output += f"\n{pull['stderr']}\n(exit code: {pull['exit_code']})"
+            return output
+        # Re-provision openclaw container with updated templates
+        apply_r = _run([
+            "ansible-playbook", "site.yml",
+            "--limit", "openclaw",
+            "--tags", "provision",
+        ], timeout=CMD_TIMEOUT)
+        output += f"\n\n--- apply-openclaw ---\n{apply_r['stdout']}"
+        if apply_r["stderr"]:
+            output += f"\n{apply_r['stderr']}"
+        if apply_r["exit_code"] != 0:
+            output += f"\n(exit code: {apply_r['exit_code']})"
+        return output
+
+    return f"ERROR: unknown action '{action}'. Use: check, upgrade, apply-openclaw, update-self"
 
 
 # ── REST API layer (for clients without MCP support) ──────

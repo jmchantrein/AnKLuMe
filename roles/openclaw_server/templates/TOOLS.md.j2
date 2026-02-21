@@ -34,7 +34,7 @@ curl http://{{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}/api
 | `web_fetch` | Fetch a URL | `curl -X POST .../api/web_fetch -d '{"url": "https://..."}'` |
 | `switch_brain` | Change brain mode | `curl -X POST .../api/switch_brain -d '{"mode": "anklume"}'` |
 | `usage` | Token usage stats | `curl .../api/usage` |
-| `self_upgrade` | Framework upgrade | `curl -X POST .../api/self_upgrade -d '{"action": "check"}'` |
+| `self_upgrade` | Framework upgrade | `{"action": "check\|upgrade\|apply-openclaw\|update-self"}` |
 
 ### MCP Protocol (for MCP-native clients)
 
