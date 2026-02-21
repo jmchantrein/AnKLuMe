@@ -108,9 +108,10 @@
 - name: OpenclawServer | Configure gh CLI auth  # noqa: risky-shell-pipe
   ansible.builtin.shell:
     cmd: |
-      token=$(cut -d: -f2 /run/secrets/git-credentials | cut -d@ -f1)
+      token=$(sed 's|.*://[^:]*:||;s|@.*||' /run/secrets/git-credentials | head -1)
       echo "$token" | gh auth login --with-token --hostname github.com
   changed_when: true
+  failed_when: false
   when: _openclaw_git_creds.stat.exists
 
 # -- Agent workspace files (ADR-036) ---------------------------------------
