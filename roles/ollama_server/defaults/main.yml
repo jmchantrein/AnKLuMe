@@ -8,5 +8,9 @@ ollama_host: "0.0.0.0:11434"
 # Default model to pull after install (empty = skip)
 ollama_default_model: ""
 
+# Additional models to pull (list of model names)
+ollama_extra_models:
+  - nomic-embed-text
+
 # Whether to enable and start the Ollama systemd service
 ollama_service_enabled: true
