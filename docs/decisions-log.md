@@ -16,7 +16,7 @@ or documented in [SPEC.md](SPEC.md) / [ROADMAP.md](ROADMAP.md) if
 implementation-level.
 
 For architecture-level decisions, see [ARCHITECTURE.md](ARCHITECTURE.md)
-(ADR-001 to ADR-031).
+(ADR-001 to ADR-036).
 
 ---
 

@@ -7,10 +7,18 @@
 # OpenClaw is a self-hosted AI assistant that connects to messaging
 # platforms and drives local/remote LLMs via its gateway daemon.
 #
+# Agent workspace files are deployed from Jinja2 templates (ADR-036).
+# Operational files are overwritten on every apply (force: true).
+# Only MEMORY.md is seeded once (force: false).
+#
 # Input variables (from defaults, overridable in host_vars):
 #   - openclaw_server_ollama_url (string): Ollama API base URL
 #   - openclaw_server_ollama_api_key (string): Ollama API key (any value)
 #   - openclaw_server_enabled (bool): enable systemd service
+#   - openclaw_server_proxy_ip (string): proxy IP (anklume-instance)
+#   - openclaw_server_proxy_port (int): proxy port
+#   - openclaw_server_agent_name (string): agent display name
+#   - openclaw_server_agent_emoji (string): agent emoji
 
 - name: OpenclawServer | Install curl for nodesource setup
   ansible.builtin.apt:
@@ -43,12 +51,48 @@
     state: directory
     mode: "0755"
 
+- name: OpenclawServer | Create agent workspace directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /root/.openclaw/agents/main
+    - /root/.openclaw/workspace
+    - /root/.openclaw/workspace/memory
+
 - name: OpenclawServer | Configure Ollama provider
   ansible.builtin.command:
     cmd: >-
       openclaw config set --json models.providers.ollama
       '{"baseUrl":"{{ openclaw_server_ollama_url }}","apiKey":"{{ openclaw_server_ollama_api_key }}","models":[{"id":"default","name":"Default Model"}]}'
   changed_when: false
+
+- name: OpenclawServer | Deploy agent instructions (AGENTS.md)
+  ansible.builtin.template:
+    src: AGENTS.md.j2
+    dest: /root/.openclaw/agents/main/AGENTS.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy operational workspace files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: "TOOLS.md.j2", dest: "/root/.openclaw/workspace/TOOLS.md" }
+    - { src: "USER.md.j2", dest: "/root/.openclaw/workspace/USER.md" }
+    - { src: "IDENTITY.md.j2", dest: "/root/.openclaw/workspace/IDENTITY.md" }
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Seed memory file (once only)
+  ansible.builtin.template:
+    src: MEMORY.md.j2
+    dest: /root/.openclaw/workspace/MEMORY.md
+    force: false
+    mode: "0644"
+  # force: false — agent accumulates memory, never overwrite
 
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:

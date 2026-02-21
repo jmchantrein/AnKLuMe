@@ -2,11 +2,35 @@
 # Default variables for openclaw_server
 # Override in group_vars or host_vars as needed.
 
-# Ollama API URL (must be reachable from the openclaw container)
-openclaw_server_ollama_url: "http://10.100.4.10:11434"
+# --- LLM backend ---
 
-# Ollama API key (any value — Ollama has no authentication)
+# Ollama/llama-server API URL (must be reachable from the openclaw container)
+openclaw_server_ollama_url: "http://10.100.3.1:8081"
+
+# Ollama API key (any value — local LLM has no authentication)
 openclaw_server_ollama_api_key: "ollama-local"
 
 # Enable and start the systemd service
 openclaw_server_enabled: true
+
+# --- Proxy location (anklume-instance) ---
+
+openclaw_server_proxy_ip: "10.100.0.134"
+openclaw_server_proxy_port: 9090
+
+# --- Container IPs ---
+
+openclaw_server_openclaw_ip: "10.100.3.5"
+openclaw_server_ollama_ip: "10.100.3.1"
+openclaw_server_ollama_port: 8081
+
+# --- Agent identity (ADR-036: reproduced from templates) ---
+
+openclaw_server_agent_name: "Ada"
+openclaw_server_agent_emoji: "\U0001F99E"
+
+# --- User profile ---
+
+openclaw_server_user_name: "anklume"
+openclaw_server_user_timezone: "Europe/Paris"
+openclaw_server_user_languages: "French (primary), English (technical)"

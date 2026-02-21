@@ -140,58 +140,84 @@ access, Incus nesting (`security.nesting=true`), and a git clone of
 AnKLuMe at `/root/AnKLuMe/`. This allows full development, testing, and
 PR creation without creating additional containers.
 
+## Agent reproducibility (ADR-036)
+
+All agent operational knowledge is stored as Jinja2 templates in the
+AnKLuMe repository (`roles/openclaw_server/templates/`). Every
+`make apply` deploys these templates to the agent's workspace,
+**overwriting** the previous versions. The git repository is the
+single source of truth.
+
+### Workspace file categories
+
+| File | Source | Overwritten on apply? | Editable directly? |
+|------|--------|----------------------|-------------------|
+| `AGENTS.md` | Template (`AGENTS.md.j2`) | **Yes** | No — edit template |
+| `TOOLS.md` | Template (`TOOLS.md.j2`) | **Yes** | No — edit template |
+| `USER.md` | Template (`USER.md.j2`) | **Yes** | No — edit template |
+| `IDENTITY.md` | Template (`IDENTITY.md.j2`) | **Yes** | No — edit template |
+| `SOUL.md` | Agent-created | No (not deployed) | **Yes — directly** |
+| `MEMORY.md` | Template (`MEMORY.md.j2`) | No (`force: false`) | **Yes — directly** |
+| `memory/*.md` | Agent-created | No | **Yes — directly** |
+
+**Operational files** (AGENTS.md, TOOLS.md, USER.md, IDENTITY.md) are
+never modified directly. To change them, the agent follows the standard
+development workflow: edit the template, test, commit, push, PR, merge,
+then `make apply` deploys the change.
+
+**SOUL.md** (personality) is the only file the agent modifies directly.
+It is `.gitignored` globally and never committed to the repository.
+
+**MEMORY.md and memory/** persist across deploys (`force: false`) but
+are lost on container rebuild. This is acceptable — they contain
+ephemeral session context, not reproducible operational knowledge.
+
+### Consequence
+
+Destroying and rebuilding the `openclaw` container restores full
+operational capability from the framework templates alone. The only
+file lost permanently is `SOUL.md` (personality).
+
 ## Self-improvement
 
-Ada has two self-improvement loops, both operating autonomously from
-her sandboxed container:
+Ada has two self-improvement loops:
 
-### Persona evolution
+### Framework contribution (primary loop)
 
-OpenClaw stores Ada's identity and knowledge in editable workspace
-files (`~/.openclaw/workspace/`). Ada can modify these herself to
-refine her behavior over sessions:
-
-| File | What Ada can evolve |
-|------|--------------------|
-| `SOUL.md` | Personality, tone, values, opinions |
-| `AGENTS.md` | Operating instructions, tool documentation |
-| `TOOLS.md` | Local notes, API references, infrastructure map |
-| `MEMORY.md` | Long-term curated knowledge |
-| `memory/YYYY-MM-DD.md` | Daily session notes for continuity |
-
-When Ada learns something useful during a conversation (a new pattern,
-a user preference, a debugging insight), she can persist it in her
-memory files. Over time, her persona and knowledge base evolve through
-accumulated experience — without any manual intervention.
-
-### Framework contribution
-
-Ada can also improve the AnKLuMe framework itself. From her `openclaw`
-container, she has full access to the git repository:
+Ada improves her own operational knowledge AND the AnKLuMe framework
+by contributing through the standard git workflow:
 
 ```
-Ada on Telegram → understands a bug or improvement
-  → creates a branch in /root/AnKLuMe/
-  → implements the fix, runs tests (make lint, pytest)
-  → pushes and creates a PR via gh CLI
+Ada on Telegram → identifies an improvement
+  → clones/updates the repo in her openclaw container
+  → edits a template in roles/openclaw_server/templates/
+  → runs tests (make lint, pytest tests/test_proxy.py)
+  → commits to a feature branch, pushes, creates a PR
   → anklume reviews and merges
+  → make apply deploys the updated template to Ada's workspace
 ```
 
-This creates a recursive loop: the AI assistant improves the
-infrastructure framework that hosts the AI assistant. Combined with
-the experience library (Phase 18d) and Agent Teams (Phase 15), this
-enables continuous, auditable self-improvement with human oversight
-at the merge gate.
+This creates a virtuous feedback loop: the AI assistant improves the
+framework that defines the AI assistant. Combined with the experience
+library (Phase 18d) and Agent Teams (Phase 15), this enables
+continuous, auditable self-improvement with human oversight at the
+merge gate.
+
+### Persona evolution (SOUL.md only)
+
+Ada can directly modify her personality file (`SOUL.md`) to refine
+her tone, values, and identity. This file is private (never committed)
+and is the only workspace file that does not go through the PR workflow.
 
 ### What makes this safe
 
 - **Sandbox isolation**: Ada runs in a dedicated LXC container with
   no access to other domains (pro, perso, etc.)
-- **Git workflow**: all changes go through branches and PRs — Ada
-  never commits to main directly
+- **Git workflow**: all operational changes go through branches and PRs
 - **Human gate**: anklume reviews every PR before it reaches production
-- **Persona files are local**: workspace changes only affect Ada's
-  own behavior, not the framework or other users
+- **Template overwrite**: `make apply` always restores the authoritative
+  version of operational files — no drift
+- **SOUL.md is private**: personality never leaves the container
 
 ## Value-add over native OpenClaw
 
@@ -338,10 +364,19 @@ Role variables (`roles/openclaw_server/defaults/main.yml`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `openclaw_version` | `latest` | OpenClaw version to install |
-| `openclaw_llm_provider` | `ollama` | LLM provider (ollama, anthropic, openai) |
-| `openclaw_ollama_url` | `http://10.100.3.1:8081/v1` | Ollama/llama-server API URL |
-| `openclaw_enabled` | `true` | Enable OpenClaw service |
+| `openclaw_server_ollama_url` | `http://10.100.3.1:8081` | Ollama/llama-server API URL |
+| `openclaw_server_ollama_api_key` | `ollama-local` | Ollama API key (any value for local) |
+| `openclaw_server_enabled` | `true` | Enable OpenClaw systemd service |
+| `openclaw_server_proxy_ip` | `10.100.0.134` | Proxy IP (anklume-instance) |
+| `openclaw_server_proxy_port` | `9090` | Proxy port |
+| `openclaw_server_openclaw_ip` | `10.100.3.5` | OpenClaw container IP |
+| `openclaw_server_ollama_ip` | `10.100.3.1` | Ollama/llama-server IP |
+| `openclaw_server_ollama_port` | `8081` | Ollama/llama-server port |
+| `openclaw_server_agent_name` | `Ada` | Agent display name |
+| `openclaw_server_agent_emoji` | lobster | Agent emoji |
+| `openclaw_server_user_name` | `anklume` | User name |
+| `openclaw_server_user_timezone` | `Europe/Paris` | User timezone |
+| `openclaw_server_user_languages` | `French (primary), English (technical)` | User languages |
 
 ### Manual setup (after role deployment)
 

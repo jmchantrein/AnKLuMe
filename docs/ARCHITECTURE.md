@@ -692,3 +692,50 @@ Why not use host as Incus remote: requires network + TLS + auth setup.
 **Consequence**: No internet access needed for nested Incus image
 downloads. Faster sandbox bootstrap. Read-only mount preserves
 isolation.
+
+---
+
+## ADR-036: Agent operational knowledge must be framework-reproducible
+
+**Context**: OpenClaw agents (like Ada) run inside Incus containers.
+If the container is destroyed, all operational knowledge (instructions,
+API reference, identity, user profile) is lost unless it comes from
+the framework. During initial deployment, Ada created her own AGENTS.md,
+TOOLS.md, USER.md, and IDENTITY.md manually — none of which were
+tracked in the AnKLuMe repository.
+
+**Decision**: All agent operational files are Jinja2 templates in
+`roles/openclaw_server/templates/`, deployed with `force: true`
+(Ansible default) on every `make apply`. The AnKLuMe git repository
+is the **single source of truth** for agent operational knowledge.
+
+Agents MUST NOT modify their operational files directly. To change
+their own instructions, they follow the standard development workflow:
+
+1. Edit the template in `roles/openclaw_server/templates/<file>.j2`
+2. Test (`make lint`, `pytest tests/test_proxy.py`)
+3. Commit to a feature branch, push, create a PR
+4. Once merged, `make apply` deploys the changes to the workspace
+
+This creates a virtuous feedback loop: agents improve their own code
+through the standard contribution workflow.
+
+**Template files (force: true — overwritten on every apply)**:
+- `AGENTS.md.j2` → `~/.openclaw/agents/main/AGENTS.md`
+- `TOOLS.md.j2` → `~/.openclaw/workspace/TOOLS.md`
+- `USER.md.j2` → `~/.openclaw/workspace/USER.md`
+- `IDENTITY.md.j2` → `~/.openclaw/workspace/IDENTITY.md`
+
+**Exceptions**:
+- `SOUL.md`: personality file, modified directly by the agent, NEVER
+  committed to git, `.gitignored` globally. This is the only file an
+  agent loses permanently if its container is destroyed.
+- `MEMORY.md` and `memory/`: accumulated session knowledge, deployed
+  with `force: false` (seed once, never overwrite). Lost on container
+  rebuild — acceptable for ephemeral session context.
+
+**Consequence**: Any agent can be fully reproduced from the framework
+alone (minus personality). Destroying and rebuilding a container
+restores full operational capability. The `.gitignore` includes a
+global `SOUL.md` pattern to prevent accidental commits of personality
+files.

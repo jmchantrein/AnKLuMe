@@ -23,6 +23,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROXY_SCRIPT = PROJECT_ROOT / "scripts" / "mcp-anklume-dev.py"
 OPENCLAW_DOC_EN = PROJECT_ROOT / "docs" / "openclaw.md"
 OPENCLAW_DOC_FR = PROJECT_ROOT / "docs" / "openclaw_FR.md"
+OPENCLAW_ROLE = PROJECT_ROOT / "roles" / "openclaw_server"
+OPENCLAW_TEMPLATES = OPENCLAW_ROLE / "templates"
+OPENCLAW_DEFAULTS = OPENCLAW_ROLE / "defaults" / "main.yml"
+OPENCLAW_TASKS = OPENCLAW_ROLE / "tasks" / "main.yml"
 
 
 # ── Script quality ─────────────────────────────────────────────────
@@ -346,3 +350,98 @@ class TestOpenClawDocumentation:
         """AGENTS.md mode markers are documented in French."""
         assert "[ALL MODES]" in self.fr
         assert "[ANKLUME MODE]" in self.fr
+
+
+# ── Agent reproducibility (ADR-036) ──────────────────────────────
+
+
+class TestOpenClawTemplates:
+    """Verify ADR-036: agent operational knowledge is framework-reproducible."""
+
+    def test_all_templates_exist(self):
+        """All 5 workspace templates exist in the role."""
+        expected = [
+            "AGENTS.md.j2", "TOOLS.md.j2", "USER.md.j2",
+            "IDENTITY.md.j2", "MEMORY.md.j2",
+        ]
+        for template in expected:
+            path = OPENCLAW_TEMPLATES / template
+            assert path.exists(), f"Template missing: {template}"
+
+    def test_agents_md_has_mode_markers(self):
+        """AGENTS.md.j2 contains all mode markers."""
+        content = (OPENCLAW_TEMPLATES / "AGENTS.md.j2").read_text()
+        for marker in ["[ALL MODES]", "[ANKLUME MODE]",
+                        "[ASSISTANT MODE]", "[LOCAL MODE]"]:
+            assert marker in content, f"Missing mode marker: {marker}"
+
+    def test_agents_md_has_critical_rule(self):
+        """AGENTS.md.j2 contains the non-modification rule."""
+        content = (OPENCLAW_TEMPLATES / "AGENTS.md.j2").read_text()
+        assert "MUST NOT modify your operational files directly" in content
+
+    def test_agents_md_has_soul_exception(self):
+        """AGENTS.md.j2 documents the SOUL.md exception."""
+        content = (OPENCLAW_TEMPLATES / "AGENTS.md.j2").read_text()
+        assert "SOUL.md" in content
+        assert "NEVER committed to git" in content
+
+    def test_tools_md_has_api_reference(self):
+        """TOOLS.md.j2 contains API tool reference."""
+        content = (OPENCLAW_TEMPLATES / "TOOLS.md.j2").read_text()
+        assert "git_status" in content
+        assert "incus_exec" in content
+        assert "web_search" in content
+
+    def test_templates_use_jinja_variables(self):
+        """Templates reference Jinja2 variables (not hardcoded IPs)."""
+        for template in ["AGENTS.md.j2", "TOOLS.md.j2"]:
+            content = (OPENCLAW_TEMPLATES / template).read_text()
+            assert "openclaw_server_proxy_ip" in content, \
+                f"{template} missing proxy_ip variable"
+
+    def test_defaults_has_all_variables(self):
+        """defaults/main.yml declares all template variables."""
+        content = OPENCLAW_DEFAULTS.read_text()
+        expected_vars = [
+            "openclaw_server_proxy_ip",
+            "openclaw_server_proxy_port",
+            "openclaw_server_openclaw_ip",
+            "openclaw_server_ollama_ip",
+            "openclaw_server_ollama_port",
+            "openclaw_server_agent_name",
+            "openclaw_server_agent_emoji",
+            "openclaw_server_user_name",
+            "openclaw_server_user_timezone",
+            "openclaw_server_user_languages",
+        ]
+        for var in expected_vars:
+            assert var in content, f"Missing default variable: {var}"
+
+    def test_tasks_deploy_agents_md(self):
+        """tasks/main.yml deploys AGENTS.md from template."""
+        content = OPENCLAW_TASKS.read_text()
+        assert "AGENTS.md.j2" in content
+
+    def test_tasks_deploy_operational_files(self):
+        """tasks/main.yml deploys TOOLS.md, USER.md, IDENTITY.md."""
+        content = OPENCLAW_TASKS.read_text()
+        for template in ["TOOLS.md.j2", "USER.md.j2", "IDENTITY.md.j2"]:
+            assert template in content, f"Task missing for {template}"
+
+    def test_tasks_seed_memory_with_force_false(self):
+        """tasks/main.yml seeds MEMORY.md with force: false."""
+        content = OPENCLAW_TASKS.read_text()
+        assert "MEMORY.md.j2" in content
+        assert "force: false" in content
+
+    def test_gitignore_has_soul_md(self):
+        """SOUL.md is globally gitignored."""
+        gitignore = (PROJECT_ROOT / ".gitignore").read_text()
+        assert "SOUL.md" in gitignore
+
+    def test_architecture_has_adr_036(self):
+        """ADR-036 is documented in ARCHITECTURE.md."""
+        arch = (PROJECT_ROOT / "docs" / "ARCHITECTURE.md").read_text()
+        assert "ADR-036" in arch
+        assert "framework-reproducible" in arch
