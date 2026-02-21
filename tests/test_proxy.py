@@ -170,6 +170,10 @@ class TestToolRegistry:
     def test_self_upgrade_registered(self):
         assert '"self_upgrade"' in self.content
 
+    def test_update_self_action(self):
+        """self_upgrade supports update-self action."""
+        assert '"update-self"' in self.content
+
 
 # ── Safety filters ─────────────────────────────────────────────────
 
