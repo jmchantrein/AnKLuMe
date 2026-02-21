@@ -32,6 +32,43 @@ Hote
     +-- qwen2.5-coder:32b (code) / qwen3:30b-a3b (chat)
 ```
 
+### Pourquoi Claude Code tourne sur anklume-instance et non dans openclaw
+
+Question naturelle : pourquoi Ada n'execute-t-elle pas ses commandes
+directement dans son conteneur `openclaw` ? Pourquoi passer par
+`incus exec openclaw` depuis `anklume-instance` ?
+
+La raison est le **modele de licence de Claude Code CLI**. Les modes
+Claude (anklume et assistant) utilisent Claude Code CLI, qui necessite
+un abonnement Anthropic valide (plan Max). Claude Code s'authentifie
+via des tokens OAuth stockes dans `~/.claude/`. Ces credentials vivent
+sur `anklume-instance` (synchronises depuis l'hote) car ce conteneur
+est le plan de controle AnKLuMe — il a le socket Incus, le depot git
+et Ansible.
+
+Faire tourner Claude Code directement dans `openclaw` necessiterait de
+dupliquer les credentials OAuth, le contexte projet (CLAUDE.md, SPEC.md)
+et le socket Incus dans un second conteneur. Cela :
+- Doublerait la surface de synchronisation des credentials
+- Casserait le principe de plan de controle unique (ADR-004)
+- Exposerait le socket Incus dans un conteneur qui a acces a internet
+  et aux bridges de messagerie (risque de securite)
+
+A la place, le proxy sur `anklume-instance` sert de pont : il recoit
+les requetes compatibles OpenAI depuis OpenClaw, les traduit en appels
+Claude Code CLI, et renvoie les reponses. Claude Code tourne avec
+`--allowedTools` qui l'autorisent a executer des commandes dans
+`openclaw` via `incus exec openclaw --project ai-tools`. Ainsi :
+- Les credentials restent uniquement sur `anklume-instance`
+- Le socket Incus n'est pas expose au conteneur connecte a internet
+- Ada peut agir en root dans `openclaw` (installer des paquets,
+  editer des fichiers, utiliser git) via le pont `incus exec`
+
+Si une version future utilise l'API Claude directement (au lieu de
+Claude Code CLI), l'execution native d'OpenClaw pourrait gerer les
+commandes dans `openclaw` sans l'indirection `incus exec` — mais au
+prix de la perte du contexte projet et des credits du plan Max.
+
 ## Modes de cerveau
 
 OpenClaw supporte trois modes de cerveau commutables. L'utilisateur peut
@@ -79,6 +116,202 @@ Les statistiques incluent :
 Note : le quota global du plan Max n'est pas accessible par API. Seuls
 les couts par session du proxy sont suivis.
 
+## API du proxy
+
+Le proxy sur `anklume-instance:9090` expose :
+
+### Endpoint compatible OpenAI
+- `POST /v1/chat/completions` — utilise par OpenClaw comme backend LLM
+- Supporte le streaming (SSE) et les reponses non-streaming
+- Persistance de session via Claude Code `--resume`
+
+### Outils d'infrastructure (REST)
+- `/api/git_status`, `/api/git_log`, `/api/git_diff`
+- `/api/make_target`, `/api/run_tests`, `/api/lint`
+- `/api/incus_list`, `/api/incus_exec`, `/api/read_file`
+- `/api/claude_chat`, `/api/claude_sessions`, `/api/claude_code`
+- `/api/switch_brain`, `/api/usage`
+
+### Outils web (delegues au conteneur openclaw)
+- `/api/web_search` — API Brave Search (`{"query": "...", "count": 5}`)
+- `/api/web_fetch` — Recuperer et extraire le texte d'une URL (`{"url": "..."}`)
+
+### Auto-gestion
+- `/api/self_upgrade` — Verifier/appliquer les mises a jour du framework
+
+### Workflow de developpement
+
+Ada travaille directement dans son conteneur `openclaw` (ou elle est root)
+via `/api/incus_exec` avec `instance: openclaw`. Le conteneur a acces a
+internet, l'imbrication Incus (`security.nesting=true`), et un clone git
+d'AnKLuMe dans `/root/AnKLuMe/`. Cela permet le developpement complet,
+les tests et la creation de PR sans creer de conteneurs supplementaires.
+
+## Auto-amelioration
+
+Ada dispose de deux boucles d'auto-amelioration, toutes deux operant
+de maniere autonome depuis son conteneur sandboxe :
+
+### Evolution du persona
+
+OpenClaw stocke l'identite et les connaissances d'Ada dans des fichiers
+workspace editables (`~/.openclaw/workspace/`). Ada peut les modifier
+elle-meme pour affiner son comportement au fil des sessions :
+
+| Fichier | Ce qu'Ada peut faire evoluer |
+|---------|-----------------------------|
+| `SOUL.md` | Personnalite, ton, valeurs, opinions |
+| `AGENTS.md` | Instructions operationnelles, documentation des outils |
+| `TOOLS.md` | Notes locales, references API, carte de l'infrastructure |
+| `MEMORY.md` | Connaissances curees a long terme |
+| `memory/YYYY-MM-DD.md` | Notes de session quotidiennes pour la continuite |
+
+Quand Ada apprend quelque chose d'utile pendant une conversation (un
+nouveau pattern, une preference utilisateur, un insight de debug), elle
+peut le persister dans ses fichiers memoire. Au fil du temps, son
+persona et sa base de connaissances evoluent par l'experience accumulee
+— sans intervention manuelle.
+
+### Contribution au framework
+
+Ada peut aussi ameliorer le framework AnKLuMe lui-meme. Depuis son
+conteneur `openclaw`, elle a un acces complet au depot git :
+
+```
+Ada sur Telegram → comprend un bug ou une amelioration
+  → cree une branche dans /root/AnKLuMe/
+  → implemente le correctif, lance les tests (make lint, pytest)
+  → pousse et cree une PR via gh CLI
+  → jmc revoit et merge
+```
+
+Cela cree une boucle recursive : l'assistant IA ameliore le framework
+d'infrastructure qui heberge l'assistant IA. Combine avec la
+bibliotheque d'experiences (Phase 18d) et les Agent Teams (Phase 15),
+cela permet une auto-amelioration continue et auditable avec une
+supervision humaine au niveau du merge.
+
+### Ce qui rend cela sur
+
+- **Isolation sandbox** : Ada tourne dans un conteneur LXC dedie sans
+  acces aux autres domaines (pro, perso, etc.)
+- **Workflow git** : tous les changements passent par des branches et
+  des PR — Ada ne commite jamais directement sur main
+- **Controle humain** : jmc revoit chaque PR avant la mise en production
+- **Les fichiers persona sont locaux** : les modifications du workspace
+  n'affectent que le comportement d'Ada, pas le framework ni les autres
+  utilisateurs
+
+## Valeur ajoutee par rapport a OpenClaw natif
+
+L'architecture proxy d'AnKLuMe etend OpenClaw avec des capacites qui
+vont au-dela de ce qu'OpenClaw fournit nativement.
+
+### 1. Cerveau agentique (Claude Code CLI)
+
+**OpenClaw natif** : appelle n'importe quelle API compatible OpenAI
+avec un simple echange requete/reponse. Le LLM ne peut que produire
+du texte.
+
+**Avec proxy** : Claude Code CLI est un assistant de codage agentique
+avec utilisation d'outils (Read, Edit, Grep, Bash). Il peut lire des
+fichiers, ecrire du code, fouiller le codebase et executer des
+commandes — le tout de facon autonome en un seul tour. Ada ne fait
+pas que repondre aux questions — elle modifie activement le code et
+gere l'infrastructure.
+
+### 2. Orchestration inter-conteneurs
+
+**OpenClaw natif** : ne peut executer des commandes que dans son
+propre conteneur via l'outil `exec` integre.
+
+**Avec proxy** : l'outil `incus_exec` permet a Ada d'executer des
+commandes dans N'IMPORTE QUEL conteneur Incus de TOUS les projets
+(avec filtres de securite). Elle peut inspecter le conteneur Ollama,
+verifier l'etat reseau, gerer d'autres instances.
+
+### 3. Commutation multi-cerveau avec gestion GPU VRAM
+
+**OpenClaw natif** : supporte un modele a la fois, configure dans
+`openclaw.json`. Changer necessite une edition manuelle et un redemarrage.
+
+**Avec proxy** : commutation transparente entre Claude (puissant,
+couteux) et les LLM locaux (gratuit, rapide) en langage naturel
+("passe en mode local"). Le proxy change automatiquement les modeles
+llama-server, gere la VRAM GPU et envoie un message de confirmation
+sur Telegram.
+
+### 4. Attribution des messages
+
+**OpenClaw natif** : tous les messages viennent du meme bot. Aucun
+moyen de distinguer le LLM, OpenClaw ou un gestionnaire d'erreur.
+
+**Avec proxy** : les messages emis par le proxy sont tagues avec
+`⚙️ [proxy]` pour distinguer Ada (le cerveau), le proxy (middleware)
+et OpenClaw (le corps).
+
+### 5. Sync automatique des credentials via bind-mount
+
+**OpenClaw natif** : ne gere pas les credentials OAuth pour des CLIs
+externes.
+
+**Avec proxy** : les credentials Claude Code de l'hote sont montes en
+bind-mount dans le conteneur. La fraicheur du token est automatique.
+
+### 6. Suivi des couts et de l'utilisation
+
+**OpenClaw natif** : ne suit pas les couts des API LLM.
+
+**Avec proxy** : accumule les couts, compteurs de tokens et utilisation
+du cache par session Claude Code. L'assistant presente les stats
+naturellement quand l'utilisateur pose la question.
+
+### 7. API REST d'infrastructure
+
+**OpenClaw natif** : dispose d'outils exec et navigateur.
+
+**Avec proxy** : endpoints REST types et filtres pour git, make, incus,
+lint et tests — avec liste noire pour les operations dangereuses.
+
+### 8. Recherche web deleguee a travers les frontieres reseau
+
+**OpenClaw natif** : dispose d'une recherche Brave integree.
+
+**Avec proxy** : delegue `web_search` et `web_fetch` au conteneur
+`openclaw` (qui a acces a internet), tandis que `anklume-instance`
+reste hors ligne. Cela maintient l'isolation reseau.
+
+### 9. Capacite d'auto-mise a jour
+
+**OpenClaw natif** : `openclaw update` se met a jour lui-meme.
+
+**Avec proxy** : l'outil `self_upgrade` peut verifier et appliquer les
+mises a jour du framework AnKLuMe, re-synchroniser la configuration
+et re-provisionner le conteneur openclaw — depuis un message Telegram.
+
+### 10. Sessions persistantes multi-tours
+
+**OpenClaw natif** : chaque tour d'agent est un appel API frais.
+
+**Avec proxy** : maintient des sessions Claude Code persistantes via
+`--resume`, permettant des conversations multi-tours ou le cerveau
+conserve le contexte complet du codebase entre les messages.
+
+### Tableau recapitulatif
+
+| Capacite | OpenClaw natif | Avec proxy AnKLuMe |
+|----------|---------------|-------------------|
+| Cerveau LLM | Completion textuelle API | Codage agentique (outils) |
+| Portee des commandes | Son conteneur uniquement | Tout conteneur Incus |
+| Changement de modele | Edition manuelle config | Langage naturel + auto-redemarrage |
+| Origine des messages | Opaque | Tague (`[proxy]`) |
+| Credentials | Manuel | Bind-mount (auto) |
+| Suivi des couts | Non | Stats par session |
+| Outils d'infra | exec uniquement | git, make, incus, lint, tests |
+| Recherche web | Native (meme conteneur) | Deleguee (isolation reseau) |
+| Auto-mise a jour | OpenClaw uniquement | Framework + conteneur |
+| Memoire de session | Par tour | Persistante (--resume) |
+
 ## Deploiement
 
 ### Prerequis
@@ -118,19 +351,62 @@ cd ~/.openclaw && openclaw onboard
 openclaw start
 ```
 
+## Fichiers de configuration
+
+Dans le conteneur `openclaw` :
+
+| Fichier | Role |
+|---------|------|
+| `~/.openclaw/openclaw.json` | Config principale (modele, provider, canaux) |
+| `~/.openclaw/agents/main/SOUL.md` | Definition du persona (identite, ton, langue) |
+| `~/.openclaw/agents/main/AGENTS.md` | Manuel operationnel avec sections par mode |
+
+### Structure de AGENTS.md
+
+Le fichier `AGENTS.md` utilise des marqueurs de mode (`[ALL MODES]`,
+`[ANKLUME MODE]`, `[ASSISTANT MODE]`, `[LOCAL MODE]`) pour organiser le
+contenu par mode de cerveau. OpenClaw envoie le fichier entier au backend
+LLM actif, et le LLM ne suit que les sections pertinentes pour son mode :
+
+| Marqueur | Contenu |
+|----------|---------|
+| `[ALL MODES]` | Architecture, internals OpenClaw, commutation, outils web, limitations |
+| `[ANKLUME MODE]` | Workflow de dev, API REST infra, incus_exec, auto-upgrade, sessions Claude Code |
+| `[ASSISTANT MODE]` | Comportement assistant general, suivi de consommation |
+| `[LOCAL MODE]` | Outils natifs OpenClaw (exec, browser, cron), skills |
+
 ## Gestion des credentials
 
 Le proxy sur `anklume-instance` utilise Claude Code CLI qui necessite
-des credentials OAuth valides. Un timer systemd (`anklume-sync-creds.timer`)
-synchronise les credentials depuis l'hote toutes les 2 heures :
+des credentials OAuth valides. Les credentials sont partages via un
+bind-mount Incus depuis l'hote vers le conteneur :
 
 ```bash
-# Installer le timer de synchronisation (sur l'hote)
-host/boot/sync-claude-credentials.sh --install
-
-# Synchronisation manuelle
-host/boot/sync-claude-credentials.sh
+# Le bind-mount est configure comme un device disk Incus :
+incus config device add anklume-instance claude-creds disk \
+  source=/home/user/.claude/.credentials.json \
+  path=/root/.claude/.credentials.json \
+  readonly=true shift=true
 ```
+
+Le conteneur lit directement le fichier de credentials de l'hote —
+pas de timer de synchronisation, pas de copie, pas de delai. Quand
+Claude Code renouvelle le token OAuth sur l'hote, le conteneur voit
+le nouveau token immediatement.
+
+**Prerequis** : Le fichier de credentials de l'hote doit etre lisible
+par tous (`chmod 644`) car le mapping UID d'Incus mappe l'utilisateur
+hote vers `nobody:nogroup` dans le conteneur.
+
+**Limitation** : Les tokens OAuth expirent toutes les ~12 heures. Si
+Claude Code n'est pas utilise de maniere interactive sur l'hote pendant
+plus de 12 heures, le token expire et Ada perd l'acces aux modes Claude.
+Pour retablir l'acces, lancer `claude` une fois sur l'hote (le token se
+renouvelle automatiquement au demarrage) — le bind-mount rend le token
+frais disponible instantanement.
+
+Quand le token expire, le proxy renvoie un message tague `⚙️ [proxy]`
+expliquant comment le renouveler, plutot qu'une erreur opaque.
 
 ## Depannage
 
@@ -153,10 +429,13 @@ host/boot/sync-claude-credentials.sh
 
 ### Erreur d'authentification Claude Code
 
-Le token OAuth a expire. Lancer le script de synchronisation sur l'hote :
+Le token OAuth a expire. Lancer Claude Code en mode interactif sur
+l'hote pour renouveler le token — le bind-mount le rend disponible
+instantanement dans le conteneur :
 
 ```bash
-host/boot/sync-claude-credentials.sh
+claude
+# (le token se renouvelle automatiquement, puis quitter)
 ```
 
 ### Le mode local est lent

@@ -158,7 +158,7 @@ le socket Incus — pas besoin de SSH.
 | | Interface web multi-fournisseur LobeChat |
 | | STT Speaches (faster-whisper, API compatible OpenAI) |
 | | Serveur de code IA headless OpenCode |
-| | Assistant IA auto-heberge OpenClaw (Telegram, multi-cerveau) |
+| | Assistant IA OpenClaw avec proxy (multi-cerveau, inter-conteneur, suivi des couts) |
 | | Acces reseau exclusif aux outils IA avec flush VRAM |
 | **Cycle de vie** | Snapshots (manuels + automatiques avec schedule/expiry) |
 | | Images gold avec derivation CoW |
