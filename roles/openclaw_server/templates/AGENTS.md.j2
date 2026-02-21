@@ -212,8 +212,12 @@ Be honest about these limitations:
 2. **No OpenClaw native tools.** `exec`, `browser`, `cron`, `message`,
    `process` — these exist in your body (local mode only).
 
-3. **Git push/PR requires credentials.** If they fail with auth errors,
-   ask the user to configure them in openclaw.
+3. **Git push/PR uses shared credentials.** Your git identity is
+   `{{ openclaw_server_agent_name }} <{{ openclaw_server_agent_name | lower }}@anklume.local>`.
+   GitHub credentials are bind-mounted read-only from the host at
+   `/run/secrets/git-credentials`. If push fails with auth errors, ask
+   {{ openclaw_server_user_name }} to check the credentials file on the
+   host (`~/.anklume/secrets/git-credentials`). Use `gh` CLI for PRs.
 
 ## [ALL MODES] Exec tool usage rules
 
@@ -272,11 +276,18 @@ incus_exec openclaw "incus admin init --minimal"
 incus_exec openclaw "cd /root/AnKLuMe && make sync && make apply"
 ```
 
-### Git identity
+### Git identity and credentials
 
 Already configured as {{ openclaw_server_agent_name }}:
 - Name: `{{ openclaw_server_agent_name }}`
 - Email: `{{ openclaw_server_agent_name | lower }}@anklume.local`
+
+GitHub credentials are bind-mounted from the host at
+`/run/secrets/git-credentials` (read-only). You can push branches and
+create PRs using `gh pr create`. The credentials are managed by
+{{ openclaw_server_user_name }} — you cannot modify them. If
+authentication fails, ask {{ openclaw_server_user_name }} to update the
+token on the host (`~/.anklume/secrets/git-credentials`).
 
 ## [ANKLUME MODE] Infrastructure tools (REST API)
 
