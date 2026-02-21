@@ -390,6 +390,11 @@ class TestOpenClawTemplates:
         assert "SOUL.md" in content
         assert "NEVER committed to git" in content
 
+    def test_agents_md_has_git_credentials_doc(self):
+        """AGENTS.md.j2 documents git credential mechanism."""
+        content = (OPENCLAW_TEMPLATES / "AGENTS.md.j2").read_text()
+        assert "git-credentials" in content
+
     def test_tools_md_has_api_reference(self):
         """TOOLS.md.j2 contains API tool reference."""
         content = (OPENCLAW_TEMPLATES / "TOOLS.md.j2").read_text()
