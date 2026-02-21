@@ -68,6 +68,13 @@
       '{"baseUrl":"{{ openclaw_server_ollama_url }}","apiKey":"{{ openclaw_server_ollama_api_key }}","models":[{"id":"default","name":"Default Model"}]}'
   changed_when: false
 
+- name: OpenclawServer | Configure memory search embeddings
+  ansible.builtin.command:
+    cmd: >-
+      openclaw config set --json agents.defaults.memorySearch
+      '{"provider":"openai","model":"{{ openclaw_server_embeddings_model }}","remote":{"baseUrl":"http://{{ openclaw_server_ollama_ip }}:11434/v1/","apiKey":"{{ openclaw_server_ollama_api_key }}"}}'
+  changed_when: false
+
 # -- Git identity and credentials ------------------------------------------
 
 - name: OpenclawServer | Configure git identity

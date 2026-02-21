@@ -24,6 +24,9 @@ openclaw_server_openclaw_ip: "10.100.3.5"
 openclaw_server_ollama_ip: "10.100.3.1"
 openclaw_server_ollama_port: 8081
 
+# Embeddings model for memory search (served by Ollama on port 11434)
+openclaw_server_embeddings_model: "nomic-embed-text"
+
 # --- Agent identity (ADR-036: reproduced from templates) ---
 
 openclaw_server_agent_name: "Ada"
