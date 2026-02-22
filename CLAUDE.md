@@ -110,17 +110,20 @@ At the start of each session or after a /clear, you MUST ask the user:
 
 ## Context files
 
-For details, read these files with `@path`:
-- @docs/SPEC.md — Full specification (architecture, formats, roles)
+Always loaded (core project instructions):
+- @docs/SPEC.md — Core specification (vision, PSOT model, infra.yml format)
 - @docs/ARCHITECTURE.md — Architecture decisions (ADR-style)
-- @docs/ROADMAP.md — Implementation phases and priorities
-- @docs/network-isolation.md — nftables inter-bridge isolation (Phase 8)
-- @docs/vm-support.md — KVM VM support guide (Phase 9)
-- @docs/gpu-advanced.md — GPU management and security policy (Phase 10)
-- @docs/firewall-vm.md — Dedicated firewall VM guide (Phase 11)
-- @docs/ai-testing.md — AI-assisted testing and development (Phase 13)
-- @docs/stt-service.md — Speech-to-Text service guide (Phase 14)
-- @docs/agent-teams.md — Claude Code Agent Teams guide (Phase 15)
-- @docs/ai-switch.md — Exclusive AI-tools network access (Phase 18a)
-- @docs/guide.md — Interactive onboarding guide (Phase 18c)
-- @docs/decisions-log.md — Autonomous decisions pending review
+
+Read on demand with the Read tool (NOT auto-loaded — too large):
+- `docs/SPEC-operations.md` — Operational reference (generator, roles, snapshots, validators, bootstrap)
+- `docs/ROADMAP.md` — Implementation phases and priorities
+- `docs/decisions-log.md` — Autonomous decisions pending review
+- `docs/network-isolation.md` — nftables inter-bridge isolation (Phase 8)
+- `docs/vm-support.md` — KVM VM support guide (Phase 9)
+- `docs/gpu-advanced.md` — GPU management and security policy (Phase 10)
+- `docs/firewall-vm.md` — Dedicated firewall VM guide (Phase 11)
+- `docs/ai-testing.md` — AI-assisted testing and development (Phase 13)
+- `docs/stt-service.md` — Speech-to-Text service guide (Phase 14)
+- `docs/agent-teams.md` — Claude Code Agent Teams guide (Phase 15)
+- `docs/ai-switch.md` — Exclusive AI-tools network access (Phase 18a)
+- `docs/guide.md` — Interactive onboarding guide (Phase 18c)
