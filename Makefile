@@ -307,6 +307,11 @@ matrix-coverage: ## Show behavior matrix test coverage
 matrix-generate: ## Generate tests for uncovered matrix cells (AI_MODE=...)
 	scripts/ai-matrix-test.sh $(if $(AI_MODE),--mode $(AI_MODE))
 
+# ── Test Report (delegation to Ada / local LLM) ──────────
+test-report: ## Run all tests and produce JSON report (SUITE=pytest|lint|ruff|shellcheck|matrix)
+	$(call require_container,test-report)
+	scripts/test-runner-report.sh $(if $(SUITE),--suite $(SUITE)) $(if $(OUTPUT_DIR),--output-dir $(OUTPUT_DIR))
+
 # ── AI-Assisted Testing (Phase 13) ────────────────────────
 ai-test: ## Run tests + AI-assisted fixing (AI_MODE=none|local|remote|claude-code|aider)
 	ANKLUME_AI_MODE=$(or $(AI_MODE),none) \

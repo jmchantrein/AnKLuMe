@@ -703,7 +703,10 @@ _LLAMA_SERVICES = {
     "assistant": "llama-server",     # qwen2.5-coder:32b
     "local": "llama-server-chat",    # qwen3:30b-a3b
 }
-GPU_CONTAINER = "gpu-server"
+GPU_CONTAINER = os.environ.get("ANKLUME_GPU_CONTAINER", "gpu-server")
+GPU_IP = os.environ.get("ANKLUME_GPU_IP", "10.100.3.1")
+GPU_LLM_PORT = int(os.environ.get("ANKLUME_GPU_LLM_PORT", "8081"))
+GPU_OLLAMA_PORT = int(os.environ.get("ANKLUME_GPU_OLLAMA_PORT", "11434"))
 
 OPENCLAW_CONTAINER = "openclaw"
 OPENCLAW_PROJECT = "ai-tools"
@@ -912,6 +915,256 @@ def self_upgrade(action: str = "check") -> str:
     return f"ERROR: unknown action '{action}'. Use: check, upgrade, apply-openclaw, update-self"
 
 
+# ── Test delegation tools ──────────────────────────────────
+# These tools enable Ada (OpenClaw) and other agents to run comprehensive
+# test suites, monitor progress, and request code reviews via local LLMs.
+
+_REPORT_DIR = "/tmp/anklume-test-report"
+
+
+@mcp.tool()
+def run_full_report(suite: str = "all") -> str:
+    """Run comprehensive test suites and produce a structured JSON report.
+
+    Runs pytest, lint, ruff, shellcheck, and matrix-coverage. Results are
+    saved to /tmp/anklume-test-report/report.json with real-time progress
+    in progress.json.
+
+    Args:
+        suite: Run all suites ("all") or a specific one:
+               "pytest", "lint", "ruff", "shellcheck", "matrix"
+    """
+    cmd = ["bash", "scripts/test-runner-report.sh", "--output-dir", _REPORT_DIR]
+    if suite != "all":
+        cmd.extend(["--suite", suite])
+    r = _run(cmd, timeout=600)
+
+    # Read the generated report
+    report_path = os.path.join(_REPORT_DIR, "report.json")
+    try:
+        with open(report_path) as f:
+            report = json.load(f)
+        return json.dumps(report, indent=2)
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Fall back to raw output if report wasn't generated
+        output = r["stdout"]
+        if r["stderr"]:
+            output += f"\n--- stderr ---\n{r['stderr']}"
+        return output
+
+
+@mcp.tool()
+def get_test_progress() -> str:
+    """Get real-time progress of a running test suite.
+
+    Returns the current progress from progress.json, showing which suite
+    is running and how many are completed. Useful for monitoring long-running
+    test executions.
+    """
+    progress_path = os.path.join(_REPORT_DIR, "progress.json")
+    try:
+        with open(progress_path) as f:
+            progress = json.load(f)
+        return json.dumps(progress, indent=2)
+    except FileNotFoundError:
+        return '{"status": "idle", "message": "No test run in progress. Use run_full_report() to start."}'
+    except json.JSONDecodeError:
+        return '{"status": "error", "message": "Progress file corrupted."}'
+
+
+@mcp.tool()
+def get_test_report() -> str:
+    """Get the most recent test report.
+
+    Returns the full JSON report from the last run_full_report() execution.
+    Includes all suite results, failure details, and matrix coverage data.
+    """
+    report_path = os.path.join(_REPORT_DIR, "report.json")
+    try:
+        with open(report_path) as f:
+            report = json.load(f)
+        return json.dumps(report, indent=2)
+    except FileNotFoundError:
+        return '{"error": "No report found. Run run_full_report() first."}'
+    except json.JSONDecodeError:
+        return '{"error": "Report file corrupted."}'
+
+
+def _call_local_llm(prompt: str, *, max_tokens: int = 16384,
+                    temperature: float = 0.3, timeout: int = 300,
+                    header: str = "") -> str:
+    """Call the currently loaded model on llama-server (GPU).
+
+    Handles qwen3 reasoning model: uses high max_tokens so reasoning
+    completes and content is produced. Strips <think> tags. Falls back
+    to reasoning_content if content is empty.
+    """
+    llm_url = f"http://{GPU_IP}:{GPU_LLM_PORT}/v1/chat/completions"
+    payload = json.dumps({
+        "model": "current",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    })
+
+    try:
+        result = subprocess.run(
+            ["curl", "-s", "--max-time", str(timeout),
+             "-X", "POST", llm_url,
+             "-H", "Content-Type: application/json",
+             "--data-binary", "@-"],
+            input=payload, capture_output=True, text=True, timeout=timeout + 10,
+        )
+        if result.returncode != 0:
+            return f"ERROR: LLM call failed: {result.stderr}"
+        response = json.loads(result.stdout)
+        msg = response["choices"][0]["message"]
+        content = msg.get("content", "") or ""
+        # Strip thinking tags if present (qwen3 reasoning model)
+        content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+        if not content.strip():
+            # Fallback: use reasoning_content (truncated) if content empty
+            reasoning = msg.get("reasoning_content", "")
+            if reasoning:
+                return f"{header}\n\n(Note: model returned reasoning only, content was empty — increase max_tokens or use a non-reasoning model)\n\n{reasoning[:3000]}"
+            return "ERROR: LLM returned empty response"
+        return f"{header}\n\n{content}" if header else content
+    except subprocess.TimeoutExpired:
+        return f"ERROR: LLM call timed out ({timeout}s). Try a smaller file."
+    except (json.JSONDecodeError, KeyError, IndexError) as e:
+        stdout = getattr(result, 'stdout', '')[:500] if 'result' in dir() else ''
+        return f"ERROR: unexpected LLM response: {e} — {stdout}"
+
+
+@mcp.tool()
+def propose_refactoring(file_path: str, focus: str = "general") -> str:
+    """Propose refactoring improvements for a file using the local LLM.
+
+    Uses qwen2.5-coder:32b (via llama-server on the GPU) to analyze a file
+    and propose argued refactoring suggestions. Claude Code reviews the
+    proposals before any changes are applied.
+
+    Args:
+        file_path: Relative path from project root (e.g., "scripts/generate.py")
+        focus: Focus area — "general", "simplify", "performance", "security",
+               "readability", "dry" (Don't Repeat Yourself)
+    """
+    # Read the file content
+    full_path = os.path.join(PROJECT_DIR, file_path)
+    if not os.path.isfile(full_path):
+        return f"ERROR: file not found: {file_path}"
+    # Safety: restrict to project directory
+    real_path = os.path.realpath(full_path)
+    if not real_path.startswith(os.path.realpath(PROJECT_DIR)):
+        return "ERROR: path outside project directory"
+
+    try:
+        with open(full_path) as f:
+            content = f.read()
+    except Exception as e:
+        return f"ERROR: cannot read file: {e}"
+
+    if len(content) > 15000:
+        return f"ERROR: file too large ({len(content)} chars). Max 15000 for local LLM analysis."
+
+    # Detect language from extension
+    ext = os.path.splitext(file_path)[1]
+    lang_map = {".py": "Python", ".sh": "Bash", ".yml": "YAML/Ansible", ".yaml": "YAML/Ansible"}
+    language = lang_map.get(ext, "unknown")
+
+    focus_prompts = {
+        "general": "Propose all applicable refactoring improvements.",
+        "simplify": "Focus on simplification: remove unnecessary complexity, dead code, over-engineering.",
+        "performance": "Focus on performance optimizations.",
+        "security": "Focus on security vulnerabilities (injection, privilege escalation, unsafe patterns).",
+        "readability": "Focus on readability: naming, structure, comments where needed.",
+        "dry": "Focus on DRY: identify duplicated logic that should be extracted.",
+    }
+    focus_instruction = focus_prompts.get(focus, focus_prompts["general"])
+
+    prompt = f"""Analyze this {language} file and propose refactoring improvements.
+
+File: {file_path}
+Focus: {focus_instruction}
+
+Rules:
+- Be specific: cite line numbers and exact code to change
+- Argue each proposal: explain WHY the change is beneficial
+- Prioritize proposals by impact (high/medium/low)
+- Do NOT propose changes to code you don't understand
+- Consider the AnKLuMe project conventions (KISS, DRY, no over-engineering)
+- Format as a numbered list of proposals
+
+```{language.lower()}
+{content}
+```"""
+
+    return _call_local_llm(
+        prompt, max_tokens=16384, temperature=0.3, timeout=300,
+        header=f"## Refactoring proposals for `{file_path}` (focus: {focus})",
+    )
+
+
+@mcp.tool()
+def review_code_local(file_path: str, focus: str = "quality") -> str:
+    """Review a file for code quality using the local LLM.
+
+    Uses qwen3:30b-a3b (reasoning model) for quick code review. Faster
+    and cheaper than Claude but less thorough. Good for preliminary
+    screening before human or Claude review.
+
+    Args:
+        file_path: Relative path from project root
+        focus: Focus area — "quality", "bugs", "security", "conventions"
+    """
+    full_path = os.path.join(PROJECT_DIR, file_path)
+    if not os.path.isfile(full_path):
+        return f"ERROR: file not found: {file_path}"
+    real_path = os.path.realpath(full_path)
+    if not real_path.startswith(os.path.realpath(PROJECT_DIR)):
+        return "ERROR: path outside project directory"
+
+    try:
+        with open(full_path) as f:
+            content = f.read()
+    except Exception as e:
+        return f"ERROR: cannot read file: {e}"
+
+    if len(content) > 15000:
+        return f"ERROR: file too large ({len(content)} chars). Max 15000 for local LLM analysis."
+
+    ext = os.path.splitext(file_path)[1]
+    lang_map = {".py": "Python", ".sh": "Bash", ".yml": "YAML/Ansible", ".yaml": "YAML/Ansible"}
+    language = lang_map.get(ext, "unknown")
+
+    focus_prompts = {
+        "quality": "Review for overall code quality: bugs, style, maintainability.",
+        "bugs": "Focus on finding bugs, logic errors, and edge cases.",
+        "security": "Focus on security vulnerabilities (OWASP top 10, injection, etc.).",
+        "conventions": "Check compliance with: FQCN for Ansible, explicit changed_when, "
+                       "task names with 'RoleName | Description', role-prefixed variables.",
+    }
+    focus_instruction = focus_prompts.get(focus, focus_prompts["quality"])
+
+    prompt = f"""Review this {language} file.
+
+File: {file_path}
+Focus: {focus_instruction}
+
+Provide a brief review with:
+1. Issues found (with severity: critical/warning/info)
+2. One-line summary verdict (PASS / NEEDS ATTENTION / CRITICAL ISSUES)
+
+```{language.lower()}
+{content}
+```"""
+
+    return _call_local_llm(
+        prompt, max_tokens=16384, temperature=0.2, timeout=300,
+        header=f"## Code review: `{file_path}` (focus: {focus})",
+    )
+
+
 # ── REST API layer (for clients without MCP support) ──────
 # POST /api/<tool> with JSON body → plain text response
 # GET /api → list available tools
@@ -935,6 +1188,11 @@ _TOOL_REGISTRY = {
     "web_search": web_search,
     "web_fetch": web_fetch,
     "self_upgrade": self_upgrade,
+    "run_full_report": run_full_report,
+    "get_test_progress": get_test_progress,
+    "get_test_report": get_test_report,
+    "propose_refactoring": propose_refactoring,
+    "review_code_local": review_code_local,
 }
 
 

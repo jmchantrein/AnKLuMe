@@ -35,6 +35,35 @@ curl http://{{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}/api
 | `switch_brain` | Change brain mode | `curl -X POST .../api/switch_brain -d '{"mode": "anklume"}'` |
 | `usage` | Token usage stats | `curl .../api/usage` |
 | `self_upgrade` | Framework upgrade | `{"action": "check\|upgrade\|apply-openclaw\|update-self"}` |
+| `run_full_report` | Full test suite with JSON report | `curl -X POST .../api/run_full_report -d '{"suite": "all"}'` |
+| `get_test_progress` | Check running test progress | `curl .../api/get_test_progress` |
+| `get_test_report` | Get last test report | `curl .../api/get_test_report` |
+| `propose_refactoring` | Local LLM refactoring proposals | `curl -X POST .../api/propose_refactoring -d '{"file_path": "scripts/generate.py", "focus": "simplify"}'` |
+| `review_code_local` | Local LLM code review | `curl -X POST .../api/review_code_local -d '{"file_path": "scripts/generate.py", "focus": "quality"}'` |
+
+### Delegation Tools (GPU-accelerated, no API credits)
+
+These tools use the local LLM (qwen2.5-coder:32b / qwen3:30b-a3b) on
+the GPU server. They cost zero API credits and are ideal for routine tasks.
+
+**Test delegation workflow:**
+1. `run_full_report` — run all test suites (pytest, lint, shellcheck, matrix)
+2. `get_test_progress` — monitor progress while tests run
+3. `get_test_report` — get structured JSON results with failure details
+4. Report findings to the user via Telegram
+
+**Refactoring workflow:**
+1. `propose_refactoring("scripts/generate.py", "simplify")` — get argued proposals
+2. Report proposals to the user for review
+3. User or Claude Code applies approved refactorings
+
+**Code review workflow:**
+1. `review_code_local("roles/ollama_server/tasks/main.yml", "conventions")` — quick review
+2. Report issues (critical/warning/info) to user
+3. Critical issues escalated to Claude Code for fixing
+
+Focus options for `propose_refactoring`: general, simplify, performance, security, readability, dry
+Focus options for `review_code_local`: quality, bugs, security, conventions
 
 ### MCP Protocol (for MCP-native clients)
 
@@ -62,5 +91,5 @@ To develop and test AnKLuMe:
 | Container | IP | Description |
 |-----------|-----|-------------|
 | anklume-instance | {{ openclaw_server_proxy_ip }} | Admin + Ansible + MCP server |
-| ollama | {{ openclaw_server_ollama_ip }} | LLM inference (GPU) |
+| gpu-server | {{ openclaw_server_ollama_ip }} | LLM inference (GPU) |
 | openclaw | {{ openclaw_server_openclaw_ip }} | OpenClaw (you) |
