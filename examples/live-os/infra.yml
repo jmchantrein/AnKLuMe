@@ -1,3 +1,4 @@
+---
 # Phase 31 Example: Live OS with Encrypted Persistent Storage
 #
 # This example demonstrates AnKLuMe configured for boot-from-USB with encrypted data disk.

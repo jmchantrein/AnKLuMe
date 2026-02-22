@@ -31,7 +31,8 @@
 - name: IncusSnapshots | Parse snapshot names
   ansible.builtin.set_fact:
     incus_snapshots_existing: >-
-      {{ (incus_snapshots_raw.stdout | default('[]') | from_json) | map(attribute='name') | list }}
+      {{ ((incus_snapshots_raw.stdout | default('')) | trim | default('[]', true) | from_json)
+         | map(attribute='name') | list }}
 
 # ── Action: create ───────────────────────────────────────
 - name: IncusSnapshots | Stop instance before snapshot

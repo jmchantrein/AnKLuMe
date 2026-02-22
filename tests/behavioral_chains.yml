@@ -1,3 +1,4 @@
+---
 # behavioral_chains.yml — Sequential admin-sys behavioral test chains
 #
 # Each chain simulates a complete admin workflow from start to finish.
@@ -64,7 +65,13 @@ chains:
           stdout_contains: "Done"
         description: "Second sync is idempotent (same output)"
 
-      - action: ".venv/bin/python3 -c \"import yaml, glob, sys; files = glob.glob('inventory/*.yml') + glob.glob('group_vars/*.yml') + glob.glob('host_vars/*.yml'); [yaml.safe_load(open(f).read()) for f in files]; print(f'{len(files)} YAML files valid')\""
+      - action: >-
+          .venv/bin/python3 -c "import yaml, glob;
+          files = glob.glob('inventory/*.yml')
+          + glob.glob('group_vars/*.yml')
+          + glob.glob('host_vars/*.yml');
+          [yaml.safe_load(open(f).read()) for f in files];
+          print(f'{len(files)} YAML files valid')"
         expect:
           exit_code: 0
           stdout_contains: "valid"
@@ -218,18 +225,24 @@ chains:
           exit_code: 0
         description: "List snapshots (may be empty)"
 
-      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh create $INSTANCE test-snap-behavioral"
+      - action: >-
+          INSTANCE=$(incus list --format csv -c n | head -1)
+          && scripts/snap.sh create $INSTANCE test-snap-behavioral
         expect:
           exit_code: 0
         description: "Create a named snapshot"
 
-      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh list $INSTANCE 2>&1"
+      - action: >-
+          INSTANCE=$(incus list --format csv -c n | head -1)
+          && scripts/snap.sh list $INSTANCE 2>&1
         expect:
           exit_code: 0
           stdout_contains: "test-snap-behavioral"
         description: "Snapshot appears in list"
 
-      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh delete $INSTANCE test-snap-behavioral"
+      - action: >-
+          INSTANCE=$(incus list --format csv -c n | head -1)
+          && scripts/snap.sh delete $INSTANCE test-snap-behavioral
         expect:
           exit_code: 0
         description: "Delete the test snapshot"
@@ -370,7 +383,9 @@ chains:
           for name, domain in d['domains'].items():
               yaml.dump({name: domain}, open(f'infra/domains/{name}.yml', 'w'), default_flow_style=False)
           if 'network_policies' in d:
-              yaml.dump({'network_policies': d['network_policies']}, open('infra/policies.yml', 'w'), default_flow_style=False)
+              pol = {'network_policies': d['network_policies']}
+              yaml.dump(pol, open('infra/policies.yml', 'w'),
+                        default_flow_style=False)
           os.rename('infra.yml', 'infra.yml.bak')
           PYEOF
         expect:
