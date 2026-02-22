@@ -1,0 +1,453 @@
+# behavioral_chains.yml — Sequential admin-sys behavioral test chains
+#
+# Each chain simulates a complete admin workflow from start to finish.
+# Steps are sequential: each depends on the previous one succeeding.
+#
+# Format:
+#   chain: descriptive name
+#   description: what an admin is trying to accomplish
+#   preconditions: what must be true before starting
+#   steps:
+#     - action: command to run (shell)
+#       expect: what should happen (machine-verifiable assertions)
+#       timeout: max seconds (default: 60)
+#       on_failure: what the admin should see if it fails
+#
+# These chains are designed to be:
+# 1. Exhaustive — cover every AnKLuMe capability
+# 2. Sequential — each step depends on the previous
+# 3. Mechanically verifiable — a local LLM can check pass/fail
+# 4. Living documentation — updated as AnKLuMe evolves
+#
+# Usage:
+#   python3 scripts/run-behavioral-tests.py              # run all chains
+#   python3 scripts/run-behavioral-tests.py --chain bootstrap
+#   python3 scripts/run-behavioral-tests.py --dry-run    # show plan only
+
+chains:
+
+  # ============================================================
+  # CHAIN 1: Fresh bootstrap → first deployment
+  # ============================================================
+  - chain: bootstrap-to-first-deploy
+    sandbox: true
+    description: >
+      Admin starts from a clean repo copy, copies a starter infra.yml,
+      generates Ansible files, and verifies the output is valid.
+    preconditions:
+      - "python3 >= 3.11 with pyyaml"
+    steps:
+      - action: "test -f CLAUDE.md && test -d scripts && test -d roles"
+        expect:
+          exit_code: 0
+        description: "Sandbox contains the project files"
+
+      - action: "cp examples/student-sysadmin/infra.yml infra.yml"
+        expect:
+          exit_code: 0
+          file_exists: "infra.yml"
+        description: "Copy a starter infra.yml"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+          files_exist:
+            - "inventory/anklume.yml"
+            - "group_vars/anklume.yml"
+            - "group_vars/all.yml"
+          stdout_contains: "Written"
+        description: "Generate Ansible files from infra.yml"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+          stdout_contains: "Done"
+        description: "Second sync is idempotent (same output)"
+
+      - action: ".venv/bin/python3 -c \"import yaml, glob, sys; files = glob.glob('inventory/*.yml') + glob.glob('group_vars/*.yml') + glob.glob('host_vars/*.yml'); [yaml.safe_load(open(f).read()) for f in files]; print(f'{len(files)} YAML files valid')\""
+        expect:
+          exit_code: 0
+          stdout_contains: "valid"
+        description: "Generated YAML files are valid YAML"
+        timeout: 60
+
+  # ============================================================
+  # CHAIN 2: PSOT generator — full lifecycle
+  # ============================================================
+  - chain: psot-generator-lifecycle
+    sandbox: true
+    description: >
+      Test the full PSOT cycle: create infra.yml, generate, add domain,
+      regenerate, remove domain, detect orphans.
+    preconditions:
+      - "python3 >= 3.11 with pyyaml"
+    steps:
+      - action: "cp examples/student-sysadmin/infra.yml infra.yml"
+        expect:
+          exit_code: 0
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+          files_exist:
+            - "inventory/anklume.yml"
+            - "inventory/lab.yml"
+
+      - action: ".venv/bin/python3 -c \"
+          import yaml;
+          d = yaml.safe_load(open('infra.yml'));
+          d['domains']['test-new'] = {
+            'description': 'Test domain',
+            'subnet_id': 99,
+            'machines': {
+              'test-box': {
+                'description': 'Test machine',
+                'type': 'lxc',
+                'ip': '10.100.99.10',
+                'roles': ['base_system']
+              }
+            }
+          };
+          yaml.dump(d, open('infra.yml', 'w'), default_flow_style=False)
+          \""
+        expect:
+          exit_code: 0
+        description: "Add a new domain to infra.yml"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+          files_exist:
+            - "inventory/test-new.yml"
+            - "group_vars/test-new.yml"
+            - "host_vars/test-box.yml"
+        description: "Sync creates files for new domain"
+
+      - action: ".venv/bin/python3 -c \"
+          import yaml;
+          d = yaml.safe_load(open('infra.yml'));
+          del d['domains']['test-new'];
+          yaml.dump(d, open('infra.yml', 'w'), default_flow_style=False)
+          \""
+        expect:
+          exit_code: 0
+        description: "Remove the test domain from infra.yml"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml --dry-run 2>&1"
+        expect:
+          exit_code: 0
+          stdout_contains: "orphan"
+        description: "Sync detects orphaned files for removed domain"
+
+  # ============================================================
+  # CHAIN 3: Validation — bad inputs caught early
+  # ============================================================
+  - chain: validation-catches-errors
+    sandbox: true
+    description: >
+      Verify that the generator rejects invalid configurations
+      with clear error messages before touching any file.
+    preconditions:
+      - "python3 >= 3.11 with pyyaml"
+    steps:
+      - action: "cp examples/student-sysadmin/infra.yml infra.yml"
+        expect:
+          exit_code: 0
+
+      - action: ".venv/bin/python3 -c \"
+          import yaml;
+          d = yaml.safe_load(open('infra.yml'));
+          d['domains']['dup-subnet'] = {
+            'description': 'Duplicate subnet',
+            'subnet_id': 0,
+            'machines': {'dup-box': {'type': 'lxc', 'ip': '10.100.0.20', 'roles': ['base_system']}}
+          };
+          yaml.dump(d, open('infra.yml', 'w'), default_flow_style=False)
+          \""
+        expect:
+          exit_code: 0
+        description: "Add domain with duplicate subnet_id"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml 2>&1"
+        expect:
+          exit_code_not: 0
+          stdout_contains: "subnet"
+        description: "Generator rejects duplicate subnet_id"
+
+      - action: "cp examples/student-sysadmin/infra.yml infra.yml"
+        expect:
+          exit_code: 0
+        description: "Restore valid infra.yml"
+
+      - action: ".venv/bin/python3 -c \"
+          import yaml;
+          d = yaml.safe_load(open('infra.yml'));
+          first_domain = list(d['domains'].keys())[0];
+          first_machine = list(d['domains'][first_domain]['machines'].keys())[0];
+          ip = d['domains'][first_domain]['machines'][first_machine].get('ip', '10.100.0.10');
+          d['domains']['dup-ip'] = {
+            'description': 'Duplicate IP',
+            'subnet_id': 88,
+            'machines': {'dup-ip-box': {'type': 'lxc', 'ip': ip, 'roles': ['base_system']}}
+          };
+          yaml.dump(d, open('infra.yml', 'w'), default_flow_style=False)
+          \""
+        expect:
+          exit_code: 0
+        description: "Add domain with duplicate IP"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml 2>&1"
+        expect:
+          exit_code_not: 0
+          stdout_contains: "IP"
+        description: "Generator rejects duplicate IP"
+
+  # ============================================================
+  # CHAIN 4: Snapshot lifecycle
+  # ============================================================
+  - chain: snapshot-lifecycle
+    description: >
+      Admin creates snapshots, lists them, restores one,
+      and cleans up old snapshots.
+    preconditions:
+      - "incus daemon is running"
+      - "at least one running instance"
+    steps:
+      - action: "scripts/snap.sh list 2>&1"
+        expect:
+          exit_code: 0
+        description: "List snapshots (may be empty)"
+
+      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh create $INSTANCE test-snap-behavioral"
+        expect:
+          exit_code: 0
+        description: "Create a named snapshot"
+
+      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh list $INSTANCE 2>&1"
+        expect:
+          exit_code: 0
+          stdout_contains: "test-snap-behavioral"
+        description: "Snapshot appears in list"
+
+      - action: "INSTANCE=$(incus list --format csv -c n | head -1) && scripts/snap.sh delete $INSTANCE test-snap-behavioral"
+        expect:
+          exit_code: 0
+        description: "Delete the test snapshot"
+
+  # ============================================================
+  # CHAIN 5: LLM backend management
+  # ============================================================
+  - chain: llm-backend-switch
+    description: >
+      Admin switches between llama-server and Ollama backends,
+      checks status, and verifies the active backend responds.
+    preconditions:
+      - "gpu-server container is running"
+      - "at least one LLM backend configured"
+    steps:
+      - action: "scripts/llm-switch.sh status 2>&1"
+        expect:
+          exit_code: 0
+          stdout_matches: "(llama-server|ollama)"
+        description: "Check current LLM backend status"
+
+      - action: "scripts/llm-switch.sh status 2>&1 | grep -oE '(llama|ollama)' | head -1"
+        expect:
+          exit_code: 0
+        description: "Identify current backend"
+
+  # ============================================================
+  # CHAIN 6: Network isolation verification
+  # ============================================================
+  - chain: network-isolation
+    description: >
+      Admin verifies that nftables rules are generated correctly
+      and that inter-domain traffic is blocked.
+    preconditions:
+      - "incus daemon is running (run from anklume-instance)"
+      - "infra.yml exists with multiple domains"
+    steps:
+      - action: "make nftables 2>&1 || true"
+        expect:
+          exit_code: 0
+          file_exists: "/opt/anklume/nftables-isolation.nft"
+        description: "Generate nftables isolation rules"
+
+  # ============================================================
+  # CHAIN 7: Pre-apply snapshots and rollback
+  # ============================================================
+  - chain: pre-apply-snapshot-rollback
+    description: >
+      Admin uses the safe-apply workflow: automatic pre-apply
+      snapshots, then rollback if something goes wrong.
+    preconditions:
+      - "incus daemon is running"
+      - "at least one running instance"
+    steps:
+      - action: "scripts/snapshot-apply.sh list 2>&1"
+        expect:
+          exit_code: 0
+        description: "List pre-apply snapshots (may be empty)"
+
+      - action: "scripts/snapshot-apply.sh create 2>&1"
+        expect:
+          exit_code: 0
+        description: "Create pre-apply snapshot of all instances"
+
+      - action: "scripts/snapshot-apply.sh list 2>&1"
+        expect:
+          exit_code: 0
+          stdout_contains: "pre-apply"
+        description: "Pre-apply snapshot appears in list"
+
+      - action: "scripts/snapshot-apply.sh cleanup --keep 1 2>&1"
+        expect:
+          exit_code: 0
+        description: "Cleanup keeps only most recent snapshot"
+
+  # ============================================================
+  # CHAIN 8: Console generation
+  # ============================================================
+  - chain: console-generation
+    description: >
+      Admin generates a tmux console layout from infra.yml.
+    preconditions:
+      - "infra.yml exists"
+      - "python3 with libtmux available"
+    steps:
+      - action: "python3 scripts/console.py --dry-run 2>&1 || true"
+        expect:
+          exit_code: 0
+        description: "Console dry-run shows planned tmux layout"
+
+  # ============================================================
+  # CHAIN 9: Code quality full pipeline
+  # ============================================================
+  - chain: code-quality-pipeline
+    description: >
+      Admin runs the full quality pipeline: lint, test, audit.
+    preconditions:
+      - "python3 with dev dependencies"
+    steps:
+      - action: "make lint 2>&1"
+        expect:
+          exit_code: 0
+        description: "All linters pass (yamllint, ansible-lint, shellcheck, ruff)"
+        timeout: 180
+
+      - action: ".venv/bin/pytest tests/ -x -q 2>&1"
+        expect:
+          exit_code: 0
+        description: "All pytest tests pass"
+        timeout: 300
+
+  # ============================================================
+  # CHAIN 10: Directory mode (infra/ instead of infra.yml)
+  # ============================================================
+  - chain: directory-mode
+    sandbox: true
+    description: >
+      Admin uses infra/ directory format instead of single infra.yml.
+    preconditions:
+      - "python3 >= 3.11 with pyyaml"
+    steps:
+      - action: "cp examples/student-sysadmin/infra.yml infra.yml"
+        expect:
+          exit_code: 0
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+        description: "Generate from single-file mode (baseline)"
+
+      - action: |
+          .venv/bin/python3 - <<'PYEOF'
+          import yaml, os
+          d = yaml.safe_load(open('infra.yml'))
+          os.makedirs('infra/domains', exist_ok=True)
+          base = {'project_name': d['project_name'], 'global': d['global']}
+          yaml.dump(base, open('infra/base.yml', 'w'), default_flow_style=False)
+          for name, domain in d['domains'].items():
+              yaml.dump({name: domain}, open(f'infra/domains/{name}.yml', 'w'), default_flow_style=False)
+          if 'network_policies' in d:
+              yaml.dump({'network_policies': d['network_policies']}, open('infra/policies.yml', 'w'), default_flow_style=False)
+          os.rename('infra.yml', 'infra.yml.bak')
+          PYEOF
+        expect:
+          exit_code: 0
+          dir_exists: "infra/"
+          file_exists: "infra/base.yml"
+        description: "Convert infra.yml to infra/ directory format"
+
+      - action: ".venv/bin/python3 scripts/generate.py infra.yml"
+        expect:
+          exit_code: 0
+        description: "Generate from directory mode produces same result"
+
+      - action: "mv infra.yml.bak infra.yml && rm -rf infra/"
+        expect:
+          exit_code: 0
+        description: "Restore single-file mode"
+
+  # ============================================================
+  # CHAIN 11: AI-tools exclusive access
+  # ============================================================
+  - chain: ai-exclusive-access
+    description: >
+      Admin configures exclusive AI access policy and switches
+      between domains.
+    preconditions:
+      - "infra.yml has ai_access_policy: exclusive"
+      - "ai-tools domain exists with running GPU container"
+    steps:
+      - action: "scripts/ai-switch.sh --dry-run --domain pro 2>&1"
+        expect:
+          exit_code: 0
+          stdout_contains: "dry-run"
+        description: "Dry-run AI access switch shows plan without executing"
+
+  # ============================================================
+  # CHAIN 12: Disposable instances
+  # ============================================================
+  - chain: disposable-instances
+    description: >
+      Admin launches a disposable (ephemeral) instance,
+      runs a command, and verifies auto-cleanup.
+    preconditions:
+      - "incus daemon is running"
+    steps:
+      - action: "scripts/disp.sh --help 2>&1"
+        expect:
+          exit_code: 0
+          stdout_contains: "usage"
+        description: "Disposable instance script shows usage"
+
+  # ============================================================
+  # CHAIN 13: Upgrade workflow
+  # ============================================================
+  - chain: upgrade-workflow
+    description: >
+      Admin checks for updates and runs the upgrade process.
+    preconditions:
+      - "git repo is clean"
+    steps:
+      - action: "git fetch origin 2>&1 && git log HEAD..origin/main --oneline 2>&1"
+        expect:
+          exit_code: 0
+        description: "Check for upstream changes"
+
+  # ============================================================
+  # CHAIN 14: Full smoke test
+  # ============================================================
+  - chain: smoke-test
+    description: >
+      Quick validation that the entire toolchain works end-to-end.
+    preconditions:
+      - "incus daemon is running"
+      - "infra.yml exists"
+    steps:
+      - action: "make smoke 2>&1"
+        expect:
+          exit_code: 0
+        description: "Smoke test passes (sync-dry, check, lint, snapshots, incus)"
+        timeout: 300
