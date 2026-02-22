@@ -990,21 +990,19 @@ def get_test_report() -> str:
         return '{"error": "Report file corrupted."}'
 
 
-def _call_local_llm(prompt: str, *, max_tokens: int = 16384,
-                    temperature: float = 0.3, timeout: int = 300,
-                    header: str = "") -> str:
+def _call_local_llm(prompt: str, *, temperature: float = 0.3,
+                    timeout: int = 300, header: str = "") -> str:
     """Call the currently loaded model on llama-server (GPU).
 
-    Handles qwen3 reasoning model: uses high max_tokens so reasoning
-    completes and content is produced. Strips <think> tags. Falls back
-    to reasoning_content if content is empty.
+    No max_tokens limit — local LLM is free, let it produce as much as
+    needed. Strips <think> tags from reasoning models (qwen3). Falls
+    back to reasoning_content if content is empty.
     """
     llm_url = f"http://{GPU_IP}:{GPU_LLM_PORT}/v1/chat/completions"
     payload = json.dumps({
         "model": "current",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
-        "max_tokens": max_tokens,
     })
 
     try:
@@ -1026,7 +1024,7 @@ def _call_local_llm(prompt: str, *, max_tokens: int = 16384,
             # Fallback: use reasoning_content (truncated) if content empty
             reasoning = msg.get("reasoning_content", "")
             if reasoning:
-                return f"{header}\n\n(Note: model returned reasoning only, content was empty — increase max_tokens or use a non-reasoning model)\n\n{reasoning[:3000]}"
+                return f"{header}\n\n(Note: model returned reasoning only, content was empty — try a non-reasoning model)\n\n{reasoning[:3000]}"
             return "ERROR: LLM returned empty response"
         return f"{header}\n\n{content}" if header else content
     except subprocess.TimeoutExpired:
@@ -1100,7 +1098,7 @@ Rules:
 ```"""
 
     return _call_local_llm(
-        prompt, max_tokens=16384, temperature=0.3, timeout=300,
+        prompt, temperature=0.3, timeout=300,
         header=f"## Refactoring proposals for `{file_path}` (focus: {focus})",
     )
 
@@ -1160,7 +1158,7 @@ Provide a brief review with:
 ```"""
 
     return _call_local_llm(
-        prompt, max_tokens=16384, temperature=0.2, timeout=300,
+        prompt, temperature=0.2, timeout=300,
         header=f"## Code review: `{file_path}` (focus: {focus})",
     )
 
