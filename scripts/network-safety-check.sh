@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+
 # Network safety check - backup and monitor network config
 
 set -euo pipefail
