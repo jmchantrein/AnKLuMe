@@ -4,8 +4,8 @@
 
 # --- LLM backend ---
 
-# Ollama/llama-server API URL (must be reachable from the openclaw container)
-openclaw_server_ollama_url: "http://10.100.3.1:8081"
+# Ollama API URL (single LLM backend, ADR-037)
+openclaw_server_ollama_url: "http://10.100.3.1:11434"
 
 # Ollama API key (any value — local LLM has no authentication)
 openclaw_server_ollama_api_key: "ollama-local"
@@ -22,7 +22,7 @@ openclaw_server_proxy_port: 9090
 
 openclaw_server_openclaw_ip: "10.100.3.5"
 openclaw_server_ollama_ip: "10.100.3.1"
-openclaw_server_ollama_port: 8081
+openclaw_server_ollama_port: 11434
 
 # Embeddings model for memory search (served by Ollama on port 11434)
 openclaw_server_embeddings_model: "nomic-embed-text"
