@@ -73,10 +73,11 @@ class TestBrainModes:
         assert "expert AnKLuMe" in self.content
         assert "assistant" in self.content.lower()
 
-    def test_llama_services_defined(self):
-        """_LLAMA_SERVICES maps each mode to a systemd service."""
-        assert "llama-server" in self.content
-        assert "llama-server-chat" in self.content
+    def test_ollama_backend_constants(self):
+        """ADR-037: Ollama is the single LLM backend, with proxy routing."""
+        assert "GPU_OLLAMA_PORT" in self.content
+        assert "LOCAL_OLLAMA_MODEL" in self.content
+        assert "_forward_to_ollama" in self.content
 
     def test_wakeup_messages_for_all_modes(self):
         """Each brain mode has a wakeup message."""

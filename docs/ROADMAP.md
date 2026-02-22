@@ -2512,6 +2512,6 @@ d) **Internationalization (i18n)**:
 | pro | pro-dev | 10.100.2.10 | net-pro | Running |
 | homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
 
-**Active ADRs**: ADR-001 to ADR-036
+**Active ADRs**: ADR-001 to ADR-037
 
 **Known issues**: None

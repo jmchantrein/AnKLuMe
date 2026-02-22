@@ -739,3 +739,114 @@ alone (minus personality). Destroying and rebuilding a container
 restores full operational capability. The `.gitignore` includes a
 global `SOUL.md` pattern to prevent accidental commits of personality
 files.
+
+---
+
+## ADR-037: Ollama as single LLM backend, proxy-always architecture
+
+**Context**: The GPU container (`gpu-server`, project `ai-tools`)
+initially ran two competing LLM backends in parallel:
+
+- **llama-server** (llama.cpp): direct GGUF inference on port 8081,
+  ~44% faster throughput (4.6 vs 3.2 tok/s on 32B Q4_K_M)
+- **Ollama**: model management + inference on port 11434, automatic
+  model loading/unloading, OpenAI-compatible API
+
+Both backends could not coexist on 24 GB VRAM with a 32B model.
+`scripts/llm-switch.sh` toggled between them by stopping one and
+starting the other. This created cascading problems:
+
+1. **VRAM contention**: switching required stopping services, flushing
+   GPU memory, and restarting — a fragile 4-step cascade that failed
+   silently when processes lingered
+2. **Operational complexity**: three services to manage (llama-server,
+   Ollama, Speaches STT) with two possible states each
+3. **OpenClaw confusion**: the MCP proxy had to detect which backend
+   was active and route accordingly, with different API formats
+4. **Model management**: llama-server required manual GGUF file
+   downloads and path configuration; Ollama handles this with
+   `ollama pull`
+
+Meanwhile, OpenClaw (Ada on Telegram) had a separate problem: its
+`local` brain mode bypassed the MCP proxy entirely, connecting
+directly to the LLM backend. This meant:
+
+- No tool access (the proxy provides `incus exec`, `Read`, `Grep`)
+- No session tracking or usage accounting
+- Different behavior between Telegram modes
+
+**Decision**: Two changes, applied together:
+
+1. **Ollama is the single LLM backend**. llama-server is retired.
+   All LLM inference (chat, embeddings, code generation) goes
+   through Ollama on port 11434. The `scripts/llm-switch.sh` and
+   `scripts/llm-bench.sh` scripts remain for switching between
+   Ollama models (not backends).
+
+2. **Proxy-always architecture**. All OpenClaw brain modes route
+   through the MCP proxy (`scripts/mcp-anklume-dev.py`) on
+   `anklume-instance:9090`. The proxy routes requests based on
+   model name:
+   - `model="anklume"` → Claude Code CLI (AnKLuMe expert mode)
+   - `model="assistant"` → Claude Code CLI (general assistant)
+   - `model="local"` → forwarded to Ollama (free, fast, no API cost)
+
+   The proxy exposes an OpenAI-compatible `/v1/chat/completions`
+   endpoint. OpenClaw sees a single provider (`claude-code`) with
+   three models. Switching brains only changes the model name in
+   the OpenClaw config — no service restart, no VRAM flush.
+
+**Why not keep both backends**:
+
+| Criterion | llama-server | Ollama |
+|-----------|-------------|--------|
+| Throughput (32B Q4_K_M) | 4.6 tok/s | 3.2 tok/s |
+| Model management | Manual GGUF download | `ollama pull` |
+| Multi-model | One model at a time | Auto-load/unload |
+| API compatibility | OpenAI-compat | OpenAI-compat |
+| Embeddings | Separate process | Built-in |
+| VRAM management | Manual | Automatic |
+| Concurrent inference | No | Yes (queueing) |
+
+The 44% throughput advantage of llama-server is real but does not
+justify the operational complexity. In practice:
+
+- Ada's Telegram responses are bounded by network latency and
+  message formatting, not raw tok/s
+- Ollama's automatic VRAM management eliminates the entire
+  switching infrastructure (llm-switch.sh, VRAM flush, service
+  state detection)
+- Ollama natively serves embeddings (nomic-embed-text) alongside
+  chat models, removing the need for a separate embeddings process
+- The MCP `ollama-coder` tools already target Ollama's API
+
+If future hardware provides enough VRAM for concurrent backends
+(e.g., 48+ GB), this decision can be revisited. For 24 GB VRAM,
+a single managed backend is the correct trade-off.
+
+**Proxy routing diagram**:
+
+```
+Telegram → OpenClaw → claude-code provider
+                          │
+                          ▼
+              MCP Proxy (anklume-instance:9090)
+              /v1/chat/completions
+                          │
+            ┌─────────────┼─────────────┐
+            ▼             ▼             ▼
+     model=anklume   model=assistant  model=local
+     Claude Code     Claude Code     → Ollama
+     (AnKLuMe        (general)        (gpu-server:11434)
+      expert)                          free, fast
+     $$ API cost     $$ API cost      $0
+```
+
+**Consequence**:
+- `llama-server.service` disabled on gpu-server (not removed —
+  available for benchmarking)
+- `scripts/llm-switch.sh` simplified to switch Ollama models only
+- OpenClaw config uses `claude-code` as sole provider
+- All brain modes get tool access through the proxy
+- VRAM is managed by Ollama alone (Speaches STT coexists as a
+  separate GPU process within the same container)
