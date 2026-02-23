@@ -1,59 +1,53 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Describes your infrastructure at a high level. After editing, run:
-#   make sync        # Generate/update Ansible files
-#   make apply       # Apply to Incus
-#
-# See docs/SPEC.md section 5 for the full format reference.
-
 # Professional workstation: 4 domains with strict compartmentalization.
 # GPU passthrough on the homelab domain for LLM inference + STT.
+#
+# IPs: anklume -> 10.100.0.x (admin)
+#       perso/pro -> 10.110.x.x (trusted)
+#       homelab -> 10.120.0.x (semi-trusted)
 
 project_name: pro-workstation
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
 
 domains:
   anklume:
+    trust_level: admin
     description: "Administration and orchestration"
-    subnet_id: 0
-    ephemeral: false
     machines:
       pw-admin:
         description: "Ansible controller"
         type: lxc
-        ip: "10.100.0.10"
         config:
           security.nesting: "true"
         roles:
           - base_system
 
   perso:
+    trust_level: trusted
     description: "Personal workspace"
-    subnet_id: 1
-    ephemeral: false
     machines:
       pw-perso:
         description: "Personal environment"
         type: lxc
-        ip: "10.100.1.10"
         roles:
           - base_system
 
   pro:
+    trust_level: trusted
     description: "Professional workspace"
-    subnet_id: 2
-    ephemeral: false
     machines:
       pw-dev:
         description: "Development workspace"
         type: lxc
-        ip: "10.100.2.10"
         config:
           limits.cpu: "4"
           limits.memory: "8GiB"
@@ -61,9 +55,8 @@ domains:
           - base_system
 
   homelab:
+    trust_level: semi-trusted
     description: "Homelab with GPU for LLM + STT"
-    subnet_id: 3
-    ephemeral: false
     profiles:
       nvidia-compute:
         devices:
@@ -74,7 +67,6 @@ domains:
       pw-ai:
         description: "AI server — Ollama + Speaches STT (single GPU)"
         type: lxc
-        ip: "10.100.3.10"
         gpu: true
         profiles:
           - default
@@ -86,7 +78,6 @@ domains:
       pw-webui:
         description: "Open WebUI frontend"
         type: lxc
-        ip: "10.100.3.11"
         roles:
           - base_system
           - open_webui

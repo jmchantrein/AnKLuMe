@@ -16,6 +16,16 @@ import yaml
 # Known MCP tool names (must match scripts/mcp-server.py TOOLS list)
 _KNOWN_MCP_TOOLS = {"gpg_sign", "clipboard_get", "clipboard_set", "file_accept", "file_provide"}
 
+# Zone offsets for trust-level-aware addressing (ADR-038)
+ZONE_OFFSETS = {
+    "admin": 0,
+    "trusted": 10,
+    "semi-trusted": 20,
+    "untrusted": 40,
+    "disposable": 50,
+}
+DEFAULT_TRUST_LEVEL = "semi-trusted"
+
 MANAGED_BEGIN = "# === MANAGED BY infra.yml ==="
 MANAGED_END = "# === END MANAGED ==="
 MANAGED_NOTICE = "# Do not edit this section — it will be overwritten by `make sync`"
@@ -260,6 +270,27 @@ def validate(infra, *, check_host_subnets=True):
     subnet_ids, all_machines, all_ips = {}, {}, {}
     gpu_instances = []  # Track machines with GPU access
 
+    # Addressing mode detection (ADR-038)
+    has_addressing = "addressing" in g
+    computed_addressing = {}
+    zone_subnet_ids = {}  # (trust_level, sid) -> dname for per-zone duplicate check
+    if has_addressing:
+        addr_cfg = g["addressing"]
+        if not isinstance(addr_cfg, dict):
+            errors.append("global.addressing must be a mapping")
+        else:
+            base_octet = addr_cfg.get("base_octet", 10)
+            if base_octet != 10:
+                errors.append(f"global.addressing.base_octet must be 10 (only RFC 1918 /8), got {base_octet}")
+            zone_base = addr_cfg.get("zone_base", 100)
+            if not isinstance(zone_base, int) or not 0 <= zone_base <= 245:
+                errors.append(f"global.addressing.zone_base must be 0-245, got {zone_base}")
+            zone_step = addr_cfg.get("zone_step", 10)
+            if not isinstance(zone_step, int) or zone_step < 1:
+                errors.append(f"global.addressing.zone_step must be a positive integer, got {zone_step}")
+            # Compute addressing for IP validation
+            computed_addressing = _compute_addressing(infra)
+
     valid_types = ("lxc", "vm")
     valid_gpu_policies = ("exclusive", "shared")
     valid_firewall_modes = ("host", "vm")
@@ -285,15 +316,37 @@ def validate(infra, *, check_host_subnets=True):
     for dname, domain in domains.items():
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):
             errors.append(f"Domain '{dname}': invalid name (lowercase alphanumeric + hyphen)")
+        # Validate enabled field (boolean, default true)
+        enabled = domain.get("enabled")
+        if enabled is not None and not isinstance(enabled, bool):
+            errors.append(f"Domain '{dname}': enabled must be a boolean, got {type(enabled).__name__}")
+
         sid = domain.get("subnet_id")
-        if sid is None:
-            errors.append(f"Domain '{dname}': missing subnet_id")
-        elif not isinstance(sid, int) or not 0 <= sid <= 254:
-            errors.append(f"Domain '{dname}': subnet_id must be 0-254, got {sid}")
-        elif sid in subnet_ids:
-            errors.append(f"Domain '{dname}': subnet_id {sid} already used by '{subnet_ids[sid]}'")
+        if has_addressing:
+            # Addressing mode: subnet_id is optional (auto-computed from trust_level)
+            if sid is not None:
+                if not isinstance(sid, int) or not 0 <= sid <= 254:
+                    errors.append(f"Domain '{dname}': subnet_id must be 0-254, got {sid}")
+                else:
+                    trust = domain.get("trust_level", DEFAULT_TRUST_LEVEL)
+                    zone_key = (trust, sid)
+                    if zone_key in zone_subnet_ids:
+                        errors.append(
+                            f"Domain '{dname}': subnet_id {sid} already used by "
+                            f"'{zone_subnet_ids[zone_key]}' in zone '{trust}'"
+                        )
+                    else:
+                        zone_subnet_ids[zone_key] = dname
         else:
-            subnet_ids[sid] = dname
+            # Legacy mode: subnet_id required
+            if sid is None:
+                errors.append(f"Domain '{dname}': missing subnet_id")
+            elif not isinstance(sid, int) or not 0 <= sid <= 254:
+                errors.append(f"Domain '{dname}': subnet_id must be 0-254, got {sid}")
+            elif sid in subnet_ids:
+                errors.append(f"Domain '{dname}': subnet_id {sid} already used by '{subnet_ids[sid]}'")
+            else:
+                subnet_ids[sid] = dname
 
         domain_eph = domain.get("ephemeral")
         if domain_eph is not None and not isinstance(domain_eph, bool):
@@ -351,7 +404,17 @@ def validate(infra, *, check_host_subnets=True):
                     errors.append(f"Machine '{mname}': IP {ip} already used by '{all_ips[ip]}'")
                 else:
                     all_ips[ip] = mname
-                if sid is not None and not ip.startswith(f"{base_subnet}.{sid}."):
+                if has_addressing and dname in computed_addressing:
+                    info = computed_addressing[dname]
+                    addr_cfg = g["addressing"]
+                    bo = addr_cfg.get("base_octet", 10)
+                    expected_prefix = f"{bo}.{info['second_octet']}.{info['domain_seq']}."
+                    if not ip.startswith(expected_prefix):
+                        errors.append(
+                            f"Machine '{mname}': IP {ip} not in subnet "
+                            f"{expected_prefix}0/24"
+                        )
+                elif not has_addressing and sid is not None and not ip.startswith(f"{base_subnet}.{sid}."):
                     errors.append(f"Machine '{mname}': IP {ip} not in subnet {base_subnet}.{sid}.0/24")
             machine_eph = machine.get("ephemeral")
             if machine_eph is not None and not isinstance(machine_eph, bool):
@@ -571,21 +634,44 @@ def validate(infra, *, check_host_subnets=True):
     )
     host_subnets = [] if skip_host_check else _detect_host_subnets()
     if host_subnets:
-        for sid, dname in subnet_ids.items():
-            try:
-                domain_net = ipaddress.IPv4Network(f"{base_subnet}.{sid}.0/24")
-            except ValueError:
-                continue
+        # Build list of (domain_name, network) to check
+        subnets_to_check = []
+        if has_addressing and computed_addressing:
+            addr_cfg = g.get("addressing", {})
+            bo = addr_cfg.get("base_octet", 10)
+            for dname, info in computed_addressing.items():
+                try:
+                    net = ipaddress.IPv4Network(
+                        f"{bo}.{info['second_octet']}.{info['domain_seq']}.0/24"
+                    )
+                    subnets_to_check.append((dname, net))
+                except ValueError:
+                    continue
+        else:
+            for sid, dname in subnet_ids.items():
+                try:
+                    net = ipaddress.IPv4Network(f"{base_subnet}.{sid}.0/24")
+                    subnets_to_check.append((dname, net))
+                except ValueError:
+                    continue
+
+        for dname, domain_net in subnets_to_check:
             for ifname, host_net in host_subnets:
                 if domain_net.overlaps(host_net):
-                    alt_base = "10.200" if base_subnet == "10.100" else "10.100"
+                    if has_addressing:
+                        fix_hint = "Adjust global.addressing.zone_base or use a different subnet_id."
+                    else:
+                        alt_base = "10.200" if base_subnet == "10.100" else "10.100"
+                        fix_hint = (
+                            f"Change global.base_subnet to '{alt_base}' or use a "
+                            f"different subnet_id for this domain."
+                        )
                     errors.append(
                         f"SUBNET CONFLICT: Domain '{dname}' uses {domain_net} which "
                         f"overlaps with host interface '{ifname}' ({host_net}). "
                         f"Incus would create a bridge on the same subnet, causing a "
                         f"routing loop and total loss of network connectivity. "
-                        f"Change global.base_subnet to '{alt_base}' or use a different "
-                        f"subnet_id for this domain."
+                        f"{fix_hint}"
                     )
 
     return errors
@@ -631,6 +717,23 @@ def get_warnings(infra):
             f"({', '.join(gpu_instances)}). No VRAM isolation on consumer GPUs."
         )
 
+    # Warn if network_policies reference disabled domains
+    disabled_domains = {
+        dname for dname, d in domains.items()
+        if d.get("enabled", True) is False
+    }
+    if disabled_domains:
+        for i, policy in enumerate(infra.get("network_policies") or []):
+            if not isinstance(policy, dict):
+                continue
+            for field in ("from", "to"):
+                ref = policy.get(field)
+                if ref in disabled_domains:
+                    warnings.append(
+                        f"network_policies[{i}]: '{field}: {ref}' references "
+                        f"disabled domain '{ref}'"
+                    )
+
     return warnings
 
 
@@ -640,9 +743,124 @@ def enrich_infra(infra):
     Called after validate() and before generate(). Mutates infra in place.
     Handles: auto-creation of sys-firewall VM, AI access policy enrichment.
     """
+    _enrich_addressing(infra)
     _enrich_firewall(infra)
     _enrich_ai_access(infra)
     _enrich_resources(infra)
+
+
+def _enrich_addressing(infra):
+    """Compute zone-based addressing and auto-assign IPs.
+
+    Runs when global.addressing is present. Sets default trust_level,
+    computes zone addressing, and auto-assigns IPs to machines without
+    explicit ip: fields. Stores results in infra['_addressing'].
+    """
+    g = infra.get("global", {})
+    if "addressing" not in g:
+        return  # Legacy mode (base_subnet), no zone addressing
+
+    addr = g["addressing"]
+    base_octet = addr.get("base_octet", 10)
+
+    # Default trust_level to semi-trusted for domains that don't have one
+    for domain in (infra.get("domains") or {}).values():
+        domain.setdefault("trust_level", DEFAULT_TRUST_LEVEL)
+
+    # Compute zone-based addressing
+    addressing = _compute_addressing(infra)
+    infra["_addressing"] = addressing
+
+    # Auto-assign IPs per domain
+    for dname, domain in (infra.get("domains") or {}).items():
+        if dname in addressing:
+            info = addressing[dname]
+            _auto_assign_ips(domain, base_octet, info["second_octet"], info["domain_seq"])
+
+
+def _compute_addressing(infra):
+    """Compute zone-based addressing from trust levels.
+
+    Groups domains by trust_level, computes second_octet from zone_base + offset,
+    and assigns domain_seq (third octet) alphabetically within each zone.
+    Explicit subnet_id overrides auto-assignment.
+
+    Returns dict: {domain_name: {"second_octet": int, "domain_seq": int}}
+    """
+    g = infra.get("global", {})
+    addr = g.get("addressing", {})
+    zone_base = addr.get("zone_base", 100)
+    domains = infra.get("domains") or {}
+
+    # Group domains by trust_level
+    zones = {}
+    for dname, domain in domains.items():
+        trust = domain.get("trust_level", DEFAULT_TRUST_LEVEL)
+        zones.setdefault(trust, []).append(dname)
+
+    result = {}
+    for trust_level, domain_names in zones.items():
+        zone_offset = ZONE_OFFSETS.get(trust_level, ZONE_OFFSETS[DEFAULT_TRUST_LEVEL])
+        second_octet = zone_base + zone_offset
+
+        # Separate explicit subnet_id from auto-assign
+        explicit_seqs = {}
+        auto_names = []
+        for dname in sorted(domain_names):
+            sid = domains[dname].get("subnet_id")
+            if sid is not None:
+                explicit_seqs[sid] = dname
+            else:
+                auto_names.append(dname)
+
+        # Auto-assign domain_seq, skipping explicit values
+        seq = 0
+        for dname in auto_names:
+            while seq in explicit_seqs:
+                seq += 1
+            explicit_seqs[seq] = dname
+            seq += 1
+
+        for seq_val, dname in explicit_seqs.items():
+            result[dname] = {"second_octet": second_octet, "domain_seq": seq_val}
+
+    return result
+
+
+def _auto_assign_ips(domain, base_octet, second_octet, domain_seq):
+    """Auto-assign IPs to machines without explicit ip: field.
+
+    Assigns addresses starting from .1 in the static range (.1-.99),
+    skipping already-used host numbers. Machines are processed in
+    declaration order.
+    """
+    machines = domain.get("machines") or {}
+    subnet_prefix = f"{base_octet}.{second_octet}.{domain_seq}"
+
+    # Collect already-used host numbers in this subnet
+    used = set()
+    for m in machines.values():
+        ip = m.get("ip")
+        if ip and ip.startswith(f"{subnet_prefix}."):
+            try:
+                host = int(ip.rsplit(".", 1)[1])
+                used.add(host)
+            except (ValueError, IndexError):
+                pass
+
+    # Assign IPs to machines without one (declaration order)
+    next_host = 1
+    for mname, m in machines.items():
+        if not m.get("ip"):
+            while next_host in used and next_host <= 99:
+                next_host += 1
+            if next_host > 99:
+                print(f"ERROR: Domain ran out of static IPs (.1-.99) "
+                      f"for machine '{mname}'", file=sys.stderr)
+                sys.exit(1)
+            m["ip"] = f"{subnet_prefix}.{next_host}"
+            used.add(next_host)
+            next_host += 1
 
 
 def _enrich_firewall(infra):
@@ -667,13 +885,22 @@ def _enrich_firewall(infra):
         sys.exit(1)
 
     anklume_domain = domains["anklume"]
-    base_subnet = g.get("base_subnet", "10.100")
-    anklume_subnet_id = anklume_domain.get("subnet_id", 0)
+
+    # Compute firewall IP from addressing or legacy base_subnet
+    if "_addressing" in infra and "anklume" in infra.get("_addressing", {}):
+        info = infra["_addressing"]["anklume"]
+        addr_cfg = g.get("addressing", {})
+        bo = addr_cfg.get("base_octet", 10)
+        fw_ip = f"{bo}.{info['second_octet']}.{info['domain_seq']}.253"
+    else:
+        base_subnet = g.get("base_subnet", "10.100")
+        anklume_subnet_id = anklume_domain.get("subnet_id", 0)
+        fw_ip = f"{base_subnet}.{anklume_subnet_id}.253"
 
     sys_fw = {
         "description": "Centralized firewall VM (auto-created by generator)",
         "type": "vm",
-        "ip": f"{base_subnet}.{anklume_subnet_id}.253",
+        "ip": fw_ip,
         "config": {
             "limits.cpu": "2",
             "limits.memory": "2GiB",
@@ -687,7 +914,7 @@ def _enrich_firewall(infra):
     anklume_domain["machines"]["sys-firewall"] = sys_fw
 
     print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain "
-          f"(ip: {sys_fw['ip']})", file=sys.stderr)
+          f"(ip: {fw_ip})", file=sys.stderr)
 
 
 def _enrich_ai_access(infra):
@@ -935,9 +1162,11 @@ def generate(infra, base_dir, dry_run=False):
     # inventory variables override play-level keywords (Ansible precedence).
     all_images = extract_all_images(infra)
     network_policies = infra.get("network_policies")
+    has_addressing = "addressing" in g
     all_vars = {k: v for k, v in {
         "project_name": infra.get("project_name"),
-        "base_subnet": g.get("base_subnet", "10.100"),
+        "addressing": g.get("addressing") if has_addressing else None,
+        "base_subnet": g.get("base_subnet", "10.100") if not has_addressing else None,
         "default_os_image": g.get("default_os_image"),
         "psot_default_connection": g.get("default_connection"),
         "psot_default_user": g.get("default_user"),
@@ -948,9 +1177,27 @@ def generate(infra, base_dir, dry_run=False):
     written.append(fp)
 
     for dname, domain in domains.items():
+        # Skip disabled domains
+        if domain.get("enabled", True) is False:
+            continue
+
         machines = domain.get("machines") or {}
-        sid = domain.get("subnet_id")
-        bs = g.get("base_subnet", "10.100")
+
+        # Compute subnet/gateway from addressing or legacy base_subnet
+        if has_addressing and "_addressing" in infra and dname in infra["_addressing"]:
+            addr_info = infra["_addressing"][dname]
+            addr_cfg = g["addressing"]
+            bo = addr_cfg.get("base_octet", 10)
+            so = addr_info["second_octet"]
+            ds = addr_info["domain_seq"]
+            subnet_str = f"{bo}.{so}.{ds}.0/24"
+            gateway_str = f"{bo}.{so}.{ds}.254"
+            sid = ds  # For subnet_id in group_vars
+        else:
+            sid = domain.get("subnet_id")
+            bs = g.get("base_subnet", "10.100")
+            subnet_str = f"{bs}.{sid}.0/24"
+            gateway_str = f"{bs}.{sid}.254"
 
         # inventory/<domain>.yml
         hosts = {}
@@ -970,8 +1217,8 @@ def generate(infra, base_dir, dry_run=False):
             "incus_project": f"{prefix}{dname}",
             "incus_network": {
                 "name": f"{prefix}net-{dname}",
-                "subnet": f"{bs}.{sid}.0/24",
-                "gateway": f"{bs}.{sid}.254",
+                "subnet": subnet_str,
+                "gateway": gateway_str,
             },
             "subnet_id": sid,
         }.items() if v is not None}
@@ -1106,8 +1353,9 @@ def main(argv=None):
         print("No domains defined. Nothing to generate.")
         return
 
+    enabled_count = sum(1 for d in domains.values() if d.get("enabled", True) is not False)
     prefix = "[DRY-RUN] " if args.dry_run else ""
-    print(f"{prefix}Generating files for {len(domains)} domain(s)...")
+    print(f"{prefix}Generating files for {enabled_count} domain(s)...")
     written = generate(infra, args.base_dir, args.dry_run)
     for fp in written:
         print(f"  {prefix}{'Would write' if args.dry_run else 'Written'}: {fp}")
