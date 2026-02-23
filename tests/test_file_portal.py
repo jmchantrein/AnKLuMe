@@ -13,8 +13,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FILE_PORTAL_SH = PROJECT_ROOT / "scripts" / "file-portal.sh"
 MAKEFILE = PROJECT_ROOT / "Makefile"

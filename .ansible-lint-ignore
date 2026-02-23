@@ -1,0 +1,5 @@
+# Upstream ansible-lint bug (25.6.1+really25.2.1):
+# syntax-check creates an empty temp playbook for role checking,
+# then complains about it. The "stdin:1:1" reference is internal,
+# not a real file in our codebase.
+stdin syntax-check[empty-playbook]

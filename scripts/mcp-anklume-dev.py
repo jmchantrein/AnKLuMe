@@ -1829,12 +1829,12 @@ def _add_rest_routes(app):
             # Filter tools to a useful subset for local models.
             # OpenClaw provides 21 tools; a 7B model works better with
             # fewer, well-defined tools.
-            _LOCAL_TOOLS = {"exec", "read", "write", "edit",
+            _local_tools = {"exec", "read", "write", "edit",
                             "web_search", "web_fetch"}
             if "tools" in body:
                 body["tools"] = [
                     t for t in body["tools"]
-                    if t.get("function", {}).get("name") in _LOCAL_TOOLS
+                    if t.get("function", {}).get("name") in _local_tools
                 ]
 
             # Execute tool loop: if Ollama returns tool_calls, execute

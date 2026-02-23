@@ -170,9 +170,9 @@ def type_text(text: str) -> None:
 
     # Envoyer par lots de 50 caractères (~200 keycodes) pour éviter
     # des lignes de commande trop longues
-    BATCH = 200
-    for i in range(0, len(all_keys), BATCH):
-        batch = all_keys[i:i + BATCH]
+    batch_size = 200
+    for i in range(0, len(all_keys), batch_size):
+        batch = all_keys[i:i + batch_size]
         subprocess.run(
             ["ydotool", "key", "--key-delay", "2"] + batch,
             capture_output=True,
@@ -180,9 +180,6 @@ def type_text(text: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        text = " ".join(sys.argv[1:])
-    else:
-        text = sys.stdin.read()
+    text = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else sys.stdin.read()
 
     type_text(text)

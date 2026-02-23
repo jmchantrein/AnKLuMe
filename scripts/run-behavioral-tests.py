@@ -36,18 +36,16 @@ def check_expectations(result, expect: dict, cwd: str) -> list:
     """Check result against expectations. Return list of failures."""
     failures = []
 
-    if "exit_code" in expect:
-        if result.returncode != expect["exit_code"]:
-            failures.append(
-                f"exit_code: expected {expect['exit_code']}, "
-                f"got {result.returncode}"
-            )
+    if "exit_code" in expect and result.returncode != expect["exit_code"]:
+        failures.append(
+            f"exit_code: expected {expect['exit_code']}, "
+            f"got {result.returncode}"
+        )
 
-    if "exit_code_not" in expect:
-        if result.returncode == expect["exit_code_not"]:
-            failures.append(
-                f"exit_code_not: should not be {expect['exit_code_not']}"
-            )
+    if "exit_code_not" in expect and result.returncode == expect["exit_code_not"]:
+        failures.append(
+            f"exit_code_not: should not be {expect['exit_code_not']}"
+        )
 
     combined = result.stdout + result.stderr
 

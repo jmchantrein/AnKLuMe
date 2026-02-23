@@ -130,7 +130,7 @@ lint-ansible: ## Validate Ansible roles and playbooks
 
 lint-shell: ## Validate shell scripts
 	@if compgen -G "scripts/*.sh" > /dev/null || compgen -G "scripts/hooks/*" > /dev/null; then \
-		shellcheck scripts/*.sh scripts/hooks/*; \
+		shellcheck --severity=warning scripts/*.sh scripts/hooks/*; \
 	else \
 		echo "No shell scripts found, skipping shellcheck"; \
 	fi

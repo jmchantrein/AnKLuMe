@@ -14,8 +14,6 @@ Covers:
 import re
 from pathlib import Path
 
-import pytest
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SITE_YML = PROJECT_ROOT / "site.yml"
 MAKEFILE = PROJECT_ROOT / "Makefile"

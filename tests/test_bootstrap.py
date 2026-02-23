@@ -662,8 +662,8 @@ class TestBootstrapPhase23Structure:
             "Script must have a main() function"
 
     def test_main_called_at_end(self):
-        lines = [l.strip() for l in self.content.strip().splitlines()
-                 if l.strip() and not l.strip().startswith('#')]
+        lines = [line.strip() for line in self.content.strip().splitlines()
+                 if line.strip() and not line.strip().startswith('#')]
         assert lines[-1] == 'main "$@"', 'Script must end with: main "$@"'
 
     def test_detect_distro_function(self):
@@ -842,8 +842,8 @@ class TestExportDesktopsScript:
         assert "cp -f" in self.content
 
     def test_main_wrapper(self):
-        lines = [l.strip() for l in self.content.strip().splitlines()
-                 if l.strip() and not l.strip().startswith('#')]
+        lines = [line.strip() for line in self.content.strip().splitlines()
+                 if line.strip() and not line.strip().startswith('#')]
         assert lines[-1] == 'main "$@"'
 
 
@@ -881,6 +881,6 @@ class TestDomainMenuScript:
         assert '"none"' in self.content
 
     def test_main_wrapper(self):
-        lines = [l.strip() for l in self.content.strip().splitlines()
-                 if l.strip() and not l.strip().startswith('#')]
+        lines = [line.strip() for line in self.content.strip().splitlines()
+                 if line.strip() and not line.strip().startswith('#')]
         assert lines[-1] == 'main "$@"'

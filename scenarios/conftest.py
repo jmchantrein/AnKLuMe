@@ -362,5 +362,5 @@ def clean_generated_files(sandbox):
 # These imports MUST be at module level for pytest-bdd collection.
 
 from scenarios.steps.given import *  # noqa: F401, F403, E402
-from scenarios.steps.when import *  # noqa: F401, F403, E402
 from scenarios.steps.then import *  # noqa: F401, F403, E402
+from scenarios.steps.when import *  # noqa: F401, F403, E402

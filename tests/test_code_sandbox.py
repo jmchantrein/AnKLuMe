@@ -11,11 +11,8 @@ Covers:
 
 import os
 import re
-import stat
 import subprocess
 from pathlib import Path
-
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BOOTSTRAP_SH = PROJECT_ROOT / "scripts" / "bootstrap.sh"

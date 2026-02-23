@@ -36,7 +36,7 @@
     name:
       - nodejs
       - git
-    state: latest
+    state: present
     update_cache: true
 
 - name: OpenclawServer | Install OpenClaw
@@ -103,12 +103,13 @@
 # -- Git identity and credentials ------------------------------------------
 
 - name: OpenclawServer | Configure git identity
-  ansible.builtin.command:
-    cmd: "git config --global {{ item.key }} '{{ item.value }}'"
+  community.general.git_config:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    scope: global
   loop:
     - { key: "user.name", value: "{{ openclaw_server_agent_name }}" }
     - { key: "user.email", value: "{{ openclaw_server_agent_name | lower }}@anklume.local" }
-  changed_when: true
 
 - name: OpenclawServer | Check for mounted secrets
   ansible.builtin.stat:
@@ -116,9 +117,10 @@
   register: _openclaw_git_creds
 
 - name: OpenclawServer | Configure git credential helper
-  ansible.builtin.command:
-    cmd: git config --global credential.helper 'store --file /run/secrets/git-credentials'
-  changed_when: true
+  community.general.git_config:
+    name: credential.helper
+    value: "store --file /run/secrets/git-credentials"
+    scope: global
   when: _openclaw_git_creds.stat.exists
 
 - name: OpenclawServer | Warn if no git credentials mounted

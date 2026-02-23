@@ -18,7 +18,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -117,10 +116,7 @@ def compute_test_ratios(categories):
     for entry in categories["python_test"]["files"]:
         name = Path(entry["path"]).stem
         # Test files typically named test_<module>.py
-        if name.startswith("test_"):
-            module = name[5:]  # Remove "test_" prefix
-        else:
-            module = name
+        module = name[5:] if name.startswith("test_") else name
         test_files[module] = entry["lines"]
 
     ratios = {}
