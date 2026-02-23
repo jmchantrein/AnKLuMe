@@ -4,7 +4,7 @@
 
 # --- LLM backend ---
 
-# Ollama API URL (single LLM backend, ADR-037)
+# Ollama API URL (single LLM backend)
 openclaw_server_ollama_url: "http://10.100.3.1:11434"
 
 # Ollama API key (any value — local LLM has no authentication)

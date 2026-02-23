@@ -43,15 +43,22 @@ customize further, edit generated files outside managed sections.
 
 ---
 
-## ADR-004: No hypervisor in the inventory
+## ADR-004: Minimize host modifications
 
-**Context**: The host runs Incus but is not managed by Ansible.
+**Context**: The host runs Incus but should remain as untouched as
+possible. The original rule ("never modify the host") proved too strict
+in practice: nftables rules must be applied on the host kernel, and
+some software prerequisites must be installed directly.
 
-**Decision**: Ansible runs inside an anklume container with the Incus socket
-mounted. Phase 1 targets `localhost`. Phase 2 targets instances via the
-`community.general.incus` connection plugin.
+**Decision**: The host is not in the Ansible inventory. Ansible runs
+inside `anklume-instance` with the Incus socket mounted. Modifications
+to the host should be avoided as much as possible. When necessary
+(nftables, software prerequisites), they are made directly if doing so
+is more KISS/DRY and does not compromise overall security.
 
-**Consequence**: The host never appears in the inventory.
+**Consequence**: The host is not managed by Ansible but may receive
+targeted manual or scripted changes when isolation constraints require
+it (e.g., `make nftables-deploy`).
 
 ---
 
@@ -93,24 +100,47 @@ The generator validates this constraint.
 
 ---
 
-## ADR-009: Spec-driven, test-driven development
+## ADR-009: Documentation-driven, behavior-driven development
 
-**Decision**: The development workflow is:
-1. Write/update the spec
-2. Write tests (Molecule for roles, pytest for generator)
-3. Implement until tests pass
+**Context**: Code written before specs and tests tends to drift from
+intent. Tests written after code describe what the code does, not what
+it should do. A behavior matrix (formerly ADR-033) and BDD-style tests
+provide both coverage tracking and living documentation.
+
+**Decision**: The development workflow follows a strict order:
+1. Write/update documentation and spec
+2. Write behavior tests (Given/When/Then style) describing expected
+   behavior from the spec — not from existing code
+3. Implement until tests pass (Molecule for roles, pytest for generator)
 4. Validate (`make lint`)
 5. Review (reviewer agent)
 6. Commit only when everything passes
 
-**Consequence**: No code without a corresponding spec and test.
+Behavior tests serve as living documentation. They are organized in a
+behavior matrix (`tests/behavior_matrix.yml`) with three depth levels
+per capability. Each cell has a unique ID (e.g., `DL-001`). Tests
+reference their matrix cell via `# Matrix: DL-001` comments.
+
+Property-based tests (Hypothesis, `tests/test_properties.py`) complement
+behavior tests for generator invariants: idempotency, no duplicate IPs,
+managed markers present, orphan detection consistency.
+
+When catching up on existing code, tests must be written from the specs,
+not reverse-engineered from the implementation.
+
+**Consequence**: No code without a corresponding spec and test. Coverage
+is measurable and auditable via the behavior matrix.
 
 ---
 
-## ADR-010: Python generator with no external dependencies
+## ADR-010: Python generator — prefer standard library, allow quality dependencies
 
-**Decision**: `scripts/generate.py` uses only PyYAML and the standard library.
-No framework, no external templating engine.
+**Decision**: `scripts/generate.py` uses PyYAML and the Python standard
+library as its foundation. If a well-maintained open-source/libre library
+avoids reinventing the wheel, it may be added. No heavy frameworks or
+external templating engines. The bar for adding a dependency: it must be
+actively maintained, solve a real problem better than stdlib, and not
+introduce transitive dependency bloat.
 
 ---
 
@@ -492,26 +522,12 @@ the Incus socket (ADR-004), not the network. Ansible uses
 
 **Decision**: The anklume bridge has no special accept rule in nftables.
 All domains (including anklume) are treated equally for network isolation.
-`ping` from anklume to other domains fails (expected).
+`ping` from `anklume-instance` to other domains fails (expected).
 
 **Consequence**: Stronger isolation. Admin management traffic flows
-through the Incus socket, which is the correct and intended path.
-
----
-
-## ADR-027: Sandbox-first Agent Teams architecture
-
-**Context**: Agent Teams with `bypassPermissions` give Claude Code
-full system access. This is dangerous on production but safe inside
-an Incus-in-Incus sandbox.
-
-**Decision**: Agent Teams ONLY run inside the Phase 12 sandbox.
-Defense in depth: OS-level isolation (Incus) + application-level
-permissions (Claude Code) + workflow-level gates (PR merge) + audit
-logging (PreToolUse hook).
-
-**Consequence**: Full autonomy inside sandbox, human approval at the
-production boundary (PR merge).
+through the Incus socket (`incus exec`), which is the correct and
+intended path. `anklume-instance` does not need network access to
+manage other instances.
 
 ---
 
@@ -614,61 +630,6 @@ between domain switches.
 
 ---
 
-## ADR-033: Behavior matrix for exhaustive testing
-
-**Context**: Manual test coverage tracking is error-prone. The project
-needs a systematic way to map capabilities to expected behaviors and
-track which cells are covered by tests.
-
-**Decision**: Maintain a YAML behavior matrix (`tests/behavior_matrix.yml`)
-with three depth levels per capability:
-- Depth 1: single-feature tests (e.g., "create domain with valid subnet_id")
-- Depth 2: pairwise interactions (e.g., "domain ephemeral + machine override")
-- Depth 3: three-way interactions (e.g., "domain + VM + GPU + firewall_mode")
-
-Each cell has a unique ID (e.g., `DL-001`). Tests reference their matrix
-cell via `# Matrix: DL-001` comments. `scripts/matrix-coverage.py` scans
-test files and reports coverage per capability and depth level.
-
-Complement the matrix with Hypothesis property-based tests
-(`tests/test_properties.py`) for generator invariants: idempotency,
-no duplicate IPs, managed markers present, orphan detection consistency.
-
-**Consequence**: Coverage is measurable and auditable. LLM test
-generators can target uncovered cells. Property-based tests discover
-edge cases missed by manual tests.
-
----
-
-## ADR-034: Experience library for self-improvement
-
-**Context**: Fix patterns are lost after each debugging session.
-The same errors are re-diagnosed from scratch each time they occur.
-
-**Decision**: Maintain a persistent experience library (`experiences/`)
-committed to git, with three categories:
-- `fixes/` — error patterns and their solutions (extracted from git history)
-- `patterns/` — reusable implementation patterns (reconciliation, role structure)
-- `decisions/` — promoted architectural decisions with rationale
-
-`scripts/mine-experiences.py` extracts fix patterns from git history
-by scanning fix/lint/resolve commits and extracting file changes and
-error patterns.
-
-The AI test loop (`ai-test-loop.sh`) searches the experience library
-before calling an LLM backend. If a matching fix pattern is found, it
-is applied directly (faster, no LLM cost). New successful fixes are
-added to the library via the `--learn` flag.
-
-`scripts/ai-improve.sh` implements a spec-driven improvement loop:
-validate → build context → LLM analysis → sandbox test → commit/discard.
-
-**Consequence**: Institutional knowledge persists across sessions.
-Repeated errors are fixed instantly from the library. The improvement
-loop enables continuous spec-implementation convergence.
-
----
-
 ## ADR-035: Shared image cache across nesting levels
 
 **Context**: Each Incus daemon (host and nested) downloads OS images
@@ -739,117 +700,6 @@ alone (minus personality). Destroying and rebuilding a container
 restores full operational capability. The `.gitignore` includes a
 global `SOUL.md` pattern to prevent accidental commits of personality
 files.
-
----
-
-## ADR-037: Ollama as single LLM backend, proxy-always architecture
-
-**Context**: The GPU container (`gpu-server`, project `ai-tools`)
-initially ran two competing LLM backends in parallel:
-
-- **llama-server** (llama.cpp): direct GGUF inference on port 8081,
-  ~44% faster throughput (4.6 vs 3.2 tok/s on 32B Q4_K_M)
-- **Ollama**: model management + inference on port 11434, automatic
-  model loading/unloading, OpenAI-compatible API
-
-Both backends could not coexist on 24 GB VRAM with a 32B model.
-`scripts/llm-switch.sh` toggled between them by stopping one and
-starting the other. This created cascading problems:
-
-1. **VRAM contention**: switching required stopping services, flushing
-   GPU memory, and restarting — a fragile 4-step cascade that failed
-   silently when processes lingered
-2. **Operational complexity**: three services to manage (llama-server,
-   Ollama, Speaches STT) with two possible states each
-3. **OpenClaw confusion**: the MCP proxy had to detect which backend
-   was active and route accordingly, with different API formats
-4. **Model management**: llama-server required manual GGUF file
-   downloads and path configuration; Ollama handles this with
-   `ollama pull`
-
-Meanwhile, OpenClaw (Ada on Telegram) had a separate problem: its
-`local` brain mode bypassed the MCP proxy entirely, connecting
-directly to the LLM backend. This meant:
-
-- No tool access (the proxy provides `incus exec`, `Read`, `Grep`)
-- No session tracking or usage accounting
-- Different behavior between Telegram modes
-
-**Decision**: Two changes, applied together:
-
-1. **Ollama is the single LLM backend**. llama-server is retired.
-   All LLM inference (chat, embeddings, code generation) goes
-   through Ollama on port 11434. The `scripts/llm-switch.sh` and
-   `scripts/llm-bench.sh` scripts remain for switching between
-   Ollama models (not backends).
-
-2. **Proxy-always architecture**. All OpenClaw brain modes route
-   through the MCP proxy (`scripts/mcp-anklume-dev.py`) on
-   `anklume-instance:9090`. The proxy routes requests based on
-   model name:
-   - `model="anklume"` → Claude Code CLI (AnKLuMe expert mode)
-   - `model="assistant"` → Claude Code CLI (general assistant)
-   - `model="local"` → forwarded to Ollama (free, fast, no API cost)
-
-   The proxy exposes an OpenAI-compatible `/v1/chat/completions`
-   endpoint. OpenClaw sees a single provider (`claude-code`) with
-   three models. Switching brains only changes the model name in
-   the OpenClaw config — no service restart, no VRAM flush.
-
-**Why not keep both backends**:
-
-| Criterion | llama-server | Ollama |
-|-----------|-------------|--------|
-| Throughput (32B Q4_K_M) | 4.6 tok/s | 3.2 tok/s |
-| Model management | Manual GGUF download | `ollama pull` |
-| Multi-model | One model at a time | Auto-load/unload |
-| API compatibility | OpenAI-compat | OpenAI-compat |
-| Embeddings | Separate process | Built-in |
-| VRAM management | Manual | Automatic |
-| Concurrent inference | No | Yes (queueing) |
-
-The 44% throughput advantage of llama-server is real but does not
-justify the operational complexity. In practice:
-
-- Ada's Telegram responses are bounded by network latency and
-  message formatting, not raw tok/s
-- Ollama's automatic VRAM management eliminates the entire
-  switching infrastructure (llm-switch.sh, VRAM flush, service
-  state detection)
-- Ollama natively serves embeddings (nomic-embed-text) alongside
-  chat models, removing the need for a separate embeddings process
-- The MCP `ollama-coder` tools already target Ollama's API
-
-If future hardware provides enough VRAM for concurrent backends
-(e.g., 48+ GB), this decision can be revisited. For 24 GB VRAM,
-a single managed backend is the correct trade-off.
-
-**Proxy routing diagram**:
-
-```
-Telegram → OpenClaw → claude-code provider
-                          │
-                          ▼
-              MCP Proxy (anklume-instance:9090)
-              /v1/chat/completions
-                          │
-            ┌─────────────┼─────────────┐
-            ▼             ▼             ▼
-     model=anklume   model=assistant  model=local
-     Claude Code     Claude Code     → Ollama
-     (AnKLuMe        (general)        (gpu-server:11434)
-      expert)                          free, fast
-     $$ API cost     $$ API cost      $0
-```
-
-**Consequence**:
-- `llama-server.service` disabled on gpu-server (not removed —
-  available for benchmarking)
-- `scripts/llm-switch.sh` simplified to switch Ollama models only
-- OpenClaw config uses `claude-code` as sole provider
-- All brain modes get tool access through the proxy
-- VRAM is managed by Ollama alone (Speaches STT coexists as a
-  separate GPU process within the same container)
 
 ---
 
