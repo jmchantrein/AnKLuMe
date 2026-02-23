@@ -1,20 +1,20 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Describes your infrastructure at a high level. After editing, run:
-#   make sync        # Generate/update Ansible files
-#   make apply       # Apply to Incus
-#
-# See docs/SPEC.md section 5 for the full format reference.
-
 # LLM supervisor: 2 isolated LLM domains + 1 supervisor domain.
 # Each LLM runs in its own network. The supervisor communicates with
 # both via API for monitoring and management.
+#
+# IPs: anklume -> 10.100.0.x (admin)
+#       supervisor -> 10.110.0.x (trusted)
+#       llm-alpha/llm-beta -> 10.120.x.x (semi-trusted)
 
 project_name: llm-supervisor
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
@@ -22,23 +22,36 @@ global:
 
 domains:
   anklume:
+    trust_level: admin
     description: "Administration and orchestration"
-    subnet_id: 0
-    ephemeral: false
     machines:
       llms-admin:
         description: "Ansible controller"
         type: lxc
-        ip: "10.100.0.10"
         config:
           security.nesting: "true"
         roles:
           - base_system
 
+  supervisor:
+    trust_level: trusted
+    description: "Supervisor monitoring both LLMs"
+    machines:
+      llm-supervisor:
+        description: "Supervisor container"
+        type: lxc
+        roles:
+          - base_system
+      llm-webui:
+        description: "Open WebUI for interacting with LLMs"
+        type: lxc
+        roles:
+          - base_system
+          - open_webui
+
   llm-alpha:
+    trust_level: semi-trusted
     description: "First LLM instance"
-    subnet_id: 1
-    ephemeral: false
     profiles:
       nvidia-compute:
         devices:
@@ -49,7 +62,6 @@ domains:
       llm-alpha-server:
         description: "Ollama server (primary model)"
         type: lxc
-        ip: "10.100.1.10"
         gpu: true
         profiles:
           - default
@@ -59,9 +71,8 @@ domains:
           - ollama_server
 
   llm-beta:
+    trust_level: semi-trusted
     description: "Second LLM instance"
-    subnet_id: 2
-    ephemeral: false
     profiles:
       nvidia-compute:
         devices:
@@ -72,7 +83,6 @@ domains:
       llm-beta-server:
         description: "Ollama server (secondary model)"
         type: lxc
-        ip: "10.100.2.10"
         gpu: true
         profiles:
           - default
@@ -80,22 +90,3 @@ domains:
         roles:
           - base_system
           - ollama_server
-
-  supervisor:
-    description: "Supervisor monitoring both LLMs"
-    subnet_id: 3
-    ephemeral: false
-    machines:
-      llm-supervisor:
-        description: "Supervisor container"
-        type: lxc
-        ip: "10.100.3.10"
-        roles:
-          - base_system
-      llm-webui:
-        description: "Open WebUI for interacting with LLMs"
-        type: lxc
-        ip: "10.100.3.11"
-        roles:
-          - base_system
-          - open_webui

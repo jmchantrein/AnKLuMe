@@ -850,3 +850,77 @@ Telegram → OpenClaw → claude-code provider
 - All brain modes get tool access through the proxy
 - VRAM is managed by Ollama alone (Speaches STT coexists as a
   separate GPU process within the same container)
+
+---
+
+## ADR-038: Trust-level-aware IP addressing convention
+
+**Context**: The original addressing scheme (`10.100.<subnet_id>.0/24`
+with manually assigned sequential subnet_ids) provides no semantic
+information. An administrator cannot determine a domain's security
+posture from its IP address alone. Manual allocation is error-prone,
+does not scale, and does not follow network segmentation best
+practices (VLAN ID encoding in IP octets).
+
+**Decision**: Encode trust zones in the second IP octet using a
+configurable zone_base + zone_offset scheme:
+
+```
+10.<zone_base + zone_offset>.<domain_seq>.<host>/24
+```
+
+Zone offsets derived from trust_level:
+
+| trust_level    | zone_offset | Default second octet |
+|----------------|-------------|----------------------|
+| admin          | 0           | 100                  |
+| trusted        | 10          | 110                  |
+| semi-trusted   | 20          | 120                  |
+| untrusted      | 40          | 140                  |
+| disposable     | 50          | 150                  |
+
+The zone_base (default 100) places all AnKLuMe traffic in the
+`10.100-159.x.x` range, avoiding common enterprise ranges
+(`10.0-60.x.x`) and well-known tool defaults (Docker `172.17`,
+Kubernetes `10.96`, `10.244`). The gap between zones (default 10)
+leaves room for future sub-zones.
+
+`domain_seq` (third octet) is auto-assigned alphabetically within
+each zone, or explicitly overridden via `subnet_id` on the domain.
+
+IP reservation per /24 subnet:
+- `.1-.99`: static assignment (machines in infra.yml)
+- `.100-.199`: DHCP range
+- `.250`: monitoring (reserved)
+- `.251-.253`: infrastructure services
+- `.254`: gateway (immutable convention)
+
+Nesting: each nesting level uses identical IP addresses. Network
+isolation between levels is provided by Incus virtualization, not
+by IP differentiation. The nesting_prefix only affects Incus
+resource names (ADR-028).
+
+Configuration:
+```yaml
+global:
+  addressing:
+    base_octet: 10     # First octet (default: 10)
+    zone_base: 100     # Starting second octet (default: 100)
+    zone_step: 10      # Gap between zones (default: 10)
+```
+
+`trust_level` defaults to `semi-trusted` if omitted. The
+`base_subnet` field is superseded by `addressing`.
+
+**Why not `11.x.x.x` or other non-RFC-1918 ranges**: `11.0.0.0/8`
+is public address space (US DoD). Using it causes DNS leaks, packet
+leaks, and disqualifies the framework as a serious tool.
+
+**Why zone_base=100**: avoids the `10.0-60.x.x` range commonly used
+by enterprise VPNs, home routers, and container orchestrators. The
+`10.1xx` prefix serves as a visual marker for AnKLuMe traffic.
+
+**Consequence**: IP addresses are human-readable. From `10.140.0.5`,
+an admin immediately knows: zone 140 = 100+40 = untrusted (sandbox).
+Auto-assignment reduces configuration burden. The generator validates
+that explicit IPs match their domain's computed zone.

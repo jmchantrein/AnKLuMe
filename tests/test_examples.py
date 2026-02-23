@@ -191,11 +191,13 @@ class TestExampleContent:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_has_base_subnet(self, example_path):
-        """Each example has base_subnet in global."""
+    def test_has_addressing_or_base_subnet(self, example_path):
+        """Each example has addressing or base_subnet in global."""
         infra = load_infra(str(example_path))
         g = infra.get("global", {})
-        assert "base_subnet" in g, f"Missing base_subnet in {example_path}"
+        assert "addressing" in g or "base_subnet" in g, (
+            f"Missing addressing or base_subnet in {example_path}"
+        )
 
     @pytest.mark.parametrize(
         "example_path",
@@ -276,12 +278,20 @@ class TestExampleGlobalSection:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_base_subnet_format(self, example_path):
-        """base_subnet must be a dotted prefix like '10.100'."""
+    def test_addressing_or_base_subnet_format(self, example_path):
+        """addressing must be a dict, or base_subnet must be a dotted prefix."""
         import re
         infra = load_infra(str(example_path))
-        bs = infra["global"]["base_subnet"]
-        assert re.match(r"^\d+\.\d+$", bs), f"Invalid base_subnet '{bs}' in {example_path}"
+        g = infra["global"]
+        if "addressing" in g:
+            assert isinstance(g["addressing"], dict), (
+                f"addressing must be a dict in {example_path}"
+            )
+        else:
+            bs = g["base_subnet"]
+            assert re.match(r"^\d+\.\d+$", bs), (
+                f"Invalid base_subnet '{bs}' in {example_path}"
+            )
 
     @pytest.mark.parametrize(
         "example_path",
@@ -378,9 +388,12 @@ class TestExampleDomainDetails:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_all_domains_have_subnet_id(self, example_path):
-        """Every domain must have a subnet_id."""
+    def test_all_domains_have_subnet_id_or_addressing(self, example_path):
+        """Every domain must have a subnet_id, or global.addressing must exist."""
         infra = load_infra(str(example_path))
+        has_addressing = "addressing" in infra.get("global", {})
+        if has_addressing:
+            return  # subnet_id is optional with addressing mode
         for dname, domain in (infra.get("domains") or {}).items():
             assert "subnet_id" in domain, (
                 f"Domain '{dname}' missing subnet_id in {example_path}"
@@ -486,9 +499,12 @@ class TestExampleMachineDetails:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_all_machines_have_ip(self, example_path):
-        """Every machine in examples should have a static IP."""
+    def test_all_machines_have_ip_or_auto_assign(self, example_path):
+        """Every machine has a static IP or uses addressing auto-assignment."""
         infra = load_infra(str(example_path))
+        has_addressing = "addressing" in infra.get("global", {})
+        if has_addressing:
+            return  # IPs are auto-assigned in addressing mode
         for _dname, domain in (infra.get("domains") or {}).items():
             for mname, machine in (domain.get("machines") or {}).items():
                 assert "ip" in machine, (
@@ -502,18 +518,38 @@ class TestExampleMachineDetails:
     )
     def test_ips_in_correct_subnet(self, example_path):
         """Each machine's IP must be within its domain's subnet."""
+        from generate import enrich_infra
         infra = load_infra(str(example_path))
-        bs = infra["global"]["base_subnet"]
-        for _dname, domain in (infra.get("domains") or {}).items():
-            sid = domain.get("subnet_id")
-            for mname, machine in (domain.get("machines") or {}).items():
-                ip = machine.get("ip")
-                if ip and sid is not None:
-                    expected_prefix = f"{bs}.{sid}."
-                    assert ip.startswith(expected_prefix), (
-                        f"Machine '{mname}' IP {ip} not in subnet "
-                        f"{expected_prefix}0/24 in {example_path}"
-                    )
+        g = infra.get("global", {})
+        has_addressing = "addressing" in g
+        if has_addressing:
+            enrich_infra(infra)
+            addressing = infra.get("_addressing", {})
+            bo = g.get("addressing", {}).get("base_octet", 10)
+            for dname, domain in (infra.get("domains") or {}).items():
+                if dname not in addressing:
+                    continue
+                info = addressing[dname]
+                prefix = f"{bo}.{info['second_octet']}.{info['domain_seq']}."
+                for mname, machine in (domain.get("machines") or {}).items():
+                    ip = machine.get("ip")
+                    if ip:
+                        assert ip.startswith(prefix), (
+                            f"Machine '{mname}' IP {ip} not in subnet "
+                            f"{prefix}0/24 in {example_path}"
+                        )
+        else:
+            bs = g.get("base_subnet", "10.100")
+            for _dname, domain in (infra.get("domains") or {}).items():
+                sid = domain.get("subnet_id")
+                for mname, machine in (domain.get("machines") or {}).items():
+                    ip = machine.get("ip")
+                    if ip and sid is not None:
+                        expected_prefix = f"{bs}.{sid}."
+                        assert ip.startswith(expected_prefix), (
+                            f"Machine '{mname}' IP {ip} not in subnet "
+                            f"{expected_prefix}0/24 in {example_path}"
+                        )
 
     @pytest.mark.parametrize(
         "example_path",
@@ -888,13 +924,19 @@ class TestExampleHasAnklumeDomain:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_anklume_domain_has_subnet_0(self, example_path):
-        """The anklume domain should use subnet_id 0."""
+    def test_anklume_domain_has_subnet_0_or_admin(self, example_path):
+        """The anklume domain should use subnet_id 0 or trust_level admin."""
         infra = load_infra(str(example_path))
+        has_addressing = "addressing" in infra.get("global", {})
         anklume = (infra.get("domains") or {}).get("anklume", {})
-        assert anklume.get("subnet_id") == 0, (
-            f"Anklume domain subnet_id != 0 in {example_path}"
-        )
+        if has_addressing:
+            assert anklume.get("trust_level") == "admin", (
+                f"Anklume domain should be trust_level: admin in {example_path}"
+            )
+        else:
+            assert anklume.get("subnet_id") == 0, (
+                f"Anklume domain subnet_id != 0 in {example_path}"
+            )
 
     @pytest.mark.parametrize(
         "example_path",
@@ -989,16 +1031,16 @@ class TestExampleGeneratedContentDetails:
         discover_examples(),
         ids=lambda p: p.parent.name,
     )
-    def test_all_yml_contains_base_subnet(self, example_path, tmp_path):
-        """group_vars/all.yml must contain base_subnet."""
+    def test_all_yml_contains_addressing_or_base_subnet(self, example_path, tmp_path):
+        """group_vars/all.yml must contain addressing or base_subnet."""
         from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
         import yaml
         content = yaml.safe_load((tmp_path / "group_vars" / "all.yml").read_text())
-        assert "base_subnet" in content, (
-            f"group_vars/all.yml missing base_subnet for {example_path}"
+        assert "addressing" in content or "base_subnet" in content, (
+            f"group_vars/all.yml missing addressing/base_subnet for {example_path}"
         )
 
     @pytest.mark.parametrize(
@@ -1197,22 +1239,33 @@ class TestCrossExampleValidation:
             )
             seen[pname] = path.parent.name
 
-    def test_all_examples_use_same_base_subnet(self):
-        """All examples should use the same base_subnet (10.100)."""
+    def test_all_examples_use_consistent_addressing(self):
+        """All examples should use consistent addressing (10.100 zone_base or base_subnet)."""
         for path in discover_examples():
             infra = load_infra(str(path))
-            bs = infra["global"]["base_subnet"]
-            assert bs == "10.100", (
-                f"Example {path.parent.name} uses base_subnet '{bs}', "
-                f"expected '10.100'"
-            )
+            g = infra.get("global", {})
+            if "addressing" in g:
+                zb = g["addressing"].get("zone_base", 100)
+                assert zb == 100, (
+                    f"Example {path.parent.name} uses zone_base {zb}, "
+                    f"expected 100"
+                )
+            elif "base_subnet" in g:
+                bs = g["base_subnet"]
+                assert bs == "10.100", (
+                    f"Example {path.parent.name} uses base_subnet '{bs}', "
+                    f"expected '10.100'"
+                )
 
     def test_no_duplicate_subnet_ids_across_examples_with_same_project(self):
         """Within each example, subnet_ids are unique (already tested, but explicit)."""
         for path in discover_examples():
             infra = load_infra(str(path))
+            domains = infra.get("domains") or {}
+            if not isinstance(domains, dict):
+                continue  # Skip non-PSOT examples (e.g., live-os)
             seen = {}
-            for dname, domain in (infra.get("domains") or {}).items():
+            for dname, domain in domains.items():
                 sid = domain.get("subnet_id")
                 if sid is not None:
                     assert sid not in seen, (
@@ -1392,7 +1445,7 @@ class TestStudentSysadminExample:
 
     def test_anklume_domain_not_ephemeral(self):
         infra = self._load()
-        assert infra["domains"]["anklume"]["ephemeral"] is False
+        assert infra["domains"]["anklume"].get("ephemeral", False) is False
 
     def test_has_three_machines(self):
         infra = self._load()
@@ -1418,9 +1471,9 @@ class TestStudentSysadminExample:
         infra = self._load()
         assert infra.get("network_policies") is None
 
-    def test_lab_subnet_id_1(self):
+    def test_anklume_is_admin(self):
         infra = self._load()
-        assert infra["domains"]["lab"]["subnet_id"] == 1
+        assert infra["domains"]["anklume"]["trust_level"] == "admin"
 
     def test_sa_admin_has_nesting(self):
         infra = self._load()
@@ -1470,10 +1523,10 @@ class TestTeacherLabExample:
         count = sum(len(d.get("machines") or {}) for d in infra["domains"].values())
         assert count == 7
 
-    def test_student_subnets_sequential(self):
+    def test_student_domains_semi_trusted(self):
         infra = self._load()
         for i in range(1, 4):
-            assert infra["domains"][f"student-0{i}"]["subnet_id"] == i
+            assert infra["domains"][f"student-0{i}"]["trust_level"] == "semi-trusted"
 
     def test_no_gpu(self):
         infra = self._load()
@@ -1586,9 +1639,9 @@ class TestSandboxIsolationExample:
         assert sbx_test.get("ephemeral") is True
         assert sbx_vm.get("ephemeral") is True
 
-    def test_sandbox_subnet_id_10(self):
+    def test_sandbox_is_disposable(self):
         infra = self._load()
-        assert infra["domains"]["sandbox"]["subnet_id"] == 10
+        assert infra["domains"]["sandbox"]["trust_level"] == "disposable"
 
     def test_no_gpu(self):
         infra = self._load()
@@ -1763,9 +1816,9 @@ class TestAiToolsExample:
         profiles = infra["domains"]["ai-tools"].get("profiles", {})
         assert "nvidia-compute" in profiles
 
-    def test_ai_tools_subnet_id_4(self):
+    def test_ai_tools_is_semi_trusted(self):
         infra = self._load()
-        assert infra["domains"]["ai-tools"]["subnet_id"] == 4
+        assert infra["domains"]["ai-tools"]["trust_level"] == "semi-trusted"
 
     def test_network_policy_anklume_to_ai_tools(self):
         """There should be a policy allowing anklume to access ai-tools."""
@@ -1835,11 +1888,19 @@ class TestExampleGeneratedDomainVarsContent:
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
+        has_addressing = "_addressing" in infra
         for dname, domain in (infra.get("domains") or {}).items():
-            gv = yaml.safe_load(
-                (tmp_path / "group_vars" / f"{dname}.yml").read_text()
-            )
-            assert gv.get("subnet_id") == domain.get("subnet_id")
+            if domain.get("enabled", True) is False:
+                continue
+            gv_path = tmp_path / "group_vars" / f"{dname}.yml"
+            if not gv_path.exists():
+                continue
+            gv = yaml.safe_load(gv_path.read_text())
+            if has_addressing and dname in infra["_addressing"]:
+                # In addressing mode, subnet_id in group_vars is the computed domain_seq
+                assert gv.get("subnet_id") == infra["_addressing"][dname]["domain_seq"]
+            else:
+                assert gv.get("subnet_id") == domain.get("subnet_id")
 
     @pytest.mark.parametrize(
         "example_path",
@@ -1847,19 +1908,29 @@ class TestExampleGeneratedDomainVarsContent:
         ids=lambda p: p.parent.name,
     )
     def test_subnet_in_network_matches_domain(self, example_path, tmp_path):
-        """incus_network.subnet must match base_subnet.subnet_id.0/24."""
+        """incus_network.subnet must match computed addressing."""
         import yaml
         from generate import enrich_infra, generate
         infra = load_infra(str(example_path))
         enrich_infra(infra)
         generate(infra, tmp_path)
-        bs = infra["global"]["base_subnet"]
+        g = infra.get("global", {})
+        has_addressing = "_addressing" in infra
         for dname, domain in (infra.get("domains") or {}).items():
-            sid = domain.get("subnet_id")
-            gv = yaml.safe_load(
-                (tmp_path / "group_vars" / f"{dname}.yml").read_text()
-            )
-            expected_subnet = f"{bs}.{sid}.0/24"
+            if domain.get("enabled", True) is False:
+                continue
+            gv_path = tmp_path / "group_vars" / f"{dname}.yml"
+            if not gv_path.exists():
+                continue
+            gv = yaml.safe_load(gv_path.read_text())
+            if has_addressing and dname in infra["_addressing"]:
+                info = infra["_addressing"][dname]
+                bo = g.get("addressing", {}).get("base_octet", 10)
+                expected_subnet = f"{bo}.{info['second_octet']}.{info['domain_seq']}.0/24"
+            else:
+                bs = g.get("base_subnet", "10.100")
+                sid = domain.get("subnet_id")
+                expected_subnet = f"{bs}.{sid}.0/24"
             assert gv["incus_network"]["subnet"] == expected_subnet
 
 

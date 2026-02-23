@@ -108,7 +108,10 @@ The anklume container:
 project_name: my-infra
 
 global:
-  base_subnet: "10.100"             # Domains use <base_subnet>.<subnet_id>.0/24
+  addressing:                         # Zone-based IP addressing (ADR-038)
+    base_octet: 10                    # First octet, always 10 (RFC 1918)
+    zone_base: 100                    # Starting second octet (default: 100)
+    zone_step: 10                     # Gap between zones (default: 10)
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
@@ -128,9 +131,10 @@ global:
 domains:
   <domain-name>:
     description: "What this domain is for"
-    subnet_id: <0-254>               # Must be unique across all domains
+    enabled: true                     # Optional (default: true). false skips generation.
+    subnet_id: <0-254>               # Optional: auto-assigned alphabetically within zone
     ephemeral: false                  # Optional (default: false). See below.
-    trust_level: admin                # Optional: admin|trusted|semi-trusted|untrusted|disposable
+    trust_level: semi-trusted         # Determines IP zone (default: semi-trusted)
     profiles:                         # Optional: extra Incus profiles
       <profile-name>:
         devices: { ... }
@@ -139,7 +143,7 @@ domains:
       <machine-name>:                # Must be globally unique
         description: "What this machine does"
         type: lxc                     # "lxc" or "vm"
-        ip: "<base_subnet>.<subnet_id>.<host>"  # Optional (DHCP if omitted)
+        ip: "<bo>.<zone>.<seq>.<host>"  # Optional (auto-assigned if omitted)
         ephemeral: false              # Optional (default: inherit from domain)
         gpu: false                    # true to enable GPU passthrough
         profiles: [default]           # List of Incus profiles
@@ -153,10 +157,44 @@ domains:
         roles: [base_system]         # Ansible roles for provisioning
 ```
 
+### Addressing convention (ADR-038)
+
+IP addresses encode trust zones in the second octet:
+
+```
+10.<zone_base + zone_offset>.<domain_seq>.<host>/24
+```
+
+| trust_level    | zone_offset | Default second octet |
+|----------------|-------------|----------------------|
+| admin          | 0           | 100                  |
+| trusted        | 10          | 110                  |
+| semi-trusted   | 20          | 120                  |
+| untrusted      | 40          | 140                  |
+| disposable     | 50          | 150                  |
+
+`domain_seq` (third octet) is auto-assigned alphabetically within each
+zone, or explicitly overridden via `subnet_id` on the domain.
+
+IP reservation per /24 subnet:
+- `.1-.99`: static assignment (machines in infra.yml, auto-assigned)
+- `.100-.199`: DHCP range
+- `.250`: monitoring (reserved)
+- `.251-.253`: infrastructure services
+- `.254`: gateway (immutable convention)
+
 ### Gateway convention
 
-Each domain network uses `<base_subnet>.<subnet_id>.254` as its gateway
+Each domain network uses `<base_octet>.<zone>.<seq>.254` as its gateway
 address. This is set automatically by the generator and cannot be overridden.
+
+### Enabled directive
+
+The optional `enabled` boolean on a domain controls whether the generator
+produces files for it. Defaults to `true`. When `false`, no inventory,
+group_vars, or host_vars files are generated for that domain. Disabled
+domains still participate in addressing computation (their IP ranges are
+reserved) and are not flagged as orphans.
 
 ### Ephemeral directive
 
@@ -260,8 +298,14 @@ adapt behavior based on domain trust posture.
 
 - Domain names: unique, alphanumeric + hyphen
 - Machine names: globally unique (not just within their domain)
-- `subnet_id`: unique per domain, range 0-254
-- IPs: globally unique, must be within the correct subnet
+- `enabled`: must be a boolean if present (default: true)
+- `subnet_id`: optional with `addressing:` (auto-assigned); unique within
+  same trust zone, range 0-254
+- IPs: globally unique, must be within the correct subnet (auto-assigned
+  in `.1-.99` range when omitted with `addressing:` mode)
+- `addressing.base_octet`: must be 10 (RFC 1918)
+- `addressing.zone_base`: must be 0-245 (default: 100)
+- `addressing.zone_step`: must be a positive integer (default: 10)
 - Profiles referenced by a machine must exist in its domain
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)

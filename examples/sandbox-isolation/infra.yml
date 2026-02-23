@@ -1,54 +1,48 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Describes your infrastructure at a high level. After editing, run:
-#   make sync        # Generate/update Ansible files
-#   make apply       # Apply to Incus
-#
-# See docs/SPEC.md section 5 for the full format reference.
-
 # Maximum isolation sandbox: ephemeral containers with no external
 # network access. Designed for testing untrusted software safely.
+#
+# IPs: anklume -> 10.100.0.x (admin), sandbox -> 10.150.0.x (disposable)
 
 project_name: sandbox-isolation
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
 
 domains:
   anklume:
+    trust_level: admin
     description: "Administration and orchestration"
-    subnet_id: 0
-    ephemeral: false
     machines:
       sbx-admin:
         description: "Ansible controller"
         type: lxc
-        ip: "10.100.0.10"
         config:
           security.nesting: "true"
         roles:
           - base_system
 
   sandbox:
+    trust_level: disposable
     description: "Isolated sandbox for untrusted software"
-    subnet_id: 10
     ephemeral: true
     machines:
       sbx-test:
         description: "Disposable test container (lightweight isolation)"
         type: lxc
-        ip: "10.100.10.10"
         ephemeral: true
         roles:
           - base_system
       sbx-vm:
         description: "Disposable VM sandbox (hardware-level isolation)"
         type: vm
-        ip: "10.100.10.20"
         ephemeral: true
         config:
           limits.cpu: "2"
@@ -58,6 +52,5 @@ domains:
       sbx-monitor:
         description: "Monitoring container (observes sandbox instances)"
         type: lxc
-        ip: "10.100.10.11"
         roles:
           - base_system

@@ -2461,6 +2461,449 @@ d) **Internationalization (i18n)**:
 
 ---
 
+## Phase 34: Addressing Convention and Canonical Infrastructure
+
+**Goal**: Replace manual subnet_id assignment with a trust-level-aware
+addressing convention that encodes security zones in the IP address,
+introduce the canonical infra.yml covering all AnKLuMe capabilities,
+and add domain enable/disable support.
+
+**Prerequisites**: Phase 29 (codebase simplification). POC mode — no
+backward compatibility required.
+
+**Context**: The current addressing scheme (`10.100.<subnet_id>.0/24`
+with manually assigned sequential subnet_ids) provides no semantic
+meaning in the IP address. A sysadmin cannot determine the security
+zone from the IP alone. The VLAN best practice (encoding zone in the
+IP octet) is not followed. Additionally, the committed `infra.yml`
+is a minimal example that does not match the real deployed
+infrastructure. A canonical `infra.yml` is needed as a reference
+covering all AnKLuMe capabilities with enable/disable support.
+
+**Deliverables**:
+
+a) **ADR-038: Trust-level-aware IP addressing** (ARCHITECTURE.md):
+   - Zone encoding: `10.<zone_base + zone_offset>.<domain_seq>.<host>/24`
+   - Zone offsets: admin=0, trusted=10, semi-trusted=20, untrusted=40,
+     disposable=50
+   - zone_base=100 (avoids enterprise 10.0-60 ranges)
+   - IP reservation: .1-.99 static, .100-.199 DHCP, .254 gateway
+
+b) **Generator changes** (scripts/generate.py):
+   - trust_level determines IP zone (no longer decorative)
+   - subnet_id becomes optional (auto-assigned within zone)
+   - `enabled: true/false` field on domains (skip generation)
+   - Auto-IP assignment for machines without explicit ip:
+   - New `addressing:` config replaces `base_subnet`
+
+c) **Canonical infra.yml**:
+   - Covers all capabilities: anklume (admin), pro/perso (trusted),
+     ai-tools (semi-trusted), anonymous (untrusted), tor-gateway
+     (disposable)
+   - Optional domains disabled by default (dev, anonymous, tor-gateway)
+   - Machine naming convention: `<domain>-<role>`
+   - Replaces current student-sysadmin at root
+
+d) **Convention documentation** (docs/addressing-convention.md):
+   - Full addressing schema with examples
+   - Naming conventions (domains and machines)
+   - IP reservation per /24 subnet
+
+e) **Updated SPEC.md, examples, and tests**:
+   - All 10 examples updated for new format
+   - All test fixtures updated
+   - New tests for zone addressing, enabled/disabled, auto-IP
+
+**Validation criteria**:
+- [ ] `make sync` with canonical infra.yml produces correct files
+- [ ] IPs encode trust zones (admin=10.100, trusted=10.110, etc.)
+- [ ] Disabled domains produce no generated files
+- [ ] Auto-IP assigns within correct subnet
+- [ ] `make lint` passes
+- [ ] All tests pass
+- [ ] `detect_orphans()` ignores disabled domains
+- [ ] Machine names follow `<domain>-<role>` convention
+
+---
+
+## Phase 35: Development Workflow Simplification
+
+**Goal**: Replace the complex MCP proxy (`mcp-anklume-dev.py`) with
+lightweight, standard tools for the development workflow.
+
+**Prerequisites**: Phase 28 (Local LLM Delegation), Phase 34 (Addressing).
+
+**Context**: The MCP proxy (`scripts/mcp-anklume-dev.py`, ~1200 lines)
+was built to route OpenClaw requests through Claude Code CLI, manage
+sessions, switch brains, handle credentials, and execute tools. This
+complexity arose from using OpenClaw as a development middleware. With
+the repositioning of OpenClaw as a per-domain assistant (Phase 37),
+the proxy is no longer needed for development. Claude Code + standard
+routing tools provide a simpler, more maintainable solution.
+
+See: `docs/vision-ai-integration.md` (Layer 1: Development workflow).
+
+**Deliverables**:
+
+a) **claude-code-router integration** (documentation + optional config):
+   - Document how to configure `claude-code-router` with
+     `ANTHROPIC_BASE_URL` for automatic background-task routing to Ollama
+   - Ollama v0.14+ implements Anthropic Messages API natively
+   - Routes: main tasks → Claude API, background tasks → Ollama local
+
+b) **MCP proxy retirement**:
+   - Extract reusable MCP tools (incus_exec, git operations) into a
+     lightweight MCP server if needed (< 200 lines)
+   - Remove: OpenAI-compatible endpoint, session management, brain
+     switching, credential forwarding, Telegram wake-up
+   - Archive `mcp-anklume-dev.py` (not delete — available for reference)
+
+c) **Credential simplification**:
+   - Remove bind-mount of Claude credentials from host to anklume-instance
+   - Remove fallback sync timer (`sync-claude-credentials.sh`)
+   - Claude Code authenticates normally on the host (where the user works)
+
+d) **Updated documentation**:
+   - `docs/claude-code-workflow.md` updated for new routing approach
+   - CLAUDE.md LLM operating mode section updated
+
+**Validation criteria**:
+- [ ] Claude Code + claude-code-router routes background tasks to Ollama
+- [ ] `mcp-ollama-coder` still works for explicit delegation
+- [ ] No proxy process needed for development workflow
+- [ ] `make lint` passes
+- [ ] All tests pass (proxy-dependent tests updated or removed)
+
+---
+
+## Phase 36: Naming Convention Migration
+
+**Goal**: Migrate from `sys-` prefix to domain-consistent naming and
+introduce the `shared` domain for shared services.
+
+**Prerequisites**: Phase 34 (Addressing Convention).
+
+**Context**: Infrastructure services currently use the `sys-` prefix
+(`sys-firewall`). This is inconsistent with the convention that containers
+are prefixed by their domain name. Services in the anklume domain should
+use `anklume-` prefix. User-facing shared services (print, DNS) should
+live in a `shared` domain with `shared-` prefixed containers.
+
+See: `docs/vision-ai-integration.md` (Section 5: Naming conventions).
+
+**Deliverables**:
+
+a) **Generator changes** (`scripts/generate.py`):
+   - `sys-firewall` → `anklume-firewall` (auto-created in anklume domain)
+   - Update all references in code and templates
+
+b) **`shared` domain support**:
+   - Document the `shared` domain pattern in SPEC.md
+   - Update `examples/sys-print/` → `examples/shared-services/`
+     with domain `shared` and containers `shared-print`, etc.
+
+c) **Canonical infra.yml update**:
+   - Rename any `sys-` references
+   - Add `shared` domain if applicable
+
+d) **Test updates**:
+   - Update fixtures referencing `sys-firewall`
+   - Update example tests
+
+**Validation criteria**:
+- [ ] `sys-firewall` auto-created as `anklume-firewall` in anklume domain
+- [ ] `shared` domain documented in SPEC.md
+- [ ] `examples/shared-services/` validates successfully
+- [ ] All tests pass
+- [ ] `make lint` passes
+
+---
+
+## Phase 37: Per-Domain OpenClaw
+
+**Goal**: Reposition OpenClaw from a centralized service in ai-tools to
+per-domain instances, each isolated by Incus network boundaries.
+
+**Prerequisites**: Phase 28b (OpenClaw role exists), Phase 34 (Addressing),
+Phase 36 (Naming).
+
+**Context**: The current OpenClaw deployment is a single instance in
+ai-tools that acts as a pass-through to a complex proxy. OpenClaw's
+real strengths — heartbeat, cron, memory, multi-agent, messaging
+multi-platform — are unexploited. Repositioning OpenClaw as a per-domain
+assistant aligns with AnKLuMe's compartmentalization philosophy: each
+domain gets its own AI agent that sees only its own network.
+
+See: `docs/vision-ai-integration.md` (Layer 2: Per-domain AI assistant).
+
+**Architecture**:
+
+```
+Domain pro       → OpenClaw "pro"     (Telegram, local-first)
+  - Sees only pro containers via Incus network isolation
+  - Talks directly to Ollama (local) or cloud API (fallback)
+  - Heartbeat monitors pro services
+
+Domain perso     → OpenClaw "perso"   (Telegram, local only)
+  - Sees only perso containers
+  - Mode: local (nothing leaves the machine)
+
+Domain sandbox   → OpenClaw "sandbox" (disposable)
+  - Tests untrusted ClawHub skills
+  - Ephemeral: destroy and recreate freely
+```
+
+**Deliverables**:
+
+a) **Extend `openclaw_server` role for multi-instance**:
+   - Role supports per-domain configuration (different Ollama URL,
+     different channels, different persona)
+   - ADR-036 templates (AGENTS.md, TOOLS.md, etc.) parameterized
+     per domain context
+   - Systemd service per instance
+
+b) **infra.yml integration**:
+   ```yaml
+   domains:
+     pro:
+       trust_level: trusted
+       openclaw: true               # Deploy an OpenClaw instance
+       machines:
+         pro-dev: { type: lxc, roles: [base_system] }
+         pro-openclaw: { type: lxc, roles: [base_system, openclaw_server] }
+   ```
+
+c) **Direct Ollama connection** (no proxy):
+   - Each OpenClaw instance connects directly to Ollama via
+     network_policy allowing access to ai-tools on port 11434
+   - No intermediate proxy needed for local mode
+
+d) **Retire centralized OpenClaw**:
+   - Remove `ai-openclaw` from ai-tools domain in examples
+   - Update `examples/ai-tools/infra.yml`
+
+e) **Security model**:
+   - Each instance sees only its domain's network (enforced by Incus)
+   - ClawHub third-party skills only in sandbox domains
+   - Custom AnKLuMe skills deployed via Ansible templates (ADR-036)
+
+**Validation criteria**:
+- [ ] Two OpenClaw instances in different domains coexist
+- [ ] Each instance sees only its domain's containers
+- [ ] Local mode (Ollama) works without proxy
+- [ ] Heartbeat functional (basic health check)
+- [ ] `make lint` passes
+- [ ] Tests for multi-instance configuration
+
+---
+
+## Phase 38: OpenClaw Heartbeat and Proactive Monitoring
+
+**Goal**: Exploit OpenClaw's heartbeat and cron for proactive per-domain
+infrastructure monitoring.
+
+**Prerequisites**: Phase 37 (Per-Domain OpenClaw).
+
+**Context**: OpenClaw's heartbeat (every 30 min, configurable) and cron
+(standard 5-field expressions) enable proactive monitoring without
+external tools. Each per-domain agent monitors its own domain and
+alerts the user via messaging (Telegram, Signal, etc.). The local LLM
+handles triage (80-90% of cases), cloud is only for complex analysis.
+
+See: `docs/vision-ai-integration.md` (Layer 2, heartbeat pattern).
+
+**Deliverables**:
+
+a) **HEARTBEAT.md template** per domain:
+   - Container status checks (`incus list` within domain project)
+   - Disk space monitoring
+   - Service health (systemd units in containers)
+   - Network scan diff (detect new/missing hosts)
+
+b) **Custom AnKLuMe monitoring skills**:
+   - `anklume-health` skill: checks container status, disk, services
+   - `anklume-network-diff` skill: compares network state to baseline
+   - Deployed via Ansible templates (not ClawHub)
+
+c) **Cron-based scheduled tasks**:
+   - Daily summary report
+   - Snapshot trigger before maintenance windows
+   - Log rotation alerts
+
+d) **Alert escalation**:
+   - Heartbeat triage: local LLM classifies (normal/suspect/critical)
+   - Normal → log to memory, no notification
+   - Suspect → Telegram alert with triage summary
+   - Critical → immediate Telegram alert + optional cloud escalation
+
+e) **Memory exploitation**:
+   - OpenClaw memory/RAG stores operational history per domain
+   - SQLite hybrid search (cosine 70% + BM25 30%) for recall
+   - Embeddings via Ollama nomic-embed-text (already configured)
+
+**Validation criteria**:
+- [ ] Heartbeat runs at configured interval
+- [ ] Container status check via heartbeat produces alert on failure
+- [ ] Cron daily summary works
+- [ ] Triage classifies correctly (at least: running vs stopped)
+- [ ] Memory accumulates operational data across sessions
+- [ ] Alert sent via Telegram on critical event
+
+---
+
+## Phase 39: LLM Sanitization Proxy
+
+**Goal**: Deploy a sanitization proxy that anonymizes infrastructure
+data before it reaches cloud LLM APIs, configurable per domain.
+
+**Prerequisites**: Phase 34 (Addressing), Phase 37 (Per-Domain OpenClaw).
+
+**Context**: When AI queries leave the local perimeter (cloud LLM APIs),
+they may contain sensitive infrastructure data: IPs, hostnames, FQDNs,
+network topology, client data. A sanitization proxy tokenizes this data
+before sending and de-tokenizes responses. For IaC, this is highly
+effective because the logic (playbooks, templates) is independent of
+the identifiers (machine names, IPs).
+
+See: `docs/vision-ai-integration.md` (Layer 3: LLM sanitization proxy).
+
+**Architecture**:
+
+```
+Container (domain pro)
+  → LLM request (raw: real IPs, hostnames)
+    → anklume-sanitizer (domain anklume)
+      → Tokenize: IPs, FQDNs, service names, credentials
+      → Forward anonymized content to cloud API
+      → De-tokenize response
+      → Return to requesting container
+      → Log for audit
+```
+
+**Deliverables**:
+
+a) **Evaluate and select base implementation**:
+   - Candidates: LLM Sentinel (Go), LLM Guard (Python), Privacy Proxy
+   - Criteria: Anthropic API support, extensibility for IaC patterns,
+     performance (< 200ms added latency), audit logging
+
+b) **IaC-specific detection patterns**:
+   - RFC1918 IP ranges (especially AnKLuMe 10.1xx convention)
+   - Incus resource names (project, bridge, instance names)
+   - FQDN patterns (*.internal, *.corp, *.local, custom)
+   - Service identifiers (database names, API endpoints)
+   - Ansible-specific: inventory hostnames, group names
+
+c) **Ansible role `llm_sanitizer`**:
+   - Deploy as `anklume-sanitizer` in the anklume domain
+   - Expose Anthropic-compatible endpoint (transparent to clients)
+   - Bidirectional token vault (tokenize/de-tokenize)
+   - Audit log with: anonymized text, response, mapping, timestamp,
+     source domain
+
+d) **infra.yml integration**:
+   ```yaml
+   domains:
+     pro:
+       trust_level: trusted
+       ai_provider: local-first
+       ai_sanitize: true          # cloud-only by default
+   ```
+
+e) **Generator support**:
+   - Validate `ai_provider`: `local` | `cloud` | `local-first`
+   - Validate `ai_sanitize`: `false` | `true` | `always`
+   - Defaults: `ai_provider: local`, `ai_sanitize: false` (safe)
+   - When `ai_provider` is `cloud` or `local-first`, `ai_sanitize`
+     defaults to `true`
+   - Generate network_policies allowing domain → anklume-sanitizer
+     when `ai_sanitize` is set
+
+f) **Transparent integration**:
+   - Containers reach sanitizer via `ANTHROPIC_BASE_URL`
+   - Works with Claude Code, OpenClaw, or any Anthropic-compatible tool
+
+**Validation criteria**:
+- [ ] Proxy tokenizes IPs, hostnames, FQDNs in Ansible playbook content
+- [ ] De-tokenization produces correct original values
+- [ ] Audit log records all cloud-bound requests
+- [ ] Latency overhead < 200ms per request
+- [ ] `ai_provider` and `ai_sanitize` validated by generator
+- [ ] Works transparently with Claude Code (`ANTHROPIC_BASE_URL`)
+- [ ] `make lint` passes, all tests pass
+
+---
+
+## Phase 40: Network Inspection and Security Monitoring
+
+**Goal**: LLM-assisted network inspection per domain — mapping,
+anomaly detection, and forensic analysis via the three-level pipeline.
+
+**Prerequisites**: Phase 38 (Heartbeat Monitoring), Phase 39 (Sanitization).
+
+**Context**: Network captures and scans are significantly more sensitive
+than IaC code. The three-level pipeline (collect → triage local → analyze
+cloud) maps naturally onto AnKLuMe domains. OpenClaw's heartbeat triggers
+the collection and triage cycle. Cloud analysis (level 3) always passes
+through the sanitization proxy.
+
+See: `docs/vision-ai-integration.md` (Section 6: Network inspection).
+
+**Architecture**:
+
+```
+LEVEL 1 — Collection (no LLM)
+  tcpdump, tshark, nmap, SNMP walks, LLDP/CDP
+  Triggered by: OpenClaw cron or manual request
+      |
+LEVEL 2 — Local triage (Ollama, 100% confidential)
+  Parsing, inventories, triage, summaries, basic alerts
+  Triggered by: OpenClaw heartbeat
+  Cost: zero, no rate limit, 24/7
+      |
+      | Only cases requiring advanced reasoning
+      | (data anonymized by anklume-sanitizer)
+      |
+LEVEL 3 — Deep analysis (cloud LLM, via sanitizer)
+  Forensics, multi-source correlation, architecture evaluation
+  Triggered by: explicit user request or static task-type routing
+```
+
+**Deliverables**:
+
+a) **Collection tools integration**:
+   - MCP Wireshark server (evaluate: mcp-wireshark, WireMCP, SharkMCP)
+   - nmap scan diff scripts (compare current vs baseline)
+   - SNMP/LLDP discovery for topology mapping
+
+b) **Local triage skills** (custom OpenClaw skills):
+   - `anklume-network-triage`: parse nmap/tshark output, classify
+     anomalies (normal/suspect/critical) via Ollama
+   - `anklume-inventory-diff`: compare network inventory to baseline,
+     detect new hosts, open ports, service changes
+   - `anklume-pcap-summary`: condense captures into readable summaries
+
+c) **Cloud escalation path**:
+   - Static routing: forensics, multi-source correlation, architecture
+     evaluation → cloud via sanitizer
+   - Explicit escalation: user says "analyze deeper" → cloud
+   - Network-specific anonymization: IPs, MACs, hostnames, DNS names,
+     topology relationships (preserve structure, anonymize endpoints)
+
+d) **Alerting pipeline**:
+   - Heartbeat detects anomaly → local triage → alert via Telegram
+   - Alert includes: triage summary, recommended action, option to
+     escalate to cloud analysis
+
+**Validation criteria**:
+- [ ] nmap scan diff detects new host and alerts via Telegram
+- [ ] PCAP summary produced by local LLM is readable and accurate
+- [ ] Cloud escalation anonymizes network data through sanitizer
+- [ ] Heartbeat-triggered triage runs without manual intervention
+- [ ] Local triage handles 80%+ of routine checks without cloud
+
+---
+
 ## Current State
 
 **Completed**:
@@ -2502,16 +2945,29 @@ d) **Internationalization (i18n)**:
 - Phase 31: Live OS with Encrypted Persistent Storage — **en cours**
 - Phase 32: Makefile UX and Robustness — **court terme**
 - Phase 33: Student Mode and Internationalization — long-term
+- Phase 34: Addressing Convention and Canonical Infrastructure — **en cours**
+- Phase 35: Development Workflow Simplification — **court terme**
+- Phase 36: Naming Convention Migration — **court terme**
+- Phase 37: Per-Domain OpenClaw — **moyen terme**
+- Phase 38: OpenClaw Heartbeat and Proactive Monitoring — **moyen terme**
+- Phase 39: LLM Sanitization Proxy — **moyen terme**
+- Phase 40: Network Inspection and Security Monitoring — **long-term**
 
-**Deployed infrastructure**:
+**Vision document**: `docs/vision-ai-integration.md` — consolidation of
+design discussions for Phases 35-40 (AI integration architecture).
 
-| Domain | Container | IP | Network | Status |
-|--------|-----------|-----|---------|--------|
-| anklume | anklume-instance | 10.100.0.10 | net-anklume | Running |
-| perso | perso-desktop | 10.100.1.10 | net-perso | Running |
-| pro | pro-dev | 10.100.2.10 | net-pro | Running |
-| homelab | homelab-llm | 10.100.3.10 | net-homelab | Running |
+**Deployed infrastructure** (Phase 34 target addressing):
 
-**Active ADRs**: ADR-001 to ADR-037
+| Domain | Container | IP | Zone | Network |
+|--------|-----------|-----|------|---------|
+| anklume | anklume-instance | 10.100.0.10 | admin | net-anklume |
+| pro | pro-dev | 10.110.0.10 | trusted | net-pro |
+| perso | perso-desktop | 10.110.1.10 | trusted | net-perso |
+| ai-tools | ai-gpu | 10.120.0.10 | semi-trusted | net-ai-tools |
+| ai-tools | ai-webui | 10.120.0.20 | semi-trusted | net-ai-tools |
+| ai-tools | ai-chat | 10.120.0.30 | semi-trusted | net-ai-tools |
+| ai-tools | ai-code | 10.120.0.40 | semi-trusted | net-ai-tools |
+
+**Active ADRs**: ADR-001 to ADR-038
 
 **Known issues**: None

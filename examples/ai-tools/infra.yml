@@ -12,6 +12,8 @@
 # The domain is isolated from other domains by default.
 # Use network_policies to allow cross-domain access.
 #
+# IPs: anklume -> 10.100.0.x (admin), ai-tools -> 10.120.0.x (semi-trusted)
+#
 # Requirements:
 # - NVIDIA GPU (recommended, CPU fallback available)
 # - 16+ GB RAM (for LLM models + services)
@@ -20,25 +22,26 @@
 project_name: ai-stack
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
 
 domains:
   anklume:
+    trust_level: admin
     description: "Administration domain"
-    subnet_id: 0
     machines:
       anklume-instance:
         description: "Ansible controller"
         type: lxc
-        ip: "10.100.0.10"
         roles: [base_system]
 
   ai-tools:
+    trust_level: semi-trusted
     description: "AI services domain — LLM, chat, coding, STT"
-    subnet_id: 4
     file_portal:
       allowed_paths: ["/shared/ai-tools", "/tmp/portal"]
       read_only: false
@@ -52,35 +55,29 @@ domains:
       gpu-server:
         description: "Ollama LLM server + STT"
         type: lxc
-        ip: "10.100.4.10"
         gpu: true
         profiles: [default, nvidia-compute]
         roles: [base_system, ollama_server, stt_server]
       ai-openwebui:
         description: "Open WebUI chat interface"
         type: lxc
-        ip: "10.100.4.20"
         roles: [base_system, open_webui]
       ai-lobechat:
         description: "LobeChat multi-provider UI"
         type: lxc
-        ip: "10.100.4.30"
         roles: [base_system, lobechat]
       ai-opencode:
         description: "OpenCode AI coding server"
         type: lxc
-        ip: "10.100.4.40"
         roles: [base_system, opencode_server]
         export_apps: [opencode]
       ai-coder:
         description: "Sandboxed AI coding (Claude Code, Aider)"
         type: lxc
-        ip: "10.100.4.50"
         roles: [base_system, code_sandbox]
       ai-openclaw:
         description: "OpenClaw self-hosted AI assistant"
         type: lxc
-        ip: "10.100.4.60"
         config:
           security.nesting: "true"
         roles: [base_system, openclaw_server]

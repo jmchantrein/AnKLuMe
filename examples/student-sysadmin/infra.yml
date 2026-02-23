@@ -1,52 +1,46 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Describes your infrastructure at a high level. After editing, run:
-#   make sync        # Generate/update Ansible files
-#   make apply       # Apply to Incus
-#
-# See docs/SPEC.md section 5 for the full format reference.
-
 # Sysadmin student: 2 domains (anklume + lab)
 # Isolated lab environment for practicing system administration.
+#
+# IPs: anklume -> 10.100.0.x (admin), lab -> 10.120.0.x (semi-trusted)
 
 project_name: student-sysadmin
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   default_os_image: "images:debian/13"
   default_connection: community.general.incus
   default_user: root
 
 domains:
   anklume:
+    trust_level: admin
     description: "Administration and orchestration"
-    subnet_id: 0
-    ephemeral: false
     machines:
       sa-admin:
         description: "Ansible controller"
         type: lxc
-        ip: "10.100.0.10"
         config:
           security.nesting: "true"
         roles:
           - base_system
 
   lab:
+    trust_level: semi-trusted
     description: "Lab environment for sysadmin exercises"
-    subnet_id: 1
     ephemeral: true
     machines:
       sa-web:
         description: "Web server for exercises"
         type: lxc
-        ip: "10.100.1.10"
         roles:
           - base_system
       sa-db:
         description: "Database server for exercises"
         type: lxc
-        ip: "10.100.1.11"
         roles:
           - base_system
