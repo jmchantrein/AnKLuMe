@@ -557,6 +557,7 @@ LOADER
 
     # Create boot entries
     local kernel_version
+    # shellcheck disable=SC2034  # used in boot entry template below
     kernel_version=$(basename "$vmlinuz" | sed 's/vmlinuz-//')
 
     # Entry for slot A (current)

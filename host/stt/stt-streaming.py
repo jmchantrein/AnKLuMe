@@ -100,14 +100,14 @@ SILENCE_THRESHOLD = 300
 
 def transcribe(wav_data, prompt=""):
     import tempfile
-    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    try:
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp.write(wav_data)
-        tmp.close()
+        tmp_name = tmp.name
+    try:
         cmd = [
             "curl", "-s", "--max-time", "30",
             "-X", "POST", f"{API_URL}/v1/audio/transcriptions",
-            "-F", f"file=@{tmp.name}",
+            "-F", f"file=@{tmp_name}",
             "-F", f"model={MODEL}",
             "-F", f"language={LANGUAGE}",
             "-F", "response_format=json",
@@ -123,7 +123,7 @@ def transcribe(wav_data, prompt=""):
         except (json.JSONDecodeError, ValueError):
             return ""
     finally:
-        os.unlink(tmp.name)
+        os.unlink(tmp_name)
 
 
 def type_text(text):
@@ -275,11 +275,11 @@ def main():
     min_audio_bytes = BYTES_PER_SECOND  # Au moins 1s d'audio
     min_new_audio = BYTES_PER_SECOND // 2  # Au moins 0.5s de NOUVEL audio
     transcribing = False
-    CHECK_INTERVAL = 0.1
+    check_interval = 0.1
 
     try:
         while time.time() - start_time < TIMEOUT:
-            time.sleep(CHECK_INTERVAL)
+            time.sleep(check_interval)
 
             if should_stop():
                 break
@@ -335,10 +335,7 @@ def main():
                         if should_stop():
                             return
 
-                        if prev_typed:
-                            to_type = " " + new_words
-                        else:
-                            to_type = new_words
+                        to_type = " " + new_words if prev_typed else new_words
                         type_text(to_type)
                         typed_text = prev_typed + to_type
 

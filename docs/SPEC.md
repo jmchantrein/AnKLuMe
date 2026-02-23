@@ -216,8 +216,9 @@ global:
 ```
 
 When enabled, the generator reads `/etc/anklume/absolute_level` (created
-by the parent instance). If the file is absent, level defaults to 1.
-The prefix format is `{level:03d}-`:
+by the parent instance). If the file is absent (physical host, no nesting),
+no prefix is applied regardless of the setting. The prefix format is
+`{level:03d}-`:
 
 | Resource | Without prefix | With prefix (level 1) |
 |----------|---------------|----------------------|

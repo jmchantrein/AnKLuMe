@@ -14,6 +14,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034  # referenced in sourced library
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Source shared library
@@ -351,6 +352,7 @@ update_bootloader() {
     fi
 
     # Ensure we unmount on exit
+    # shellcheck disable=SC2064  # Intentional: expand efi_mount now
     trap "umount '$efi_mount' 2>/dev/null || true" RETURN
 
     # Get verity hash for target slot

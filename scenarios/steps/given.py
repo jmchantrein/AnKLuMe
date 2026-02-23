@@ -7,7 +7,7 @@ import pytest
 import yaml
 from pytest_bdd import given, parsers
 
-from scenarios.conftest import PROJECT_DIR, _clean_incus_state
+from scenarios.conftest import _clean_incus_state
 
 
 @given("a clean sandbox environment")

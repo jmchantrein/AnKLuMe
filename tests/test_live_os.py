@@ -11,15 +11,12 @@ This module tests all scripts and configurations for the AnKLuMe live OS phase:
   - Makefile targets (build-image, live-update, live-status)
 """
 
-import os
 import re
 import stat
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
-
 
 # ── Path definitions ──────────────────────────────────────────────
 
@@ -36,10 +33,13 @@ UMOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "script
 MAKEFILE = Path(__file__).resolve().parent.parent / "Makefile"
 
 # Mkinitcpio hooks paths for Arch support
-MKINITCPIO_TORAM_INSTALL = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "install" / "anklume-toram"
-MKINITCPIO_TORAM_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "hooks" / "anklume-toram"
-MKINITCPIO_VERITY_INSTALL = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "install" / "anklume-verity"
-MKINITCPIO_VERITY_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio" / "hooks" / "anklume-verity"
+_MKINITCPIO = (
+    Path(__file__).resolve().parent.parent / "host" / "boot" / "mkinitcpio"
+)
+MKINITCPIO_TORAM_INSTALL = _MKINITCPIO / "install" / "anklume-toram"
+MKINITCPIO_TORAM_HOOK = _MKINITCPIO / "hooks" / "anklume-toram"
+MKINITCPIO_VERITY_INSTALL = _MKINITCPIO / "install" / "anklume-verity"
+MKINITCPIO_VERITY_HOOK = _MKINITCPIO / "hooks" / "anklume-verity"
 
 
 # ── Fixtures ───────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ class TestShellSyntax:
         """Verify shell script passes bash -n syntax check."""
         if not script.exists():
             pytest.skip(f"Script not found: {script}")
-        
+
         result = subprocess.run(
             ["bash", "-n", str(script)],
             capture_output=True, text=True,
@@ -272,8 +272,8 @@ class TestBuildImageStructure:
 
     def test_main_called_at_end(self):
         """Verify script ends with main call."""
-        lines = [l.strip() for l in self.content.strip().splitlines()
-                 if l.strip() and not l.strip().startswith('#')]
+        lines = [line.strip() for line in self.content.strip().splitlines()
+                 if line.strip() and not line.strip().startswith('#')]
         assert lines[-1] == 'main "$@"'
 
     def test_uses_debootstrap(self):
@@ -513,7 +513,7 @@ class TestSystemdServices:
         """Verify first-boot service has valid INI sections."""
         if not FIRST_BOOT_SERVICE.exists():
             pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
-        
+
         content = FIRST_BOOT_SERVICE.read_text()
         assert "[Unit]" in content
         assert "[Service]" in content
@@ -523,7 +523,7 @@ class TestSystemdServices:
         """Verify first-boot runs only if persist not initialized."""
         if not FIRST_BOOT_SERVICE.exists():
             pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
-        
+
         content = FIRST_BOOT_SERVICE.read_text()
         assert "ConditionPathExists=!/mnt/anklume-persist/pool.conf" in content
 
@@ -531,7 +531,7 @@ class TestSystemdServices:
         """Verify first-boot is wanted by multi-user.target."""
         if not FIRST_BOOT_SERVICE.exists():
             pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
-        
+
         content = FIRST_BOOT_SERVICE.read_text()
         assert "WantedBy=multi-user.target" in content
 
@@ -545,7 +545,7 @@ class TestSystemdServices:
         """Verify data-mount service has valid INI sections."""
         if not DATA_MOUNT_SERVICE.exists():
             pytest.skip(f"File not found: {DATA_MOUNT_SERVICE}")
-        
+
         content = DATA_MOUNT_SERVICE.read_text()
         assert "[Unit]" in content
         assert "[Service]" in content
@@ -555,7 +555,7 @@ class TestSystemdServices:
         """Verify data-mount runs only if persist is initialized."""
         if not DATA_MOUNT_SERVICE.exists():
             pytest.skip(f"File not found: {DATA_MOUNT_SERVICE}")
-        
+
         content = DATA_MOUNT_SERVICE.read_text()
         assert "ConditionPathExists=/mnt/anklume-persist/pool.conf" in content
 
@@ -563,7 +563,7 @@ class TestSystemdServices:
         """Verify data-mount runs before incus.service."""
         if not DATA_MOUNT_SERVICE.exists():
             pytest.skip(f"File not found: {DATA_MOUNT_SERVICE}")
-        
+
         content = DATA_MOUNT_SERVICE.read_text()
         assert "Before=incus.service" in content
 
@@ -571,7 +571,7 @@ class TestSystemdServices:
         """Verify data-mount is wanted by multi-user.target."""
         if not DATA_MOUNT_SERVICE.exists():
             pytest.skip(f"File not found: {DATA_MOUNT_SERVICE}")
-        
+
         content = DATA_MOUNT_SERVICE.read_text()
         assert "WantedBy=multi-user.target" in content
 

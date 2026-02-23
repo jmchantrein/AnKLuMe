@@ -415,9 +415,9 @@ run_suite_shellcheck() {
     local suite_start
     suite_start=$(date +%s)
     local exit_code=0
-    # shellcheck all .sh files in scripts/ and host/
+    # Run shellcheck on all .sh files in scripts/ and host/
     find "$PROJECT_DIR/scripts" "$PROJECT_DIR/host" -name '*.sh' -print0 2>/dev/null \
-        | xargs -0 shellcheck 2>&1 > "$log" || exit_code=$?
+        | xargs -0 shellcheck > "$log" 2>&1 || exit_code=$?
     local suite_end
     suite_end=$(date +%s)
     local duration=$(( suite_end - suite_start ))

@@ -16,7 +16,7 @@ def mock_env(tmp_path):
     mock_bin = tmp_path / "bin"
     mock_bin.mkdir()
     log_file = tmp_path / "commands.log"
-    guard_state = tmp_path / "incus-guard-host-dev"
+    tmp_path / "incus-guard-host-dev"
 
     # Mock ip command: returns fake network info
     mock_ip = mock_bin / "ip"
@@ -130,7 +130,13 @@ export LOGFILE="{tmp_path}/guard.log"
 # Override guard state path in the script
 export GUARD_STATE="{tmp_path}/incus-guard-host-dev"
 # Source the guard script with modified variables
-sed 's|LOGFILE=.*|LOGFILE="{tmp_path}/guard.log"|;s|GUARD_STATE=.*|GUARD_STATE="{tmp_path}/incus-guard-host-dev"|;s|GUARD_SCRIPT_INSTALL=.*|GUARD_SCRIPT_INSTALL="{tmp_path}/installed-guard.sh"|;s|DROPIN_DIR=.*|DROPIN_DIR="{tmp_path}/dropin"|;s|DROPIN_FILE=.*|DROPIN_FILE="{tmp_path}/dropin/network-guard.conf"|' "{GUARD_SH}" > "{tmp_path}/guard-patched.sh"
+sed \
+  -e 's|LOGFILE=.*|LOGFILE="{tmp_path}/guard.log"|' \
+  -e 's|GUARD_STATE=.*|GUARD_STATE="{tmp_path}/incus-guard-host-dev"|' \
+  -e 's|GUARD_SCRIPT_INSTALL=.*|GUARD_SCRIPT_INSTALL="{tmp_path}/installed-guard.sh"|' \
+  -e 's|DROPIN_DIR=.*|DROPIN_DIR="{tmp_path}/dropin"|' \
+  -e 's|DROPIN_FILE=.*|DROPIN_FILE="{tmp_path}/dropin/network-guard.conf"|' \
+  "{GUARD_SH}" > "{tmp_path}/guard-patched.sh"
 chmod +x "{tmp_path}/guard-patched.sh"
 bash "{tmp_path}/guard-patched.sh" "$@"
 """)

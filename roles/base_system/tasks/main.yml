@@ -18,6 +18,7 @@
   register: base_system_dpkg_lock
   changed_when: false
   failed_when: false
+  check_mode: false
   retries: 30
   delay: 5
   until: base_system_dpkg_lock.rc != 0

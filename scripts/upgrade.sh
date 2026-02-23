@@ -36,7 +36,7 @@ ok()   { printf "${GREEN}%s${NC}\n" "$1"; }
 warn() { printf "${YELLOW}%s${NC}\n" "$1"; }
 die()  { printf "${RED}ERROR: %s${NC}\n" "$1" >&2; exit 1; }
 
-printf "\n${BOLD}=== AnKLuMe Upgrade ===${NC}\n\n"
+printf '\n%b=== AnKLuMe Upgrade ===%b\n\n' "$BOLD" "$NC"
 
 # Check we're in a git repository
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then
@@ -95,7 +95,7 @@ if git remote | grep -q origin; then
     fi
 
     git merge "origin/$CURRENT_BRANCH" --no-edit || {
-        printf "\n${RED}ERROR: Merge conflict detected. Resolve manually.${NC}\n"
+        printf '\n%bERROR: Merge conflict detected. Resolve manually.%b\n' "$RED" "$NC"
         echo "Backups of modified files have been created (.bak)."
         if [ ${#MOVED_UNTRACKED[@]} -gt 0 ]; then
             echo "Moved untracked files:"

@@ -183,8 +183,8 @@ cmd_export() {
     fi
 
     # Resolve domain context
-    local domain="unknown" trust_level="trusted" resolved_project=""
-    if IFS=$'\t' read -r domain trust_level resolved_project < <(resolve_context "$INSTANCE"); then
+    local domain="unknown" _trust_level="trusted" resolved_project=""
+    if IFS=$'\t' read -r domain _trust_level resolved_project < <(resolve_context "$INSTANCE"); then
         if [[ -z "$PROJECT" && -n "$resolved_project" ]]; then
             PROJECT="$resolved_project"
         fi
@@ -205,6 +205,7 @@ cmd_export() {
     # Step 2: Pull .desktop content from container
     local tmp_desktop
     tmp_desktop=$(mktemp /tmp/anklume-export-XXXXXX.desktop)
+    # shellcheck disable=SC2064  # Intentional: expand tmp_desktop now
     trap "rm -f '$tmp_desktop'" EXIT
 
     incus_file_pull "${INSTANCE}${desktop_path}" "$tmp_desktop" 2>/dev/null \
@@ -326,8 +327,8 @@ cmd_list() {
 
         # Resolve project if needed
         if [[ -z "$PROJECT" ]]; then
-            local domain trust_level resolved_project
-            if IFS=$'\t' read -r domain trust_level resolved_project < <(resolve_context "$INSTANCE"); then
+            local domain _trust_level resolved_project
+            if IFS=$'\t' read -r domain _trust_level resolved_project < <(resolve_context "$INSTANCE"); then
                 if [[ -n "$resolved_project" ]]; then
                     PROJECT="$resolved_project"
                 fi

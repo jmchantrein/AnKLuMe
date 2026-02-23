@@ -55,7 +55,7 @@ def _get_nesting_prefix(infra):
         return ""
     level = _read_absolute_level()
     if level is None:
-        level = 1  # Default when file absent
+        return ""  # No context file = physical host, no prefix
     return f"{level:03d}-"
 
 

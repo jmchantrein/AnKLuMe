@@ -54,14 +54,14 @@ declare -r BOOTSTRAP_IMAGE="${BOOTSTRAP_IMAGE:-$(
     esac
 )}"
 declare -r POOL_NAME="anklume-data"
+# shellcheck disable=SC2034  # referenced in sourced scripts
 declare -r INCUS_DIR="/var/lib/incus"
 declare -r LUKS_NAME="anklume-crypt"
 declare -r POOL_CONF_FILE="pool.conf"
 
 # Color codes for output
-declare -r RED='\033[0;31m'
-declare -r GREEN='\033[0;32m'
-declare -r YELLOW='\033[1;33m'
+# shellcheck disable=SC2034  # Colors used in helper functions
+declare -r RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[1;33m'
 declare -r BLUE='\033[0;34m'
 declare -r NC='\033[0m' # No Color
 

@@ -2018,13 +2018,14 @@ class TestNestingPrefix:
         hv = (tmp_path / "host_vars" / "pro-dev.yml").read_text()
         assert "instance_name: 002-pro-dev" in hv
 
-    def test_prefix_default_level_when_file_absent(self, sample_infra, tmp_path, monkeypatch):
-        """When absolute_level file is absent, default level is 1."""
+    def test_prefix_no_level_file_means_no_prefix(self, sample_infra, tmp_path, monkeypatch):
+        """When absolute_level file is absent (physical host), no prefix applied."""
         sample_infra["global"]["nesting_prefix"] = True
         monkeypatch.setattr("generate._read_absolute_level", lambda: None)
         generate(sample_infra, tmp_path)
         gv = (tmp_path / "group_vars" / "pro.yml").read_text()
-        assert "incus_project: 001-pro" in gv
+        assert "incus_project: pro" in gv
+        assert "name: net-pro" in gv
 
     def test_prefix_does_not_change_file_paths(self, sample_infra, tmp_path, monkeypatch):
         """File paths use unprefixed domain/machine names."""
