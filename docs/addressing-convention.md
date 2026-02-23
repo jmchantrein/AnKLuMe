@@ -95,7 +95,7 @@ machines:
 Each nesting level uses identical IP addresses. Network isolation
 between levels is provided by Incus virtualization (separate bridges,
 separate Incus daemons), not by IP differentiation. The nesting_prefix
-(ADR-028) only affects Incus resource names (`001-net-pro`, etc.).
+(ADR-020) only affects Incus resource names (`001-net-pro`, etc.).
 
 This means the same `infra.yml` produces identical results at any
 nesting level — the framework is fully reproducible.

@@ -86,13 +86,6 @@ but reliable.
 
 ---
 
-## ADR-007: NVIDIA GPU = LXC only, no VM
-
-**Decision**: GPU instances are LXC containers with a GPU profile. LLM models
-stored in separate storage volumes. No GPU for KVM VMs.
-
----
-
 ## ADR-008: Globally unique machine names
 
 **Decision**: Machine names are globally unique, not just within their domain.
@@ -159,14 +152,11 @@ indicating that the English version is authoritative in case of divergence.
 
 **Context**: Code quality must be enforced consistently across all file types.
 
-**Decision**: Each file type has a mandatory validator:
-- `*.yml` / `*.yaml` → `yamllint` + `ansible-lint` (for Ansible files)
-- `*.sh` → `shellcheck`
-- `*.py` → `ruff`
-- `*.md` → `markdownlint` (optional but recommended)
+**Decision**: Every file type in the project has a mandatory validator.
+`make lint` chains all validators. CI must pass all of them. No file
+escapes validation. Zero violations tolerated.
 
-`make lint` chains all validators. CI must pass all of them. No file escapes
-validation.
+See SPEC-operations.md Section 9 for the full validator table.
 
 **Consequence**: Contributors must have all validators installed. `make init`
 installs them.
@@ -268,30 +258,17 @@ The layout matches what Ansible users expect from standard projects.
 cases require KVM VMs: stronger isolation (GPU with vfio-pci, untrusted
 workloads), full kernel customization, or running non-Linux guests.
 
-**Decision:** The `instance_type` variable (from infra.yml `type: lxc|vm`)
-is present in host_vars but the `incus_instances` role currently treats all
-instances as LXC containers. The codebase MUST be kept VM-aware from now on:
+**Decision:** The codebase MUST be kept VM-aware from now on. The
+`instance_type` variable (from infra.yml `type: lxc|vm`) drives
+role behavior where LXC and VM differ. Do not add VM-specific roles,
+profiles, or devices until there is a concrete use case — keep the
+abstraction minimal.
 
-1. **infra.yml already supports `type: lxc|vm`** — no schema change needed
-2. **incus_instances role:** the `incus launch` command must pass `--vm`
-   when `instance_type == 'vm'`. This is the ONLY change needed for basic
-   VM creation. All other reconciliation logic (device override, IP config,
-   wait for running) works identically.
-3. **Profiles:** VM instances may need different default profiles (e.g.,
-   `agent.nic.enp5s0.mode` for network config inside VMs). This is a
-   Phase 8+ concern.
-4. **GPU in VMs:** Requires vfio-pci passthrough + IOMMU groups, which is
-   significantly more complex than LXC GPU passthrough. Deferred to Phase 9+.
-5. **Connection plugin:** VMs use `incus exec` just like LXC containers,
-   so the `community.general.incus` connection plugin works for both.
+See SPEC-operations.md Section 7 (`incus_instances` role) for
+implementation details (--vm flag, profile differences, GPU passthrough).
 
 **Consequence:** All new code in incus_instances MUST branch on
-`instance_type` where behavior differs between LXC and VM. Today the
-only difference is the `--vm` flag on `incus launch`. Future phases will
-add VM-specific profiles, devices, and boot configuration.
-
-**What NOT to do now:** Do not add VM-specific roles, profiles, or devices
-until there is a concrete use case. Keep the abstraction minimal.
+`instance_type` where behavior differs between LXC and VM.
 
 ---
 
@@ -305,24 +282,13 @@ same GPU to multiple containers simultaneously introduces risks:
 - Any container with GPU access can potentially read GPU memory
 
 **Decision:**
-1. **Default policy: `gpu_policy: exclusive`** — the PSOT generator
-   validates that at most ONE instance across all domains has a GPU device.
-   If multiple instances declare `gpu: true`, the generator errors with a
-   clear message.
-2. **Optional override: `gpu_policy: shared`** — set in `infra.yml`
-   `global.gpu_policy: shared` to allow multiple instances to share the
-   GPU. The generator emits a warning but does not error.
-3. **GPU in VMs:** When `instance_type: vm` has GPU access, it uses
-   vfio-pci passthrough which provides hardware-level isolation. The
-   exclusive policy still applies by default (only one VM can own a
-   PCI device), but `shared` mode is irrelevant for VMs (you can't
-   share a PCI device between VMs without SR-IOV).
+1. **Default policy: `gpu_policy: exclusive`** — at most one GPU instance.
+2. **Optional override: `gpu_policy: shared`** — allows multiple instances
+   to share the GPU with a warning.
+3. **GPU in VMs:** vfio-pci passthrough provides hardware-level isolation.
+   Exclusive policy still applies (one VM per PCI device without SR-IOV).
 
-**Validation rules for the PSOT generator (scripts/generate.py):**
-- Count instances with `gpu: true` or with a profile containing a `gpu` device
-- If count > 1 and `global.gpu_policy` != `shared` → error
-- If count > 1 and `global.gpu_policy` == `shared` → warning
-- If a VM instance has `gpu: true` → validate host has IOMMU enabled (Phase 9+)
+See SPEC.md Validation constraints for generator validation rules.
 
 **Consequence:** Safe by default. Users who know what they're doing can
 opt into shared GPU access explicitly.
@@ -331,93 +297,49 @@ opt into shared GPU access explicitly.
 
 ## ADR-019: anklume-instance proxy socket resilience at boot
 
-**Context:** The `anklume-instance` container has an Incus proxy device that
-maps the host's Incus socket (`/var/lib/incus/unix.socket`) to
-`/var/run/incus/unix.socket` inside the container. When the container is
-restarted, the `/var/run/` directory is ephemeral (tmpfs) and the
-`/var/run/incus/` subdirectory does not exist yet when the proxy device
-tries to bind, causing the container to fail to start with:
+**Context:** The `anklume-instance` proxy device maps the host's Incus
+socket to `/var/run/incus/unix.socket` inside the container. On restart,
+`/var/run/` (tmpfs) is empty and the proxy bind fails.
 
-```
-Error: Failed to listen on /var/run/incus/unix.socket:
-listen unix /var/run/incus/unix.socket: bind: no such file or directory
-```
+**Decision:** A systemd oneshot service creates `/var/run/incus/` early
+in the boot sequence, before the proxy device starts.
 
-The workaround today is manual: remove the proxy device, start the
-container, create the directory, re-add the proxy device. This must be
-automated.
+**Why not `raw.lxc`:** `lxc.hook.pre-start` runs on the HOST, not inside
+the container — conflicts with ADR-004. A systemd service inside the
+container is self-contained and portable.
 
-**Decision:** Add a systemd oneshot service in the `anklume-instance`
-container that creates `/var/run/incus/` before the proxy device starts.
-This service runs early in boot (`Before=network.target`,
-`After=local-fs.target`).
-
-Implementation in the `base_admin` role (or provisioning for anklume-instance):
-
-```ini
-# /etc/systemd/system/incus-socket-dir.service
-[Unit]
-Description=Create Incus socket directory for proxy device
-DefaultDependencies=no
-Before=network.target
-After=local-fs.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/mkdir -p /var/run/incus
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Why not `raw.lxc`:** The `lxc.hook.pre-start` hook runs on the HOST,
-not inside the container. While it could create the directory in the
-container's rootfs, it requires knowing the rootfs path and runs as root
-on the host — which conflicts with our principle that Ansible does not
-modify the host (ADR-004). A systemd service inside the container is
-self-contained and portable.
-
-**Scope:** This fix applies ONLY to `anklume-instance`. Other containers do
-not have the proxy device and are not affected.
+See SPEC-operations.md Section 12 for the systemd unit file.
 
 **Consequence:** `anklume-instance` survives restarts without manual
-intervention. The systemd service is idempotent (mkdir -p).
+intervention. Applies only to `anklume-instance`.
 
 ---
 
-## ADR-020: Privileged LXC forbidden at first nesting level
+## ADR-020: Privileged LXC forbidden at first nesting level + nesting context
 
 **Context**: LXC containers with `security.privileged: true` share the
-host kernel with elevated capabilities. This expands the attack surface
-significantly. AnKLuMe must distinguish between its primary purpose
-(infrastructure compartmentalization) and development tooling
-(Incus-in-Incus testing).
+host kernel with elevated capabilities. Each nesting level also needs
+to know its position in the hierarchy for decision-making.
 
 **Decision**: At the first nesting level (directly under the physical
 host or under an unprivileged LXC), `security.privileged=true` is
 forbidden for LXC containers. Only VMs provide sufficient hardware
 isolation (separate kernel, IOMMU) for privileged workloads.
 
-The enforcement uses a `vm_nested` flag with automatic detection and
-propagation:
+Nesting context is stored as individual files in `/etc/anklume/`
+(created by the **parent**, not the child). Individual files rather
+than a structured config because they are trivially readable from
+shell, Ansible, or Python with no parsing dependency.
 
-1. At bootstrap, detect virtualization type via `systemd-detect-virt`
-2. Compute: `vm_nested = parent_vm_nested OR (local_type == kvm)`
-3. Store in `/etc/anklume/vm_nested` (created by parent, not child)
-4. Propagate to ALL child instances unconditionally
-5. Generator validates: if `vm_nested == false` and machine has
-   `security.privileged: true` on `type: lxc` → error
+The `--YOLO` flag bypasses security restrictions (warnings instead
+of errors) for lab/training contexts.
 
-Additional context files in `/etc/anklume/`:
-- `absolute_level` = parent + 1 (depth from real host)
-- `relative_level` = 0 if VM (reset), else parent + 1
-- `yolo` = bypass flag (warnings instead of errors)
+See SPEC.md "Security policy" section for the full file list,
+propagation formulas, and validation rules.
 
 **Consequence**: Safe by default. Privileged containers only allowed
-inside a VM isolation boundary. The `--YOLO` flag bypasses this for
-lab/training contexts. The nesting context files enable future
-decision-making based on position in the hierarchy.
+inside a VM isolation boundary. Nesting context enables future
+hierarchy-aware decisions. (Absorbs former ADR-028.)
 
 ---
 
@@ -425,25 +347,14 @@ decision-making based on position in the hierarchy.
 
 **Context**: Phase 8 drops all inter-domain traffic. There is no
 mechanism to selectively allow specific services to be accessed
-cross-domain. Use cases like AI services accessible from multiple
-domains require a policy system.
+cross-domain (e.g., AI services from multiple domains).
 
-**Decision**: Add `network_policies:` section to infra.yml. Syntax is
-a flat list of allow rules (inspired by Consul Intentions):
+**Decision**: Add `network_policies:` section to infra.yml — a flat
+list of allow rules inspired by Consul Intentions. Default: all
+inter-domain traffic is DROP. Each rule adds an `accept` before
+the `drop`.
 
-```yaml
-network_policies:
-  - description: "..."
-    from: <domain|machine|host>
-    to: <domain|machine>
-    ports: [port1, port2] | all
-    protocol: tcp | udp
-    bidirectional: true | false
-```
-
-Default: all inter-domain traffic is DROP. Each rule adds an `accept`
-before the `drop`. The generator validates that `from`/`to` references
-known domains, machines, or the `host` keyword.
+See SPEC.md "Network policies" for the full syntax and examples.
 
 **Consequence**: Enables cross-domain service access while maintaining
 isolation by default. Rules are generated into both host nftables
@@ -531,27 +442,6 @@ manage other instances.
 
 ---
 
-## ADR-028: Nesting context files in /etc/anklume/
-
-**Context**: Each AnKLuMe level needs to know its position in the
-nesting hierarchy for decision-making.
-
-**Decision**: Store one file per context value in `/etc/anklume/`:
-- `absolute_level` — depth from the real physical host
-- `relative_level` — depth from the nearest VM boundary (resets at VMs)
-- `vm_nested` — whether a VM exists in the parent chain
-- `yolo` — whether YOLO mode is active
-
-Files created by the **parent** at instance creation time. Propagation:
-`absolute_level = parent + 1`, `relative_level = 0 if VM else parent + 1`,
-`vm_nested = parent_vm_nested OR (type == kvm)`.
-
-**Consequence**: Trivially readable from shell, Ansible, or Python.
-No parsing dependency. Enables ADR-020 enforcement and future
-nesting-aware decisions.
-
----
-
 ## ADR-029: dev_test_runner in VM (not LXC)
 
 **Context**: Testing AnKLuMe inside AnKLuMe required privileged LXC
@@ -572,9 +462,8 @@ nesting eliminated. Test environment matches production exactly.
 **Context**: A single `infra.yml` becomes unwieldy for large
 deployments (20+ domains).
 
-**Decision**: The generator accepts both formats with auto-detection:
-- `infra.yml` → single-file mode (backward compatible)
-- `infra/` → merges `base.yml` + `domains/*.yml` + `policies.yml`
+**Decision**: The generator accepts both formats with auto-detection.
+See SPEC.md "infra.yml as a directory" for the directory layout.
 
 **Consequence**: Scales to large deployments. Git-friendly. 100%
 backward compatible.
@@ -607,22 +496,10 @@ GPUs lack SR-IOV, so VRAM is shared across all processes using the GPU.
 
 **Decision**: Add `ai_access_policy: exclusive` mode to infra.yml.
 When enabled, only one domain at a time can access ai-tools. Switching
-domains via `scripts/ai-switch.sh` atomically:
-1. Stops GPU services (ollama, speaches)
-2. Flushes VRAM (kills GPU processes, attempts nvidia-smi --gpu-reset)
-3. Updates nftables rules (replaces source bridge in accept rule)
-4. Restarts GPU services
-5. Records state in `/opt/anklume/ai-access-current`
+domains atomically flushes VRAM and updates nftables rules.
 
-The PSOT generator validates:
-- `ai_access_default` must reference a known domain (not ai-tools)
-- An `ai-tools` domain must exist when exclusive mode is active
-- At most one network_policy can target ai-tools as destination
-- Auto-creates a network_policy from `ai_access_default` to ai-tools
-  if none exists
-
-The nftables role supports an `incus_nftables_ai_override` variable
-for dynamic rule replacement without modifying infra.yml.
+See SPEC.md Validation constraints for generator validation rules.
+See docs/ai-switch.md for the operational switching procedure.
 
 **Consequence**: VRAM isolation enforced at the operational level.
 Cross-domain data leakage through GPU memory prevented by flushing
@@ -636,19 +513,13 @@ between domain switches.
 independently from the internet. The dev_test_runner VM (Phase 12)
 re-downloads all images, wasting bandwidth and time.
 
-**Decision**: Pre-export images from the host Incus to a shared
-directory, mount it read-only into nested VMs, and import locally.
-
-Flow:
-1. Host: `incus image export <alias> /opt/anklume/images/` (via
-   `incus_images` role with `incus_images_export_for_nesting: true`)
-2. VM: disk device mounts `/opt/anklume/images` → `/mnt/host-images`
-   (read-only)
-3. Nested Incus: `incus image import /mnt/host-images/<file>.tar.gz`
-   (via `dev_test_runner` role)
+**Decision**: Pre-export images from the host, mount read-only into
+nested VMs, import locally.
 
 Why not mount host filesystem directly: breaks isolation.
 Why not use host as Incus remote: requires network + TLS + auth setup.
+
+See SPEC-operations.md Section 15 for the full flow.
 
 **Consequence**: No internet access needed for nested Incus image
 downloads. Faster sandbox bootstrap. Read-only mount preserves
@@ -658,48 +529,23 @@ isolation.
 
 ## ADR-036: Agent operational knowledge must be framework-reproducible
 
-**Context**: OpenClaw agents (like Ada) run inside Incus containers.
-If the container is destroyed, all operational knowledge (instructions,
-API reference, identity, user profile) is lost unless it comes from
-the framework. During initial deployment, Ada created her own AGENTS.md,
-TOOLS.md, USER.md, and IDENTITY.md manually — none of which were
-tracked in the AnKLuMe repository.
+**Context**: OpenClaw agents run inside Incus containers. If the
+container is destroyed, all operational knowledge is lost unless it
+comes from the framework.
 
-**Decision**: All agent operational files are Jinja2 templates in
-`roles/openclaw_server/templates/`, deployed with `force: true`
-(Ansible default) on every `make apply`. The AnKLuMe git repository
-is the **single source of truth** for agent operational knowledge.
+**Decision**: The AnKLuMe git repository is the **single source of
+truth** for agent operational knowledge. All agent files are Jinja2
+templates deployed with `force: true` on every `make apply`. Agents
+MUST NOT modify their operational files directly — they follow the
+standard development workflow (edit template, test, PR, merge, apply).
 
-Agents MUST NOT modify their operational files directly. To change
-their own instructions, they follow the standard development workflow:
+Exception: `SOUL.md` (personality) is agent-owned and `.gitignored`.
 
-1. Edit the template in `roles/openclaw_server/templates/<file>.j2`
-2. Test (`make lint`, `pytest tests/test_proxy.py`)
-3. Commit to a feature branch, push, create a PR
-4. Once merged, `make apply` deploys the changes to the workspace
-
-This creates a virtuous feedback loop: agents improve their own code
-through the standard contribution workflow.
-
-**Template files (force: true — overwritten on every apply)**:
-- `AGENTS.md.j2` → `~/.openclaw/agents/main/AGENTS.md`
-- `TOOLS.md.j2` → `~/.openclaw/workspace/TOOLS.md`
-- `USER.md.j2` → `~/.openclaw/workspace/USER.md`
-- `IDENTITY.md.j2` → `~/.openclaw/workspace/IDENTITY.md`
-
-**Exceptions**:
-- `SOUL.md`: personality file, modified directly by the agent, NEVER
-  committed to git, `.gitignored` globally. This is the only file an
-  agent loses permanently if its container is destroyed.
-- `MEMORY.md` and `memory/`: accumulated session knowledge, deployed
-  with `force: false` (seed once, never overwrite). Lost on container
-  rebuild — acceptable for ephemeral session context.
+See SPEC-operations.md for the template file list and deploy rules.
 
 **Consequence**: Any agent can be fully reproduced from the framework
 alone (minus personality). Destroying and rebuilding a container
-restores full operational capability. The `.gitignore` includes a
-global `SOUL.md` pattern to prevent accidental commits of personality
-files.
+restores full operational capability.
 
 ---
 
@@ -708,69 +554,23 @@ files.
 **Context**: The original addressing scheme (`10.100.<subnet_id>.0/24`
 with manually assigned sequential subnet_ids) provides no semantic
 information. An administrator cannot determine a domain's security
-posture from its IP address alone. Manual allocation is error-prone,
-does not scale, and does not follow network segmentation best
-practices (VLAN ID encoding in IP octets).
+posture from its IP address alone. Manual allocation is error-prone
+and does not follow network segmentation best practices.
 
-**Decision**: Encode trust zones in the second IP octet using a
-configurable zone_base + zone_offset scheme:
-
-```
-10.<zone_base + zone_offset>.<domain_seq>.<host>/24
-```
-
-Zone offsets derived from trust_level:
-
-| trust_level    | zone_offset | Default second octet |
-|----------------|-------------|----------------------|
-| admin          | 0           | 100                  |
-| trusted        | 10          | 110                  |
-| semi-trusted   | 20          | 120                  |
-| untrusted      | 40          | 140                  |
-| disposable     | 50          | 150                  |
-
-The zone_base (default 100) places all AnKLuMe traffic in the
-`10.100-159.x.x` range, avoiding common enterprise ranges
-(`10.0-60.x.x`) and well-known tool defaults (Docker `172.17`,
-Kubernetes `10.96`, `10.244`). The gap between zones (default 10)
-leaves room for future sub-zones.
-
-`domain_seq` (third octet) is auto-assigned alphabetically within
-each zone, or explicitly overridden via `subnet_id` on the domain.
-
-IP reservation per /24 subnet:
-- `.1-.99`: static assignment (machines in infra.yml)
-- `.100-.199`: DHCP range
-- `.250`: monitoring (reserved)
-- `.251-.253`: infrastructure services
-- `.254`: gateway (immutable convention)
-
-Nesting: each nesting level uses identical IP addresses. Network
-isolation between levels is provided by Incus virtualization, not
-by IP differentiation. The nesting_prefix only affects Incus
-resource names (ADR-028).
-
-Configuration:
-```yaml
-global:
-  addressing:
-    base_octet: 10     # First octet (default: 10)
-    zone_base: 100     # Starting second octet (default: 100)
-    zone_step: 10      # Gap between zones (default: 10)
-```
-
-`trust_level` defaults to `semi-trusted` if omitted. The
+**Decision**: Encode trust zones in the second IP octet:
+`10.<zone_base + zone_offset>.<domain_seq>.<host>/24`. The
 `base_subnet` field is superseded by `addressing`.
 
-**Why not `11.x.x.x` or other non-RFC-1918 ranges**: `11.0.0.0/8`
-is public address space (US DoD). Using it causes DNS leaks, packet
-leaks, and disqualifies the framework as a serious tool.
+See SPEC.md "Addressing convention" for the full zone table, IP
+reservations, configuration format, and validation rules.
+See docs/addressing-convention.md for the complete documentation.
 
-**Why zone_base=100**: avoids the `10.0-60.x.x` range commonly used
-by enterprise VPNs, home routers, and container orchestrators. The
-`10.1xx` prefix serves as a visual marker for AnKLuMe traffic.
+**Why not `11.x.x.x`**: `11.0.0.0/8` is public address space (US DoD).
+DNS leaks, packet leaks — disqualifies the framework.
+
+**Why zone_base=100**: avoids `10.0-60.x.x` used by enterprise VPNs,
+home routers, and container orchestrators. `10.1xx` is a visual marker
+for AnKLuMe traffic.
 
 **Consequence**: IP addresses are human-readable. From `10.140.0.5`,
-an admin immediately knows: zone 140 = 100+40 = untrusted (sandbox).
-Auto-assignment reduces configuration burden. The generator validates
-that explicit IPs match their domain's computed zone.
+an admin immediately knows: zone 140 = 100+40 = untrusted.

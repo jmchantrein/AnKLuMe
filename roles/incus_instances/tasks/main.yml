@@ -509,7 +509,7 @@
   delay: "{{ incus_instances_vm_agent_delay }}"
   when: instance_type == 'vm'
 
-# ── Nesting context files (ADR-028) ──────────────────────
+# ── Nesting context files (ADR-020) ──────────────────────
 # Parent creates /etc/anklume/ in children with propagated context values.
 # Formula: absolute_level = parent + 1
 #          relative_level = 0 if VM, else parent + 1
