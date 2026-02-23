@@ -701,7 +701,7 @@ def web_fetch(url: str) -> str:
 
 # ── OpenClaw brain switching ──────
 # Mode → (model primary string for openclaw.json, description)
-# All modes go through the proxy (proxy-always architecture, ADR-037).
+# All modes go through the proxy (proxy-always architecture).
 # The proxy routes "local" to Ollama and "anklume"/"assistant" to Claude Code CLI.
 _BRAIN_MODES = {
     "anklume": ("claude-code/anklume", "Claude Opus — expert AnKLuMe (infra, réseau, Ansible)"),
@@ -709,7 +709,7 @@ _BRAIN_MODES = {
     "local": ("claude-code/local", "LLM local Ollama (gratuit, rapide)"),
 }
 
-# Ollama is the single LLM backend (ADR-037: no llama-server in parallel).
+# Ollama is the single LLM backend (no llama-server in parallel).
 # Ollama manages VRAM automatically, loads/unloads models on demand.
 GPU_CONTAINER = os.environ.get("ANKLUME_GPU_CONTAINER", "gpu-server")
 GPU_IP = os.environ.get("ANKLUME_GPU_IP", "10.100.3.1")

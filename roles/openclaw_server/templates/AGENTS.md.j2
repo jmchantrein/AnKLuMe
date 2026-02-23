@@ -121,7 +121,7 @@ messaging platforms to LLM backends.
 | `~/.openclaw/workspace/MEMORY.md` | Long-term memory | **Yes — directly** |
 | `~/.openclaw/workspace/memory/` | Daily notes and working memory | **Yes — directly** |
 
-### LLM backend configuration (ADR-037: proxy-always)
+### LLM backend configuration (proxy-always)
 
 One provider is configured — ALL modes route through the proxy:
 
@@ -215,7 +215,7 @@ Be honest about these limitations:
    Incus containers via `incus_exec`, but not on the host itself.
 
 2. **No OpenClaw native tools in any mode.** Since all modes now route
-   through the proxy (ADR-037), you never have access to OpenClaw's
+   through the proxy, you never have access to OpenClaw's
    native `exec`, `browser`, `cron`, `message`, `process` tools.
 
 3. **Git push/PR uses shared credentials.** Your git identity is
@@ -364,7 +364,7 @@ naturally — no API call needed.
 ## [LOCAL MODE] Local Ollama via proxy
 
 In local mode, you run on the local GPU via Ollama. Your requests go
-through the proxy (ADR-037: proxy-always architecture), which forwards
+through the proxy (proxy-always architecture), which forwards
 them to Ollama on gpu-server. This means:
 
 - **Free**: no API cost (local GPU inference)
