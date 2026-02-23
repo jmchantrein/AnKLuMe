@@ -98,6 +98,31 @@ declarative property of the infrastructure.
 | `dev_agent_runner` | Claude Code Agent Teams setup | `provision`, `agent-setup` |
 | (user-defined) | Application-specific setup | `provision` |
 
+### Role implementation notes
+
+**`incus_instances`** (ADR-017): The `instance_type` variable (from
+infra.yml `type: lxc|vm`) drives behavior:
+- `incus launch` passes `--vm` when `instance_type == 'vm'`
+- VM instances may need different default profiles (e.g.,
+  `agent.nic.enp5s0.mode` for network config). Phase 8+ concern.
+- GPU in VMs requires vfio-pci passthrough + IOMMU groups
+  (deferred to Phase 9+)
+- VMs use `incus exec` like LXC containers — the
+  `community.general.incus` connection plugin works for both
+
+**`openclaw_server`** (ADR-036): Agent operational files are Jinja2
+templates deployed with `force: true` on every `make apply`:
+- `AGENTS.md.j2` → `~/.openclaw/agents/main/AGENTS.md`
+- `TOOLS.md.j2` → `~/.openclaw/workspace/TOOLS.md`
+- `USER.md.j2` → `~/.openclaw/workspace/USER.md`
+- `IDENTITY.md.j2` → `~/.openclaw/workspace/IDENTITY.md`
+
+Exceptions:
+- `SOUL.md`: personality file, agent-owned, `.gitignored` globally.
+  The only file lost permanently if the container is destroyed.
+- `MEMORY.md` and `memory/`: deployed with `force: false` (seed once,
+  never overwrite). Lost on container rebuild — acceptable.
+
 ### Reconciliation pattern (all infra roles)
 
 Every infra role follows exactly this 6-step pattern:
@@ -278,6 +303,33 @@ This project follows **spec-driven, test-driven development**:
 
 Production mode auto-detects the filesystem (btrfs, zfs, ext4) and
 configures the Incus preseed with the optimal storage backend.
+
+### anklume-instance proxy socket resilience (ADR-019)
+
+The `anklume-instance` proxy device maps the host Incus socket to
+`/var/run/incus/unix.socket` inside the container. On restart,
+`/var/run/` (tmpfs) is empty and the proxy bind fails. A systemd
+oneshot service creates the directory early in boot:
+
+```ini
+# /etc/systemd/system/incus-socket-dir.service
+[Unit]
+Description=Create Incus socket directory for proxy device
+DefaultDependencies=no
+Before=network.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /var/run/incus
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+This applies only to `anklume-instance`. Other containers do not have
+the proxy device.
 
 ### Import existing infrastructure
 

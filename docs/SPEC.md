@@ -94,10 +94,12 @@ restore, delete.
 └─────────────────────────────────────────────────────────┘
 ```
 
-The anklume container:
+The anklume container (`anklume-instance`):
 - Has the host's Incus socket mounted read/write
 - Contains Ansible, the git repo, and drives everything via `incus` CLI
-- Never modifies the host directly
+- Avoids modifying the host as much as possible; when necessary
+  (nftables, software prerequisites), changes are made directly
+  if it is more KISS/DRY and does not compromise security (ADR-004)
 
 ## 5. infra.yml format
 
@@ -307,6 +309,10 @@ adapt behavior based on domain trust posture.
 - `addressing.zone_base`: must be 0-245 (default: 100)
 - `addressing.zone_step`: must be a positive integer (default: 10)
 - Profiles referenced by a machine must exist in its domain
+- GPU policy (`gpu_policy: exclusive` default): at most one instance
+  with `gpu: true` or a GPU profile device. If count > 1 and policy
+  != `shared` → error. If count > 1 and policy == `shared` → warning.
+  VM instances with GPU require IOMMU (Phase 9+)
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
 - `weight`: must be a positive integer if present (default: 1)
