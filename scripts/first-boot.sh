@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Source shared library
+# shellcheck source=/dev/null
 source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ─────────────────────────────────────────────────────────────────────────────

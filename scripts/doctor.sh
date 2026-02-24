@@ -51,7 +51,7 @@ verbose()     { if $VERBOSE; then printf "     %s\n" "$1"; fi; }
 REPAIR_CONTAINER="anklume-doctor-$$"
 REPAIR_READY=false
 
-# shellcheck disable=SC2317  # cleanup is called via trap
+# shellcheck disable=SC2317,SC2329
 cleanup() {
     if incus info "$REPAIR_CONTAINER" &>/dev/null; then
         incus delete "$REPAIR_CONTAINER" --force &>/dev/null || true

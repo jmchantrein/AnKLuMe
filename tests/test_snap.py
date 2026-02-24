@@ -7,7 +7,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import read_log
 
 SNAP_SH = Path(__file__).resolve().parent.parent / "scripts" / "snap.sh"

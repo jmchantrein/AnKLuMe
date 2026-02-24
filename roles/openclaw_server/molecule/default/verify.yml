@@ -1,0 +1,9 @@
+---
+# Molecule verify playbook for openclaw_server role
+- name: Verify openclaw_server
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Placeholder verification
+      ansible.builtin.assert:
+        that: true

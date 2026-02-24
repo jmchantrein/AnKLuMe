@@ -33,11 +33,23 @@ def _ansible_env(tmpl_dir):
 # ── speaches service template edge cases ────────────────────
 
 
+class _GpuCheck:
+    """Mock for stt_server_gpu_check register variable."""
+
+    def __init__(self, rc=0):
+        self.rc = rc
+
+
 class TestSpeachesEdgeCases:
     def _render(self, **kwargs):
         tmpl_dir = ROLES_DIR / "stt_server" / "templates"
         env = _ansible_env(tmpl_dir)
         template = env.get_template("speaches.service.j2")
+        # Map stt_server_quantization → stt_server_effective_compute
+        # and inject stt_server_gpu_check mock (template expects both)
+        if "stt_server_quantization" in kwargs:
+            kwargs.setdefault("stt_server_effective_compute", kwargs.pop("stt_server_quantization"))
+        kwargs.setdefault("stt_server_gpu_check", _GpuCheck(rc=0))
         return template.render(ansible_managed="Ansible managed", **kwargs)
 
     def test_with_language_set(self):
@@ -257,6 +269,9 @@ class TestSpeachesModelCombinations:
         tmpl_dir = ROLES_DIR / "stt_server" / "templates"
         env = _ansible_env(tmpl_dir)
         template = env.get_template("speaches.service.j2")
+        if "stt_server_quantization" in kwargs:
+            kwargs.setdefault("stt_server_effective_compute", kwargs.pop("stt_server_quantization"))
+        kwargs.setdefault("stt_server_gpu_check", _GpuCheck(rc=0))
         return template.render(ansible_managed="Ansible managed", **kwargs)
 
     def test_tiny_model_with_int8(self):

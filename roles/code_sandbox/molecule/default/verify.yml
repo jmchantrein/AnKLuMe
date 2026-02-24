@@ -1,0 +1,9 @@
+---
+# Molecule verify playbook for code_sandbox role
+- name: Verify code_sandbox
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Placeholder verification
+      ansible.builtin.assert:
+        that: true

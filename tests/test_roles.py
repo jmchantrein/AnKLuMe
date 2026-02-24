@@ -21,8 +21,11 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ROLES_DIR = PROJECT_ROOT / "roles"
 
-# All roles in the project
-ALL_ROLES = sorted([d.name for d in ROLES_DIR.iterdir() if d.is_dir() and (d / "tasks").exists()])
+# All roles in the project (exclude _shared — shared task library, not a role)
+ALL_ROLES = sorted([
+    d.name for d in ROLES_DIR.iterdir()
+    if d.is_dir() and (d / "tasks").exists() and not d.name.startswith("_")
+])
 
 
 # ── Role structure ──────────────────────────────────────────
@@ -314,12 +317,16 @@ class TestTemplates:
         env = _ansible_env(tmpl_dir)
         template = env.get_template("speaches.service.j2")
 
+        # Template uses stt_server_effective_compute (set by set_fact in role)
+        # and stt_server_gpu_check (register from nvidia-smi check)
+        gpu_check = type("GpuCheck", (), {"rc": 0})()
         result = template.render(
             stt_server_host="0.0.0.0",
             stt_server_port=8000,
             stt_server_model="large-v3-turbo",
-            stt_server_quantization="float16",
+            stt_server_effective_compute="float16",
             stt_server_language="",
+            stt_server_gpu_check=gpu_check,
         )
         assert "[Unit]" in result
         assert "[Service]" in result
