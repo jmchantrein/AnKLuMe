@@ -163,22 +163,26 @@ installs them.
 
 ---
 
-## ADR-013: Snapshot MVP via shell script, not Ansible role
+## ADR-013: Snapshot operations — shell script + Ansible role
 
 **Context**: Snapshot and restore are imperative, one-shot operations ("take a
 snapshot now", "restore to this snapshot now"). They do not follow the
 declarative reconciliation pattern (read/compare/create/update/orphans) that
-all infra roles use. An Ansible playbook would be a glorified for-loop around
-`incus snapshot` with unnecessary overhead.
+all infra roles use.
 
-**Decision**: The snapshot MVP is `scripts/snap.sh`, a standalone Bash script
-wrapping `incus snapshot` CLI commands. It queries Incus directly
-(`incus list --all-projects`) to resolve instance-to-project mappings.
-Supports `self` keyword to auto-detect the current instance via `hostname`.
+**Decision**: Two complementary implementations:
+- `scripts/snap.sh`: standalone Bash script for ad-hoc snapshot operations.
+  Queries Incus directly, supports `self` keyword. Validated by `shellcheck`.
+- `incus_snapshots` Ansible role + `snapshot.yml` playbook: declarative
+  snapshot management invoked via Makefile (`make snapshot`, `make restore`,
+  etc.). Supports domain-level batch operations.
 
-**Consequence**: Makefile snapshot targets invoke `scripts/snap.sh`. Validated
-by `shellcheck`. A declarative Ansible role may supersede this in a future
-phase if pre/post hooks or scheduling are needed.
+**History**: The original MVP (snap.sh only) was superseded by the Ansible
+role in Phase 4, which provides better integration with the playbook
+infrastructure. `scripts/snap.sh` remains available for direct CLI use.
+
+**Consequence**: Makefile snapshot targets use the Ansible role (`snapshot.yml`).
+`scripts/snap.sh` is a standalone tool for ad-hoc use outside Ansible.
 
 ---
 

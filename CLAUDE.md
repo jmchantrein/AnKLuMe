@@ -94,6 +94,57 @@ CI must pass all of them before merge.
 - `pytest` for the generator (`scripts/generate.py`)
 - Review via `.claude/agents/reviewer.md` before committing
 
+## Quality guardrails (learned from audits)
+
+These rules prevent recurring mistakes. When an audit reveals a new
+pattern, add a rule here.
+
+### Python (generate.py, scripts/)
+- **No `sys.exit()` outside `main()`** — raise `ValueError` or a custom
+  exception; `main()` wraps in try/except.
+- **No dead code** — if a variable is built but never read, delete it.
+- **Spec before code** — every feature in `generate.py` must have a
+  matching entry in `SPEC.md` (ADR-009).
+- **DRY helpers** — when logic is duplicated (>5 lines identical in 2+
+  places), extract a helper immediately.
+- **Validate all optional fields** — every optional `infra.yml` field must
+  be type-checked in `validate()` (bool, int range, enum).
+- **DNS-safe names** — domain and machine names must match
+  `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` (no trailing hyphen, no uppercase).
+
+### Ansible roles
+- **`changed_when` must be semantically correct** — never use
+  `changed_when: false` on a task that mutates state (`incus config set`,
+  `npm install`, etc.). Read current value first, compare, then set with
+  `changed_when: true` (gated by condition).
+- **`# noqa` is not a fix** — suppressing a lint warning without fixing
+  the underlying issue is forbidden.
+- **Role variable prefix** — ALL role-private variables (including
+  defaults and register variables) must use `<role_name>_` prefix.
+  The `.ansible-lint` `var-naming` skip is for PSOT shared variables only.
+- **No duplicated patterns across roles** — shared setup (Node.js, dpkg
+  lock wait, collection install) must be extracted to a shared task file
+  or dependency role.
+
+### Tests
+- **Fixtures in `conftest.py`** — if a fixture appears in 2+ test files,
+  move it to `conftest.py`.
+- **Test from the spec, not from the code** — behavior tests describe
+  what SPEC.md says, not what the implementation happens to do.
+- **`skipif` for optional tools** — tests that call external binaries
+  (`shellcheck`, `ruff`, etc.) must use `pytest.mark.skipif` with
+  `shutil.which()`.
+
+### Documentation
+- **Update ADRs when implementation evolves** — if a decision is
+  superseded by later work, update the ADR text or add a supersession
+  note.
+- **Deprecated syntax in examples = bug** — all code examples in docs
+  and `*.example` files must use the current API (not `base_subnet` when
+  `addressing:` is the current standard).
+- **French translations** — every English doc update must note the FR
+  file as out-of-sync if not updated simultaneously.
+
 ## LLM operating mode
 
 At the start of each session or after a /clear, you MUST ask the user:

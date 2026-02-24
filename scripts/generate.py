@@ -189,6 +189,25 @@ def _format_memory(bytes_val):
     return str(bytes_val)
 
 
+def _collect_gpu_instances(infra):
+    """Collect machine names that have GPU access (direct flag or profile device)."""
+    gpu_instances = []
+    for domain in (infra.get("domains") or {}).values():
+        domain_profiles = domain.get("profiles") or {}
+        for mname, machine in (domain.get("machines") or {}).items():
+            has_gpu = machine.get("gpu", False)
+            if not has_gpu:
+                for pname in machine.get("profiles") or []:
+                    if pname in domain_profiles:
+                        pdevices = domain_profiles[pname].get("devices") or {}
+                        if any(d.get("type") == "gpu" for d in pdevices.values()):
+                            has_gpu = True
+                            break
+            if has_gpu:
+                gpu_instances.append(mname)
+    return gpu_instances
+
+
 def load_infra(path):
     """Load infra.yml (file) or infra/ (directory) and return parsed dict.
 
@@ -224,8 +243,7 @@ def _load_infra_dir(dirpath):
     dirpath = Path(dirpath)
     base_path = dirpath / "base.yml"
     if not base_path.exists():
-        print(f"ERROR: {base_path} not found in infra directory.", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError(f"{base_path} not found in infra directory.")
 
     with open(base_path) as f:
         infra = yaml.safe_load(f) or {}
@@ -268,7 +286,6 @@ def validate(infra, *, check_host_subnets=True):
     base_subnet = g.get("base_subnet", "10.100")
     gpu_policy = g.get("gpu_policy", "exclusive")
     subnet_ids, all_machines, all_ips = {}, {}, {}
-    gpu_instances = []  # Track machines with GPU access
 
     # Addressing mode detection (ADR-038)
     has_addressing = "addressing" in g
@@ -314,8 +331,8 @@ def validate(infra, *, check_host_subnets=True):
         errors.append(f"global.ai_access_policy must be 'exclusive' or 'open', got '{ai_access_policy}'")
 
     for dname, domain in domains.items():
-        if not re.match(r"^[a-z0-9][a-z0-9-]*$", dname):
-            errors.append(f"Domain '{dname}': invalid name (lowercase alphanumeric + hyphen)")
+        if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", dname):
+            errors.append(f"Domain '{dname}': invalid name (lowercase alphanumeric + hyphen, no trailing hyphen)")
         # Validate enabled field (boolean, default true)
         enabled = domain.get("enabled")
         if enabled is not None and not isinstance(enabled, bool):
@@ -363,6 +380,8 @@ def validate(infra, *, check_host_subnets=True):
         domain_profiles = domain.get("profiles") or {}
         domain_profile_names = set(domain_profiles)
         for mname, machine in (domain.get("machines") or {}).items():
+            if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", mname):
+                errors.append(f"Machine '{mname}': invalid name (lowercase alphanumeric + hyphen, no trailing hyphen)")
             if mname in all_machines:
                 errors.append(f"Machine '{mname}': duplicate (already in '{all_machines[mname]}')")
             else:
@@ -385,18 +404,6 @@ def validate(infra, *, check_host_subnets=True):
                         f"when vm_nested=false (no VM in parent chain). Use a VM or "
                         f"enable --YOLO to bypass."
                     )
-
-            # Track GPU instances (direct flag or profile with gpu device)
-            has_gpu = machine.get("gpu", False)
-            if not has_gpu:
-                for pname in machine.get("profiles") or []:
-                    if pname in domain_profiles:
-                        pdevices = domain_profiles[pname].get("devices") or {}
-                        if any(d.get("type") == "gpu" for d in pdevices.values()):
-                            has_gpu = True
-                            break
-            if has_gpu:
-                gpu_instances.append(mname)
 
             ip = machine.get("ip")
             if ip:
@@ -503,6 +510,7 @@ def validate(infra, *, check_host_subnets=True):
                         )
 
     # GPU policy enforcement (ADR-018)
+    gpu_instances = _collect_gpu_instances(infra)
     if len(gpu_instances) > 1 and gpu_policy == "exclusive":
         errors.append(
             f"GPU policy is 'exclusive' but {len(gpu_instances)} instances have GPU access: "
@@ -537,6 +545,9 @@ def validate(infra, *, check_host_subnets=True):
         protocol = policy.get("protocol")
         if protocol is not None and protocol not in ("tcp", "udp"):
             errors.append(f"network_policies[{i}]: protocol must be 'tcp' or 'udp', got '{protocol}'")
+        bidirectional = policy.get("bidirectional")
+        if bidirectional is not None and not isinstance(bidirectional, bool):
+            errors.append(f"network_policies[{i}]: bidirectional must be a boolean, got {type(bidirectional).__name__}")
 
     # AI access policy exclusive-mode validation (Phase 18a)
     if ai_access_policy == "exclusive":
@@ -683,24 +694,12 @@ def get_warnings(infra):
     g = infra.get("global", {})
     gpu_policy = g.get("gpu_policy", "exclusive")
     domains = infra.get("domains") or {}
-    gpu_instances = []
+    gpu_instances = _collect_gpu_instances(infra)
     yolo = _read_yolo()
     vm_nested = _read_vm_nested()
 
     for domain in domains.values():
-        domain_profiles = domain.get("profiles") or {}
         for mname, machine in (domain.get("machines") or {}).items():
-            has_gpu = machine.get("gpu", False)
-            if not has_gpu:
-                for pname in machine.get("profiles") or []:
-                    if pname in domain_profiles:
-                        pdevices = domain_profiles[pname].get("devices") or {}
-                        if any(d.get("type") == "gpu" for d in pdevices.values()):
-                            has_gpu = True
-                            break
-            if has_gpu:
-                gpu_instances.append(mname)
-
             # YOLO mode: privileged LXC warning instead of error
             mconfig = machine.get("config") or {}
             is_privileged = str(mconfig.get("security.privileged", "false")).lower() == "true"
@@ -855,9 +854,9 @@ def _auto_assign_ips(domain, base_octet, second_octet, domain_seq):
             while next_host in used and next_host <= 99:
                 next_host += 1
             if next_host > 99:
-                print(f"ERROR: Domain ran out of static IPs (.1-.99) "
-                      f"for machine '{mname}'", file=sys.stderr)
-                sys.exit(1)
+                raise ValueError(
+                    f"Domain ran out of static IPs (.1-.99) for machine '{mname}'"
+                )
             m["ip"] = f"{subnet_prefix}.{next_host}"
             used.add(next_host)
             next_host += 1
@@ -880,9 +879,10 @@ def _enrich_firewall(infra):
 
     # Require anklume domain
     if "anklume" not in domains:
-        print("ERROR: firewall_mode is 'vm' but no 'anklume' domain exists. "
-              "Cannot auto-create sys-firewall.", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError(
+            "firewall_mode is 'vm' but no 'anklume' domain exists. "
+            "Cannot auto-create sys-firewall."
+        )
 
     anklume_domain = domains["anklume"]
 
@@ -1085,9 +1085,9 @@ def _enrich_resources(infra):
             )
         msg = "Resource overcommit: " + "; ".join(parts)
         if not overcommit:
-            print(f"ERROR: {msg}. Set resource_policy.overcommit: true to allow.",
-                  file=sys.stderr)
-            sys.exit(1)
+            raise ValueError(
+                f"{msg}. Set resource_policy.overcommit: true to allow."
+            )
         else:
             print(f"WARNING: {msg}", file=sys.stderr)
 
@@ -1267,19 +1267,6 @@ def detect_orphans(infra, base_dir):
     domain_names = set(domains)
     machine_names = {m for d in domains.values() for m in (d.get("machines") or {})}
 
-    # Build protection map from last known state in files
-    protected_domains = set()
-    protected_machines = set()
-    for dname, domain in domains.items():
-        domain_eph = domain.get("ephemeral", False)
-        if not domain_eph:
-            protected_domains.add(dname)
-        for mname, machine in (domain.get("machines") or {}).items():
-            machine_eph = machine.get("ephemeral")
-            resolved = machine_eph if machine_eph is not None else domain_eph
-            if not resolved:
-                protected_machines.add(mname)
-
     orphans = []
 
     for subdir, valid_names in [("inventory", domain_names), ("group_vars", domain_names | {"all"})]:
@@ -1326,7 +1313,12 @@ def main(argv=None):
     parser.add_argument("--base-dir", default=".", help="Output base directory")
     args = parser.parse_args(argv)
 
-    infra = load_infra(args.infra_file)
+    try:
+        infra = load_infra(args.infra_file)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
     errors = validate(infra)
     if errors:
         print("Validation errors:", file=sys.stderr)
@@ -1334,10 +1326,14 @@ def main(argv=None):
             print(f"  - {e}", file=sys.stderr)
         sys.exit(1)
 
-    enrich_infra(infra)
+    try:
+        enrich_infra(infra)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Re-validate after enrichment to catch IP collisions from auto-created resources
-    post_errors = validate(infra)
+    post_errors = validate(infra, check_host_subnets=False)
     if post_errors:
         print("Post-enrichment validation errors:", file=sys.stderr)
         for e in post_errors:
