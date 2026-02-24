@@ -585,3 +585,70 @@ class TestMakefileTestTargets:
         content = _parse_makefile()
         recipe = _get_recipe(content, "test-role")
         assert "$(R)" in recipe, "test-role should use $(R) variable"
+
+
+# ── TestMakefileLLMTargets ─────────────────────────────────
+
+
+class TestMakefileLLMTargets:
+    """Verify LLM-related targets and backward compatibility aliases."""
+
+    LLM_TARGETS = [
+        "llm-switch",
+        "llm-status",
+        "llm-bench",
+        "llm-dev",
+    ]
+
+    def test_llm_targets_exist(self):
+        """All llm-* targets are defined in the Makefile."""
+        content = _parse_makefile()
+        missing = []
+        for target in self.LLM_TARGETS:
+            if f"\n{target}:" not in content:
+                missing.append(target)
+        assert not missing, f"Missing LLM targets: {missing}"
+
+    def test_llm_bench_calls_script(self):
+        """llm-bench target calls scripts/llm-bench.sh."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "llm-bench")
+        assert "llm-bench.sh" in recipe, (
+            "llm-bench should call scripts/llm-bench.sh"
+        )
+
+    def test_llm_dev_calls_script(self):
+        """llm-dev target calls ollama-dev.py."""
+        content = _parse_makefile()
+        recipe = _get_recipe(content, "llm-dev")
+        assert "ollama-dev.py" in recipe, (
+            "llm-dev should call scripts/ollama-dev.py"
+        )
+
+    def test_ollama_dev_alias_exists(self):
+        """ollama-dev backward-compat alias exists and delegates to llm-dev."""
+        content = _parse_makefile()
+        # ollama-dev target should depend on llm-dev
+        alias_match = re.search(
+            r"^ollama-dev:\s*(.+?)(?:\s*##.*)?$", content, re.MULTILINE
+        )
+        assert alias_match, "ollama-dev alias target not found"
+        deps = alias_match.group(1).strip()
+        assert "llm-dev" in deps, (
+            "ollama-dev should depend on llm-dev"
+        )
+
+    def test_ollama_dev_alias_in_phony(self):
+        """ollama-dev alias is listed in .PHONY."""
+        content = _parse_makefile()
+        phony_match = re.search(
+            r"^\.PHONY:\s*(.*?)(?:\n(?!\s)|\Z)",
+            content,
+            re.MULTILINE | re.DOTALL,
+        )
+        assert phony_match, ".PHONY declaration not found"
+        raw = phony_match.group(1).replace("\\\n", " ")
+        phony_set = set(raw.split())
+        assert "ollama-dev" in phony_set, (
+            "ollama-dev alias missing from .PHONY"
+        )

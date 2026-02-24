@@ -99,3 +99,42 @@ demonstrated in `examples/shared-services/`. Users add it when needed.
    safety" and "bypass delete protection". Should these be separate?
 
 ---
+
+## Phase 32: Makefile UX and Robustness
+
+### Target-to-category mapping
+
+| Category            | Targets |
+|---------------------|---------|
+| Getting Started     | guide, quickstart, init |
+| Core Workflow       | sync, sync-dry, apply, apply-limit, check, nftables, doctor |
+| Snapshots           | snapshot, restore, rollback, rollback-list |
+| AI / LLM            | apply-ai, llm-switch, llm-status, llm-bench, llm-dev, ai-switch, claude-host |
+| Console             | console, dashboard |
+| Instance Management | disp, backup, file-copy |
+| Lifecycle           | upgrade, flush, import-infra |
+| Development         | lint, test, smoke |
+
+### Backward compatibility approach
+
+- **ollama-dev**: Added as a Make alias target that depends on `llm-dev`.
+  The old name still works but delegates to the new one.
+
+### llm-bench.sh robustness fixes
+
+- Numeric guards on integer comparisons to prevent crash on non-numeric values.
+- Fallback `|| echo "0 0 0"` on bench_endpoint calls.
+- Default values `${var:-0}` for empty variables in result rows.
+
+### upgrade.sh improvements
+
+- Conflicts moved to `/tmp/anklume-upgrade-backup-<timestamp>/` instead
+  of `.local-backup` alongside originals.
+- Preserves directory structure. Clear restore instructions.
+
+### Questions for review
+
+1. Should `ollama-dev` alias emit a deprecation warning?
+2. Should any targets be promoted from internal to user-facing?
+
+---
