@@ -567,6 +567,25 @@ quickstart: ## Copy example infra.yml and generate Ansible files
 	@echo "Copied infra.yml.example -> infra.yml"
 	@echo "Edit infra.yml, then run: make sync && make apply"
 
+# ── Educational Labs (Phase 30) ──────────────────────────
+lab-list: ## List available labs
+	@scripts/lab-runner.sh list
+
+lab-start: ## Start a lab (L=01)
+	@scripts/lab-runner.sh start L=$(L)
+
+lab-check: ## Check current step (L=01)
+	@scripts/lab-runner.sh check L=$(L)
+
+lab-hint: ## Show hint (L=01)
+	@scripts/lab-runner.sh hint L=$(L)
+
+lab-reset: ## Reset lab (L=01)
+	@scripts/lab-runner.sh reset L=$(L)
+
+lab-solution: ## Show solution (L=01)
+	@scripts/lab-runner.sh solution L=$(L)
+
 # ── Setup ─────────────────────────────────────────────────
 init: install-hooks ## Initial setup: install all dependencies
 	$(call require_container,init)
@@ -631,6 +650,11 @@ help: ## Show categorized help (use help-all for all targets)
 	@printf "    \033[36m%-22s\033[0m %s\n" "make flush" "Destroy all infrastructure (FORCE=true)"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make import-infra" "Generate infra.yml from Incus state"
 	@printf "\n"
+	@printf "  \033[1;33mEDUCATION\033[0m\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make lab-list" "List available labs"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make lab-start L=01" "Start a lab"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make lab-check L=01" "Check current step"
+	@printf "\n"
 	@printf "  \033[1;32mDEVELOPMENT\033[0m\n"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make lint" "Run all validators"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make test" "Run all tests"
@@ -679,4 +703,5 @@ help-all: ## Show all available targets
         llm-switch llm-status llm-bench llm-dev \
         claude-host claude-host-resume claude-host-audit \
         mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
+        lab-list lab-start lab-check lab-hint lab-reset lab-solution \
         guide quickstart init install-hooks help help-all

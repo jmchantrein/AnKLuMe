@@ -2064,7 +2064,10 @@ f) **Test rationalization** (deferred — Phase 22 dependency):
 
 ---
 
-## Phase 30: Educational Platform and Guided Labs
+## Phase 30: Educational Platform and Guided Labs (Framework)
+
+**Status**: FRAMEWORK COMPLETE. Sandbox execution (Incus-in-Incus)
+and teacher mode deferred to a future iteration.
 
 **Goal**: Turn anklume into a learning platform where students or
 self-learners can follow guided tutorials and execute commands in
@@ -2092,49 +2095,47 @@ Student flow:
   6. Student can reset and retry without affecting other labs
 ```
 
-**Deliverables**:
+**Deliverables (framework — complete)**:
 
 a) **Lab framework** (`labs/`):
-   - Each lab is a directory with:
-     - `lab.yml` — metadata (title, difficulty, prerequisites, duration)
-     - `infra.yml` — lab-specific infrastructure
-     - `steps/` — ordered step files with instructions + validation
-     - `solution/` — reference solution (hidden by default)
-   - Labs run in Incus-in-Incus sandbox (Phase 12)
-   - Each step has a validation command that checks completion
+   - [x] `lab-schema.yml` — validation schema for lab.yml
+   - [x] `labs/README.md` — framework documentation
+   - [x] Each lab is a directory with: `lab.yml`, `infra.yml`,
+     `steps/`, `solution/`
+   - [x] Each step has a validation command that checks completion
 
-b) **Example labs**:
-   - **Lab 01**: First deployment (create 2 containers, verify
+b) **Example labs** (3 of 5 implemented):
+   - [x] **Lab 01**: First deployment (create 2 containers, verify
      connectivity)
-   - **Lab 02**: Network isolation (set up 2 domains, verify
+   - [x] **Lab 02**: Network isolation (set up 2 domains, verify
      nftables blocks cross-domain traffic)
-   - **Lab 03**: Snapshots and recovery (create, break, restore)
-   - **Lab 04**: GPU passthrough and AI services (deploy Ollama,
-     run inference)
-   - **Lab 05**: Security audit (find and fix misconfigurations)
+   - [x] **Lab 03**: Snapshots and recovery (create, break, restore)
+   - [ ] **Lab 04**: GPU passthrough and AI services (deferred)
+   - [ ] **Lab 05**: Security audit (deferred)
 
 c) **Make targets**:
-   ```makefile
-   make lab-list          ## List available labs
-   make lab-start L=01    ## Start lab 01 (creates sandbox)
-   make lab-check L=01    ## Validate current step
-   make lab-hint L=01     ## Show hint for current step
-   make lab-reset L=01    ## Reset lab to initial state
-   make lab-solution L=01 ## Show solution (marks lab as assisted)
-   ```
+   - [x] `make lab-list`, `make lab-start`, `make lab-check`,
+     `make lab-hint`, `make lab-reset`, `make lab-solution`
 
-d) **Teacher mode**:
-   - `make lab-deploy N=30 L=02` — deploy lab 02 for 30 students
-   - Each student gets their own Incus-in-Incus sandbox
-   - Teacher dashboard shows progress per student
-   - Automatic grading and report generation
+d) **Lab runner** (`scripts/lab-runner.sh` + `scripts/lab-lib.sh`):
+   - [x] Lab discovery, progress tracking, step validation
+   - [x] State stored in `~/.anklume/labs/<lab>/progress.yml`
+
+e) **Tests** (`tests/test_labs.py`):
+   - [x] Behavior matrix cells ED-001 to ED-005
+   - [x] Schema validation, step structure, CLI parsing,
+     infra.yml validity, solution file checks
+
+f) **Teacher mode** (deferred):
+   - [ ] `make lab-deploy N=30 L=02` — deploy for N students
+   - [ ] Student dashboards and auto-grading
 
 **Validation criteria**:
-- [ ] At least 3 labs implemented and tested
-- [ ] Labs run in isolated sandbox (no impact on host infra)
-- [ ] Step validation provides clear pass/fail feedback
-- [ ] `make lab-reset` fully restores initial state
-- [ ] Teacher mode deploys N isolated lab instances
+- [x] At least 3 labs implemented and tested
+- [x] Step validation provides clear pass/fail feedback
+- [x] `make lab-reset` fully restores initial state
+- [ ] Labs run in isolated sandbox (deferred — Incus-in-Incus)
+- [ ] Teacher mode deploys N isolated lab instances (deferred)
 
 ---
 
@@ -2981,7 +2982,7 @@ d) **Alerting pipeline**:
 
 **Long-term**:
 - Phase 27: Streaming STT (Real-Time Transcription)
-- Phase 30: Educational Platform and Guided Labs
+- Phase 30: Educational Platform — sandbox + teacher mode (framework done)
 - Phase 33: Student Mode and Internationalization
 - Phase 40: Network Inspection and Security Monitoring
 

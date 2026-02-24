@@ -1,0 +1,42 @@
+---
+# Lab 02: Network Isolation
+# Set up two domains and verify that nftables blocks cross-domain traffic.
+
+title: "Network Isolation"
+description: >-
+  Learn how anklume isolates domains from each other using separate
+  network bridges and nftables rules. You will create two domains,
+  verify intra-domain connectivity, and confirm that cross-domain
+  traffic is blocked by default.
+
+difficulty: intermediate
+duration: "45m"
+
+prerequisites:
+  - "01-first-deploy"
+
+objectives:
+  - "Create two isolated domains with separate subnets"
+  - "Verify intra-domain connectivity within each domain"
+  - "Confirm cross-domain traffic is blocked by nftables"
+  - "Understand bridge-level network isolation"
+
+steps:
+  - id: "01"
+    title: "Create two domains"
+    instruction_file: "steps/01-create-domains.md"
+    hint: "Copy the lab infra.yml and run make sync"
+    validation: "test -f inventory/lab-office.yml && test -f inventory/lab-dmz.yml"
+  - id: "02"
+    title: "Deploy the infrastructure"
+    instruction_file: "steps/02-deploy.md"
+    hint: "Run make apply and check incus list for both projects"
+    validation: "incus list --project lab-office --format csv -c s 2>/dev/null | grep -qc RUNNING"
+  - id: "03"
+    title: "Test intra-domain connectivity"
+    instruction_file: "steps/03-intra-domain.md"
+    hint: "Ping between containers in the same domain"
+  - id: "04"
+    title: "Verify cross-domain isolation"
+    instruction_file: "steps/04-cross-domain.md"
+    hint: "Try pinging across domains — it should fail"

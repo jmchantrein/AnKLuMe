@@ -1,0 +1,24 @@
+---
+# Lab 03 — Snapshots and Recovery
+# A single domain with one container to practice snapshot operations.
+
+project_name: lab-03
+
+global:
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  lab-snap:
+    description: "Snapshot exercise domain"
+    trust_level: semi-trusted
+    machines:
+      snap-server:
+        description: "Server for snapshot exercises"
+        type: lxc
+        roles: [base_system]
