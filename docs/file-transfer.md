@@ -3,6 +3,10 @@
 AnKLuMe provides controlled file transfer between instances and
 encrypted backup/restore via `scripts/transfer.sh`.
 
+For persistent, declarative cross-domain directory sharing, see
+[shared_volumes](SPEC.md) (ADR-039) which provides host bind mounts
+with RO/RW access control. `transfer.sh` is for one-off transfers.
+
 ## Quick start
 
 ### Copy a file between instances
@@ -53,7 +57,7 @@ wherever the script runs) but is never written to disk on the host.
 scripts/transfer.sh copy pro-dev:/etc/nginx/nginx.conf anklume-instance:/tmp/nginx.conf
 
 # Copy a log file to perso for analysis
-scripts/transfer.sh copy homelab-ai:/var/log/ollama.log perso-desktop:/tmp/ollama.log
+scripts/transfer.sh copy gpu-server:/var/log/ollama.log perso-desktop:/tmp/ollama.log
 ```
 
 ### backup
@@ -86,7 +90,7 @@ scripts/transfer.sh backup anklume-instance
 scripts/transfer.sh backup --gpg-recipient admin@example.com anklume-instance
 
 # Custom output directory
-scripts/transfer.sh backup --output /mnt/backup homelab-ai
+scripts/transfer.sh backup --output /mnt/backup gpu-server
 ```
 
 ### restore

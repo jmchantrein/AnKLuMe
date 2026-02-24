@@ -21,8 +21,8 @@ Host
 |   +-- Claude Code CLI (brain for anklume/assistant modes)
 |   +-- REST API for infrastructure tools
 |
-+-- Container: ollama                 (ai-tools project)
-    +-- llama-server (:8081)
++-- Container: gpu-server             (ai-tools project)
+    +-- Ollama (:11434)
     +-- GPU-accelerated inference
     +-- qwen2.5-coder:32b (coding) / qwen3:30b-a3b (chat)
 ```
@@ -72,7 +72,7 @@ at any time by messaging "passe en mode anklume", "switch to local", etc.
 |------|---------|-------------|
 | **anklume** | Claude Code (Opus) | Expert AnKLuMe: infra, Ansible, Incus, networking |
 | **assistant** | Claude Code (Opus) | General-purpose assistant (Ada persona) |
-| **local** | qwen3:30b-a3b (MoE) | Free, fast local LLM via llama-server on GPU |
+| **local** | qwen3:30b-a3b (MoE) | Free, fast local LLM via Ollama on GPU |
 
 ### How switching works
 
@@ -81,17 +81,16 @@ at any time by messaging "passe en mode anklume", "switch to local", etc.
 3. The LLM includes a `[SWITCH:local]` marker in its response
 4. The proxy detects the marker and:
    - Updates OpenClaw's config to use the new backend
-   - Switches llama-server model if needed (coder vs chat)
+   - Loads the appropriate Ollama model if needed (coder vs chat)
    - Restarts OpenClaw
    - Sends a wake-up message on Telegram confirming the new mode
 
-### llama-server model switching
+### Ollama model switching
 
 Claude modes use `qwen2.5-coder:32b` (optimized for code tasks via MCP).
 Local mode uses `qwen3:30b-a3b` (MoE with 3B active params, fast,
-good at chat and personality). The two models run as mutually exclusive
-systemd services (`llama-server.service` and `llama-server-chat.service`
-with `Conflicts=` directives) since both require the full GPU VRAM.
+good at chat and personality). Ollama handles model loading/unloading
+automatically — only one model is kept in VRAM at a time.
 
 ## Usage tracking
 
@@ -253,9 +252,9 @@ instances — acting as an infrastructure-wide agent.
 
 **With proxy**: seamless switching between Claude (expensive, powerful)
 and local LLMs (free, fast) via natural language ("passe en mode
-local"). The proxy automatically swaps llama-server models, manages
-GPU VRAM (mutually exclusive systemd services), restarts OpenClaw,
-and sends a wake-up message on Telegram confirming the new mode.
+local"). The proxy automatically loads the appropriate Ollama model,
+restarts OpenClaw, and sends a wake-up message on Telegram confirming
+the new mode.
 
 ### 4. Message attribution
 
@@ -341,7 +340,7 @@ auto-cleaned after 1 hour of inactivity.
 
 ### Prerequisites
 - AnKLuMe deployed with the `ai-tools` domain
-- Ollama or llama-server running with a model loaded
+- Ollama running on `gpu-server` with a model loaded
 - A Telegram bot token (from [@BotFather](https://t.me/BotFather))
 
 ### Ansible role
@@ -352,11 +351,10 @@ The `openclaw_server` role installs and configures OpenClaw:
 # In infra.yml
 domains:
   ai-tools:
-    subnet_id: 10
+    trust_level: semi-trusted
     machines:
       openclaw:
         type: lxc
-        ip: "10.100.10.40"
         roles: [base_system, openclaw_server]
 ```
 
@@ -364,14 +362,14 @@ Role variables (`roles/openclaw_server/defaults/main.yml`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `openclaw_server_ollama_url` | `http://10.100.3.1:8081` | Ollama/llama-server API URL |
+| `openclaw_server_ollama_url` | `http://{{ gpu_server_ip }}:11434` | Ollama API URL |
 | `openclaw_server_ollama_api_key` | `ollama-local` | Ollama API key (any value for local) |
 | `openclaw_server_enabled` | `true` | Enable OpenClaw systemd service |
-| `openclaw_server_proxy_ip` | `10.100.0.134` | Proxy IP (anklume-instance) |
+| `openclaw_server_proxy_ip` | `{{ anklume_instance_ip }}` | Proxy IP (anklume-instance) |
 | `openclaw_server_proxy_port` | `9090` | Proxy port |
-| `openclaw_server_openclaw_ip` | `10.100.3.5` | OpenClaw container IP |
-| `openclaw_server_ollama_ip` | `10.100.3.1` | Ollama/llama-server IP |
-| `openclaw_server_ollama_port` | `8081` | Ollama/llama-server port |
+| `openclaw_server_openclaw_ip` | `{{ openclaw_ip }}` | OpenClaw container IP |
+| `openclaw_server_ollama_ip` | `{{ gpu_server_ip }}` | Ollama server IP |
+| `openclaw_server_ollama_port` | `11434` | Ollama port |
 | `openclaw_server_agent_name` | `Ada` | Agent display name |
 | `openclaw_server_agent_emoji` | lobster | Agent emoji |
 | `openclaw_server_user_name` | `jmc` | User name |
@@ -482,10 +480,10 @@ claude
 
 ### Local mode is slow
 
-Check which llama-server service is active:
+Check which model is loaded in Ollama:
 
 ```bash
-incus exec ollama --project ai-tools -- systemctl status llama-server-chat
+incus exec gpu-server --project ai-tools -- curl -s localhost:11434/api/ps
 ```
 
 The qwen3:30b-a3b MoE model should have fast inference (~3B active params).

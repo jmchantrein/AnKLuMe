@@ -38,26 +38,22 @@ which domains can route traffic through it.
 domains:
   tor-gateway:
     description: "Tor transparent proxy gateway"
-    subnet_id: 5
     trust_level: untrusted
     ephemeral: true
     machines:
       tor-gw:
         description: "Tor transparent proxy"
         type: lxc
-        ip: "10.100.5.10"
         roles:
           - base_system
 
   anonymous:
     description: "Domain routed through Tor"
-    subnet_id: 6
     trust_level: untrusted
     ephemeral: true
     machines:
       anon-browser:
         type: lxc
-        ip: "10.100.6.10"
         roles:
           - base_system
 

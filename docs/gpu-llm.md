@@ -53,8 +53,9 @@ global section:
 
 ```yaml
 global:
-  base_subnet: "10.100"
-  default_os_image: "images:debian/13"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   gpu_policy: shared
 ```
 
@@ -78,7 +79,7 @@ To auto-pull a model during provisioning, set `ollama_default_model`
 in the host_vars for your LLM container (outside the managed section):
 
 ```yaml
-# host_vars/homelab-ai.yml (add below the managed section)
+# host_vars/gpu-server.yml (below the managed section)
 ollama_default_model: "llama3.2:3b"
 ```
 
@@ -96,8 +97,8 @@ Since Open WebUI and Ollama run in separate containers, configure the
 Ollama URL to point to the LLM container's IP:
 
 ```yaml
-# host_vars/homelab-webui.yml (add below the managed section)
-open_webui_ollama_url: "http://10.100.3.10:11434"
+# host_vars/webui.yml (below the managed section)
+open_webui_ollama_url: "http://10.120.0.1:11434"
 ```
 
 ## Deployment
@@ -118,7 +119,7 @@ make apply-llm
 ### Check GPU inside the container
 
 ```bash
-incus exec homelab-ai --project homelab -- nvidia-smi
+incus exec gpu-server --project ai-tools -- nvidia-smi
 ```
 
 You should see the same GPU as on the host.
@@ -126,7 +127,7 @@ You should see the same GPU as on the host.
 ### Check Ollama
 
 ```bash
-incus exec homelab-ai --project homelab -- curl -s http://localhost:11434/api/tags
+incus exec gpu-server --project ai-tools -- curl -s http://localhost:11434/api/tags
 ```
 
 This should return a JSON response with available models.
@@ -134,7 +135,7 @@ This should return a JSON response with available models.
 ### Check Open WebUI
 
 ```bash
-incus exec homelab-webui --project homelab -- curl -s http://localhost:3000
+incus exec webui --project ai-tools -- curl -s http://localhost:3000
 ```
 
 Open WebUI should respond with HTML. Access it from a browser at
@@ -143,7 +144,7 @@ Open WebUI should respond with HTML. Access it from a browser at
 ### Test inference
 
 ```bash
-incus exec homelab-ai --project homelab -- ollama run llama3.2:3b "Hello, world!"
+incus exec gpu-server --project ai-tools -- ollama run llama3.2:3b "Hello, world!"
 ```
 
 ## Storage volumes for models
@@ -156,7 +157,7 @@ mount a dedicated volume at `/root/.ollama`. See the
 
 - **nvidia-smi not found**: Verify the GPU profile is applied and the
   host has NVIDIA drivers. Check with
-  `incus profile show nvidia-compute --project homelab`
+  `incus profile show nvidia-compute --project ai-tools`
 - **Ollama falls back to CPU**: Verify `nvidia-smi` works, then check
   Ollama logs with `journalctl -u ollama` inside the container
 - **Open WebUI cannot connect to Ollama**: Test connectivity with

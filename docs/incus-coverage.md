@@ -39,7 +39,7 @@ All Incus features remain accessible via the CLI alongside AnKLuMe.
 | **Manual snapshots** | Full | `scripts/snap.sh` wraps `incus snapshot` |
 | **Image caching** | Full | `incus_images` role pre-downloads images |
 | **Image export/import** | Full | Shared image repository across nesting levels |
-| **Nesting** | Full | `security.nesting` profile + `incus_nesting` role |
+| **Nesting** | Full | `security.nesting` via profile config + nesting context files |
 | **Proxy devices** | Full | Used for Incus socket forwarding to anklume container |
 | **Cloud-init** | Partial | Supported via `config:` keys, no dedicated abstraction |
 | **Limits (CPU/memory)** | Full | `config:` keys + `resource_policy` auto-allocation |

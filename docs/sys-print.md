@@ -34,13 +34,11 @@ Other domains print via IPP (port 631) through `network_policies`.
 domains:
   print-service:
     description: "Dedicated print service domain"
-    subnet_id: 7
     trust_level: trusted
     machines:
       sys-print:
         description: "CUPS print server"
         type: lxc
-        ip: "10.100.7.10"
         roles:
           - base_system
 
@@ -177,7 +175,7 @@ incus exec pro-dev --project pro -- apt install -y cups-client
 
 # Add the remote printer
 incus exec pro-dev --project pro -- \
-    lpadmin -p remote-printer -v ipp://10.100.7.10:631/printers/MyPrinter -E
+    lpadmin -p remote-printer -v ipp://sys-print:631/printers/MyPrinter -E
 
 # Print a test page
 incus exec pro-dev --project pro -- \

@@ -383,7 +383,7 @@ When `global.firewall_mode` is set to `vm`, the generator automatically
 creates a `sys-firewall` machine in the anklume domain if one is not already
 declared. This enrichment step (`enrich_infra()`) runs after validation but
 before file generation. The auto-created machine uses:
-- type: `vm`, ip: `<base_subnet>.<anklume_subnet_id>.253`
+- type: `vm`, ip: `<base_octet>.<zone>.<anklume_seq>.253`
 - config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
 - roles: `[base_system, firewall_router]`
 - ephemeral: `false`

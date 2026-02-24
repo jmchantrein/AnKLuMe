@@ -38,11 +38,10 @@ are supported. No prompts, resources, or sampling.
 ```yaml
 domains:
   vault:
-    subnet_id: 0
+    trust_level: admin
     machines:
       vault-signer:
         type: lxc
-        ip: "10.100.0.10"
         services:
           - name: file_sign
             tool: gpg_sign
@@ -51,11 +50,10 @@ domains:
             tool: clipboard_get
             consumers: [work-dev]
   work:
-    subnet_id: 1
+    trust_level: trusted
     machines:
       work-dev:
         type: lxc
-        ip: "10.100.1.10"
 ```
 
 ### 2. Generate and apply
