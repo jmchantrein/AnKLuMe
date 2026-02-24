@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import read_log
 
 DEPLOY_SH = Path(__file__).resolve().parent.parent / "scripts" / "deploy-nftables.sh"

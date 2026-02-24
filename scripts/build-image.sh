@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Source shared library
+# shellcheck source=/dev/null
 source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ── Defaults ──
@@ -146,9 +147,9 @@ create_disk_image() {
     # Create GPT partition table and partitions on the block device
     sgdisk --clear "$LOOP_DEVICE"
     sgdisk \
-        --new=1:2048:+${EFI_SIZE_MB}M   --typecode=1:EF00 --change-name=1:"$ANKLUME_EFI_LABEL" \
-        --new=2:0:+${OS_SIZE_MB}M       --typecode=2:8300 --change-name=2:"$ANKLUME_OSA_LABEL" \
-        --new=3:0:+${OS_SIZE_MB}M       --typecode=3:8300 --change-name=3:"$ANKLUME_OSB_LABEL" \
+        --new=1:2048:+"${EFI_SIZE_MB}"M   --typecode=1:EF00 --change-name=1:"$ANKLUME_EFI_LABEL" \
+        --new=2:0:+"${OS_SIZE_MB}"M       --typecode=2:8300 --change-name=2:"$ANKLUME_OSA_LABEL" \
+        --new=3:0:+"${OS_SIZE_MB}"M       --typecode=3:8300 --change-name=3:"$ANKLUME_OSB_LABEL" \
         --new=4:0:0                      --typecode=4:8300 --change-name=4:"$ANKLUME_PERSIST_LABEL" \
         "$LOOP_DEVICE"
 
@@ -220,8 +221,10 @@ bootstrap_rootfs_debian() {
     debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,openssh-server,curl,jq,python3"
 
     if [ -n "$MIRROR" ]; then
+        # shellcheck disable=SC2086
         debootstrap $debootstrap_opts "$suite" "$ROOTFS_DIR" "$MIRROR"
     else
+        # shellcheck disable=SC2086
         debootstrap $debootstrap_opts "$suite" "$ROOTFS_DIR"
     fi
     info "  Debootstrap complete"
@@ -236,6 +239,7 @@ bootstrap_rootfs_debian() {
     # Install additional packages via chroot
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
     chroot "$ROOTFS_DIR" apt-get update -qq
+    # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" apt-get install -y -qq $packages 2>&1 | tail -5
     info "  Additional packages installed"
 

@@ -7,7 +7,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import read_log
 
 SNAPSHOT_APPLY_SH = Path(__file__).resolve().parent.parent / "scripts" / "snapshot-apply.sh"

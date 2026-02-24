@@ -3,15 +3,16 @@
 These features are fully implemented in generate.py but had zero test coverage.
 """
 
-import yaml
 from unittest.mock import patch
+
+import yaml
 from generate import (
+    _format_memory,
+    _get_nesting_prefix,
+    _parse_memory_value,
     enrich_infra,
     generate,
     validate,
-    _get_nesting_prefix,
-    _parse_memory_value,
-    _format_memory,
 )
 
 

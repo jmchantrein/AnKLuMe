@@ -11,13 +11,25 @@ import pytest
 BOOTSTRAP_SH = Path(__file__).resolve().parent.parent / "scripts" / "bootstrap.sh"
 
 
+def _patch_bootstrap_content(original, etc_dir, tmp_path):
+    """Patch bootstrap.sh content to redirect system paths to tmp directories.
+
+    Replaces /etc/anklume and /srv/anklume so the script does not require
+    root access (which fails in CI environments).
+    """
+    srv_dir = tmp_path / "srv_anklume"
+    srv_dir.mkdir(exist_ok=True)
+    content = original.replace("/etc/anklume", str(etc_dir))
+    return content.replace("/srv/anklume", str(srv_dir))
+
+
 def _make_patched_bootstrap(tmp_path):
     """Create a patched bootstrap.sh that writes to tmp instead of /etc/anklume."""
     etc_anklume = tmp_path / "etc_anklume"
     etc_anklume.mkdir(exist_ok=True)
     patched = tmp_path / "bootstrap_patched.sh"
     original = BOOTSTRAP_SH.read_text()
-    patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+    patched.write_text(_patch_bootstrap_content(original, etc_anklume, tmp_path))
     patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
     return patched, etc_anklume
 
@@ -202,7 +214,9 @@ exit 0
         etc_anklume.mkdir(exist_ok=True)
         patched = tmp_path / "bootstrap_patched.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+        patched.write_text(
+            _patch_bootstrap_content(original, etc_anklume, tmp_path)
+        )
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         env = os.environ.copy()
@@ -247,7 +261,7 @@ class TestBootstrapNesting:
         env, _, cwd, _, etc = mock_env
         patched = cwd / "bootstrap_kvm.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -269,7 +283,7 @@ class TestBootstrapNesting:
 
         patched = cwd / "bootstrap_nested.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         result = run_bootstrap(["--dev"], env, script=patched, cwd=cwd)
@@ -319,7 +333,7 @@ class TestBootstrapRelativeLevel:
 
         patched = cwd / "bootstrap_rel.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -341,7 +355,7 @@ class TestBootstrapRelativeLevel:
 
         patched = cwd / "bootstrap_vm.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -363,7 +377,7 @@ class TestBootstrapRelativeLevel:
 
         patched = cwd / "bootstrap_qemu.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -390,7 +404,7 @@ class TestBootstrapVmNestedPropagation:
 
         patched = cwd / "bootstrap_inherit.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -412,7 +426,7 @@ class TestBootstrapVmNestedPropagation:
 
         patched = cwd / "bootstrap_false.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         result = run_bootstrap(["--dev"], env, script=patched, cwd=cwd)
@@ -425,7 +439,7 @@ class TestBootstrapVmNestedPropagation:
 
         patched = cwd / "bootstrap_kvm_fresh.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         mock_bin = cwd / "bin"
@@ -452,7 +466,7 @@ class TestBootstrapDeepNesting:
 
         patched = cwd / "bootstrap_deep.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc)))
+        patched.write_text(_patch_bootstrap_content(original, etc, cwd))
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         result = run_bootstrap(["--dev"], env, script=patched, cwd=cwd)
@@ -531,7 +545,9 @@ fi
         etc_anklume.mkdir(exist_ok=True)
         patched = tmp_path / "bootstrap_fs.sh"
         original = BOOTSTRAP_SH.read_text()
-        patched.write_text(original.replace("/etc/anklume", str(etc_anklume)))
+        patched.write_text(
+            _patch_bootstrap_content(original, etc_anklume, tmp_path)
+        )
         patched.chmod(patched.stat().st_mode | stat.S_IEXEC)
 
         env = os.environ.copy()

@@ -218,7 +218,9 @@
       - "{{ instance_domain }}"
   when:
     - instance_boot_priority is defined
-    - (_incus_instances_current_config['boot.autostart.priority'] | default('') | string) != (instance_boot_priority | string)
+    - >-
+      (_incus_instances_current_config['boot.autostart.priority']
+      | default('') | string) != (instance_boot_priority | string)
   changed_when: true
 
 # ── Delete protection (from instance_ephemeral) ─────────────────────────────

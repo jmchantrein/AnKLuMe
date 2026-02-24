@@ -8,7 +8,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import read_log
 
 PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "sys-print.sh"

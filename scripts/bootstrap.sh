@@ -70,7 +70,9 @@ detect_distro() {
     fi
 
     local id id_like
+    # shellcheck source=/dev/null
     id=$(. /etc/os-release && echo "${ID:-unknown}")
+    # shellcheck source=/dev/null
     id_like=$(. /etc/os-release && echo "${ID_LIKE:-}")
 
     case "$id" in
@@ -674,6 +676,7 @@ EOF
                         mkdir -p /etc/apt/keyrings
                         curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
                         local codename
+                        # shellcheck source=/dev/null
                         codename=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
                         tee /etc/apt/sources.list.d/zabbly-incus-stable.sources >/dev/null <<ZABBLY
 Enabled: yes

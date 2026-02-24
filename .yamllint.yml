@@ -19,4 +19,5 @@ rules:
 
 ignore:
   - .claude/
+  - .venv/
   - node_modules/

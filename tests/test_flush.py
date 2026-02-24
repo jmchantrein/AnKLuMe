@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from conftest import read_log
 
 FLUSH_SH = Path(__file__).resolve().parent.parent / "scripts" / "flush.sh"
