@@ -553,6 +553,37 @@ restores full operational capability.
 
 ---
 
+## ADR-039: Shared volumes via host bind mounts
+
+**Context**: Users need to share directories between machines
+across domains (e.g., shared documents, datasets for AI tools).
+Incus custom storage volumes cannot span projects, so
+cross-project sharing requires a different mechanism.
+
+**Decision**: Use host bind mounts (Incus disk devices with
+`source` pointing to a host directory) injected by the generator
+into consumer host_vars. The generator resolves `shared_volumes`
+declarations in `infra.yml` into `sv-<name>` disk devices merged
+with each consumer's `instance_devices`.
+
+**Why host bind mounts, not Incus custom volumes**: Incus storage
+volumes belong to a single project. Cross-project attachment
+requires manual `incus storage volume attach` calls with
+`--target-project`, which is fragile and not well-documented.
+Host bind mounts work across all projects natively and are the
+recommended approach for shared data in Incus documentation.
+
+**Naming convention**: Injected devices use the prefix `sv-` to
+avoid collisions with user-declared devices. The generator
+validates that no user device uses the `sv-` prefix.
+
+**Consequence**: Shared volumes are fully declarative. Adding a
+consumer is a one-line change in `infra.yml`. The existing
+`incus_instances` role handles the devices transparently — no
+new role needed.
+
+---
+
 ## ADR-038: Trust-level-aware IP addressing convention
 
 **Context**: The original addressing scheme (`10.100.<subnet_id>.0/24`
