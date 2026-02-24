@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "sys-print.sh"
 
 # Fake Incus JSON output: two instances across two projects
@@ -90,13 +92,6 @@ def run_print(args, env):
         ["bash", str(PRINT_SH)] + args,
         capture_output=True, text=True, env=env,
     )
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── shellcheck + executable ──────────────────────────────────

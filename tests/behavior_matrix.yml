@@ -608,6 +608,174 @@ capabilities:
         expected: "All features coexist, no interference"
         deterministic: true
 
+  boot_autostart:
+    description: "Instance boot ordering and priority on host startup"
+    depth_1:
+      - id: BA-001
+        action: "Valid boot_autostart boolean (true/false)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: BA-002
+        action: "Valid boot_priority integer (0-100)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: BA-003
+        action: "boot_autostart and boot_priority written to host_vars"
+        expected: "instance_boot_autostart and instance_boot_priority in host_vars"
+        deterministic: true
+      - id: BA-004
+        action: "Invalid boot_autostart (string, int)"
+        expected: "Validation error about boolean type"
+        deterministic: true
+      - id: BA-005
+        action: "Invalid boot_priority (negative, >100, float, string)"
+        expected: "Validation error about integer 0-100 range"
+        deterministic: true
+      - id: BA-006
+        action: "Omitted boot fields"
+        expected: "No errors, no instance_boot_* in host_vars"
+        deterministic: true
+    depth_2:
+      - id: BA-2-001
+        action: "boot_autostart + boot_priority on same machine"
+        expected: "Both written to host_vars"
+        deterministic: true
+      - id: BA-2-002
+        action: "boot_priority on VM and LXC"
+        expected: "Both types accept boot_priority identically"
+        deterministic: true
+    depth_3:
+      - id: BA-3-001
+        action: "boot_autostart + ephemeral + resource_policy"
+        expected: "All features independent, boot config correct"
+        deterministic: true
+
+  snapshots_config:
+    description: "Automatic snapshot scheduling and retention"
+    depth_1:
+      - id: SN-001
+        action: "Valid cron expression (5 fields)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: SN-002
+        action: "Valid expiry duration (30d, 24h, 60m)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: SN-003
+        action: "Schedule and expiry written to host_vars"
+        expected: "instance_snapshots_schedule and instance_snapshots_expiry present"
+        deterministic: true
+      - id: SN-004
+        action: "Invalid cron (wrong field count, non-string)"
+        expected: "Validation error about cron expression"
+        deterministic: true
+      - id: SN-005
+        action: "Invalid expiry (no unit, wrong unit, non-string)"
+        expected: "Validation error about duration format"
+        deterministic: true
+      - id: SN-006
+        action: "Omitted snapshot fields"
+        expected: "No errors, no instance_snapshots_* in host_vars"
+        deterministic: true
+    depth_2:
+      - id: SN-2-001
+        action: "Schedule + expiry on same machine"
+        expected: "Both written to host_vars independently"
+        deterministic: true
+    depth_3:
+      - id: SN-3-001
+        action: "Snapshots + ephemeral domain + boot_autostart"
+        expected: "All features independent, snapshot config correct"
+        deterministic: true
+
+  nesting_prefix:
+    description: "Resource name prefixing for nested anklume instances"
+    depth_1:
+      - id: NX-001
+        action: "Valid nesting_prefix boolean"
+        expected: "Validation passes"
+        deterministic: true
+      - id: NX-002
+        action: "Prefix computation from absolute_level"
+        expected: "Level 1 → 001-, level 2 → 002-, None → empty"
+        deterministic: true
+      - id: NX-003
+        action: "Prefix applied to Incus-facing names"
+        expected: "incus_project, incus_network.name, instance_name prefixed"
+        deterministic: true
+      - id: NX-004
+        action: "Invalid nesting_prefix (string, int)"
+        expected: "Validation error about boolean type"
+        deterministic: true
+      - id: NX-005
+        action: "File paths not prefixed"
+        expected: "inventory/pro.yml not 001-pro.yml"
+        deterministic: true
+    depth_2:
+      - id: NX-2-001
+        action: "Prefix disabled even with context file"
+        expected: "No prefix on names when nesting_prefix: false"
+        deterministic: true
+      - id: NX-2-002
+        action: "Prefix + shared_volumes"
+        expected: "Devices use unprefixed paths, names prefixed"
+        deterministic: true
+    depth_3:
+      - id: NX-3-001
+        action: "Prefix + addressing + firewall_mode=vm"
+        expected: "All names prefixed, addressing correct"
+        deterministic: true
+
+  resource_policy:
+    description: "Automatic CPU and memory allocation to instances"
+    depth_1:
+      - id: RP-001
+        action: "resource_policy: true or {} activates with defaults"
+        expected: "Validation passes, allocation runs"
+        deterministic: true
+      - id: RP-002
+        action: "host_reserve percentage validation (1-99%)"
+        expected: "Valid percentages pass, 0% and 100% error"
+        deterministic: true
+      - id: RP-003
+        action: "Machine weight validation (positive integer)"
+        expected: "Valid weights pass, 0 and negative error"
+        deterministic: true
+      - id: RP-004
+        action: "Proportional vs equal distribution modes"
+        expected: "Proportional respects weights, equal ignores them"
+        deterministic: true
+      - id: RP-005
+        action: "CPU modes (allowance % vs count vCPU)"
+        expected: "Allowance sets limits.cpu.allowance, count sets limits.cpu"
+        deterministic: true
+      - id: RP-006
+        action: "Memory enforcement (soft vs hard)"
+        expected: "Soft adds limits.memory.enforce, hard does not"
+        deterministic: true
+      - id: RP-007
+        action: "Host detection failure skips allocation"
+        expected: "Warning emitted, no limits set"
+        deterministic: true
+      - id: RP-008
+        action: "Overcommit check (false raises, true warns)"
+        expected: "ValueError when false, warning when true"
+        deterministic: true
+    depth_2:
+      - id: RP-2-001
+        action: "Explicit config excluded from auto-allocation"
+        expected: "Machine with limits.cpu keeps it, gets auto memory"
+        deterministic: true
+      - id: RP-2-002
+        action: "Weighted machines across domains"
+        expected: "Weight respected across all domains"
+        deterministic: true
+    depth_3:
+      - id: RP-3-001
+        action: "Resource policy + GPU + ephemeral + addressing"
+        expected: "All features independent, allocation correct"
+        deterministic: true
+
   shared_volumes:
     description: "Declarative inter-domain directory sharing via host bind mounts"
     depth_1:
@@ -659,4 +827,9 @@ capabilities:
       - id: SV-2-005
         action: "Disabled domain as consumer"
         expected: "Disabled domain machines skipped"
+        deterministic: true
+    depth_3:
+      - id: SV-3-001
+        action: "Shared volumes + nesting prefix + addressing"
+        expected: "Devices use correct paths, names prefixed, IPs zone-aware"
         deterministic: true

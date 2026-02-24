@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 GUARD_SH = Path(__file__).resolve().parent.parent / "scripts" / "incus-guard.sh"
 
 
@@ -147,13 +149,6 @@ bash "{tmp_path}/guard-patched.sh" "$@"
         capture_output=True, text=True, env=env, timeout=10,
     )
     return result
-
-
-def read_log(log_file):
-    """Return list of commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── help / no args ──────────────────────────────────────────

@@ -66,19 +66,7 @@ def build_session_config(infra):
     windows = []
     domains = infra.get("domains", {})
 
-    # Window 0: anklume-instance (the controller) — always present
-    windows.append({
-        "name": "anklume",
-        "subnet_id": 0,
-        "trust": "admin",
-        "color": TRUST_LABELS["admin"],
-        "panes": [{
-            "machine": "anklume-instance",
-            "command": "bash",  # Already inside anklume-instance
-        }],
-    })
-
-    # Remaining windows sorted by subnet_id
+    # Windows sorted by subnet_id
     sorted_domains = sorted(
         domains.items(),
         key=lambda item: item[1].get("subnet_id", 0),

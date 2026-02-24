@@ -156,7 +156,7 @@ def test_dry_run_output(sample_infra, capsys):
     output = captured.out
 
     assert "Session: test-session" in output
-    assert "prefix: C-a" in output
+    assert "prefix: C-b" in output
     assert "Window [0] anklume" in output
     assert "trust: admin" in output
     assert "color: dark blue" in output

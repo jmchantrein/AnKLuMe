@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DISP_SH = PROJECT_ROOT / "scripts" / "disp.sh"
 
@@ -178,13 +180,6 @@ exit 1
     env = os.environ.copy()
     env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 class TestLaunch:

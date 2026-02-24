@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 GOLDEN_SH = Path(__file__).resolve().parent.parent / "scripts" / "golden.sh"
 
 # Fake Incus JSON output: two instances across two projects
@@ -126,13 +128,6 @@ def run_golden(args, env, input_text=None):
         ["bash", str(GOLDEN_SH)] + args,
         capture_output=True, text=True, env=env, input=input_text,
     )
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── shellcheck + executable ──────────────────────────────────────

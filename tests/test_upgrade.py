@@ -253,16 +253,14 @@ class TestUpgradeNoOriginRemote:
 class TestUpgradeUncommittedChangesPrompt:
     """Test uncommitted changes interactive prompt responses."""
 
-    def test_uncommitted_changes_n_aborts(self, git_workspace):
-        """Responding 'n' to uncommitted changes prompt aborts the upgrade."""
+    def test_uncommitted_changes_auto_stashed(self, git_workspace):
+        """Uncommitted changes are auto-stashed during upgrade."""
         # Create an uncommitted change
         (git_workspace / "ansible.cfg").write_text("[defaults]\nmodified=true\n")
-        result = run_upgrade(git_workspace, input_text="n\n")
-        # Should abort without errors
+        result = run_upgrade(git_workspace)
         assert result.returncode == 0
-        assert "Aborted" in result.stdout
-        # Should NOT reach the upgrade complete message
-        assert "Upgrade complete" not in result.stdout
+        assert "stashing automatically" in result.stdout
+        assert "Upgrade complete" in result.stdout
 
     def test_uncommitted_changes_y_continues(self, git_workspace):
         """Responding 'y' to uncommitted changes prompt continues the upgrade."""
@@ -586,6 +584,12 @@ class TestUpgradeEdgeCases:
     def test_missing_generate_py_fails_gracefully(self, git_workspace):
         """If scripts/generate.py is missing, upgrade reports an error."""
         (git_workspace / "scripts" / "generate.py").unlink()
+        # Commit the deletion so stash doesn't restore it
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "remove generate.py"],
+            cwd=git_workspace, capture_output=True,
+        )
         result = run_upgrade(git_workspace)
         # python3 scripts/generate.py will fail since the file is missing
         assert result.returncode != 0

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 SNAP_SH = Path(__file__).resolve().parent.parent / "scripts" / "snap.sh"
 
 # Fake Incus JSON output: two instances across two projects
@@ -55,13 +57,6 @@ def run_snap(args, env, input_text=None):
         capture_output=True, text=True, env=env, input=input_text,
     )
     return result
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── create ───────────────────────────────────────────────────

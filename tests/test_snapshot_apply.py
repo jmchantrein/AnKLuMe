@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 SNAPSHOT_APPLY_SH = Path(__file__).resolve().parent.parent / "scripts" / "snapshot-apply.sh"
 
 
@@ -153,13 +155,6 @@ def run_snapshot_apply(args, env, cwd=None):
         env=env,
         cwd=cwd,
     )
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 def get_state_dir(env):

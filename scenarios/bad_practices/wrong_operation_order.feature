@@ -6,11 +6,11 @@ Feature: Wrong operation order
   Background:
     Given a clean sandbox environment
 
-  Scenario: Lint before sync
+  Scenario: Lint before sync detects no generated files
     Given infra.yml from "student-sysadmin"
+    And no generated files exist
     When I run "make lint-yaml" and it may fail
-    # Should work on existing files but won't catch generated content
-    # if sync hasn't been run yet.
+    Then exit code is non-zero
 
   Scenario: Sync then lint passes
     Given infra.yml from "student-sysadmin"
