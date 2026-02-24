@@ -249,7 +249,7 @@ anklume domain. Container names are prefixed `anklume-`:
 | Service | Container name | Role |
 |---|---|---|
 | Admin/controller | `anklume-instance` | Ansible, git, orchestration (exists) |
-| Firewall | `anklume-firewall` | nftables cross-domain (currently `sys-firewall`, to rename) |
+| Firewall | `anklume-firewall` | nftables cross-domain routing |
 | Monitoring | `anklume-monitoring` | Infrastructure metrics, alerting |
 | Backup | `anklume-backup` | Cross-domain snapshot management |
 | Sanitizer | `anklume-sanitizer` | LLM anonymization proxy |
@@ -282,7 +282,7 @@ that containers are prefixed by their domain name (`pro-dev`, `perso-desktop`,
 
 ### Migration notes
 
-- `sys-firewall` -> `anklume-firewall` (code change in generator)
+- `sys-firewall` has been renamed to `anklume-firewall` (Phase 36)
 - `sys-print` example -> `shared-print` in domain `shared`
 - The `sys-` prefix is retired. Services are either in `anklume` (admin
   infrastructure) or in `shared` (user-facing shared services).
@@ -481,8 +481,8 @@ Rough ordering, to be refined:
    add IaC-specific patterns, deploy as `anklume-sanitizer`.
 5. **Network inspection integration**: MCP Wireshark + local triage
    pipeline + cloud escalation through sanitizer.
-6. **Naming migration**: `sys-firewall` -> `anklume-firewall`, `sys-print`
-   -> `shared-print` in domain `shared`.
+6. **Naming migration**: `sys-firewall` renamed to `anklume-firewall`
+   (Phase 36, done), `sys-print` -> `shared-print` in domain `shared`.
 7. **`ai_provider` and `ai_sanitize` in infra.yml**: generator support,
    validation, documentation.
 

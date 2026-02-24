@@ -1028,8 +1028,8 @@ class TestPSOTOrphanDetection:
 class TestPSOTEnrichEdgeCases:
     """Test enrich_infra with various configurations."""
 
-    def test_enrich_firewall_vm_creates_sys_firewall(self):
-        """enrich_infra creates sys-firewall when firewall_mode=vm."""
+    def test_enrich_firewall_vm_creates_anklume_firewall(self):
+        """enrich_infra creates anklume-firewall when firewall_mode=vm."""
         infra = _minimal_infra()
         infra["global"]["firewall_mode"] = "vm"
         infra["domains"]["anklume"] = {
@@ -1039,20 +1039,20 @@ class TestPSOTEnrichEdgeCases:
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        assert "anklume-firewall" in infra["domains"]["anklume"]["machines"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert fw["type"] == "vm"
         assert fw["ip"] == "10.100.0.253"
 
-    def test_enrich_does_not_overwrite_user_sys_firewall(self):
-        """enrich_infra does not overwrite user-defined sys-firewall."""
+    def test_enrich_does_not_overwrite_user_anklume_firewall(self):
+        """enrich_infra does not overwrite user-defined anklume-firewall."""
         infra = _minimal_infra()
         infra["global"]["firewall_mode"] = "vm"
         infra["domains"]["anklume"] = {
             "subnet_id": 0,
             "machines": {
                 "anklume-ctrl": {"type": "lxc", "ip": "10.100.0.10"},
-                "sys-firewall": {
+                "anklume-firewall": {
                     "type": "vm",
                     "ip": "10.100.0.200",
                     "config": {"limits.cpu": "8"},
@@ -1060,7 +1060,7 @@ class TestPSOTEnrichEdgeCases:
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert fw["ip"] == "10.100.0.200"  # User's IP preserved
         assert fw["config"]["limits.cpu"] == "8"  # User's config preserved
 

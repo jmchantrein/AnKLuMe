@@ -260,10 +260,10 @@ que LXC (charges non fiables, GPU vfio-pci, noyau personnalise, systemes non-Lin
 
 ---
 
-## Phase 11 : VM Pare-feu Dediee (Style sys-firewall) -- COMPLETE
+## Phase 11 : VM Pare-feu Dediee (anklume-firewall) -- COMPLETE
 
 **Objectif** : Optionnel -- router tout le trafic inter-domaines a travers une
-VM pare-feu dediee, style sys-firewall de QubesOS
+VM pare-feu dediee (anklume-firewall)
 
 **Contexte** : En Phase 8, l'isolation est faite via nftables sur l'hote.
 Cette phase ajoute une option pour router tout le trafic a travers une VM

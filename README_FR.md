@@ -147,7 +147,7 @@ le socket Incus — pas besoin de SSH.
 | | Detection et nettoyage des orphelins |
 | **Isolation** | Bridges par domaine avec isolation nftables cross-bridge |
 | | Acces inter-domaines selectif via `network_policies` |
-| | Firewall VM dedie optionnel (style QubesOS sys-firewall) |
+| | Firewall VM dedie optionnel (`anklume-firewall`) |
 | | Niveaux de confiance avec console tmux coloree |
 | **Calcul** | Containers LXC et VMs KVM dans le meme domaine |
 | | GPU passthrough NVIDIA (politique exclusive ou partagee) |

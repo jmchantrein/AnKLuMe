@@ -1,4 +1,4 @@
-# Dedicated Firewall VM (sys-firewall)
+# Dedicated Firewall VM (anklume-firewall)
 
 anklume supports two firewall modes for inter-domain isolation:
 
@@ -19,7 +19,7 @@ kernel, with centralized logging and full nftables control inside the VM.
 │    └──────┬───────┴───────┬──┘           │                │
 │           │               │              │                │
 │    ┌──────┴───────────────┴──────────────┴──────┐        │
-│    │         sys-firewall (KVM VM)               │        │
+│    │       anklume-firewall (KVM VM)              │        │
 │    │  eth0=anklume  eth1=perso  eth2=pro  eth3=ai │        │
 │    │                                              │        │
 │    │  nftables: all inter-domain dropped            │        │
@@ -35,7 +35,7 @@ router between domains, applying nftables rules on forwarded traffic.
 ## Quick start (auto-creation)
 
 The simplest way to enable the firewall VM is to set `firewall_mode: vm`
-in `infra.yml`. The PSOT generator automatically creates the `sys-firewall`
+in `infra.yml`. The PSOT generator automatically creates the `anklume-firewall`
 machine in the anklume domain if you have not declared one yourself:
 
 ```yaml
@@ -57,19 +57,19 @@ domains:
 ```
 
 ```bash
-make sync    # Auto-creates sys-firewall (.253) in anklume domain
+make sync    # Auto-creates anklume-firewall (.253) in anklume domain
 make apply   # Creates infrastructure + provisions the firewall VM
 ```
 
 The generator prints an informational message when auto-creating:
 
 ```
-INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain (ip: 10.100.0.253)
+INFO: firewall_mode is 'vm' — auto-created anklume-firewall in anklume domain (ip: 10.100.0.253)
 ```
 
 (IP depends on zone addressing; shown here for admin zone at zone_base=100.)
 
-The auto-created `sys-firewall` has: type `vm`, IP `.253` in the anklume
+The auto-created `anklume-firewall` has: type `vm`, IP `.253` in the anklume
 subnet, 2 vCPU, 2 GiB memory, roles `[base_system, firewall_router]`,
 and `ephemeral: false`.
 
@@ -91,7 +91,7 @@ global:
 
 ### 2. Declare the firewall VM (optional — auto-created if omitted)
 
-To override the defaults, add `sys-firewall` to the anklume domain:
+To override the defaults, add `anklume-firewall` to the anklume domain:
 
 ```yaml
 domains:
@@ -101,7 +101,7 @@ domains:
       anklume-instance:
         type: lxc
         roles: [base_system]
-      sys-firewall:
+      anklume-firewall:
         description: "Centralized firewall VM"
         type: vm
         config:
@@ -122,7 +122,7 @@ make apply         # Create infrastructure + provision
 The `incus_firewall_vm` role automatically:
 1. Discovers all anklume bridges
 2. Creates a `firewall-multi-nic` profile with one NIC per bridge
-3. Attaches the profile to the sys-firewall VM
+3. Attaches the profile to the anklume-firewall VM
 
 The `firewall_router` role provisions the VM:
 1. Enables IP forwarding (`net.ipv4.ip_forward = 1`)
@@ -152,7 +152,7 @@ All decisions are logged with prefixes:
 ### Viewing logs
 
 ```bash
-incus exec sys-firewall --project anklume -- journalctl -kf | grep "FW-"
+incus exec anklume-firewall --project anklume -- journalctl -kf | grep "FW-"
 ```
 
 ## Defense in depth
@@ -215,11 +215,11 @@ Add a route configuration task in the `base_system` role or a custom role:
 Edit the firewall rules inside the VM:
 
 ```bash
-incus exec sys-firewall --project anklume -- \
+incus exec anklume-firewall --project anklume -- \
   vi /etc/nftables.d/anklume-firewall.nft
 
 # Reload
-incus exec sys-firewall --project anklume -- \
+incus exec anklume-firewall --project anklume -- \
   systemctl restart nftables
 ```
 
@@ -242,8 +242,8 @@ incus profile show firewall-multi-nic --project anklume
 
 ### Traffic not flowing through firewall VM
 
-1. Verify IP forwarding: `incus exec sys-firewall -- sysctl net.ipv4.ip_forward`
-2. Check nftables rules: `incus exec sys-firewall -- nft list ruleset`
+1. Verify IP forwarding: `incus exec anklume-firewall -- sysctl net.ipv4.ip_forward`
+2. Check nftables rules: `incus exec anklume-firewall -- nft list ruleset`
 3. Verify instance routes: `incus exec <instance> -- ip route show`
 
 ### Firewall VM not starting

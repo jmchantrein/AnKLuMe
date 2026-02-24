@@ -3,7 +3,7 @@
 #
 # Runs on the controller via connection:local (ADR-015).
 # Discovers all anklume bridges and creates a profile with one
-# NIC per bridge. The sys-firewall VM uses this profile to have
+# NIC per bridge. The anklume-firewall VM uses this profile to have
 # network presence on every domain bridge.
 #
 # This role runs ONLY when global.firewall_mode == 'vm'.
