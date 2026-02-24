@@ -1,7 +1,7 @@
 ---
 # FirewallRouter | Defaults for the firewall VM provisioning
 #
-# This role configures the sys-firewall VM with IP forwarding
+# This role configures the anklume-firewall VM with IP forwarding
 # and nftables rules for inter-domain isolation + logging.
 #
 # The firewall_router_interfaces variable is built by the infra

@@ -114,8 +114,9 @@ Recommended pattern: `<domain>-<role>` or `<domain_abbrev>-<role>`.
 | tor-gateway | torgw-proxy     | Tor transparent proxy |
 | anonymous   | anon-browser    | Isolated browser |
 
-Exception: system machines use the `sys-` prefix (QubesOS convention):
-`sys-firewall`, `sys-dns`, `sys-vpn`.
+Infrastructure machines in the anklume domain use the `anklume-` prefix:
+`anklume-firewall`, `anklume-instance`. Other system services use their
+domain prefix: `shared-dns`, `shared-vpn`.
 
 ## Domain naming convention
 

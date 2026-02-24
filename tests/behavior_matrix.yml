@@ -89,7 +89,7 @@ capabilities:
     depth_3:
       - id: DL-3-001
         action: "Domain + VM + GPU + firewall_mode=vm"
-        expected: "sys-firewall auto-created, VM host_vars correct, GPU tracked"
+        expected: "anklume-firewall auto-created, VM host_vars correct, GPU tracked"
         deterministic: true
       - id: DL-3-002
         action: "3 domains, profiles, ephemeral mix, network_policies"
@@ -337,7 +337,7 @@ capabilities:
     depth_3:
       - id: VM-3-001
         action: "VM + GPU + firewall_mode=vm"
-        expected: "VM created, GPU tracked, sys-firewall auto-created"
+        expected: "VM created, GPU tracked, anklume-firewall auto-created"
         deterministic: true
 
   privileged_policy:
@@ -402,15 +402,15 @@ capabilities:
         expected: "Validation error about mode"
         deterministic: true
       - id: FM-005
-        action: "firewall_mode: vm auto-creates sys-firewall"
-        expected: "sys-firewall machine added to admin domain"
+        action: "firewall_mode: vm auto-creates anklume-firewall"
+        expected: "anklume-firewall machine added to admin domain"
         deterministic: true
       - id: FM-006
-        action: "Auto-created sys-firewall has correct IP"
+        action: "Auto-created anklume-firewall has correct IP"
         expected: "IP is base_subnet.admin_subnet_id.253"
         deterministic: true
       - id: FM-007
-        action: "Auto-created sys-firewall has correct roles"
+        action: "Auto-created anklume-firewall has correct roles"
         expected: "roles: [base_system, firewall_router]"
         deterministic: true
       - id: FM-008
@@ -419,7 +419,7 @@ capabilities:
         deterministic: true
     depth_2:
       - id: FM-2-001
-        action: "User-declared sys-firewall not overwritten"
+        action: "User-declared anklume-firewall not overwritten"
         expected: "User IP and description preserved"
         deterministic: true
       - id: FM-2-002
@@ -429,7 +429,7 @@ capabilities:
     depth_3:
       - id: FM-3-001
         action: "firewall_mode: vm + GPU + privileged VM"
-        expected: "All features coexist, sys-firewall created"
+        expected: "All features coexist, anklume-firewall created"
         deterministic: true
 
   infra_directory:

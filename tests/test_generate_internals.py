@@ -424,12 +424,12 @@ class TestEnrichInfra:
             "domains": {"anklume": {"subnet_id": 0, "machines": {}}},
         }
         enrich_infra(infra)
-        assert "sys-firewall" not in infra["domains"]["anklume"].get(
+        assert "anklume-firewall" not in infra["domains"]["anklume"].get(
             "machines", {},
         )
 
-    def test_enrich_firewall_vm_creates_sys_firewall(self):
-        """Enrichment auto-creates sys-firewall when firewall_mode=vm."""
+    def test_enrich_firewall_vm_creates_anklume_firewall(self):
+        """Enrichment auto-creates anklume-firewall when firewall_mode=vm."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
@@ -444,20 +444,20 @@ class TestEnrichInfra:
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        assert "anklume-firewall" in infra["domains"]["anklume"]["machines"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert fw["type"] == "vm"
         assert fw["ip"] == "10.100.0.253"
 
     def test_enrich_firewall_user_defined_not_overwritten(self):
-        """User-defined sys-firewall is not overwritten."""
+        """User-defined anklume-firewall is not overwritten."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
                 "anklume": {
                     "subnet_id": 0,
                     "machines": {
-                        "sys-firewall": {
+                        "anklume-firewall": {
                             "type": "vm",
                             "ip": "10.100.0.250",
                         },
@@ -466,7 +466,7 @@ class TestEnrichInfra:
             },
         }
         enrich_infra(infra)
-        assert infra["domains"]["anklume"]["machines"]["sys-firewall"]["ip"] == "10.100.0.250"
+        assert infra["domains"]["anklume"]["machines"]["anklume-firewall"]["ip"] == "10.100.0.250"
 
     def test_enrich_ai_access_creates_policy(self):
         """Enrichment creates network policy for exclusive AI access."""
@@ -1166,7 +1166,7 @@ class TestEnrichIdempotency:
     """Test that enrich_infra is idempotent (calling twice = same result)."""
 
     def test_firewall_enrichment_idempotent(self):
-        """Calling enrich_infra twice doesn't duplicate sys-firewall."""
+        """Calling enrich_infra twice doesn't duplicate anklume-firewall."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
@@ -1174,10 +1174,10 @@ class TestEnrichIdempotency:
             },
         }
         enrich_infra(infra)
-        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in infra["domains"]["anklume"]["machines"]
         enrich_infra(infra)
-        # Should still have exactly one sys-firewall, not two
-        fw_count = sum(1 for m in infra["domains"]["anklume"]["machines"] if m == "sys-firewall")
+        # Should still have exactly one anklume-firewall, not two
+        fw_count = sum(1 for m in infra["domains"]["anklume"]["machines"] if m == "anklume-firewall")
         assert fw_count == 1
 
     def test_ai_access_enrichment_idempotent(self):
@@ -1876,8 +1876,24 @@ class TestGenerateOutput:
 class TestEnrichFirewallDetailed:
     """Additional edge cases for firewall VM enrichment."""
 
-    def test_sys_firewall_in_non_anklume_domain_blocks_auto_creation(self):
-        """User-defined sys-firewall in any domain prevents auto-creation."""
+    def test_anklume_firewall_in_non_anklume_domain_blocks_auto_creation(self):
+        """User-defined anklume-firewall in any domain prevents auto-creation."""
+        infra = {
+            "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
+            "domains": {
+                "anklume": {"subnet_id": 0, "machines": {"ctrl": {"type": "lxc"}}},
+                "other": {
+                    "subnet_id": 1,
+                    "machines": {"anklume-firewall": {"type": "vm", "ip": "10.100.1.250"}},
+                },
+            },
+        }
+        enrich_infra(infra)
+        # anklume-firewall should NOT be auto-created in anklume since user defined it in 'other'
+        assert "anklume-firewall" not in infra["domains"]["anklume"]["machines"]
+
+    def test_legacy_sys_firewall_in_non_anklume_domain_blocks_auto_creation(self):
+        """Legacy sys-firewall in any domain prevents auto-creation."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
@@ -1889,11 +1905,11 @@ class TestEnrichFirewallDetailed:
             },
         }
         enrich_infra(infra)
-        # sys-firewall should NOT be auto-created in anklume since user defined it in 'other'
-        assert "sys-firewall" not in infra["domains"]["anklume"]["machines"]
+        # anklume-firewall should NOT be auto-created since legacy sys-firewall exists
+        assert "anklume-firewall" not in infra["domains"]["anklume"]["machines"]
 
     def test_auto_created_firewall_has_correct_roles(self):
-        """Auto-created sys-firewall has base_system and firewall_router roles."""
+        """Auto-created anklume-firewall has base_system and firewall_router roles."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
@@ -1901,12 +1917,12 @@ class TestEnrichFirewallDetailed:
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert "base_system" in fw["roles"]
         assert "firewall_router" in fw["roles"]
 
     def test_auto_created_firewall_not_ephemeral(self):
-        """Auto-created sys-firewall has ephemeral: false."""
+        """Auto-created anklume-firewall has ephemeral: false."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "10.100"},
             "domains": {
@@ -1914,7 +1930,7 @@ class TestEnrichFirewallDetailed:
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert fw["ephemeral"] is False
 
     def test_firewall_mode_default_is_host(self):
@@ -1924,10 +1940,10 @@ class TestEnrichFirewallDetailed:
             "domains": {"anklume": {"subnet_id": 0, "machines": {}}},
         }
         enrich_infra(infra)
-        assert "sys-firewall" not in infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" not in infra["domains"]["anklume"]["machines"]
 
     def test_firewall_custom_base_subnet(self):
-        """Auto-created sys-firewall uses custom base_subnet."""
+        """Auto-created anklume-firewall uses custom base_subnet."""
         infra = {
             "global": {"firewall_mode": "vm", "base_subnet": "192.168"},
             "domains": {
@@ -1935,7 +1951,7 @@ class TestEnrichFirewallDetailed:
             },
         }
         enrich_infra(infra)
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         assert fw["ip"] == "192.168.5.253"
 
     def test_firewall_machines_none_creates_dict(self):
@@ -1948,4 +1964,4 @@ class TestEnrichFirewallDetailed:
         }
         enrich_infra(infra)
         assert isinstance(infra["domains"]["anklume"]["machines"], dict)
-        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in infra["domains"]["anklume"]["machines"]

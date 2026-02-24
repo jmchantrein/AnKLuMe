@@ -174,7 +174,7 @@ class TestKitchenSinkInfra:
         }
 
     def test_all_files_generated_with_auto_created_resources(self, tmp_path):
-        """All domains + auto-created sys-firewall generate files.
+        """All domains + auto-created anklume-firewall generate files.
 
         Combines: firewall_mode=vm + gpu_policy + ai_access + VM + LXC
         + ephemeral + profiles + network_policies.
@@ -188,7 +188,7 @@ class TestKitchenSinkInfra:
 
         expected_hosts = [
             "admin-ctrl",
-            "sys-firewall",
+            "anklume-firewall",
             "pro-dev",
             "pro-sandbox",
             "perso-box",
@@ -210,7 +210,7 @@ class TestKitchenSinkInfra:
 
         expected = {
             ("admin-ctrl", "lxc", False),
-            ("sys-firewall", "vm", False),
+            ("anklume-firewall", "vm", False),
             ("pro-dev", "lxc", False),
             ("pro-sandbox", "vm", False),
             ("perso-box", "lxc", True),
@@ -242,7 +242,7 @@ class TestFirewallGPUPolicies:
     """firewall_mode=vm + GPU + network policies interact correctly."""
 
     def test_firewall_vm_with_exclusive_gpu_and_policies(self, tmp_path):
-        """sys-firewall auto-created, GPU host_vars correct, policies in all.yml.
+        """anklume-firewall auto-created, GPU host_vars correct, policies in all.yml.
 
         Combines: firewall_mode=vm + gpu_policy=exclusive + network_policies.
         """
@@ -263,7 +263,7 @@ class TestFirewallGPUPolicies:
 
         _full_pipeline(infra, tmp_path)
 
-        fw_hv = yaml.safe_load((tmp_path / "host_vars" / "sys-firewall.yml").read_text())
+        fw_hv = yaml.safe_load((tmp_path / "host_vars" / "anklume-firewall.yml").read_text())
         assert fw_hv["instance_type"] == "vm"
 
         gpu_hv = yaml.safe_load((tmp_path / "host_vars" / "pro-gpu.yml").read_text())
@@ -323,14 +323,14 @@ class TestAIAccessWithPolicies:
         assert len([p for p in infra["network_policies"] if p.get("to") == "ai-tools"]) == 1
 
     def test_ai_exclusive_with_firewall_vm(self, tmp_path):
-        """Both enrichments applied: sys-firewall + AI network policy.
+        """Both enrichments applied: anklume-firewall + AI network policy.
 
         Combines: ai_access_policy=exclusive + firewall_mode=vm.
         """
         infra = _ai_infra(firewall_mode="vm")
         generate.enrich_infra(infra)
 
-        assert "sys-firewall" in infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in infra["domains"]["anklume"]["machines"]
         assert any(p.get("to") == "ai-tools" for p in infra.get("network_policies", []))
 
 

@@ -139,7 +139,7 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | | Orphan detection and cleanup |
 | **Isolation** | Per-domain bridges with nftables cross-bridge isolation |
 | | Selective cross-domain access via `network_policies` |
-| | Optional dedicated firewall VM (QubesOS sys-firewall style) |
+| | Optional dedicated firewall VM (`anklume-firewall`) |
 | | Trust levels with color-coded tmux console |
 | **Compute** | LXC containers and KVM VMs in the same domain |
 | | NVIDIA GPU passthrough (exclusive or shared policy) |
