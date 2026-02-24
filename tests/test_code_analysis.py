@@ -1,9 +1,12 @@
 """Tests for scripts/code-analysis.sh — static code analysis."""
 
 import os
+import shutil
 import stat
 import subprocess
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = PROJECT_ROOT / "scripts" / "code-analysis.sh"
@@ -23,6 +26,7 @@ def run_analysis(args, **kwargs):
 # ── dead-code subcommand ──────────────────────────────
 
 
+@pytest.mark.skipif(not shutil.which("vulture"), reason="vulture not installed")
 class TestDeadCode:
     def test_dead_code_runs(self):
         """dead-code subcommand runs and produces output."""
@@ -123,6 +127,7 @@ class TestArguments:
 
 
 class TestScriptQuality:
+    @pytest.mark.skipif(not shutil.which("shellcheck"), reason="shellcheck not installed")
     def test_shellcheck_clean(self):
         """code-analysis.sh passes shellcheck."""
         result = subprocess.run(

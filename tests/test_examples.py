@@ -7,9 +7,17 @@ from generate import load_infra, validate
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 
 
+# Examples that are not standard PSOT infra.yml files
+# (different schema, e.g. live-os uses a live_os: key instead of project_name/global/domains)
+_NON_PSOT_EXAMPLES = {"live-os"}
+
+
 def discover_examples():
-    """Find all example infra.yml files."""
-    return sorted(EXAMPLES_DIR.glob("*/infra.yml"))
+    """Find all example infra.yml files (excluding non-PSOT formats)."""
+    return sorted(
+        p for p in EXAMPLES_DIR.glob("*/infra.yml")
+        if p.parent.name not in _NON_PSOT_EXAMPLES
+    )
 
 
 @pytest.mark.parametrize(

@@ -8,12 +8,16 @@ Tests cover:
 - Generator: services validation in generate.py
 """
 
+import importlib.util
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 import yaml
+
+_HAS_MCP_SDK = importlib.util.find_spec("mcp") is not None
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 MCP_SERVER = SCRIPTS_DIR / "mcp-server.py"
@@ -27,6 +31,7 @@ MCP_POLICY = SCRIPTS_DIR / "mcp-policy.py"
 class TestScriptQuality:
     """All MCP Python files pass ruff check."""
 
+    @pytest.mark.skipif(not shutil.which("ruff"), reason="ruff not installed")
     def test_mcp_server_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_SERVER)],
@@ -34,6 +39,7 @@ class TestScriptQuality:
         )
         assert result.returncode == 0, f"ruff errors in mcp-server.py:\n{result.stdout}"
 
+    @pytest.mark.skipif(not shutil.which("ruff"), reason="ruff not installed")
     def test_mcp_client_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_CLIENT)],
@@ -41,6 +47,7 @@ class TestScriptQuality:
         )
         assert result.returncode == 0, f"ruff errors in mcp-client.py:\n{result.stdout}"
 
+    @pytest.mark.skipif(not shutil.which("ruff"), reason="ruff not installed")
     def test_mcp_policy_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_POLICY)],
@@ -52,6 +59,7 @@ class TestScriptQuality:
 # ── MCP Server ─────────────────────────────────────────────────────
 
 
+@pytest.mark.skipif(not _HAS_MCP_SDK, reason="MCP SDK not installed")
 class TestMCPServer:
     """Test MCP server tool registration and help."""
 
@@ -161,6 +169,7 @@ asyncio.run(run())
 # ── MCP Client ─────────────────────────────────────────────────────
 
 
+@pytest.mark.skipif(not _HAS_MCP_SDK, reason="MCP SDK not installed")
 class TestMCPClient:
     """Test MCP client CLI."""
 
