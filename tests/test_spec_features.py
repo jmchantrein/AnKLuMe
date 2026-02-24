@@ -742,3 +742,245 @@ class TestMemoryHelpers:
     def test_format_sub_mib(self):
         result = _format_memory(1024)
         assert result == "1024"  # Raw bytes when < 1 MiB
+
+
+# =============================================================================
+# Boot autostart — Depth 1 missing cells: BA-004, BA-005, BA-006
+# =============================================================================
+
+
+class TestBootAutostartDepth1:
+    """Validation tests for invalid boot_autostart/boot_priority values."""
+
+    def test_boot_autostart_string_true(self):  # Matrix: BA-004
+        """boot_autostart='true' (string) is invalid, must be boolean."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_autostart"] = "true"
+        errors = validate(infra)
+        assert any("boot_autostart must be a boolean" in e for e in errors)
+
+    def test_boot_autostart_int_zero(self):  # Matrix: BA-004
+        """boot_autostart=0 (int) is invalid, must be boolean."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_autostart"] = 0
+        errors = validate(infra)
+        assert any("boot_autostart must be a boolean" in e for e in errors)
+
+    def test_boot_priority_negative_value(self):  # Matrix: BA-005
+        """boot_priority=-10 is outside 0-100 range."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = -10
+        errors = validate(infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_over_max(self):  # Matrix: BA-005
+        """boot_priority=200 is outside 0-100 range."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 200
+        errors = validate(infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_float_value(self):  # Matrix: BA-005
+        """boot_priority=3.14 (float) is not an integer."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 3.14
+        errors = validate(infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_string_value(self):  # Matrix: BA-005
+        """boot_priority='low' (string) is not an integer."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = "low"
+        errors = validate(infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_omitted_boot_fields(self, tmp_path):  # Matrix: BA-006
+        """Omitted boot fields: no validation errors and no boot keys in host_vars."""
+        infra = _base_infra()
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert "instance_boot_autostart" not in hvars
+        assert "instance_boot_priority" not in hvars
+
+
+# =============================================================================
+# Boot autostart — Depth 2: BA-2-001, BA-2-002
+# =============================================================================
+
+
+class TestBootAutostartDepth2:
+    """Pairwise interaction tests for boot_autostart with other features."""
+
+    def test_boot_autostart_and_priority_on_same_machine(self, tmp_path):  # Matrix: BA-2-001
+        """Both boot_autostart and boot_priority set on one machine appear in host_vars."""
+        infra = _base_infra()
+        m = infra["domains"]["pro"]["machines"]["pro-dev"]
+        m["boot_autostart"] = True
+        m["boot_priority"] = 42
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert hvars["instance_boot_autostart"] is True
+        assert hvars["instance_boot_priority"] == 42
+
+    def test_boot_priority_on_vm_and_lxc(self, tmp_path):  # Matrix: BA-2-002
+        """boot_priority accepted identically on VM and LXC instance types."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["type"] = "vm"
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 80
+        infra["domains"]["pro"]["machines"]["pro-web"]["boot_priority"] = 80
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars_vm = _read_host_vars(tmp_path, "pro-dev")
+        hvars_lxc = _read_host_vars(tmp_path, "pro-web")
+        assert hvars_vm["instance_boot_priority"] == 80
+        assert hvars_lxc["instance_boot_priority"] == 80
+        assert hvars_vm["instance_type"] == "vm"
+        assert hvars_lxc["instance_type"] == "lxc"
+
+
+# =============================================================================
+# Boot autostart — Depth 3: BA-3-001
+# =============================================================================
+
+
+class TestBootAutostartDepth3:
+    """Three-way interaction tests for boot_autostart."""
+
+    def test_boot_ephemeral_resource_policy(self, tmp_path):  # Matrix: BA-3-001
+        """boot_autostart + ephemeral domain + resource_policy coexist independently."""
+        infra = _base_infra(resource_policy={})
+        infra["domains"]["pro"]["ephemeral"] = True
+        m = infra["domains"]["pro"]["machines"]["pro-dev"]
+        m["boot_autostart"] = True
+        m["boot_priority"] = 25
+        assert validate(infra) == []
+        host = {"cpu": 8, "memory_bytes": 16 * 1024**3}
+        with patch("generate._detect_host_resources", return_value=host):
+            enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert hvars["instance_boot_autostart"] is True
+        assert hvars["instance_boot_priority"] == 25
+        assert hvars["instance_ephemeral"] is True
+        config = hvars.get("instance_config", {})
+        assert "limits.memory" in config or "limits.cpu.allowance" in config
+
+
+# =============================================================================
+# Snapshots config — Depth 1 missing cells: SN-004, SN-005, SN-006
+# =============================================================================
+
+
+class TestSnapshotsDepth1:
+    """Validation tests for invalid snapshot schedule and expiry values."""
+
+    def test_invalid_cron_three_fields(self):  # Matrix: SN-004
+        """snapshots_schedule with 3 fields is invalid (must be 5)."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_schedule"] = "0 * *"
+        errors = validate(infra)
+        assert any("snapshots_schedule must be a cron expression" in e for e in errors)
+
+    def test_invalid_cron_boolean(self):  # Matrix: SN-004
+        """snapshots_schedule=True (non-string) is invalid."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_schedule"] = True
+        errors = validate(infra)
+        assert any("snapshots_schedule must be a cron expression" in e for e in errors)
+
+    def test_invalid_cron_empty_string(self):  # Matrix: SN-004
+        """snapshots_schedule='' (empty) is invalid."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_schedule"] = ""
+        errors = validate(infra)
+        assert any("snapshots_schedule must be a cron expression" in e for e in errors)
+
+    def test_invalid_expiry_weeks_unit(self):  # Matrix: SN-005
+        """snapshots_expiry='7w' (weeks not a valid unit, only d/h/m)."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_expiry"] = "7w"
+        errors = validate(infra)
+        assert any("snapshots_expiry must be a duration" in e for e in errors)
+
+    def test_invalid_expiry_float(self):  # Matrix: SN-005
+        """snapshots_expiry=30.5 (float, not string) is invalid."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_expiry"] = 30.5
+        errors = validate(infra)
+        assert any("snapshots_expiry must be a duration" in e for e in errors)
+
+    def test_invalid_expiry_bare_unit(self):  # Matrix: SN-005
+        """snapshots_expiry='d' (no number before unit) is invalid."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["snapshots_expiry"] = "d"
+        errors = validate(infra)
+        assert any("snapshots_expiry must be a duration" in e for e in errors)
+
+    def test_omitted_snapshot_fields(self, tmp_path):  # Matrix: SN-006
+        """Omitted snapshot fields: no errors and no snapshot keys in host_vars."""
+        infra = _base_infra()
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert "instance_snapshots_schedule" not in hvars
+        assert "instance_snapshots_expiry" not in hvars
+
+
+# =============================================================================
+# Snapshots config — Depth 2: SN-2-001
+# =============================================================================
+
+
+class TestSnapshotsDepth2:
+    """Pairwise interaction tests for snapshots config."""
+
+    def test_schedule_and_expiry_both_written(self, tmp_path):  # Matrix: SN-2-001
+        """Both schedule and expiry on same machine appear in host_vars independently."""
+        infra = _base_infra()
+        m = infra["domains"]["pro"]["machines"]["pro-dev"]
+        m["snapshots_schedule"] = "0 4 * * 1"
+        m["snapshots_expiry"] = "14d"
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert hvars["instance_snapshots_schedule"] == "0 4 * * 1"
+        assert hvars["instance_snapshots_expiry"] == "14d"
+        # Other machine should have no snapshot config
+        hvars_web = _read_host_vars(tmp_path, "pro-web")
+        assert "instance_snapshots_schedule" not in hvars_web
+        assert "instance_snapshots_expiry" not in hvars_web
+
+
+# =============================================================================
+# Snapshots config — Depth 3: SN-3-001
+# =============================================================================
+
+
+class TestSnapshotsDepth3:
+    """Three-way interaction tests for snapshots config."""
+
+    def test_snapshots_ephemeral_boot_combined(self, tmp_path):  # Matrix: SN-3-001
+        """Snapshots + ephemeral domain + boot_autostart all coexist independently."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["ephemeral"] = True
+        m = infra["domains"]["pro"]["machines"]["pro-dev"]
+        m["snapshots_schedule"] = "0 3 * * 0"
+        m["snapshots_expiry"] = "7d"
+        m["boot_autostart"] = True
+        m["boot_priority"] = 10
+        assert validate(infra) == []
+        enrich_infra(infra)
+        generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert hvars["instance_snapshots_schedule"] == "0 3 * * 0"
+        assert hvars["instance_snapshots_expiry"] == "7d"
+        assert hvars["instance_ephemeral"] is True
+        assert hvars["instance_boot_autostart"] is True
+        assert hvars["instance_boot_priority"] == 10
