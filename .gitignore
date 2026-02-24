@@ -82,3 +82,4 @@ uv.lock
 watch_*
 control
 control.tar.xz
+*.bak

@@ -492,26 +492,26 @@ class TestFirewallMode:
 
 
 class TestFirewallVMAutoCreation:
-    def test_firewall_mode_vm_auto_creates_sys_firewall(self, sample_infra):  # Matrix: FM-005
-        """firewall_mode: vm auto-creates sys-firewall in anklume domain."""
+    def test_firewall_mode_vm_auto_creates_anklume_firewall(self, sample_infra):  # Matrix: FM-005
+        """firewall_mode: vm auto-creates anklume-firewall in anklume domain."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
         admin_machines = sample_infra["domains"]["anklume"]["machines"]
-        assert "sys-firewall" in admin_machines
+        assert "anklume-firewall" in admin_machines
 
     def test_firewall_mode_vm_auto_created_has_correct_ip(self, sample_infra):  # Matrix: FM-006
-        """Auto-created sys-firewall gets IP <base_subnet>.<anklume_subnet_id>.253."""
+        """Auto-created anklume-firewall gets IP <base_subnet>.<anklume_subnet_id>.253."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
-        sys_fw = sample_infra["domains"]["anklume"]["machines"]["sys-firewall"]
-        assert sys_fw["ip"] == "10.100.0.253"
+        fw = sample_infra["domains"]["anklume"]["machines"]["anklume-firewall"]
+        assert fw["ip"] == "10.100.0.253"
 
     def test_firewall_mode_vm_auto_created_roles(self, sample_infra):  # Matrix: FM-007
-        """Auto-created sys-firewall has base_system and firewall_router roles."""
+        """Auto-created anklume-firewall has base_system and firewall_router roles."""
         sample_infra["global"]["firewall_mode"] = "vm"
         enrich_infra(sample_infra)
-        sys_fw = sample_infra["domains"]["anklume"]["machines"]["sys-firewall"]
-        assert sys_fw["roles"] == ["base_system", "firewall_router"]
+        fw = sample_infra["domains"]["anklume"]["machines"]["anklume-firewall"]
+        assert fw["roles"] == ["base_system", "firewall_router"]
 
     def test_firewall_mode_vm_no_anklume_domain_error(self, sample_infra):  # Matrix: FM-008
         """firewall_mode: vm without anklume domain raises ValueError."""
@@ -521,19 +521,32 @@ class TestFirewallVMAutoCreation:
             enrich_infra(sample_infra)
 
     def test_firewall_mode_vm_user_override_not_overwritten(self, sample_infra):  # Matrix: FM-2-001
-        """If user declares sys-firewall, enrich_infra does not overwrite it."""
+        """If user declares anklume-firewall, enrich_infra does not overwrite it."""
         sample_infra["global"]["firewall_mode"] = "vm"
-        sample_infra["domains"]["anklume"]["machines"]["sys-firewall"] = {
+        sample_infra["domains"]["anklume"]["machines"]["anklume-firewall"] = {
             "description": "My custom firewall",
             "type": "vm",
             "ip": "10.100.0.200",
             "roles": ["base_system"],
         }
         enrich_infra(sample_infra)
-        sys_fw = sample_infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = sample_infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         # User's config should be preserved, not overwritten
-        assert sys_fw["ip"] == "10.100.0.200"
-        assert sys_fw["description"] == "My custom firewall"
+        assert fw["ip"] == "10.100.0.200"
+        assert fw["description"] == "My custom firewall"
+
+    def test_firewall_mode_vm_legacy_sys_firewall_blocks_auto_creation(self, sample_infra):
+        """If user declares legacy sys-firewall, no anklume-firewall is auto-created."""
+        sample_infra["global"]["firewall_mode"] = "vm"
+        sample_infra["domains"]["anklume"]["machines"]["sys-firewall"] = {
+            "description": "Legacy firewall",
+            "type": "vm",
+            "ip": "10.100.0.200",
+            "roles": ["base_system"],
+        }
+        enrich_infra(sample_infra)
+        assert "anklume-firewall" not in sample_infra["domains"]["anklume"]["machines"]
+        assert sample_infra["domains"]["anklume"]["machines"]["sys-firewall"]["ip"] == "10.100.0.200"
 
 
 # -- orphan protection ---------------------------------------------------------
@@ -1213,7 +1226,7 @@ class TestDepth2Interactions:
         errors = validate(result)
         assert errors == []
         enrich_infra(result)
-        assert "sys-firewall" in result["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in result["domains"]["anklume"]["machines"]
 
     def test_ephemeral_orphan_unprotected(self, sample_infra, tmp_path):  # Matrix: EL-2-001
         """Orphan from ephemeral domain is unprotected."""
@@ -1239,7 +1252,7 @@ class TestDepth3Interactions:
         errors = validate(sample_infra)
         assert errors == []
         enrich_infra(sample_infra)
-        assert "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in sample_infra["domains"]["anklume"]["machines"]
 
     def test_three_domains_profiles_ephemeral_policies(self, sample_infra, tmp_path):  # Matrix: DL-3-002
         """3 domains, profiles, mixed ephemeral, network_policies all work together."""
@@ -1320,7 +1333,7 @@ class TestDepth3Interactions:
         errors = validate(sample_infra)
         assert errors == []
         enrich_infra(sample_infra)
-        assert "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in sample_infra["domains"]["anklume"]["machines"]
 
     def test_ephemeral_gpu_policies(self, sample_infra, tmp_path):  # Matrix: EL-3-001
         """Mixed ephemeral + GPU + network_policies all independent."""
@@ -1350,8 +1363,8 @@ class TestDepth3Interactions:
         generate(sample_infra, out_file)
 
         # Reset enrichment for directory test
-        if "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]:
-            del sample_infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        if "anklume-firewall" in sample_infra["domains"]["anklume"]["machines"]:
+            del sample_infra["domains"]["anklume"]["machines"]["anklume-firewall"]
 
         # Create directory format
         infra_dir = tmp_path / "infra"
@@ -1373,7 +1386,7 @@ class TestDepth3Interactions:
         out_dir.mkdir()
         generate(dir_infra, out_dir)
 
-        # Compare (both should have sys-firewall and all files)
+        # Compare (both should have anklume-firewall and all files)
         file_keys = {str(f.relative_to(out_file)) for f in out_file.rglob("*.yml")}
         dir_keys = {str(f.relative_to(out_dir)) for f in out_dir.rglob("*.yml")}
         assert file_keys == dir_keys
@@ -1393,8 +1406,8 @@ class TestDepth3Interactions:
         errors = validate(sample_infra)
         assert errors == []
         enrich_infra(sample_infra)
-        # sys-firewall auto-created
-        assert "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]
+        # anklume-firewall auto-created
+        assert "anklume-firewall" in sample_infra["domains"]["anklume"]["machines"]
         # AI policy auto-created
         policies = sample_infra.get("network_policies", [])
         assert any(p.get("to") == "ai-tools" for p in policies)

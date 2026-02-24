@@ -75,7 +75,7 @@ and should not blindly trust container output.
 
 ## D-039: Post-enrichment re-validation in generate.py
 
-**Problem**: `enrich_infra()` (auto-creates sys-firewall, network
+**Problem**: `enrich_infra()` (auto-creates anklume-firewall, network
 policies) runs after `validate()`. Auto-created resources could
 introduce IP collisions or invalid references not caught by the
 initial validation pass.

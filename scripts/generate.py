@@ -801,7 +801,7 @@ def enrich_infra(infra):
     """Enrich infra dict with auto-generated resources.
 
     Called after validate() and before generate(). Mutates infra in place.
-    Handles: auto-creation of sys-firewall VM, AI access policy enrichment.
+    Handles: auto-creation of anklume-firewall VM, AI access policy enrichment.
     """
     _enrich_addressing(infra)
     _enrich_firewall(infra)
@@ -925,7 +925,7 @@ def _auto_assign_ips(domain, base_octet, second_octet, domain_seq):
 
 
 def _enrich_firewall(infra):
-    """Auto-create sys-firewall VM when firewall_mode is 'vm'."""
+    """Auto-create anklume-firewall VM when firewall_mode is 'vm'."""
     g = infra.get("global", {})
     firewall_mode = g.get("firewall_mode", "host")
     if firewall_mode != "vm":
@@ -933,17 +933,17 @@ def _enrich_firewall(infra):
 
     domains = infra.get("domains") or {}
 
-    # Check if sys-firewall already exists in any domain (user override)
+    # Check if anklume-firewall (or legacy sys-firewall) already exists in any domain
     for domain in domains.values():
         for mname in (domain.get("machines") or {}):
-            if mname == "sys-firewall":
+            if mname in ("anklume-firewall", "sys-firewall"):
                 return
 
     # Require anklume domain
     if "anklume" not in domains:
         raise ValueError(
             "firewall_mode is 'vm' but no 'anklume' domain exists. "
-            "Cannot auto-create sys-firewall."
+            "Cannot auto-create anklume-firewall."
         )
 
     anklume_domain = domains["anklume"]
@@ -973,9 +973,9 @@ def _enrich_firewall(infra):
 
     if "machines" not in anklume_domain or anklume_domain["machines"] is None:
         anklume_domain["machines"] = {}
-    anklume_domain["machines"]["sys-firewall"] = sys_fw
+    anklume_domain["machines"]["anklume-firewall"] = sys_fw
 
-    print("INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain "
+    print("INFO: firewall_mode is 'vm' — auto-created anklume-firewall in anklume domain "
           f"(ip: {fw_ip})", file=sys.stderr)
 
 

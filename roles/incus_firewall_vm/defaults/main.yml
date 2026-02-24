@@ -2,7 +2,7 @@
 # IncusFirewallVM | Defaults for multi-NIC firewall profile
 #
 # Creates a profile with one NIC per domain bridge, attached to
-# the sys-firewall VM in the anklume project.
+# the anklume-firewall VM in the anklume project.
 
 # Bridge prefix to discover anklume bridges
 incus_firewall_vm_bridge_pattern: "net-"

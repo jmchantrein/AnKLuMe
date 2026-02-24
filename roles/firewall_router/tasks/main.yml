@@ -1,7 +1,7 @@
 ---
 # FirewallRouter | Configure the firewall VM as an inter-domain router
 #
-# Runs INSIDE the sys-firewall VM via community.general.incus connection.
+# Runs INSIDE the anklume-firewall VM via community.general.incus connection.
 # Enables IP forwarding, installs nftables, and deploys isolation rules
 # with centralized logging.
 #

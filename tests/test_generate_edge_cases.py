@@ -578,17 +578,17 @@ class TestEnrichEdgeCases:
         sample_infra["global"]["firewall_mode"] = "vm"
         sample_infra["domains"]["anklume"]["machines"] = None
         enrich_infra(sample_infra)
-        assert "sys-firewall" in sample_infra["domains"]["anklume"]["machines"]
+        assert "anklume-firewall" in sample_infra["domains"]["anklume"]["machines"]
 
-    def test_enrich_firewall_sys_firewall_in_other_domain(self, sample_infra):
-        """sys-firewall in a non-anklume domain prevents auto-creation."""
+    def test_enrich_firewall_anklume_firewall_in_other_domain(self, sample_infra):
+        """anklume-firewall in a non-anklume domain prevents auto-creation."""
         sample_infra["global"]["firewall_mode"] = "vm"
-        sample_infra["domains"]["work"]["machines"]["sys-firewall"] = {
+        sample_infra["domains"]["work"]["machines"]["anklume-firewall"] = {
             "type": "vm", "ip": "10.100.1.253",
         }
         enrich_infra(sample_infra)
-        # Should not auto-create in anklume since sys-firewall exists
-        assert "sys-firewall" not in sample_infra["domains"]["anklume"]["machines"]
+        # Should not auto-create in anklume since anklume-firewall exists
+        assert "anklume-firewall" not in sample_infra["domains"]["anklume"]["machines"]
 
     def test_enrich_ai_auto_created_policy_is_bidirectional(self, sample_infra):
         """Auto-created AI policy has bidirectional: true and ports: all."""

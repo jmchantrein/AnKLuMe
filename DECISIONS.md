@@ -47,20 +47,19 @@ Open: `bool` subclass of `int` bug, existing BA-001/BA-004 tag mismatch.
 | RP-2-002 | test_weighted_machines_across_domains | Cross-domain weights |
 | RP-3-001 | test_resource_policy_gpu_ephemeral_addressing | 4-way combination |
 
-Coverage: 89% → 93%. Open: NX-3-001 references `sys-firewall` (renamed in branch 4).
+Coverage: 89% → 93%. Open: NX-3-001 references `sys-firewall` (now renamed).
 
 ---
 
 ## Branch 3: make help categories (Phase 32)
 
-32 user-facing targets across 8 categories:
-- GETTING STARTED (3): guide, quickstart, init
-- CORE WORKFLOW (7): sync, sync-dry, apply, apply-limit, check, nftables, doctor
-- SNAPSHOTS (4): snapshot, restore, rollback, rollback-list
-- AI/LLM (7): apply-ai, llm-switch, llm-status, llm-bench, llm-dev, ai-switch, claude-host
-- CONSOLE (2): console, dashboard
-- INSTANCE MANAGEMENT (3): disp, backup, file-copy
-- LIFECYCLE (3): upgrade, flush, import-infra
-- DEVELOPMENT (3): lint, test, smoke
+32 user-facing targets across 8 categories. All other targets in `help-all`.
+Fix: warn() added to llm-bench.sh.
 
-All other targets in `help-all`. Fix: warn() added to llm-bench.sh.
+---
+
+## Branch 4: sys-firewall → anklume-firewall (Phase 36)
+
+Pure rename across 26 files. Backward compatibility: user-declared `sys-firewall`
+still prevents auto-creation. New deployments get `anklume-firewall`. Existing
+auto-created `sys-firewall` must be manually removed after update.
