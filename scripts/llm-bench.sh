@@ -36,9 +36,9 @@ _exec() {
     incus exec "$CONTAINER" --project "$PROJECT" -- "$@"
 }
 
-die() { echo -e "${RED}ERROR: $1${NC}" >&2; exit 1; }
-info() { echo -e "${CYAN}$1${NC}"; }
-warn() { echo -e "${YELLOW}$1${NC}"; }
+die() { printf "${RED}ERROR: %s${NC}\n" "$1" >&2; exit 1; }
+info() { printf "${CYAN}%s${NC}\n" "$1"; }
+warn() { printf "${YELLOW}%s${NC}\n" "$1"; }
 
 bench_endpoint() {
     # Benchmark a single endpoint+model combination
