@@ -2,18 +2,47 @@
 
 ## 1. Vision
 
-AnKLuMe is a declarative infrastructure compartmentalization framework.
-It provides QubesOS-like isolation using native Linux kernel features
-(KVM/LXC), orchestrated by the user through Ansible and Incus.
+AnKLuMe is a declarative infrastructure compartmentalization
+framework. It provides QubesOS-like isolation using native
+Linux kernel features (KVM/LXC), with optional integrated AI
+capabilities.
 
-The user describes their infrastructure in a single YAML file (`infra.yml`),
-runs `make sync && make apply`, and gets isolated, reproducible, disposable
-environments.
+The user describes their infrastructure in a single YAML file
+(`infra.yml`), runs `make sync && make apply`, and gets
+isolated, reproducible, disposable environments. AnKLuMe
+abstracts away the complexity of the underlying technologies
+(Incus, Ansible, nftables) behind a high-level declarative
+format — mastering these tools is beneficial but not required.
+
+The framework ships with sensible defaults following
+enterprise conventions:
+- Trust-level-aware IP addressing (`10.<zone>.<seq>.<host>`)
+  encoding security posture directly in IP addresses
+- Domain naming conventions aligned with professional
+  network segmentation practices
+- All defaults are configurable for custom environments
+
+Optionally, AnKLuMe integrates AI assistants into the
+compartmentalized infrastructure:
+- Per-domain AI assistants respecting network boundaries
+- Local-first LLM inference (GPU) with optional cloud
+  fallback
+- Automatic anonymization of sensitive data leaving the
+  local perimeter
 
 Designed for:
-- Sysadmins who want to compartmentalize their workstation
-- Teachers deploying networking labs for N students
-- Power users who want QubesOS-like isolation without QubesOS constraints
+- **Sysadmins** compartmentalizing their workstation
+- **Students** learning system administration in a safe,
+  reproducible environment that mirrors enterprise
+  conventions (IP classes, naming, network segmentation)
+- **Teachers** deploying networking labs for N students
+- **Power users** wanting QubesOS-like isolation without
+  QubesOS constraints
+- **Privacy-conscious users** needing to bypass internet
+  restrictions or route traffic through isolated gateways
+  (Tor, VPN)
+- Anyone wanting AI tools that respect domain boundaries
+  and data confidentiality
 
 ## 2. Key concepts
 

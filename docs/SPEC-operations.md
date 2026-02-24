@@ -95,7 +95,6 @@ declarative property of the infrastructure.
 | `opencode_server` | OpenCode headless AI coding server | `provision`, `opencode` |
 | `firewall_router` | nftables routing inside firewall VM | `provision`, `firewall` |
 | `dev_test_runner` | Incus-in-Incus sandbox provisioning | `provision`, `test` |
-| `dev_agent_runner` | Claude Code Agent Teams setup | `provision`, `agent-setup` |
 | (user-defined) | Application-specific setup | `provision` |
 
 ### Role implementation notes
@@ -263,14 +262,21 @@ Every file type has a dedicated validator. No file escapes validation.
 
 ## 10. Development workflow
 
-This project follows **spec-driven, test-driven development**:
+This project follows **documentation-driven, behavior-driven development**
+(ADR-009). For features and refactorings, the strict order is:
 
-1. **Spec first**: Update SPEC.md or ARCHITECTURE.md
-2. **Test second**: Molecule (roles) or pytest (generator)
-3. **Implement third**: Code until tests pass
+1. **Document first**: Update docs, SPEC.md, or ARCHITECTURE.md
+2. **Behavior tests second**: Write Given/When/Then style tests describing
+   expected behavior from the spec — not from existing code. Reference
+   behavior matrix cells (`# Matrix: XX-NNN`) where applicable.
+3. **Implement third**: Code until tests pass (Molecule for roles, pytest
+   for generator)
 4. **Validate**: `make lint`
 5. **Review**: Run the reviewer agent
 6. **Commit**: Only when everything passes
+
+For bugfixes and trivial patches (< ~10 lines, obvious cause), steps 1-2
+may be skipped — fix, add a regression test, validate, commit.
 
 ## 11. Tech stack
 
@@ -372,8 +378,10 @@ Managed by `bootstrap.sh` or manual host configuration:
 - Sway/Wayland configuration for GUI forwarding
 - Filesystem snapshots for rollback (`bootstrap.sh --snapshot` assists)
 
-The AnKLuMe framework DOES NOT modify the host directly from Ansible.
-It drives Incus via the socket. Host-level operations use dedicated
+The AnKLuMe framework minimizes host modifications (ADR-004). It
+primarily drives Incus via the socket. Host-level operations that
+improve KISS/DRY without compromising security (e.g., nftables rules,
+prerequisites, systemd drop-ins) may be applied directly via dedicated
 scripts run by the operator.
 
 ## 14. Behavior matrix testing
