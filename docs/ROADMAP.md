@@ -2337,7 +2337,12 @@ If the data disk is not present (first boot or new machine):
 ### Deliverables
 
 a) **Image builder** (`scripts/build-image.sh`):
-   - Build a minimal bootable ISO/image with Incus + anklume
+   - Build a **hybrid ISO** (BIOS + UEFI bootable) as the default
+     output format — `.iso` is universally recognized by flashing
+     tools (Rufus, Etcher, Ventoy, `dd`) and works on both legacy
+     BIOS and modern UEFI systems. The current `.img` (raw GPT
+     disk image) requires `dd` and only boots on UEFI; it will be
+     retained as `--format raw` for advanced users.
    - Support Debian and Arch base
    - toram mode configurable via kernel parameter
    - A/B partition scheme for safe updates (IncusOS-inspired)
@@ -2375,6 +2380,7 @@ e) **Documentation**:
 ### Validation criteria
 
 - [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
+- [ ] Hybrid ISO boots on both BIOS and UEFI systems
 - [ ] Bootable image created for at least one base distro
 - [ ] Encrypted pool setup works (both ZFS and BTRFS)
 - [ ] toram mode functional (OS runs from RAM)

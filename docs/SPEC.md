@@ -14,6 +14,15 @@ abstracts away the complexity of the underlying technologies
 (Incus, Ansible, nftables) behind a high-level declarative
 format — mastering these tools is beneficial but not required.
 
+**Design principle: minimize UX friction.** Every interaction
+with the framework — from first bootstrap to daily operations —
+should require the fewest possible steps, decisions, and
+prerequisites. Sensible defaults eliminate configuration when
+the user has no opinion. Error messages explain what to do, not
+just what went wrong. Formats are chosen for maximum
+compatibility (e.g., hybrid ISO for live images, standard
+Ansible layout for generated files).
+
 The framework ships with sensible defaults following
 enterprise conventions:
 - Trust-level-aware IP addressing (`10.<zone>.<seq>.<host>`)
