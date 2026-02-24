@@ -281,7 +281,7 @@ dans des phases de playbook differentes avec des types de connexion differents.
 **Decision** : Decouper en deux roles :
 - `incus_firewall_vm` : Role d'infrastructure (connection: local). Decouvre les
   bridges, cree un profil `firewall-multi-nic` avec une carte reseau par bridge
-  de domaine, attache a la VM sys-firewall.
+  de domaine, attache a la VM anklume-firewall.
 - `firewall_router` : Role de provisionnement (connection: community.general.incus).
   S'execute dans la VM : active le forwarding IP, installe nftables, deploie les
   regles d'isolation via un template Jinja2.
@@ -311,11 +311,11 @@ invalides doivent etre detectees tot par `make sync`, pas au moment du deploieme
 **Decision** : Ajouter la validation de `firewall_mode` a `validate()` dans
 generate.py. Valeurs valides : `host` (defaut) et `vm`. Les valeurs invalides
 produisent une erreur de validation. Le generateur n'impose pas qu'une machine
-`sys-firewall` existe quand le mode `vm` est defini -- c'est la responsabilite
+`anklume-firewall` existe quand le mode `vm` est defini -- c'est la responsabilite
 de l'operateur.
 
 **Justification** : KISS -- le generateur valide les valeurs, pas la topologie de
-deploiement. Verifier l'existence de sys-firewall couplerait le generateur aux
+deploiement. Verifier l'existence de anklume-firewall couplerait le generateur aux
 preoccupations au niveau des roles.
 
 ### D-021 : Defense en profondeur -- les modes hote + VM peuvent coexister
@@ -538,7 +538,7 @@ du container.
 
 ### D-039 : Re-validation post-enrichissement dans generate.py
 
-**Probleme** : `enrich_infra()` (creation auto de sys-firewall, politiques
+**Probleme** : `enrich_infra()` (creation auto de anklume-firewall, politiques
 reseau) s'execute apres `validate()`. Les ressources auto-creees pouvaient
 introduire des collisions d'IP ou des references invalides non detectees
 par la validation initiale.

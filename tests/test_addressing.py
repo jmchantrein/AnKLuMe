@@ -342,6 +342,6 @@ class TestEnrichFirewallAddressing:
             }},
         }, firewall_mode="vm")
         enrich_infra(infra)
-        fw = infra["domains"]["anklume"]["machines"]["sys-firewall"]
+        fw = infra["domains"]["anklume"]["machines"]["anklume-firewall"]
         # Admin zone: 10.100.0.253
         assert fw["ip"] == "10.100.0.253"

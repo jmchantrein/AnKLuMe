@@ -386,20 +386,22 @@ adapt behavior based on domain trust posture.
   - An `ai-tools` domain must exist
   - At most one `network_policy` can target `ai-tools` as destination
 
-### Auto-creation of sys-firewall (firewall_mode: vm)
+### Auto-creation of anklume-firewall (firewall_mode: vm)
 
 When `global.firewall_mode` is set to `vm`, the generator automatically
-creates a `sys-firewall` machine in the anklume domain if one is not already
-declared. This enrichment step (`enrich_infra()`) runs after validation but
-before file generation. The auto-created machine uses:
+creates an `anklume-firewall` machine in the anklume domain if one is not
+already declared. This enrichment step (`enrich_infra()`) runs after
+validation but before file generation. The auto-created machine uses:
 - type: `vm`, ip: `<base_octet>.<zone>.<anklume_seq>.253`
 - config: `limits.cpu: "2"`, `limits.memory: "2GiB"`
 - roles: `[base_system, firewall_router]`
 - ephemeral: `false`
 
-If the user declares `sys-firewall` explicitly (in any domain), their
-definition takes precedence and no auto-creation occurs. If `firewall_mode`
-is `vm` but no `anklume` domain exists, the generator exits with an error.
+If the user declares `anklume-firewall` explicitly (in any domain), their
+definition takes precedence and no auto-creation occurs. For backward
+compatibility, a user-declared `sys-firewall` also prevents auto-creation.
+If `firewall_mode` is `vm` but no `anklume` domain exists, the generator
+exits with an error.
 
 ### Security policy (privileged containers)
 

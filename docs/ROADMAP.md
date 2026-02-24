@@ -258,10 +258,10 @@ network isolation.
 
 ---
 
-## Phase 11: Dedicated Firewall VM (sys-firewall Style) ✅ COMPLETE
+## Phase 11: Dedicated Firewall VM (anklume-firewall) ✅ COMPLETE
 
 **Goal**: Optional — route all inter-domain traffic through a dedicated
-firewall VM, QubesOS sys-firewall style
+firewall VM (anklume-firewall)
 
 **Context**: In Phase 8, isolation is done via nftables on the host.
 This phase adds an option to route all traffic through a dedicated
@@ -2637,7 +2637,7 @@ d) **Test updates**:
    - Update example tests
 
 **Validation criteria**:
-- [ ] `sys-firewall` auto-created as `anklume-firewall` in anklume domain
+- [x] `sys-firewall` auto-created as `anklume-firewall` in anklume domain
 - [ ] `shared` domain documented in SPEC.md
 - [ ] `examples/shared-services/` validates successfully
 - [ ] All tests pass
