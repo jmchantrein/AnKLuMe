@@ -81,7 +81,7 @@ PYEOF
 EOF
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 parse_pytest_failures() {
     local log_file="$1"
     python3 - "$log_file" <<'PYEOF'
@@ -126,7 +126,7 @@ print(json.dumps(failures))
 PYEOF
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 parse_pytest_summary() {
     local log_file="$1"
     python3 - "$log_file" <<'PYEOF'
@@ -162,7 +162,7 @@ print(json.dumps(result))
 PYEOF
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 parse_matrix_coverage() {
     local log_file="$1"
     python3 - "$log_file" <<'PYEOF'
@@ -202,7 +202,7 @@ print(json.dumps(result))
 PYEOF
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 parse_lint_output() {
     local log_file="$1"
     local linter="$2"
@@ -264,7 +264,7 @@ OVERALL_STATUS="passed"
 
 # ── Run suites ────────────────────────────────────────────
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 run_suite_pytest() {
     local log="$OUTPUT_DIR/pytest.log"
     update_progress "pytest" "$COMPLETED" "$TOTAL_SUITES" "running"
@@ -315,7 +315,7 @@ PYEOF
     echo "  pytest: $status (${failed_count} failures, ${duration}s)"
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 run_suite_lint() {
     local log="$OUTPUT_DIR/lint.log"
     update_progress "lint" "$COMPLETED" "$TOTAL_SUITES" "running"
@@ -367,7 +367,7 @@ PYEOF
     echo "  lint: $status (${issue_count} issues, ${duration}s)"
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 run_suite_ruff() {
     local log="$OUTPUT_DIR/ruff.log"
     update_progress "ruff" "$COMPLETED" "$TOTAL_SUITES" "running"
@@ -411,7 +411,7 @@ PYEOF
     echo "  ruff: $status (${issue_count} issues, ${duration}s)"
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 run_suite_shellcheck() {
     local log="$OUTPUT_DIR/shellcheck.log"
     update_progress "shellcheck" "$COMPLETED" "$TOTAL_SUITES" "running"
@@ -457,7 +457,7 @@ PYEOF
     echo "  shellcheck: $status (${issue_count} issues, ${duration}s)"
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 run_suite_matrix() {
     local log="$OUTPUT_DIR/matrix.log"
     update_progress "matrix" "$COMPLETED" "$TOTAL_SUITES" "running"
