@@ -7,8 +7,6 @@ It will be removed after review.
 
 ## Branch 1: boot_autostart & snapshots_config (20 tests)
 
-### Tests added
-
 | Matrix ID | Test | Verifies |
 |-----------|------|----------|
 | BA-004 | test_boot_autostart_string_true | `"true"` (string) rejected |
@@ -31,15 +29,11 @@ It will be removed after review.
 | SN-2-001 | test_schedule_and_expiry_both_written | Both in host_vars, sibling clean |
 | SN-3-001 | test_snapshots_ephemeral_boot_combined | 3-way combination |
 
-### Open questions
-1. `bool` subclass of `int` bug: `boot_priority=True` passes validation (maps to 1)
-2. Existing tests tagged BA-001 actually test BA-004 behavior — retag?
+Open: `bool` subclass of `int` bug, existing BA-001/BA-004 tag mismatch.
 
 ---
 
 ## Branch 2: nesting_prefix & resource_policy (11 tests)
-
-### Tests added
 
 | Matrix ID | Test | Verifies |
 |-----------|------|----------|
@@ -53,9 +47,20 @@ It will be removed after review.
 | RP-2-002 | test_weighted_machines_across_domains | Cross-domain weights |
 | RP-3-001 | test_resource_policy_gpu_ephemeral_addressing | 4-way combination |
 
-### Coverage impact: 89% → 93%
+Coverage: 89% → 93%. Open: NX-3-001 references `sys-firewall` (renamed in branch 4).
 
-### Open questions
-1. Existing NX-001/RP-007 tag mismatches — retag?
-2. RP-3-001 tests 4 features but matrix cell says depth 3
-3. NX-3-001 references `sys-firewall` (renamed in branch 4)
+---
+
+## Branch 3: make help categories (Phase 32)
+
+32 user-facing targets across 8 categories:
+- GETTING STARTED (3): guide, quickstart, init
+- CORE WORKFLOW (7): sync, sync-dry, apply, apply-limit, check, nftables, doctor
+- SNAPSHOTS (4): snapshot, restore, rollback, rollback-list
+- AI/LLM (7): apply-ai, llm-switch, llm-status, llm-bench, llm-dev, ai-switch, claude-host
+- CONSOLE (2): console, dashboard
+- INSTANCE MANAGEMENT (3): disp, backup, file-copy
+- LIFECYCLE (3): upgrade, flush, import-infra
+- DEVELOPMENT (3): lint, test, smoke
+
+All other targets in `help-all`. Fix: warn() added to llm-bench.sh.
