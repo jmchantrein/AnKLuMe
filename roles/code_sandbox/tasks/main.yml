@@ -17,15 +17,15 @@
 #   - code_sandbox_ssh_agent_socket (string): SSH agent socket path
 #   - code_sandbox_projects_path (string): projects directory
 
-- name: CodeSandbox | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: curl -fsSL https://deb.nodesource.com/setup_{{ code_sandbox_node_version }}.x | bash -
-    creates: /etc/apt/sources.list.d/nodesource.list
+- name: CodeSandbox | Install Node.js
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/nodejs.yml
+  vars:
+    _nodejs_version: "{{ code_sandbox_node_version }}"
 
 - name: CodeSandbox | Install system dependencies
   ansible.builtin.apt:
     name:
-      - nodejs
       - git
       - python3
       - python3-pip

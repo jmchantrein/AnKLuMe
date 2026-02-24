@@ -26,15 +26,15 @@
     state: present
     update_cache: true
 
-- name: OpenclawServer | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    creates: /etc/apt/sources.list.d/nodesource.list
+- name: OpenclawServer | Install Node.js
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/nodejs.yml
+  vars:
+    _nodejs_version: "{{ openclaw_server_node_version }}"
 
 - name: OpenclawServer | Install system dependencies
   ansible.builtin.apt:
     name:
-      - nodejs
       - git
     state: present
     update_cache: true

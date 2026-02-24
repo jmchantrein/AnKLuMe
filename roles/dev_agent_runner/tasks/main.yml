@@ -5,18 +5,15 @@
 # run-tests.sh) with Claude Code CLI and Agent Teams support.
 # Runs inside the container via community.general.incus connection.
 
-- name: DevAgentRunner | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: >-
-      curl -fsSL https://deb.nodesource.com/setup_{{ dev_agent_runner_node_version }}.x
-      | bash -
-    creates: /etc/apt/sources.list.d/nodesource.list
-  changed_when: true
+- name: DevAgentRunner | Install Node.js
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/nodejs.yml
+  vars:
+    _nodejs_version: "{{ dev_agent_runner_node_version }}"
 
-- name: DevAgentRunner | Install Node.js and tmux
+- name: DevAgentRunner | Install tmux
   ansible.builtin.apt:
     name:
-      - nodejs
       - tmux
     state: present
     update_cache: true
