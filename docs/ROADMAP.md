@@ -194,11 +194,11 @@ network isolation.
 - Two-step workflow: generate in admin container, deploy on host
 - Same-bridge accept rules for br_netfilter compatibility
 - Atomic table replacement (delete + recreate)
-- ADR-004 exception: deploy script runs on host, not via Ansible
+- Host-side deployment per ADR-004 (minimize host modifications, allow when KISS/DRY)
 
 **Notes**:
 - nftables rules are on the HOST, not in containers
-- This is an exception to "Ansible does not modify the host" (ADR-004)
+- Host modification accepted per ADR-004 (KISS/DRY, no security compromise)
 - Alternative: manage via Incus ACLs if the version supports it
 
 ---
@@ -2370,18 +2370,15 @@ e) **Documentation**:
 targets, fixing naming inconsistencies, and improving robustness
 of existing scripts.
 
-**Prerequisites**: Phase 28 (LLM backend switching).
+**Prerequisites**: Phase 28 (Local LLM Delegation).
 
 **Deliverables**:
 
 a) **Bug fixes** (`scripts/llm-bench.sh`):
    - Add missing `warn()` function (crashes with `set -e`)
-   - Add `safe_switch()` helper to handle backend switch failures
-   - Protect all 4 `llm-switch.sh` calls in compare/model-all flows
    - Show FAILED in results table instead of crashing
 
 b) **Target renaming** (Makefile):
-   - `switch-llama` + `switch-ollama` → `llm-switch` (`B=llama|ollama`)
    - `ollama-dev` → `llm-dev`
    - All LLM targets consistently prefixed with `llm-*`
 
@@ -2404,8 +2401,7 @@ e) **Upgrade notification** (admin_bootstrap role):
 **Validation criteria**:
 - [ ] `make help` shows ~28 targets in categories
 - [ ] `make help-all` shows all targets
-- [ ] `make llm-switch B=llama` works
-- [ ] `make llm-bench COMPARE=1` does not crash on switch failure
+- [ ] `make llm-bench` does not crash on benchmark failure
 - [ ] `make upgrade` handles untracked file conflicts gracefully
 - [ ] Login to anklume-instance shows update notification when available
 
@@ -2906,7 +2902,7 @@ d) **Alerting pipeline**:
 
 ## Current State
 
-**Completed**:
+**Completed** (Phases 1-29):
 - Phase 1: PSOT generator functional (make sync idempotent)
 - Phase 2: Incus infrastructure deployed and idempotent
 - Phase 2b: Post-deployment hardening (ADR-017 to ADR-019)
@@ -2929,34 +2925,40 @@ d) **Alerting pipeline**:
 - Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
 - Phase 20: Native Incus Features and QubesOS Parity (20a-20e)
 - Phase 21: Desktop Integration (clipboard, Sway, dashboard)
+- Phase 22: End-to-End Scenario Testing (BDD)
+- Phase 23: Host Bootstrap and Thin Host Layer
+- Phase 23b: Sandboxed AI Coding Environment
+- Phase 24: Snapshot-Before-Apply and Rollback
+- Phase 25: XDG Desktop Portal for Cross-Domain File Access
+- Phase 26: Native App Export (distrobox-export Style)
+- Phase 28: Local LLM Delegation for Claude Code
+- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
+- Phase 29: Codebase Simplification and Real-World Testing
 
-**Next**:
-- Phase 22: End-to-End Scenario Testing (BDD) ✅
-- Phase 23: Host Bootstrap and Thin Host Layer ✅
-- Phase 23b: Sandboxed AI Coding Environment ✅
-- Phase 24: Snapshot-Before-Apply and Rollback ✅
-- Phase 25: XDG Desktop Portal for Cross-Domain File Access ✅
-- Phase 26: Native App Export (distrobox-export Style) ✅
-- Phase 27: Streaming STT (Real-Time Transcription) — long-term
-- Phase 28: Local LLM Delegation for Claude Code ✅
-- Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) ✅
-- Phase 29: Codebase Simplification and Real-World Testing ✅
-- Phase 30: Educational Platform and Guided Labs — long-term
-- Phase 31: Live OS with Encrypted Persistent Storage — **en cours**
-- Phase 32: Makefile UX and Robustness — **court terme**
-- Phase 33: Student Mode and Internationalization — long-term
-- Phase 34: Addressing Convention and Canonical Infrastructure — **en cours**
-- Phase 35: Development Workflow Simplification — **court terme**
-- Phase 36: Naming Convention Migration — **court terme**
-- Phase 37: Per-Domain OpenClaw — **moyen terme**
-- Phase 38: OpenClaw Heartbeat and Proactive Monitoring — **moyen terme**
-- Phase 39: LLM Sanitization Proxy — **moyen terme**
-- Phase 40: Network Inspection and Security Monitoring — **long-term**
+**In progress**:
+- Phase 31: Live OS with Encrypted Persistent Storage
+- Phase 34: Addressing Convention and Canonical Infrastructure
+
+**Short-term**:
+- Phase 32: Makefile UX and Robustness
+- Phase 35: Development Workflow Simplification
+- Phase 36: Naming Convention Migration
+
+**Medium-term**:
+- Phase 37: Per-Domain OpenClaw
+- Phase 38: OpenClaw Heartbeat and Proactive Monitoring
+- Phase 39: LLM Sanitization Proxy
+
+**Long-term**:
+- Phase 27: Streaming STT (Real-Time Transcription)
+- Phase 30: Educational Platform and Guided Labs
+- Phase 33: Student Mode and Internationalization
+- Phase 40: Network Inspection and Security Monitoring
 
 **Vision document**: `docs/vision-ai-integration.md` — consolidation of
 design discussions for Phases 35-40 (AI integration architecture).
 
-**Deployed infrastructure** (Phase 34 target addressing):
+**Deployed infrastructure** (Phase 34 addressing convention):
 
 | Domain | Container | IP | Zone | Network |
 |--------|-----------|-----|------|---------|
@@ -2968,6 +2970,7 @@ design discussions for Phases 35-40 (AI integration architecture).
 | ai-tools | ai-chat | 10.120.0.30 | semi-trusted | net-ai-tools |
 | ai-tools | ai-code | 10.120.0.40 | semi-trusted | net-ai-tools |
 
-**Active ADRs**: ADR-001 to ADR-038
+**Active ADRs**: 32 ADRs (ADR-001 to ADR-038, gaps at 007, 027, 028,
+033, 034, 037 — deleted during documentation review)
 
 **Known issues**: None
