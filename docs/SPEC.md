@@ -855,6 +855,48 @@ completed_steps:
 
 Viewing the solution marks the lab as `assisted: true`.
 
+### CLI modes and internationalization
+
+anklume provides three CLI modes that control the `make help` output,
+targeting different user profiles:
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| `user` | `make mode-user` | Standard help (default). ~35 categorized targets. |
+| `student` | `make mode-student` | Bilingual help (English + French descriptions). Same targets as user. |
+| `dev` | `make mode-dev` | All 110+ targets visible, with French translations in dim text. |
+
+The active mode is persisted in `~/.anklume/mode` (plain text file).
+Default: `user` (when no mode file exists).
+
+**Mode detection** in the Makefile:
+```makefile
+ANKLUME_MODE ?= $(shell cat ~/.anklume/mode 2>/dev/null || echo user)
+```
+
+**Language override**: The `ANKLUME_LANG` environment variable overrides
+the default language. In student mode, `ANKLUME_LANG` defaults to `fr`.
+
+```bash
+ANKLUME_LANG=fr make help        # French help regardless of mode
+ANKLUME_MODE=student make help   # Equivalent (student defaults to fr)
+```
+
+**Translation files**: `i18n/<lang>.yml` contains translations for all
+Makefile targets. Format:
+```yaml
+target_name: "Description in the target language"
+```
+
+The `i18n/fr.yml` file covers all documented Makefile targets (those
+with `##` comments). Adding a new target requires adding a corresponding
+entry in `i18n/fr.yml`.
+
+**Student mode specifics**: In student mode, `make help` shows:
+- Bilingual category headers (English / French)
+- French descriptions for each target
+- A mode indicator showing how to switch modes
+
 ---
 
 For operational details (generator, roles, snapshots, validators,

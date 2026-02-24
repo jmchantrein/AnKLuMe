@@ -1,6 +1,11 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# ── CLI Mode (Phase 33) ─────────────────────────────────────
+# Modes: student (bilingual help), user (default), dev (all targets)
+ANKLUME_MODE ?= $(shell cat $(HOME)/.anklume/mode 2>/dev/null || echo user)
+ANKLUME_LANG ?= $(if $(filter student,$(ANKLUME_MODE)),fr,)
+
 # ── Host guard ──────────────────────────────────────────────
 # Detects if running on the host instead of inside anklume-instance.
 # Container-only targets call $(require_container) to block with a helpful message.
@@ -604,8 +609,23 @@ install-hooks: ## Install git pre-commit hooks
 	@chmod +x .git/hooks/pre-commit
 	@echo "Git hooks installed. Use --no-verify to bypass."
 
+# ── CLI Mode Targets (Phase 33) ──────────────────────────
+mode-student: ## Switch to student mode (bilingual help)
+	@bash scripts/mode-set.sh student
+
+mode-user: ## Switch to user mode (default)
+	@bash scripts/mode-set.sh user
+
+mode-dev: ## Switch to dev mode (all targets visible)
+	@bash scripts/mode-set.sh dev
+
 # ── Help ──────────────────────────────────────────────────
 help: ## Show categorized help (use help-all for all targets)
+ifeq ($(ANKLUME_MODE),student)
+	@python3 scripts/help-i18n.py student $(or $(ANKLUME_LANG),fr)
+else ifeq ($(ANKLUME_MODE),dev)
+	@python3 scripts/help-i18n.py dev $(or $(ANKLUME_LANG),fr)
+else
 	@printf "\n"
 	@printf "  \033[1manklume\033[0m — Infrastructure Compartmentalization\n"
 	@printf "\n"
@@ -665,6 +685,7 @@ help: ## Show categorized help (use help-all for all targets)
 	@printf "\n"
 	@printf "  Run \033[36mmake help-all\033[0m for all targets.\n"
 	@printf "\n"
+endif
 
 help-all: ## Show all available targets
 	@printf "\n"
@@ -708,4 +729,5 @@ help-all: ## Show all available targets
         claude-host claude-host-resume claude-host-audit \
         mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
         lab-list lab-start lab-check lab-hint lab-reset lab-solution \
+        mode-student mode-user mode-dev \
         guide quickstart init install-hooks help help-all
