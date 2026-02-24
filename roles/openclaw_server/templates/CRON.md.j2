@@ -1,0 +1,67 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Cron Configuration — {{ openclaw_server_agent_name }}
+
+Scheduled tasks for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+These tasks use OpenClaw's built-in cron system (`openclaw cron`).
+
+## Daily health summary
+
+**Schedule**: Every day at {{ "%02d" | format(openclaw_server_cron_daily_hour) }}:{{ "%02d" | format(openclaw_server_cron_daily_minute) }}
+**Action**: Run the full health check procedure from HEARTBEAT.md
+and produce a summary report.
+
+Steps:
+1. Execute the `anklume-health` skill
+2. Compare network state via `anklume-network-diff` skill
+3. Compose a summary with all findings
+4. Store in `~/.openclaw/workspace/memory/daily-<date>.md`
+5. If any CRITICAL alerts: notify user immediately
+6. If only WARNINGs or OK: include in next conversation naturally
+
+## Pre-maintenance snapshot
+
+**Trigger**: Before any `make apply` affecting this domain
+**Action**: Create a snapshot of all domain instances.
+
+Steps:
+1. List running instances in project `{{ openclaw_server_incus_project | default('default') }}`
+2. For each instance, create snapshot `pre-maint-<timestamp>`
+3. Log snapshot names to `~/.openclaw/workspace/memory/snapshots-log.md`
+4. Report success or failure
+
+```bash
+incus snapshot create <instance> pre-maint-$(date +%Y%m%d-%H%M%S) \
+  --project {{ openclaw_server_incus_project | default('default') }}
+```
+
+## Log rotation alerts
+
+**Schedule**: Weekly (Monday at {{ "%02d" | format(openclaw_server_cron_daily_hour) }}:00)
+**Action**: Check container log sizes and warn if large.
+
+Steps:
+1. For each running instance, check `/var/log/` size
+2. Warn if total log size exceeds 500MB
+3. Suggest rotation commands if needed
+
+```bash
+incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+  du -sh /var/log/ 2>/dev/null
+```
+
+## Cron registration
+
+Register these tasks with OpenClaw:
+
+```bash
+# Daily health summary
+openclaw cron add "health-daily" \
+  --schedule "{{ openclaw_server_cron_daily_minute }} {{ openclaw_server_cron_daily_hour }} * * *" \
+  --message "Run daily health check for {{ openclaw_server_domain | default('unknown') }} domain"
+
+# Weekly log rotation check
+openclaw cron add "log-rotation" \
+  --schedule "0 {{ openclaw_server_cron_daily_hour }} * * 1" \
+  --message "Check log sizes for {{ openclaw_server_domain | default('unknown') }} domain"
+```

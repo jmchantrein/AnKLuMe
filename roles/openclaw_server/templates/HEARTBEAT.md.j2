@@ -1,0 +1,98 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Heartbeat Monitoring — {{ openclaw_server_agent_name }}
+
+Domain-scoped health monitoring for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+All checks target the Incus project `{{ openclaw_server_incus_project | default('default') }}` only.
+
+## Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Check interval | {{ openclaw_server_heartbeat_interval }}s | Seconds between health checks |
+| Disk warning | {{ openclaw_server_disk_warn_pct }}% | Warning threshold |
+| Disk critical | {{ openclaw_server_disk_crit_pct }}% | Critical threshold |
+| Domain | {{ openclaw_server_domain | default('unknown') }} | Monitored domain |
+| Project | {{ openclaw_server_incus_project | default('default') }} | Incus project |
+
+## Container status check
+
+Query all instances in the domain project and report status changes.
+
+```bash
+incus list --project {{ openclaw_server_incus_project | default('default') }} --format json
+```
+
+**Expected states**: RUNNING, STOPPED, FROZEN.
+Report any instance not in RUNNING state as a warning. Report instances
+that were RUNNING in the previous check but are now STOPPED as critical.
+
+## Disk space monitoring
+
+Check disk usage for each running instance in the domain.
+
+```bash
+incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+  df -h --output=pcent,target / | tail -1
+```
+
+| Level | Threshold | Action |
+|-------|-----------|--------|
+| OK | < {{ openclaw_server_disk_warn_pct }}% | No action |
+| Warning | >= {{ openclaw_server_disk_warn_pct }}% | Log warning, notify user |
+| Critical | >= {{ openclaw_server_disk_crit_pct }}% | Log critical, notify user immediately |
+
+## Service health check
+
+For each running instance, verify key systemd services are active.
+
+```bash
+incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+  systemctl is-active <service> 2>/dev/null
+```
+
+Check these services if they exist (skip if not installed):
+- `openclaw.service` (on OpenClaw instances)
+- `ollama.service` (on GPU instances)
+- `networking.service` or `systemd-networkd.service`
+
+Report any expected service in a non-active state as a warning.
+
+## Network scan diff
+
+Compare current network state against a saved baseline.
+
+### Capture baseline
+
+```bash
+incus list --project {{ openclaw_server_incus_project | default('default') }} \
+  --format csv -c n,s,4 > ~/.openclaw/workspace/memory/network-baseline.csv
+```
+
+### Compare
+
+Read current state and diff against baseline. Report:
+- **New hosts**: present now, absent from baseline (info)
+- **Missing hosts**: in baseline, absent now (warning)
+- **IP changes**: same host, different IP (warning)
+
+Save the diff result to `~/.openclaw/workspace/memory/network-diff-latest.md`.
+
+## Reporting
+
+Format health check results as a structured summary:
+
+```markdown
+## Health Report — {{ openclaw_server_domain | default('unknown') }}
+**Date**: <timestamp>
+**Status**: OK | WARNING | CRITICAL
+
+### Containers (<count> total)
+- <instance>: RUNNING (disk: XX%)
+- ...
+
+### Alerts
+- <level>: <description>
+```
+
+Store the latest report in `~/.openclaw/workspace/memory/health-latest.md`.

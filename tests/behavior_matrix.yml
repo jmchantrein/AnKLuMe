@@ -977,3 +977,37 @@ capabilities:
         action: "Lab start + check + solution (marks as assisted)"
         expected: "Solution marks assisted:true in progress, step still tracked"
         deterministic: true
+
+  heartbeat_monitoring:
+    description: "OpenClaw heartbeat monitoring templates and skills (Phase 38)"
+    depth_1:
+      - id: HB-001
+        action: "HEARTBEAT.md.j2 template renders with domain variables"
+        expected: "Domain name and project injected, thresholds present"
+        deterministic: true
+      - id: HB-002
+        action: "CRON.md.j2 template renders with schedule variables"
+        expected: "Daily hour/minute and project name present in output"
+        deterministic: true
+      - id: HB-003
+        action: "Heartbeat tasks file deploys all templates"
+        expected: "heartbeat.yml deploys HEARTBEAT, CRON, and both skills"
+        deterministic: true
+      - id: HB-004
+        action: "Heartbeat defaults present in role defaults"
+        expected: "All heartbeat variables have sensible defaults"
+        deterministic: true
+      - id: HB-005
+        action: "Skill templates render with correct Incus project"
+        expected: "Both skills contain --project flag with domain project"
+        deterministic: true
+    depth_2:
+      - id: HB-2-001
+        action: "Heartbeat + domain-scoped monitoring only"
+        expected: "Agent monitors only its own domain project"
+        deterministic: true
+    depth_3:
+      - id: HB-3-001
+        action: "Heartbeat + openclaw + domain trust level"
+        expected: "Heartbeat adapts to domain trust, monitoring scoped"
+        deterministic: true

@@ -1,0 +1,66 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Skill: anklume-network-diff
+
+Compare current network state against a saved baseline for the
+**{{ openclaw_server_domain | default('unknown') }}** domain.
+
+## Inputs
+
+- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+  (Incus project, auto-configured)
+- **baseline_path**: `~/.openclaw/workspace/memory/network-baseline.csv`
+  (auto-generated on first run)
+
+## Procedure
+
+### 1. Capture current state
+
+```bash
+incus list --project {{ openclaw_server_incus_project | default('default') }} \
+  --format csv -c n,s,4
+```
+
+Output: `<name>,<status>,<ipv4>` per line.
+
+### 2. Load baseline
+
+Read `~/.openclaw/workspace/memory/network-baseline.csv`.
+If the file does not exist, save current state as baseline and report
+"Baseline created, no comparison available."
+
+### 3. Compare
+
+Build two maps: `{name: (status, ip)}` for baseline and current.
+
+Detect:
+- **New hosts**: in current but not in baseline
+- **Missing hosts**: in baseline but not in current
+- **Status changes**: same host, different status
+- **IP changes**: same host, different IPv4
+
+### 4. Update baseline
+
+After comparison, overwrite baseline with current state. This means
+the next diff will compare against the state from this run.
+
+### 5. Compose report
+
+```
+Network Diff — {{ openclaw_server_domain | default('unknown') }}
+Project: {{ openclaw_server_incus_project | default('default') }}
+Timestamp: <ISO 8601>
+
+Changes since last check:
+  + <name> (<ip>) — new host
+  - <name> (<ip>) — missing host
+  ~ <name>: <old_status> -> <new_status>
+  ~ <name>: <old_ip> -> <new_ip>
+
+No changes detected. (if applicable)
+```
+
+## Output
+
+Return the diff report as text. Save to
+`~/.openclaw/workspace/memory/network-diff-latest.md`.
