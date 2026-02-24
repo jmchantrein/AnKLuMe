@@ -8,10 +8,13 @@ import os
 import shutil
 import stat
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
 from generate import enrich_infra, generate, validate
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _base_infra(**global_extra):
@@ -270,7 +273,7 @@ class TestPersistentDataDepth3:
 class TestFlushProtection:
     """Tests for flush.sh protection behavior (FP-001 to FP-003, FP-2-001)."""
 
-    SCRIPT = "/home/anklume/AnKLuMe/.claude/worktrees/agent-a094b57f/scripts/flush.sh"
+    SCRIPT = str(REPO_ROOT / "scripts" / "flush.sh")
 
     def _make_flush_test_env(self, tmp_path, *, protected=False):
         """Create a mock environment for testing flush.sh."""
