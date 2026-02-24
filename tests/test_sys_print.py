@@ -1,4 +1,4 @@
-"""Tests for scripts/sys-print.sh — CUPS print service management."""
+"""Tests for scripts/sys-print.sh -- CUPS print service management."""
 
 import json
 import os
@@ -14,7 +14,7 @@ PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "sys-print.sh"
 
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
-    {"name": "sys-print", "project": "print-service", "status": "Running"},
+    {"name": "shared-print", "project": "shared", "status": "Running"},
     {"name": "anklume-instance", "project": "anklume", "status": "Running"},
 ])
 
@@ -152,11 +152,11 @@ class TestSetup:
     def test_setup_installs_and_configures(self, mock_env):
         """setup installs CUPS and pushes configuration."""
         env, log = mock_env
-        result = run_print(["setup", "sys-print"], env)
+        result = run_print(["setup", "shared-print"], env)
         assert result.returncode == 0
         cmds = read_log(log)
         # Should exec apt-get install (via bash -c)
-        assert any("exec" in c and "sys-print" in c for c in cmds)
+        assert any("exec" in c and "shared-print" in c for c in cmds)
         # Should push cupsd.conf via file push
         assert any("file push" in c and "cupsd.conf" in c for c in cmds)
         # Should enable and restart cups
@@ -166,7 +166,7 @@ class TestSetup:
     def test_setup_with_explicit_project(self, mock_env):
         """setup with --project skips auto-detection."""
         env, log = mock_env
-        result = run_print(["setup", "sys-print", "--project", "print-service"], env)
+        result = run_print(["setup", "shared-print", "--project", "print-service"], env)
         assert result.returncode == 0
         cmds = read_log(log)
         assert any("--project" in c and "print-service" in c for c in cmds)
@@ -175,7 +175,7 @@ class TestSetup:
     def test_setup_output_message(self, mock_env):
         """setup shows completion message with web interface URL."""
         env, _ = mock_env
-        result = run_print(["setup", "sys-print"], env)
+        result = run_print(["setup", "shared-print"], env)
         assert result.returncode == 0
         assert "Done" in result.stdout
         assert "631" in result.stdout
@@ -195,14 +195,14 @@ class TestAddUsb:
     def test_add_usb_requires_vendor(self, mock_env):
         """add-usb without --vendor fails."""
         env, _ = mock_env
-        result = run_print(["add-usb", "sys-print", "--product", "0005"], env)
+        result = run_print(["add-usb", "shared-print", "--product", "0005"], env)
         assert result.returncode != 0
         assert "vendor" in result.stderr.lower() or "ERROR" in result.stderr
 
     def test_add_usb_requires_product(self, mock_env):
         """add-usb without --product fails."""
         env, _ = mock_env
-        result = run_print(["add-usb", "sys-print", "--vendor", "04b8"], env)
+        result = run_print(["add-usb", "shared-print", "--vendor", "04b8"], env)
         assert result.returncode != 0
         assert "product" in result.stderr.lower() or "ERROR" in result.stderr
 
@@ -210,7 +210,7 @@ class TestAddUsb:
         """add-usb adds USB device to instance."""
         env, log = mock_env
         result = run_print(
-            ["add-usb", "sys-print", "--vendor", "04b8", "--product", "0005"],
+            ["add-usb", "shared-print", "--vendor", "04b8", "--product", "0005"],
             env,
         )
         assert result.returncode == 0
@@ -225,7 +225,7 @@ class TestAddUsb:
         """add-usb with --project passes it through."""
         env, log = mock_env
         result = run_print(
-            ["add-usb", "sys-print", "--vendor", "04b8", "--product", "0005",
+            ["add-usb", "shared-print", "--vendor", "04b8", "--product", "0005",
              "--project", "print-service"],
             env,
         )
@@ -248,7 +248,7 @@ class TestAddNetwork:
     def test_add_network_requires_nic_parent(self, mock_env):
         """add-network without --nic-parent fails."""
         env, _ = mock_env
-        result = run_print(["add-network", "sys-print"], env)
+        result = run_print(["add-network", "shared-print"], env)
         assert result.returncode != 0
         assert "nic-parent" in result.stderr.lower() or "ERROR" in result.stderr
 
@@ -256,7 +256,7 @@ class TestAddNetwork:
         """add-network adds macvlan NIC device."""
         env, log = mock_env
         result = run_print(
-            ["add-network", "sys-print", "--nic-parent", "enp3s0"],
+            ["add-network", "shared-print", "--nic-parent", "enp3s0"],
             env,
         )
         assert result.returncode == 0
@@ -271,7 +271,7 @@ class TestAddNetwork:
         """add-network with --project passes it through."""
         env, log = mock_env
         result = run_print(
-            ["add-network", "sys-print", "--nic-parent", "enp3s0",
+            ["add-network", "shared-print", "--nic-parent", "enp3s0",
              "--project", "print-service"],
             env,
         )
@@ -294,7 +294,7 @@ class TestStatus:
     def test_status_shows_cups_info(self, mock_env):
         """status queries systemctl and lpstat."""
         env, log = mock_env
-        result = run_print(["status", "sys-print"], env)
+        result = run_print(["status", "shared-print"], env)
         assert result.returncode == 0
         cmds = read_log(log)
         assert any("systemctl" in c and "status" in c and "cups" in c for c in cmds)

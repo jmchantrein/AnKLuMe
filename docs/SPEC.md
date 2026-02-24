@@ -386,6 +386,37 @@ adapt behavior based on domain trust posture.
   - An `ai-tools` domain must exist
   - At most one `network_policy` can target `ai-tools` as destination
 
+### Naming conventions
+
+Machine names follow the `<domain>-<role>` pattern. Two domains have
+special naming significance:
+
+**`anklume` domain** (infrastructure/admin):
+- Trust level: `admin`
+- Machines use the `anklume-` prefix
+- Purpose: framework infrastructure (orchestration, firewall)
+- Examples: `anklume-instance` (Ansible controller),
+  `anklume-firewall` (auto-created firewall VM)
+
+**`shared` domain** (user-facing shared services):
+- Trust level: `semi-trusted` (services are shared, not admin)
+- Machines use the `shared-` prefix
+- Purpose: user-facing services accessible from multiple domains
+  via `network_policies` (print, DNS, VPN)
+- Examples: `shared-print` (CUPS server), `shared-dns` (local
+  resolver), `shared-vpn` (VPN gateway)
+- Distinct from `anklume`: the `anklume` domain is for framework
+  infrastructure that users do not interact with directly; the
+  `shared` domain is for services that users consume from other
+  domains
+
+**Other domains** follow the standard `<domain>-<role>` pattern:
+- `pro-dev`, `perso-desktop`, `ai-gpu`, `torgw-proxy`
+
+The `sys-` prefix is retired. Legacy `sys-firewall` declarations
+are still accepted for backward compatibility (see "Auto-creation
+of anklume-firewall" below).
+
 ### Auto-creation of anklume-firewall (firewall_mode: vm)
 
 When `global.firewall_mode` is set to `vm`, the generator automatically

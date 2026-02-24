@@ -220,7 +220,7 @@ Ready-to-use `infra.yml` configurations:
 | [Developer](examples/developer/) | anklume dev setup with Incus-in-Incus |
 | [AI tools](examples/ai-tools/) | Full AI stack (Ollama, WebUI, LobeChat, STT) |
 | [Tor gateway](examples/tor-gateway/) | Anonymous browsing via Tor transparent proxy |
-| [Print service](examples/sys-print/) | Dedicated CUPS server with USB/network printers |
+| [Shared services](examples/shared-services/) | Dedicated CUPS server with USB/network printers |
 
 ## Ansible roles
 

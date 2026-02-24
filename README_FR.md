@@ -228,7 +228,7 @@ Configurations `infra.yml` pretes a l'emploi :
 | [Developpeur](examples/developer/) | Environnement dev anklume avec Incus-dans-Incus |
 | [Outils IA](examples/ai-tools/) | Stack IA complete (Ollama, WebUI, LobeChat, STT) |
 | [Passerelle Tor](examples/tor-gateway/) | Navigation anonyme via proxy transparent Tor |
-| [Service d'impression](examples/sys-print/) | Serveur CUPS dedie avec imprimantes USB/reseau |
+| [Services partages](examples/shared-services/) | Serveur CUPS dedie avec imprimantes USB/reseau |
 
 ## Roles Ansible
 

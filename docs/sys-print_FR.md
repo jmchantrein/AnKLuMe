@@ -1,6 +1,9 @@
-# Service d'impression (sys-print)
+# Service d'impression
 
 > Note : la version anglaise ([`sys-print.md`](sys-print.md)) fait reference en cas de divergence.
+
+La configuration recommandee utilise un domaine `shared` avec
+`shared-print` comme nom de conteneur (voir SPEC.md "Naming conventions").
 
 anklume permet de configurer un serveur d'impression CUPS dedie dans
 un conteneur. Les imprimantes USB sont passees via le mecanisme de
@@ -18,7 +21,7 @@ les `network_policies`.
 │  net-pro ────────────┐                                  │
 │    pro-dev           │  IPP :631     ┌───────────────┐  │
 │                      ├──────────────▶│ net-print      │  │
-│  net-perso ──────────┤               │  sys-print     │  │
+│  net-perso ──────────┤               │  shared-print  │  │
 │    perso-desktop     │               │  CUPS :631     │  │
 │                      │               │                │  │
 │                      │               │  USB: printer  │  │
@@ -36,11 +39,11 @@ les `network_policies`.
 
 ```yaml
 domains:
-  print-service:
-    description: "Domaine dedie au service d'impression"
-    trust_level: trusted
+  shared:
+    description: "Services partages (impression, DNS, VPN)"
+    trust_level: semi-trusted
     machines:
-      sys-print:
+      shared-print:
         description: "Serveur d'impression CUPS"
         type: lxc
         roles:
@@ -49,13 +52,13 @@ domains:
 network_policies:
   - description: "Le domaine pro imprime via CUPS"
     from: pro
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp
 
   - description: "Le domaine perso imprime via CUPS"
     from: perso
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp
 ```
@@ -70,23 +73,23 @@ make apply
 ### 3. Configurer CUPS dans le conteneur
 
 ```bash
-make apply-print I=sys-print
+make apply-print I=shared-print
 ```
 
 ### 4. Ajouter des imprimantes
 
 ```bash
 # Imprimante USB (necessite les IDs vendeur et produit)
-scripts/sys-print.sh add-usb sys-print --vendor 04b8 --product 0005
+scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
 
 # Imprimante reseau (NIC macvlan pour acces au reseau local)
-scripts/sys-print.sh add-network sys-print --nic-parent enp3s0
+scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
 ```
 
 ### 5. Verifier l'etat
 
 ```bash
-scripts/sys-print.sh status sys-print
+scripts/sys-print.sh status shared-print
 ```
 
 ## Commandes
@@ -181,7 +184,7 @@ incus exec pro-dev --project pro -- apt install -y cups-client
 
 # Ajouter l'imprimante distante
 incus exec pro-dev --project pro -- \
-    lpadmin -p remote-printer -v ipp://sys-print:631/printers/MyPrinter -E
+    lpadmin -p remote-printer -v ipp://shared-print:631/printers/MyPrinter -E
 
 # Imprimer une page de test
 incus exec pro-dev --project pro -- \
@@ -212,7 +215,7 @@ lsusb
 ### Retirer un peripherique USB
 
 ```bash
-incus config device remove sys-print printer-04b8-0005 --project print-service
+incus config device remove shared-print printer-04b8-0005 --project shared
 ```
 
 ## Acces imprimante reseau via macvlan
@@ -239,7 +242,7 @@ Limitations :
 Verifier les journaux du service :
 
 ```bash
-incus exec sys-print --project print-service -- journalctl -u cups -f
+incus exec shared-print --project shared -- journalctl -u cups -f
 ```
 
 ### Imprimante USB non detectee
@@ -247,7 +250,7 @@ incus exec sys-print --project print-service -- journalctl -u cups -f
 Verifier que le peripherique est attache :
 
 ```bash
-incus config device show sys-print --project print-service
+incus config device show shared-print --project shared
 ```
 
 Verifier que le peripherique USB est branche sur l'hote :
@@ -261,13 +264,13 @@ lsusb | grep <vendor-id>
 Apres l'ajout d'une interface macvlan, redemarrer l'instance :
 
 ```bash
-incus restart sys-print --project print-service
+incus restart shared-print --project shared
 ```
 
 Verifier que l'interface est active :
 
 ```bash
-incus exec sys-print --project print-service -- ip addr show
+incus exec shared-print --project shared -- ip addr show
 ```
 
 ### Permission refusee a l'impression
