@@ -30,20 +30,19 @@ INDEPENDENT (hardware-dependent, not automatable):
   Phase 31  ←── physical boot media (already in progress)
 ```
 
-## Vague 1 — Running now
+## Vague 1 — COMPLETE
 
 | Agent | Phase | Branch | Status |
 |-------|-------|--------|--------|
-| a094b57f | 20g Persistent data | feat/persistent-data | Running |
-| a11d4e14 | 32 Makefile UX | feat/makefile-ux | Running |
-| a984299c | 35 Dev workflow | feat/dev-workflow-simplify | Running |
-| a61669d1 | 36 Naming convention | feat/naming-convention | Running |
+| a094b57f | 20g Persistent data | feat/persistent-data | Merged ✓ |
+| a11d4e14 | 32 Makefile UX | feat/makefile-ux | Merged ✓ |
+| a984299c | 35 Dev workflow | feat/dev-workflow-simplify | Merged ✓ |
+| a61669d1 | 36 Naming convention | feat/naming-convention | Merged ✓ |
 
-**After completion**: Review each agent's DECISIONS.md, run tests on
-each worktree, merge into main sequentially (36 first, then 20g,
-32, 35 — order matters for generate.py conflicts).
+**Result**: All 4 branches merged into main. 3343 tests passing,
+linters clean. DECISIONS.md consolidated. Worktrees cleaned up.
 
-## Vague 2 — After vague 1 merge
+## Vague 2 — Running now
 
 ### Phase 37: Per-Domain OpenClaw
 **Branch**: `feat/openclaw-per-domain`

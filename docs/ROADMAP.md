@@ -3003,25 +3003,25 @@ d) **Alerting pipeline**:
 - Phase 29: Codebase Simplification and Real-World Testing
 - Phase 34: Addressing Convention and Canonical Infrastructure
 
-**In progress**:
-- Phase 31: Live OS with Encrypted Persistent Storage
-
-**Short-term**:
+**Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
 - Phase 32: Makefile UX and Robustness
 - Phase 35: Development Workflow Simplification
 - Phase 36: Naming Convention Migration
 
-**Medium-term**:
+**In progress**:
+- Phase 31: Live OS with Encrypted Persistent Storage
 - Phase 37: Per-Domain OpenClaw
+- Phase 30: Educational Platform and Guided Labs
+
+**Short-term**:
 - Phase 38: OpenClaw Heartbeat and Proactive Monitoring
 - Phase 39: LLM Sanitization Proxy
+- Phase 33: Student Mode and Internationalization
+- Phase 40: Network Inspection and Security Monitoring
 
 **Long-term**:
 - Phase 27: Streaming STT (Real-Time Transcription)
-- Phase 30: Educational Platform and Guided Labs
-- Phase 33: Student Mode and Internationalization
-- Phase 40: Network Inspection and Security Monitoring
 
 **Vision document**: `docs/vision-ai-integration.md` — consolidation of
 design discussions for Phases 35-40 (AI integration architecture).
