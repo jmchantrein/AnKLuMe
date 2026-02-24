@@ -180,3 +180,4 @@ Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/golden-images.md` — Pre-built OS images
 - `docs/disposable.md` — Disposable containers
 - `docs/tor-gateway.md` — Tor gateway routing
+- `docs/llm-sanitizer.md` — LLM sanitization proxy (Phase 39)

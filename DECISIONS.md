@@ -243,3 +243,31 @@ Used `ED-*` for educational_labs to avoid collision with existing
 `EL-*` (ephemeral_lifecycle).
 
 ---
+
+## Phase 39: LLM Sanitization Proxy
+
+### ai_provider / ai_sanitize as domain-level fields
+
+Domain-level fields (`ai_provider`, `ai_sanitize`) because different
+domains have fundamentally different sensitivity levels. An `admin`
+domain should always sanitize cloud requests, while a `disposable`
+sandbox may not need it.
+
+### Default ai_sanitize based on ai_provider
+
+Auto-default `ai_sanitize: true` when `ai_provider` is `cloud` or
+`local-first`. Auto-default `false` for `local`. Safe by default,
+explicit opt-out.
+
+### Pattern-based detection, not ML-based
+
+Regex patterns are predictable, auditable, have zero false positives
+from model drift, and require no GPU. IaC identifiers follow strict
+naming conventions (ADR-038 IP scheme, Incus naming) ideal for regex.
+
+### ai_sanitize accepts "always" as a third value
+
+Accept `"always"` as a third value (string, not boolean) for users who
+need sanitization even for local requests (compliance, shared infra).
+
+---

@@ -1,0 +1,33 @@
+---
+# Default variables for llm_sanitizer
+# Override in group_vars or host_vars as needed.
+
+# Service endpoint configuration
+llm_sanitizer_listen_port: 8089
+llm_sanitizer_upstream_endpoint: "http://localhost:11434"
+
+# Pattern file path inside the container
+llm_sanitizer_patterns_path: /etc/llm-sanitizer/patterns.yml
+llm_sanitizer_config_path: /etc/llm-sanitizer/config.yml
+
+# Audit settings
+llm_sanitizer_audit_enabled: true
+llm_sanitizer_audit_log_path: /var/log/llm-sanitizer/audit.log
+llm_sanitizer_audit_log_redacted_only: true
+
+# Replacement strategy: "mask" (replace with [REDACTED]) or "pseudonymize"
+llm_sanitizer_replacement_mode: mask
+
+# Enable/disable pattern categories individually
+llm_sanitizer_enable_ip_patterns: true
+llm_sanitizer_enable_incus_patterns: true
+llm_sanitizer_enable_fqdn_patterns: true
+llm_sanitizer_enable_credential_patterns: true
+llm_sanitizer_enable_ansible_patterns: true
+llm_sanitizer_enable_service_patterns: true
+
+# Packages required by the sanitizer
+llm_sanitizer_packages:
+  - python3
+  - python3-yaml
+  - python3-aiohttp
