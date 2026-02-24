@@ -1202,7 +1202,7 @@ print management.
 - [x] Network policies control which domains can print
 - [x] Other domains cannot access the physical LAN directly
 
-### Phase 20f: Shared Volumes
+### Phase 20f: Shared Volumes ✅ COMPLETE
 
 **Goal**: Declarative inter-domain directory sharing with RO/RW
 access control via host bind mounts (ADR-039).
@@ -1220,11 +1220,11 @@ access control via host bind mounts (ADR-039).
 - `shift` and `propagate` options for idmap and nesting support
 
 **Validation criteria**:
-- [ ] Domain consumer gives all machines the shared device
-- [ ] Machine consumer overrides domain-level access
-- [ ] Device name collision detected
-- [ ] Duplicate mount paths detected
-- [ ] `make sync-dry` shows sv-* devices in host_vars
+- [x] Domain consumer gives all machines the shared device
+- [x] Machine consumer overrides domain-level access
+- [x] Device name collision detected
+- [x] Duplicate mount paths detected
+- [x] `make sync-dry` shows sv-* devices in host_vars
 
 ---
 
