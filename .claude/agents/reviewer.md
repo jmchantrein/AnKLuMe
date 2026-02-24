@@ -3,7 +3,7 @@ name: reviewer
 description: |
   Quality reviewer. Use before each commit to verify code conformity with
   project conventions, Ansible/Incus best practices, and SPEC consistency.
-model: sonnet
+model: opus
 tools:
   - Read
   - Glob
@@ -41,6 +41,11 @@ Review checklist:
 - [ ] Error handling with clear messages
 - [ ] pytest tests cover the change
 
+### Shared volumes (if applicable)
+- [ ] `sv-*` devices correctly injected in host_vars for consumers
+- [ ] No device name collision with user-declared devices
+- [ ] No duplicate mount paths on same consumer
+
 ### Consistency
 - [ ] Conforms to SPEC (read `docs/SPEC.md` if in doubt)
 - [ ] Respects all ADRs (read `docs/ARCHITECTURE.md`)
@@ -50,6 +55,7 @@ Review checklist:
 ### Development process
 - [ ] Spec was written/updated before implementation
 - [ ] Tests were written before implementation
+- [ ] New tests reference a behavior matrix ID (`# Matrix: XX-NNN`)
 - [ ] All tests pass (`make test`)
 
 Produce a structured report:

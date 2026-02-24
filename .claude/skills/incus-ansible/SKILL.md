@@ -107,12 +107,29 @@ incus exec <instance> --project <project> -- <command>
 ## Incus socket path
 
 The socket is at `/var/run/incus/unix.socket` (NOT `/var/lib/incus/...`).
-In the admin container, mounted via a disk device:
+In the admin container, mounted via a proxy device (ADR-019):
 ```bash
-incus config device add <admin> incus-socket disk \
-  source=/var/run/incus/unix.socket \
-  path=/var/run/incus/unix.socket
+incus config device add <admin> incus-socket proxy \
+  connect=unix:/var/lib/incus/unix.socket \
+  listen=unix:/var/run/incus/unix.socket \
+  bind=container
 ```
+
+## Shared volume devices (ADR-039)
+
+The generator injects `sv-<name>` disk devices into `instance_devices`
+for shared_volumes consumers. These are standard Incus disk devices:
+```yaml
+instance_devices:
+  sv-docs:
+    type: disk
+    source: /srv/anklume/shares/docs
+    path: /shared/docs
+    shift: "true"
+    readonly: "true"  # only for ro consumers
+```
+
+The `incus_instances` role handles these like any other declared device.
 
 ## Connection plugin: community.general.incus
 
