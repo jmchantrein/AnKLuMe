@@ -175,6 +175,8 @@ domains:
     subnet_id: <0-254>               # Optional: auto-assigned alphabetically within zone
     ephemeral: false                  # Optional (default: false). See below.
     trust_level: semi-trusted         # Determines IP zone (default: semi-trusted)
+    ai_provider: local               # "local" | "cloud" | "local-first" (default: local)
+    ai_sanitize: false               # true | false | "always" (default: auto, see below)
     profiles:                         # Optional: extra Incus profiles
       <profile-name>:
         devices: { ... }
@@ -334,6 +336,39 @@ The generator propagates `trust_level` to `domain_trust_level` in
 `group_vars/<domain>.yml`. Roles and tools can read this variable to
 adapt behavior based on domain trust posture.
 
+### AI provider and sanitization (Phase 39)
+
+The optional `ai_provider` and `ai_sanitize` fields on a domain
+control how LLM requests are routed and whether they pass through
+the sanitization proxy (ADR-044).
+
+**`ai_provider`** — where LLM inference runs for this domain:
+- **`local`** (default): All requests stay on the local network
+  (e.g., Ollama in `ai-tools` domain). No sanitization needed.
+- **`cloud`**: Requests are sent to external cloud APIs. The
+  sanitization proxy is enabled by default.
+- **`local-first`**: Prefers local inference, falls back to cloud
+  when local capacity is insufficient. Sanitization enabled by
+  default for the cloud fallback path.
+
+**`ai_sanitize`** — sanitization behavior:
+- **`false`** (default for `local`): No sanitization.
+- **`true`** (default for `cloud` and `local-first`): Sanitize
+  cloud-bound requests using the `llm_sanitizer` role patterns.
+- **`"always"`**: Sanitize all requests, including local ones.
+  Useful for audit/compliance or when local infrastructure is
+  shared with untrusted parties.
+
+**Default logic**: If `ai_sanitize` is not set:
+- `ai_provider: local` -> `ai_sanitize: false`
+- `ai_provider: cloud` -> `ai_sanitize: true`
+- `ai_provider: local-first` -> `ai_sanitize: true`
+
+The generator propagates these to `domain_ai_provider` and
+`domain_ai_sanitize` in `group_vars/<domain>.yml`. The
+`llm_sanitizer` role reads these variables to decide whether
+to activate.
+
 ### Validation constraints
 
 - Domain names: unique, alphanumeric + hyphen
@@ -353,6 +388,9 @@ adapt behavior based on domain trust posture.
   VM instances with GPU require IOMMU (Phase 9+)
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
+- `ai_provider`: must be `local`, `cloud`, or `local-first` (if present, default: `local`)
+- `ai_sanitize`: must be `true`, `false`, or `"always"` (if present; default:
+  `true` when `ai_provider` is `cloud` or `local-first`, `false` otherwise)
 - `weight`: must be a positive integer if present (default: 1)
 - `boot_autostart`: must be a boolean if present
 - `boot_priority`: must be an integer 0-100 if present (default: 0)

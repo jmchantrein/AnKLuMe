@@ -1,0 +1,48 @@
+---
+# LlmSanitizer | Deploy LLM sanitization proxy
+#
+# Transparent proxy that anonymizes IaC-specific data in LLM requests
+# before they leave the local network perimeter.
+#
+# Input variables (from defaults, overridable in group_vars/host_vars):
+#   - llm_sanitizer_listen_port (int): port to listen on
+#   - llm_sanitizer_upstream_endpoint (string): upstream LLM API endpoint
+#   - llm_sanitizer_patterns_path (string): path to detection patterns
+#   - llm_sanitizer_config_path (string): path to service configuration
+#   - llm_sanitizer_audit_enabled (bool): enable audit logging
+#   - llm_sanitizer_replacement_mode (string): mask or pseudonymize
+#   - domain_ai_sanitize (bool/string): from PSOT generator
+
+- name: LlmSanitizer | Skip when sanitization is disabled
+  ansible.builtin.meta: end_role
+  when: domain_ai_sanitize is defined and domain_ai_sanitize == false
+
+- name: LlmSanitizer | Wait for dpkg lock
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/dpkg-wait.yml
+
+- name: LlmSanitizer | Install dependencies
+  ansible.builtin.apt:
+    name: "{{ llm_sanitizer_packages }}"
+    state: present
+
+- name: LlmSanitizer | Create configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/llm-sanitizer
+    - /var/log/llm-sanitizer
+
+- name: LlmSanitizer | Deploy configuration
+  ansible.builtin.template:
+    src: sanitizer-config.yml.j2
+    dest: "{{ llm_sanitizer_config_path }}"
+    mode: "0644"
+
+- name: LlmSanitizer | Deploy detection patterns
+  ansible.builtin.template:
+    src: patterns.yml.j2
+    dest: "{{ llm_sanitizer_patterns_path }}"
+    mode: "0644"
