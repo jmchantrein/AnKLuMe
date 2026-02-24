@@ -1228,6 +1228,43 @@ access control via host bind mounts (ADR-039).
 
 ---
 
+### Phase 20g: Data Persistence and Flush Protection
+
+**Goal**: Per-machine persistent host bind mounts (Docker-style) with
+flush protection for non-ephemeral resources (ADR-040, ADR-041).
+
+**Prerequisites**: Phase 20f (Shared Volumes — reuse sv-* pattern).
+
+See: `docs/phase-20g-persistent-data.md` for detailed implementation plan.
+
+**Deliverables**:
+
+a) **Flush protection** (ADR-041):
+   - `scripts/flush.sh` respects `security.protection.delete=true`
+   - Protected instances skipped with `PROTECTED (skipped)` message
+   - `FORCE=true` overrides protection
+   - Host data dirs never deleted
+
+b) **Instance removal** (`make instance-remove`):
+   - New `scripts/instance-remove.sh`
+   - Modes: single instance, domain ephemeral, domain all, with FORCE
+
+c) **Persistent data** (ADR-040):
+   - `persistent_data:` per-machine section in infra.yml
+   - Host bind mounts at `<persistent_data_base>/<machine>/<volume>`
+   - Devices injected as `pd-<name>` (like `sv-*` for shared volumes)
+   - `scripts/create-data-dirs.py` + `make data-dirs`
+
+**Validation criteria**:
+- [ ] `make flush` skips protected instances (ephemeral: false)
+- [ ] `make flush FORCE=true` overrides protection
+- [ ] `make instance-remove I=pro-dev` removes single instance
+- [ ] persistent_data volumes appear as pd-* in host_vars
+- [ ] Mount path collision with shared_volumes detected
+- [ ] Host data directories survive flush
+
+---
+
 ## Phase 21: Desktop Integration ✅ COMPLETE
 
 **Goal**: Visual desktop integration for users running anklume on
@@ -2970,6 +3007,7 @@ d) **Alerting pipeline**:
 - Phase 31: Live OS with Encrypted Persistent Storage
 
 **Short-term**:
+- Phase 20g: Data Persistence and Flush Protection
 - Phase 32: Makefile UX and Robustness
 - Phase 35: Development Workflow Simplification
 - Phase 36: Naming Convention Migration
