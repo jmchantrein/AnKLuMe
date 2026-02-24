@@ -19,6 +19,8 @@ def mock_env(tmp_path):
     log_file = tmp_path / "incus.log"
 
     # Simulate anklume resources: 2 projects, 2 instances, 1 profile, 1 bridge
+    deleted_dir = tmp_path / "deleted"
+    deleted_dir.mkdir()
     mock_incus = mock_bin / "incus"
     mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
@@ -30,19 +32,25 @@ if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then
     echo "work"
     exit 0
 fi
-# list instances --format csv -c n
+# config get (ADR-042: flush protection check) — default: not protected
+if [[ "$1" == "config" && "$2" == "get" ]]; then
+    echo "false"
+    exit 0
+fi
+# list instances --format csv -c n (track deletions)
 if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then
     if [[ "$*" == *"--project anklume"* ]]; then
-        echo "anklume-ctrl"
+        [[ ! -f "{deleted_dir}/anklume-ctrl" ]] && echo "anklume-ctrl"
         exit 0
     elif [[ "$*" == *"--project work"* ]]; then
-        echo "work-dev"
+        [[ ! -f "{deleted_dir}/work-dev" ]] && echo "work-dev"
         exit 0
     fi
     exit 0
 fi
-# delete instance
-if [[ "$1" == "delete" ]]; then
+# delete instance (track deletion)
+if [[ "$1" == "delete" && "$2" != "" ]]; then
+    touch "{deleted_dir}/$2"
     exit 0
 fi
 # image list / image delete
@@ -381,6 +389,8 @@ class TestFlushDeletionFailures:
         mock_bin.mkdir()
         log_file = tmp_path / "incus.log"
 
+        deleted_dir = tmp_path / "deleted"
+        deleted_dir.mkdir()
         mock_incus = mock_bin / "incus"
         mock_incus.write_text(f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
@@ -396,11 +406,16 @@ if [[ "$1" == "project" && "$2" == "list" && "$*" == *"--format csv"* ]]; then
     echo "anklume"
     exit 0
 fi
-# list instances
+# config get (ADR-042: flush protection check) — default: not protected
+if [[ "$1" == "config" && "$2" == "get" ]]; then
+    echo "false"
+    exit 0
+fi
+# list instances (track deletions)
 if [[ "$1" == "list" && "$*" == *"--format csv"* ]]; then
     if [[ "$*" == *"--project anklume"* ]]; then
-        echo "anklume-ctrl"
-        echo "anklume-stuck"
+        [[ ! -f "{deleted_dir}/anklume-ctrl" ]] && echo "anklume-ctrl"
+        [[ ! -f "{deleted_dir}/anklume-stuck" ]] && echo "anklume-stuck"
         exit 0
     fi
     exit 0
@@ -410,8 +425,9 @@ if [[ "$1" == "delete" && "$2" == "anklume-stuck" ]]; then
     echo "Error: instance is busy" >&2
     exit 1
 fi
-# delete instance — anklume-ctrl succeeds
+# delete instance — anklume-ctrl succeeds (track deletion)
 if [[ "$1" == "delete" ]]; then
+    touch "{deleted_dir}/$2"
     exit 0
 fi
 # profile list
@@ -419,7 +435,11 @@ if [[ "$1" == "profile" && "$2" == "list" ]]; then
     echo "default"
     exit 0
 fi
-# project delete — anklume fails
+# profile device list / profile device remove
+if [[ "$1" == "profile" && "$2" == "device" ]]; then
+    exit 0
+fi
+# project delete — anklume fails (stuck instance remains)
 if [[ "$1" == "project" && "$2" == "delete" && "$3" == "anklume" ]]; then
     echo "Error: project not empty" >&2
     exit 1
@@ -457,11 +477,12 @@ exit 0
         assert "anklume-stuck" in result.stdout
 
     def test_continues_after_project_delete_failure(self, failing_env):
-        """Flush continues and warns when a project deletion fails."""
+        """Flush continues when project has remaining instances (ADR-042: skipped)."""
         env, log, cwd = failing_env
         result = run_flush(["--force"], env, cwd=cwd)
         assert result.returncode == 0
-        assert "WARNING" in result.stdout
+        # Project skipped because stuck instance remains (ADR-042)
+        assert "SKIPPED" in result.stdout or "WARNING" in result.stdout
 
     def test_successful_deletions_still_counted(self, failing_env):
         """Successful deletions are counted even when some fail."""
@@ -469,4 +490,4 @@ exit 0
         result = run_flush(["--force"], env, cwd=cwd)
         assert result.returncode == 0
         assert "Flush complete" in result.stdout
-        assert "resources destroyed" in result.stdout
+        assert "destroyed" in result.stdout

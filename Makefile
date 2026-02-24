@@ -41,6 +41,19 @@ sync-clean: ## Remove orphan files without confirmation
 shares: ## Create host directories for shared_volumes
 	@python3 scripts/create-shares.py $(INFRA_SRC)
 
+data-dirs: ## Create host directories for persistent_data
+	@python3 scripts/create-data-dirs.py $(INFRA_SRC)
+
+instance-remove: ## Remove instance(s) (I=<name> | DOMAIN=<d> SCOPE=ephemeral|all) [FORCE=true]
+	@if [ -n "$(I)" ]; then \
+		scripts/instance-remove.sh --instance $(I) $(if $(FORCE),--force); \
+	elif [ -n "$(DOMAIN)" ] && [ -n "$(SCOPE)" ]; then \
+		scripts/instance-remove.sh --domain $(DOMAIN) --scope $(SCOPE) $(if $(FORCE),--force); \
+	else \
+		echo "Usage: make instance-remove I=<instance> or DOMAIN=<d> SCOPE=<ephemeral|all>"; \
+		exit 1; \
+	fi
+
 # ── Telemetry (Phase 19b) ────────────────────────────────
 # Shell function to wrap a command with telemetry logging.
 # Usage in recipes: $(call tele_wrap,<target>,<command>)
@@ -624,6 +637,7 @@ help: ## Show categorized help (use help-all for all targets)
 	@printf "  \033[1;36mINSTANCE MANAGEMENT\033[0m\n"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make disp" "Launch disposable ephemeral instance"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make backup I=x" "Backup an instance"
+	@printf "    \033[36m%-22s\033[0m %s\n" "make instance-remove" "Remove instance (I= or DOMAIN= SCOPE=)"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make file-copy" "Copy file between instances (SRC= DST=)"
 	@printf "\n"
 	@printf "  \033[1;31mLIFECYCLE\033[0m\n"
@@ -647,7 +661,8 @@ help-all: ## Show all available targets
 		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
 
-.PHONY: sync sync-dry sync-clean shares console lint lint-yaml lint-ansible lint-shell \
+.PHONY: sync sync-dry sync-clean shares data-dirs instance-remove \
+        console lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         export-images test-report \

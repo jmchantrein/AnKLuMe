@@ -194,6 +194,10 @@ domains:
         snapshots_expiry: "30d"       # Optional: retention duration (e.g., 30d, 24h)
         config: { ... }              # Incus instance config overrides
         storage_volumes: { ... }     # Optional: dedicated volumes
+        persistent_data:             # Optional: host-persisted data
+          <volume-name>:
+            path: "/absolute/path"   # Required: mount path inside container
+            readonly: false          # Optional (default: false)
         roles: [base_system]         # Ansible roles for provisioning
 ```
 
@@ -380,6 +384,17 @@ adapt behavior based on domain trust posture.
   devices on any consumer
 - Path uniqueness: two volumes cannot mount at the same `path` on the
   same consumer machine
+- `persistent_data_base`: must be an absolute path if present
+  (default: `/srv/anklume/data`)
+- `persistent_data` volume names: DNS-safe
+  (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+- `persistent_data.*.path`: required, must be an absolute path
+- `persistent_data.*.readonly`: must be a boolean if present
+  (default: false)
+- Device name collision: `pd-<name>` must not collide with
+  user-declared devices or `sv-*` shared volume devices
+- Path uniqueness: persistent_data paths must not collide with
+  shared_volume paths on the same machine
 - When `ai_access_policy: exclusive`:
   - `ai_access_default` is required and must reference a known domain
   - `ai_access_default` cannot be `ai-tools` itself
@@ -586,6 +601,50 @@ declare its volumes.
 **Host directories**: `make shares` creates the host-side directories
 for all declared shared volumes. `global.shared_volumes_base` sets
 the base path (default: `/srv/anklume/shares`).
+
+### Persistent data volumes
+
+The optional `persistent_data` field on a machine declares host
+directories that persist across container rebuilds. Unlike shared
+volumes (which share data between instances), persistent data is
+tied to a specific machine.
+
+```yaml
+global:
+  persistent_data_base: /srv/anklume/data   # Default
+
+domains:
+  pro:
+    machines:
+      pro-dev:
+        type: lxc
+        persistent_data:
+          projects:
+            path: /home/user/projects    # Required: mount path inside container
+            readonly: false              # Optional, default: false
+          config:
+            path: /home/user/.config
+```
+
+**Fields**:
+- `path`: absolute path inside the container where the volume is
+  mounted. Required.
+- `readonly`: boolean, default `false`. If `true`, the volume is
+  mounted read-only.
+
+**Mechanism**: The generator resolves `persistent_data` into Incus
+disk devices injected into `instance_devices`. Device naming:
+`pd-<volume_name>` (prefix `pd-` avoids collisions with user
+devices and `sv-*` shared volume devices). Source directory:
+`<persistent_data_base>/<machine_name>/<volume_name>`.
+
+**Host directories**: `make data-dirs` creates the host-side
+directories. `global.persistent_data_base` sets the base path
+(default: `/srv/anklume/data`).
+
+**Flush protection**: `make flush` never deletes
+`/srv/anklume/data/` or `/srv/anklume/shares/`. Data persists
+across infrastructure rebuilds. See ADR-042.
 
 ### infra.yml as a directory
 

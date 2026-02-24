@@ -472,6 +472,50 @@ def validate(infra, *, check_host_subnets=True):
                     f"Machine '{mname}': weight must be a positive integer, got {weight}"
                 )
 
+            # Validate persistent_data (ADR-041)
+            pd = machine.get("persistent_data")
+            if pd is not None:
+                if not isinstance(pd, dict):
+                    errors.append(f"Machine '{mname}': persistent_data must be a mapping")
+                else:
+                    user_devices = machine.get("devices") or {}
+                    for vname, vconfig in pd.items():
+                        if not isinstance(vconfig, dict):
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname} must be a mapping"
+                            )
+                            continue
+                        if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", vname):
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname}: "
+                                f"invalid name (lowercase alphanumeric + hyphen)"
+                            )
+                        pd_path = vconfig.get("path")
+                        if pd_path is None:
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname}: "
+                                f"path is required"
+                            )
+                        elif not isinstance(pd_path, str) or not pd_path.startswith("/"):
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname}: "
+                                f"path must be an absolute path"
+                            )
+                        pd_ro = vconfig.get("readonly")
+                        if pd_ro is not None and not isinstance(pd_ro, bool):
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname}: "
+                                f"readonly must be a boolean, got {type(pd_ro).__name__}"
+                            )
+                        # Device name collision check
+                        device_name = f"pd-{vname}"
+                        if device_name in user_devices:
+                            errors.append(
+                                f"Machine '{mname}': persistent_data.{vname}: "
+                                f"device name '{device_name}' collision with "
+                                f"existing device"
+                            )
+
     # GPU policy enforcement (ADR-018)
     gpu_instances = _collect_gpu_instances(infra)
     if len(gpu_instances) > 1 and gpu_policy == "exclusive":
@@ -539,6 +583,11 @@ def validate(infra, *, check_host_subnets=True):
     sv_base = g.get("shared_volumes_base")
     if sv_base is not None and (not isinstance(sv_base, str) or not sv_base.startswith("/")):
         errors.append("global.shared_volumes_base must be an absolute path")
+
+    # persistent_data_base validation (ADR-041)
+    pd_base = g.get("persistent_data_base")
+    if pd_base is not None and (not isinstance(pd_base, str) or not pd_base.startswith("/")):
+        errors.append("global.persistent_data_base must be an absolute path")
 
     # shared_volumes validation (ADR-039)
     shared_volumes = infra.get("shared_volumes") or {}
@@ -634,6 +683,26 @@ def validate(infra, *, check_host_subnets=True):
                     )
                 else:
                     sv_mount_paths[path_key] = vname
+
+    # persistent_data mount path collision with shared_volumes (ADR-041)
+    for _dname, domain in domains.items():
+        for mname, machine in (domain.get("machines") or {}).items():
+            pd = machine.get("persistent_data")
+            if not pd or not isinstance(pd, dict):
+                continue
+            for vname, vconfig in pd.items():
+                if not isinstance(vconfig, dict):
+                    continue
+                pd_path = vconfig.get("path")
+                if pd_path:
+                    path_key = (mname, pd_path)
+                    if path_key in sv_mount_paths:
+                        errors.append(
+                            f"Machine '{mname}': persistent_data.{vname}: "
+                            f"duplicate mount path '{pd_path}' "
+                            f"(already used by shared_volume "
+                            f"'{sv_mount_paths[path_key]}')"
+                        )
 
     # Resource policy validation
     resource_policy = g.get("resource_policy")
@@ -810,6 +879,7 @@ def enrich_infra(infra):
     _enrich_ai_access(infra)
     _enrich_resources(infra)
     _enrich_shared_volumes(infra)
+    _enrich_persistent_data(infra)
 
 
 def _enrich_addressing(infra):
@@ -1225,6 +1295,45 @@ def _enrich_shared_volumes(infra):
     infra["_shared_volume_devices"] = sv_devices
 
 
+def _enrich_persistent_data(infra):
+    """Resolve persistent_data into per-machine disk devices (ADR-041).
+
+    Builds infra['_persistent_data_devices']: {machine_name: {device_name: device_dict}}.
+    Called from enrich_infra() after shared_volumes enrichment.
+    """
+    g = infra.get("global", {})
+    pd_base = g.get("persistent_data_base", "/srv/anklume/data")
+    domains = infra.get("domains") or {}
+
+    pd_devices = {}  # {machine_name: {device_name: device_dict}}
+
+    for domain in domains.values():
+        for mname, machine in (domain.get("machines") or {}).items():
+            pd = machine.get("persistent_data")
+            if not pd or not isinstance(pd, dict):
+                continue
+            for vname, vconfig in pd.items():
+                if not isinstance(vconfig, dict):
+                    continue
+                path = vconfig.get("path")
+                if not path:
+                    continue
+                source = f"{pd_base}/{mname}/{vname}"
+                readonly = vconfig.get("readonly", False)
+                device_name = f"pd-{vname}"
+                device = {
+                    "type": "disk",
+                    "source": source,
+                    "path": path,
+                    "shift": "true",
+                }
+                if readonly:
+                    device["readonly"] = "true"
+                pd_devices.setdefault(mname, {})[device_name] = device
+
+    infra["_persistent_data_devices"] = pd_devices
+
+
 def _apply_memory_enforce(infra):
     """Set limits.memory.enforce: soft on all machines with limits.memory."""
     for domain in (infra.get("domains") or {}).values():
@@ -1362,20 +1471,23 @@ def generate(infra, base_dir, dry_run=False):
 
         # host_vars/<machine>.yml
         sv_devices_map = infra.get("_shared_volume_devices") or {}
+        pd_devices_map = infra.get("_persistent_data_devices") or {}
         for mname, m in machines.items():
             machine_eph = m.get("ephemeral")
             instance_ephemeral = machine_eph if machine_eph is not None else domain_ephemeral
 
-            # Merge user devices + shared volume devices
+            # Merge user devices + shared volume devices + persistent data devices
             user_devices = m.get("devices")
             sv_devs = sv_devices_map.get(mname)
+            pd_devs = pd_devices_map.get(mname)
+            merged_devices = {}
             if sv_devs:
-                merged_devices = dict(sv_devs)  # sv-* first
-                if user_devices:
-                    merged_devices.update(user_devices)  # user overrides
-                final_devices = merged_devices
-            else:
-                final_devices = user_devices
+                merged_devices.update(sv_devs)  # sv-* first
+            if pd_devs:
+                merged_devices.update(pd_devs)  # pd-* second
+            if user_devices:
+                merged_devices.update(user_devices)  # user overrides
+            final_devices = merged_devices if merged_devices else user_devices
 
             hvars = {k: v for k, v in {
                 "instance_name": f"{prefix}{mname}",

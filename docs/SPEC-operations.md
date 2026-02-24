@@ -346,6 +346,20 @@ to converge idempotently.
 - Preserves: infra.yml, roles/, scripts/, docs/
 - Requires `FORCE=true` on production (`absolute_level == 0`, `yolo != true`)
 
+**Flush protection (ADR-042)**: Instances with
+`security.protection.delete=true` (set by `ephemeral: false`) are
+skipped by flush. Projects that still contain instances after the
+deletion pass are also skipped. Host data directories
+(`/srv/anklume/data/`, `/srv/anklume/shares/`) are never deleted.
+Set `FORCE=true` to bypass protection and delete all instances.
+
+**Targeted removal**: `make instance-remove` removes individual
+instances or domain scopes:
+- `make instance-remove I=<instance>` — single instance
+- `make instance-remove DOMAIN=<d> SCOPE=ephemeral` — ephemeral only
+- `make instance-remove DOMAIN=<d> SCOPE=all` — all in domain
+- Add `FORCE=true` to bypass protection on protected instances
+
 ### Upgrade
 
 `make upgrade` updates anklume framework files safely:
