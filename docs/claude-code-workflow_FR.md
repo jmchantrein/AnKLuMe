@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`claude-code-workflow.md`](claude-code-workflow.md). En cas de divergence, la version anglaise fait foi.
 
-Comment travailler efficacement sur AnKLuMe avec Claude Code.
+Comment travailler efficacement sur anklume avec Claude Code.
 
 ## Demarrer une session
 

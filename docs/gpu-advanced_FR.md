@@ -2,13 +2,13 @@
 
 > Traduction francaise de [`gpu-advanced.md`](gpu-advanced.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte le passthrough GPU pour les containers LXC et les VMs KVM,
+anklume supporte le passthrough GPU pour les containers LXC et les VMs KVM,
 avec une politique de securite qui controle combien d'instances peuvent
 acceder au GPU simultanement.
 
 ## Politique d'acces GPU (ADR-018)
 
-Par defaut, AnKLuMe applique un acces GPU **exclusif** : une seule instance
+Par defaut, anklume applique un acces GPU **exclusif** : une seule instance
 dans tous les domaines peut avoir acces au GPU. Cela previent les conflits
 de VRAM et les risques de securite lies a la memoire GPU partagee sur les
 GPUs grand public.

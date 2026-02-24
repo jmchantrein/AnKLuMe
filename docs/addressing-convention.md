@@ -1,6 +1,6 @@
 # Addressing Convention
 
-AnKLuMe encodes trust zones in IP addresses so that an administrator
+anklume encodes trust zones in IP addresses so that an administrator
 can determine the security posture of any machine from its IP alone.
 
 ## Scheme
@@ -130,7 +130,7 @@ Domain names should be short, English, descriptive of usage:
 
 ## Complete example
 
-Canonical AnKLuMe infrastructure:
+Canonical anklume infrastructure:
 
 ```
 IP               Machine           Domain       Zone       trust_level

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-image.sh — Build bootable AnKLuMe Live OS image
+# build-image.sh — Build bootable anklume Live OS image
 # Usage: build-image.sh [OPTIONS]
 #
 # Options:
@@ -64,7 +64,7 @@ trap cleanup EXIT
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
     echo ""
-    echo "Build a bootable AnKLuMe Live OS image with GPT partitions, squashfs, and dm-verity."
+    echo "Build a bootable anklume Live OS image with GPT partitions, squashfs, and dm-verity."
     echo ""
     echo "Options:"
     echo "  --output FILE     Output image file (default: anklume-live.img)"
@@ -244,7 +244,7 @@ bootstrap_rootfs_debian() {
 
     # Create fstab for dm-verity
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
-# AnKLuMe Live OS fstab
+# anklume Live OS fstab
 /dev/dm-0  /  squashfs  ro,defaults  0  0
 tmpfs      /tmp  tmpfs  mode=1777,nosuid,nodev,noexec  0  0
 tmpfs      /run  tmpfs  mode=0755,nosuid,nodev  0  0
@@ -258,7 +258,7 @@ FSTAB
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
 
-    # Copy AnKLuMe framework files
+    # Copy anklume framework files
     mkdir -p "$ROOTFS_DIR/opt/anklume"
     if [ -d "$PROJECT_ROOT/scripts" ]; then
         cp -r "$PROJECT_ROOT/scripts" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
@@ -266,7 +266,7 @@ FSTAB
     if [ -d "$PROJECT_ROOT/ansible" ]; then
         cp -r "$PROJECT_ROOT/ansible" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
     fi
-    info "  AnKLuMe framework files copied"
+    info "  anklume framework files copied"
 
     # Copy initramfs hooks
     if [ -d "$PROJECT_ROOT/host/boot/initramfs" ]; then
@@ -283,10 +283,10 @@ FSTAB
         info "  Systemd services installed"
     fi
 
-    # Enable AnKLuMe services in chroot
+    # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
-    info "  AnKLuMe services enabled"
+    info "  anklume services enabled"
 
     # Generate initramfs in chroot
     chroot "$ROOTFS_DIR" update-initramfs -c -k all >/dev/null 2>&1 || true
@@ -328,7 +328,7 @@ bootstrap_rootfs_arch() {
 
     # Create fstab for dm-verity
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
-# AnKLuMe Live OS fstab
+# anklume Live OS fstab
 /dev/dm-0  /  squashfs  ro,defaults  0  0
 tmpfs      /tmp  tmpfs  mode=1777,nosuid,nodev,noexec  0  0
 tmpfs      /run  tmpfs  mode=0755,nosuid,nodev  0  0
@@ -345,7 +345,7 @@ FSTAB
     ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
     info "  Timezone configured"
 
-    # Copy AnKLuMe framework files
+    # Copy anklume framework files
     mkdir -p "$ROOTFS_DIR/opt/anklume"
     if [ -d "$PROJECT_ROOT/scripts" ]; then
         cp -r "$PROJECT_ROOT/scripts" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
@@ -353,7 +353,7 @@ FSTAB
     if [ -d "$PROJECT_ROOT/ansible" ]; then
         cp -r "$PROJECT_ROOT/ansible" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
     fi
-    info "  AnKLuMe framework files copied"
+    info "  anklume framework files copied"
 
     # Copy mkinitcpio hooks
     # ZFS not included by default on Arch (requires archzfs repo). Use BTRFS.
@@ -386,10 +386,10 @@ FSTAB
         info "  Systemd services installed"
     fi
 
-    # Enable AnKLuMe services in chroot
+    # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
-    info "  AnKLuMe services enabled"
+    info "  anklume services enabled"
 
     # Generate initramfs in chroot
     chroot "$ROOTFS_DIR" mkinitcpio -P >/dev/null 2>&1 || true
@@ -562,7 +562,7 @@ LOADER
 
     # Entry for slot A (current)
     cat > "$efi_mount/loader/entries/anklume-a.conf" << ENTRY_A
-title           AnKLuMe (Slot A)
+title           anklume (Slot A)
 linux           /vmlinuz
 initrd          /initrd.img
 options         root=/dev/dm-0 ro anklume.slot=A anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0
@@ -572,7 +572,7 @@ ENTRY_A
 
     # Entry for slot B (fallback)
     cat > "$efi_mount/loader/entries/anklume-b.conf" << ENTRY_B
-title           AnKLuMe (Slot B)
+title           anklume (Slot B)
 linux           /vmlinuz
 initrd          /initrd.img
 options         root=/dev/dm-0 ro anklume.slot=B anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0
@@ -621,7 +621,7 @@ print_summary() {
     img_size=$(stat -f%z "$OUTPUT" 2>/dev/null || stat -c%s "$OUTPUT")
 
     echo ""
-    echo "=== AnKLuMe Live OS Build Complete ==="
+    echo "=== anklume Live OS Build Complete ==="
     echo "Image file:      $OUTPUT"
     echo "Image size:      $((img_size / 1024 / 1024 / 1024))GB ($img_size bytes)"
     echo "Base distro:     $BASE"
@@ -637,7 +637,7 @@ print_summary() {
     echo ""
     echo "Next steps:"
     echo "  1. Write image to USB: sudo dd if=$OUTPUT of=/dev/sdX bs=4M status=progress"
-    echo "  2. Boot from USB and select AnKLuMe from boot menu"
+    echo "  2. Boot from USB and select anklume from boot menu"
     echo "  3. System will load into RAM (toram) for performance"
     echo ""
 }
@@ -657,7 +657,7 @@ main() {
         esac
     done
 
-    echo "=== AnKLuMe Live OS Image Builder ==="
+    echo "=== anklume Live OS Image Builder ==="
 
     # Create work directory
     WORK_DIR=$(mktemp -d)

@@ -10,6 +10,6 @@ build() {
 
 help() {
     cat <<HELPEOF
-AnKLuMe: dm-verity integrity verification for squashfs root
+anklume: dm-verity integrity verification for squashfs root
 HELPEOF
 }

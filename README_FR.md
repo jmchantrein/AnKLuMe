@@ -4,11 +4,11 @@
 > de divergence.
 
 <!-- Badges -->
-[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
+[![CI](https://github.com/jmchantrein/anklume/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/anklume/actions)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![Last commit](https://img.shields.io/github/last-commit/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/commits/main)
-[![Issues](https://img.shields.io/github/issues/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/pulls)
+[![Last commit](https://img.shields.io/github/last-commit/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/commits/main)
+[![Issues](https://img.shields.io/github/issues/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/pulls)
 
 <!-- Badges statiques — stack technique -->
 [![Ansible](https://img.shields.io/badge/ansible-%3E%3D2.16-EE0000?logo=ansible&logoColor=white)](https://www.ansible.com/)
@@ -32,13 +32,13 @@ Isolation type QubesOS utilisant les fonctionnalites natives du noyau
 Linux (KVM/LXC), orchestree sereinement par vous en assemblant des
 outils standards eprouves.
 
-> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) => **AnKLuMe** — de "enclume", traduction francaise d'[Incus](https://linuxcontainers.org/incus/) (enclume)
+> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) => **anklume** — de "enclume", traduction francaise d'[Incus](https://linuxcontainers.org/incus/) (enclume)
 
 ---
 
-## Qu'est-ce qu'AnKLuMe ?
+## Qu'est-ce qu'anklume ?
 
-AnKLuMe est un framework declaratif de cloisonnement d'infrastructure.
+anklume est un framework declaratif de cloisonnement d'infrastructure.
 Vous decrivez vos environnements isoles dans un seul fichier YAML, lancez
 deux commandes, et obtenez des domaines reproductibles, jetables et isoles
 par reseau — chacun avec son propre sous-reseau, projet Incus et ensemble
@@ -48,7 +48,7 @@ La philosophie [QubesOS](https://www.qubes-os.org/), mais :
 - **Pas d'OS dedie** — fonctionne sur n'importe quelle distribution Linux
 - **Pas de Xen** — utilise les fonctionnalites natives du noyau (KVM pour les VMs, LXC pour les containers)
 - **Pas de boite noire** — des outils standards que vous connaissez deja, assembles intelligemment
-- **Declaratif** — decrivez ce que vous voulez, AnKLuMe converge
+- **Declaratif** — decrivez ce que vous voulez, anklume converge
 
 ## Pour qui ?
 
@@ -76,7 +76,7 @@ infra.yml          ->    make sync    ->    Fichiers Ansible  ->    make apply  
 
 ## Prerequis
 
-Avant d'utiliser AnKLuMe, il vous faut :
+Avant d'utiliser anklume, il vous faut :
 
 1. **Un hote Linux** avec [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
    installe et initialise
@@ -85,15 +85,15 @@ Avant d'utiliser AnKLuMe, il vous faut :
    - Ansible, Python 3.11+, git installes
 3. **Ce depot** clone dans l'instance anklume
 
-AnKLuMe s'execute entierement depuis l'instance anklume. Il ne modifie
+anklume s'execute entierement depuis l'instance anklume. Il ne modifie
 jamais l'hote directement — tout passe par le socket Incus.
 
 ## Demarrage rapide
 
 ```bash
 # Dans le container anklume-instance :
-git clone https://github.com/jmchantrein/AnKLuMe.git
-cd AnKLuMe
+git clone https://github.com/jmchantrein/anklume.git
+cd anklume
 
 # Installer les dependances Ansible
 make init
@@ -225,7 +225,7 @@ Configurations `infra.yml` pretes a l'emploi :
 | [Poste professionnel](examples/pro-workstation/) | Anklume/pro/perso/homelab avec GPU |
 | [Sandbox isolation](examples/sandbox-isolation/) | Isolation maximale pour logiciels non fiables |
 | [Superviseur LLM](examples/llm-supervisor/) | 2 LLMs isoles + 1 superviseur |
-| [Developpeur](examples/developer/) | Environnement dev AnKLuMe avec Incus-dans-Incus |
+| [Developpeur](examples/developer/) | Environnement dev anklume avec Incus-dans-Incus |
 | [Outils IA](examples/ai-tools/) | Stack IA complete (Ollama, WebUI, LobeChat, STT) |
 | [Passerelle Tor](examples/tor-gateway/) | Navigation anonyme via proxy transparent Tor |
 | [Service d'impression](examples/sys-print/) | Serveur CUPS dedie avec imprimantes USB/reseau |
@@ -277,7 +277,7 @@ Configurations `infra.yml` pretes a l'emploi :
 | `make nftables` | Generer les regles d'isolation nftables |
 | `make nftables-deploy` | Deployer les regles sur l'hote |
 | `make snap I=<nom>` | Creer un snapshot |
-| `make flush` | Detruire toute l'infrastructure AnKLuMe |
+| `make flush` | Detruire toute l'infrastructure anklume |
 | `make upgrade` | Mise a jour securisee du framework |
 | `make import-infra` | Generer infra.yml depuis l'etat Incus existant |
 | `make help` | Lister toutes les commandes disponibles |
@@ -295,6 +295,64 @@ Configurations `infra.yml` pretes a l'emploi :
 | [nftables](https://netfilter.org/projects/nftables/) | -- | Isolation inter-bridges |
 | [shellcheck](https://www.shellcheck.net/) | -- | Validation scripts shell |
 | [ruff](https://docs.astral.sh/ruff/) | -- | Linting Python |
+
+## Credits
+
+anklume est un framework d'assemblage — il orchestre ces excellents projets
+open-source (ADR-040) :
+
+### Infrastructure
+
+| Outil | Role |
+|-------|------|
+| [Incus](https://linuxcontainers.org/incus/) | Containers LXC + machines virtuelles KVM |
+| [Ansible](https://www.ansible.com/) | Orchestration, roles, playbooks |
+| [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) | Plugin de connexion Incus pour Ansible |
+| [nftables](https://netfilter.org/projects/nftables/) | Isolation reseau inter-bridges |
+| [Python](https://www.python.org/) | Generateur PSOT et scripts |
+| [PyYAML](https://pyyaml.org/) | Parsing YAML pour le generateur |
+| [Noyau Linux](https://kernel.org/) | KVM, LXC, namespaces, cgroups |
+
+### Services IA / ML
+
+| Outil | Role |
+|-------|------|
+| [Ollama](https://ollama.com/) | Serveur d'inference LLM local |
+| [Open WebUI](https://openwebui.com/) | Interface de chat pour LLMs |
+| [LobeChat](https://lobechat.com/) | Interface web multi-fournisseurs |
+| [Speaches](https://github.com/speaches-ai/speaches) | Reconnaissance vocale (faster-whisper, API OpenAI-compatible) |
+| [OpenCode](https://opencode.ai/) | Serveur de codage IA headless |
+| [OpenClaw](https://github.com/openclaw-ai/openclaw) | Assistant IA auto-heberge |
+
+### Qualite et tests
+
+| Outil | Role |
+|-------|------|
+| [Molecule](https://molecule.readthedocs.io/) | Tests des roles Ansible |
+| [pytest](https://docs.pytest.org/) | Tests generateur et BDD |
+| [Hypothesis](https://hypothesis.readthedocs.io/) | Tests bases sur les proprietes |
+| [ansible-lint](https://ansible.readthedocs.io/projects/lint/) | Linting Ansible |
+| [yamllint](https://yamllint.readthedocs.io/) | Validation YAML |
+| [shellcheck](https://www.shellcheck.net/) | Validation scripts shell |
+| [ruff](https://docs.astral.sh/ruff/) | Linting Python |
+
+### Bureau et reseau
+
+| Outil | Role |
+|-------|------|
+| [tmux](https://github.com/tmux/tmux) | Multiplexeur de terminaux pour la console coloree |
+| [libtmux](https://libtmux.git-pull.com/) | API Python pour tmux |
+| [Tor](https://www.torproject.org/) | Passerelle de routage anonyme |
+| [CUPS](https://openprinting.github.io/cups/) | Serveur d'impression |
+
+### Developpement
+
+| Outil | Role |
+|-------|------|
+| [Claude Code](https://claude.ai/claude-code) | Developpement assiste par IA |
+| [Aider](https://aider.chat/) | Codage assiste par IA |
+| [uv](https://docs.astral.sh/uv/) | Gestion des paquets Python |
+| [Git](https://git-scm.com/) | Controle de version |
 
 ## Licence
 

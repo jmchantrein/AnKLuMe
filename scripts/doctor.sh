@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# doctor.sh — AnKLuMe infrastructure health checker and auto-fixer
+# doctor.sh — anklume infrastructure health checker and auto-fixer
 #
 # Usage:
 #   scripts/doctor.sh                    # Diagnose all categories
@@ -356,7 +356,7 @@ run_deps_checks() {
 
 # ── Main ────────────────────────────────────────────────────
 
-printf "%bAnKLuMe Doctor%b — checking infrastructure health...\n" "$BOLD" "$RESET"
+printf "%banklume Doctor%b — checking infrastructure health...\n" "$BOLD" "$RESET"
 if $FIX; then printf "(auto-fix mode enabled)\n"; fi
 
 case "$CATEGORY" in

@@ -1,5 +1,5 @@
 ---
-# snapshot.yml — Snapshot management for AnKLuMe instances
+# snapshot.yml — Snapshot management for anklume instances
 #
 # Standalone playbook (not part of site.yml). Snapshots are an operational
 # action, not a desired-state reconciliation (ADR-013).

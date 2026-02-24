@@ -1,6 +1,6 @@
 # Disposable Instances
 
-AnKLuMe supports on-demand, auto-destroyed instances using Incus native
+anklume supports on-demand, auto-destroyed instances using Incus native
 `--ephemeral` flag. Disposable instances are ideal for one-time tasks,
 untrusted software testing, and temporary sandboxes.
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=AnKLuMe Data Pool Mount
+Description=anklume Data Pool Mount
 ConditionPathExists=/mnt/anklume-persist/pool.conf
 After=local-fs.target
 Before=incus.service

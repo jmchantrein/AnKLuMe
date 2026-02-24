@@ -2,7 +2,7 @@
 
 ## Introduction
 
-AnKLuMe Live OS enables compartmentalized infrastructure to run from a USB boot media with encrypted persistent data on a separate disk. Boot into a live OS, run containers immediately, and maintain state across reboots.
+anklume Live OS enables compartmentalized infrastructure to run from a USB boot media with encrypted persistent data on a separate disk. Boot into a live OS, run containers immediately, and maintain state across reboots.
 
 **Key features:**
 - Boot from USB (no installation required)
@@ -290,7 +290,7 @@ Add kernel parameter: `anklume.toram=1`
 
 ## Arch Linux Support
 
-AnKLuMe Live OS can be built with Arch Linux as the base OS, providing a lightweight alternative to Debian.
+anklume Live OS can be built with Arch Linux as the base OS, providing a lightweight alternative to Debian.
 
 ### Build with Arch
 
@@ -358,7 +358,7 @@ sudo pacman -S btrfs-progs           # for BTRFS pool creation
 
 ## Ventoy Compatibility
 
-AnKLuMe Live OS images (both Arch and Debian) are fully compatible with [Ventoy](https://www.ventoy.net/), a USB boot manager that simplifies multiboot setups.
+anklume Live OS images (both Arch and Debian) are fully compatible with [Ventoy](https://www.ventoy.net/), a USB boot manager that simplifies multiboot setups.
 
 ### Multiboot USB
 
@@ -393,7 +393,7 @@ By default, `anklume.toram=1` is active in bootloader configuration:
 
 ## Checksums
 
-AnKLuMe Live OS builds automatically generate SHA256 checksums.
+anklume Live OS builds automatically generate SHA256 checksums.
 
 ### Automatic Generation
 

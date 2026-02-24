@@ -13,7 +13,7 @@ validation.
 | [pro-workstation](pro-workstation/) | 4 | 5 | Yes | Compartmentalized workstation with AI homelab (LLM + STT) |
 | [sandbox-isolation](sandbox-isolation/) | 2 | 3 | No | Maximum isolation for untrusted software |
 | [llm-supervisor](llm-supervisor/) | 4 | 5 | Yes | 2 LLMs + supervisor for multi-model orchestration |
-| [developer](developer/) | 2 | 3 | No | AnKLuMe dev setup with Incus-in-Incus testing |
+| [developer](developer/) | 2 | 3 | No | anklume dev setup with Incus-in-Incus testing |
 
 ## Usage
 

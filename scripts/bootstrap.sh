@@ -190,12 +190,12 @@ setup_container_devices() {
     if incus config device show "$container_name" --project "$project" 2>/dev/null | grep -q "anklume-repo"; then
         ok "Repo bind mount already configured"
     else
-        info "Adding repo bind mount ($PROJECT_ROOT -> /root/AnKLuMe)..."
+        info "Adding repo bind mount ($PROJECT_ROOT -> /root/anklume)..."
         incus config device add "$container_name" anklume-repo disk \
             source="$PROJECT_ROOT" \
-            path=/root/AnKLuMe \
+            path=/root/anklume \
             --project "$project"
-        ok "Repo bind-mounted at /root/AnKLuMe"
+        ok "Repo bind-mounted at /root/anklume"
     fi
 }
 
@@ -231,13 +231,13 @@ first_apply() {
 
     local exec_cmd="incus exec $container_name --project $project --"
 
-    if $exec_cmd test -f /root/AnKLuMe/Makefile 2>/dev/null; then
+    if $exec_cmd test -f /root/anklume/Makefile 2>/dev/null; then
         info "Running first apply (make sync && make apply)..."
-        $exec_cmd bash -c "cd /root/AnKLuMe && make sync && make apply"
+        $exec_cmd bash -c "cd /root/anklume && make sync && make apply"
         ok "First apply completed"
     else
         warn "Makefile not found — skipping first apply"
-        warn "Run manually: incus exec $container_name --project $project -- bash -c 'cd /root/AnKLuMe && make sync && make apply'"
+        warn "Run manually: incus exec $container_name --project $project -- bash -c 'cd /root/anklume && make sync && make apply'"
     fi
 }
 

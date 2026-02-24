@@ -1,6 +1,6 @@
 # Matrix: PG-001
 Feature: Apply without sync
-  AnKLuMe must detect when the user skips the generate step and
+  anklume must detect when the user skips the generate step and
   provides clear guidance to run "make sync" first.
 
   Background:

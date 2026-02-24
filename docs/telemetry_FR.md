@@ -2,7 +2,7 @@
 
 > Note : La version anglaise (`telemetry.md`) fait foi en cas de divergence.
 
-AnKLuMe inclut une telemetry optionnelle et purement locale pour vous
+anklume inclut une telemetry optionnelle et purement locale pour vous
 aider a comprendre vos habitudes d'utilisation. Les donnees ne quittent
 jamais votre machine.
 

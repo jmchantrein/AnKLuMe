@@ -3,7 +3,7 @@
 > **Note** : La version anglaise (`mcp-services.md`) fait foi en cas
 > de divergence.
 
-AnKLuMe fournit une exposition controllee de services entre conteneurs
+anklume fournit une exposition controllee de services entre conteneurs
 via MCP (Model Context Protocol) et les proxy devices Incus. Un
 conteneur peut declarer des services que d'autres conteneurs sont
 autorises a appeler, avec un controle d'acces par liste blanche dans
@@ -115,12 +115,12 @@ Le generateur PSOT valide les declarations de services :
 
 ### Pourquoi le SDK officiel `mcp`
 
-AnKLuMe utilise le SDK Python MCP officiel (`pip install mcp`) avec le
+anklume utilise le SDK Python MCP officiel (`pip install mcp`) avec le
 framework serveur FastMCP et le client ClientSession. Cela fournit une
 implementation correcte du protocole, la negociation automatique des
 capacites, des definitions de tools type-safe via decorateurs, et une
 compatibilite future avec l'evolution du protocole MCP. La dependance
-est acceptable — AnKLuMe requiert deja des paquets pip (pyyaml, pytest,
+est acceptable — anklume requiert deja des paquets pip (pyyaml, pytest,
 libtmux).
 
 ### Transport

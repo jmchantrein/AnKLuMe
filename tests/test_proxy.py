@@ -1,4 +1,4 @@
-"""Tests for the AnKLuMe OpenClaw proxy (scripts/mcp-anklume-dev.py).
+"""Tests for the anklume OpenClaw proxy (scripts/mcp-anklume-dev.py).
 
 Covers:
 - Script quality (ruff clean, valid Python)
@@ -70,7 +70,7 @@ class TestBrainModes:
     def test_brain_modes_have_descriptions(self):
         """Each brain mode has a description string."""
         # Each entry is ("model_string", "description")
-        assert "expert AnKLuMe" in self.content
+        assert "expert anklume" in self.content
         assert "assistant" in self.content.lower()
 
     def test_ollama_backend_constants(self):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""code-audit.py — Codebase audit report for AnKLuMe.
+"""code-audit.py — Codebase audit report for anklume.
 
 Produces a structured report with:
 - Dead code detection (delegates to scripts/code-analysis.sh dead-code)
@@ -264,7 +264,7 @@ def print_report(report):
     """Print a human-readable report to stdout."""
     s = report["summary"]
     print("=" * 60)
-    print("  AnKLuMe Code Audit Report")
+    print("  anklume Code Audit Report")
     print("=" * 60)
     print()
 
@@ -328,7 +328,7 @@ def print_report(report):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AnKLuMe codebase audit report")
+    parser = argparse.ArgumentParser(description="anklume codebase audit report")
     parser.add_argument(
         "--json", action="store_true", help="Output as JSON instead of text"
     )

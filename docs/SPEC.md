@@ -1,15 +1,15 @@
-# SPEC.md — AnKLuMe Specification
+# SPEC.md — anklume Specification
 
 ## 1. Vision
 
-AnKLuMe is a declarative infrastructure compartmentalization
+anklume is a declarative infrastructure compartmentalization
 framework. It provides QubesOS-like isolation using native
 Linux kernel features (KVM/LXC), with optional integrated AI
 capabilities.
 
 The user describes their infrastructure in a single YAML file
 (`infra.yml`), runs `make sync && make apply`, and gets
-isolated, reproducible, disposable environments. AnKLuMe
+isolated, reproducible, disposable environments. anklume
 abstracts away the complexity of the underlying technologies
 (Incus, Ansible, nftables) behind a high-level declarative
 format — mastering these tools is beneficial but not required.
@@ -22,7 +22,7 @@ enterprise conventions:
   network segmentation practices
 - All defaults are configurable for custom environments
 
-Optionally, AnKLuMe integrates AI assistants into the
+Optionally, anklume integrates AI assistants into the
 compartmentalized infrastructure:
 - Per-domain AI assistants respecting network boundaries
 - Local-first LLM inference (GPU) with optional cloud
@@ -277,7 +277,7 @@ these via `incus config set snapshots.schedule` and `snapshots.expiry`.
 
 The optional `nesting_prefix` boolean in `global:` enables prefixing
 all Incus resource names with the nesting level. This prevents name
-collisions when running AnKLuMe nested inside another AnKLuMe instance.
+collisions when running anklume nested inside another anklume instance.
 
 ```yaml
 global:
@@ -301,7 +301,7 @@ Incus-facing names stored in variables (`incus_project`, `incus_network.name`,
 `instance_name`). Ansible roles consume these variables transparently.
 
 When `nesting_prefix: false`, no prefix is applied. This is useful when
-running AnKLuMe directly on a physical host with no nesting.
+running anklume directly on a physical host with no nesting.
 
 ### Trust levels
 
@@ -398,7 +398,7 @@ The generator enforces a security policy based on nesting context:
 
 - **`security.privileged: true`** is forbidden on LXC containers when
   `vm_nested` is `false` (i.e., no VM exists in the chain above the
-  current AnKLuMe instance). Only VMs provide sufficient hardware
+  current anklume instance). Only VMs provide sufficient hardware
   isolation for privileged workloads.
 - The `vm_nested` flag is auto-detected at bootstrap via
   `systemd-detect-virt` and propagated to all child instances.
@@ -547,7 +547,7 @@ shared_volumes:
   Default: `true`. Required for unprivileged containers to access
   host-owned files.
 - `propagate`: if `true`, the volume is also mounted in instances that
-  have `security.nesting=true` in their config, allowing nested AnKLuMe
+  have `security.nesting=true` in their config, allowing nested anklume
   instances to re-declare the volume. Default: `false`.
 - `consumers`: mapping of domain or machine names to access mode
   (`ro` or `rw`). Machine-level entries override domain-level entries
@@ -567,7 +567,7 @@ handles arbitrary disk devices.
   `instance_devices`. Validation prevents naming collisions.
 
 **Cross-nesting**: `propagate: true` mounts the volume in
-nesting-enabled instances. The child AnKLuMe can then re-declare the
+nesting-enabled instances. The child anklume can then re-declare the
 volume with `source:` pointing to the propagated mount path. There is
 no automatic recursive propagation — each nesting level must explicitly
 declare its volumes.

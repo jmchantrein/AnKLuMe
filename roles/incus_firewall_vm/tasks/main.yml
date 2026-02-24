@@ -2,7 +2,7 @@
 # IncusFirewallVM | Create multi-NIC profile for the firewall VM
 #
 # Runs on the controller via connection:local (ADR-015).
-# Discovers all AnKLuMe bridges and creates a profile with one
+# Discovers all anklume bridges and creates a profile with one
 # NIC per bridge. The sys-firewall VM uses this profile to have
 # network presence on every domain bridge.
 #
@@ -15,7 +15,7 @@
   changed_when: false
   check_mode: false
 
-- name: IncusFirewallVM | Filter AnKLuMe bridges
+- name: IncusFirewallVM | Filter anklume bridges
   ansible.builtin.set_fact:
     incus_firewall_vm_bridges: >-
       {{ incus_firewall_vm_networks_raw.stdout | from_json

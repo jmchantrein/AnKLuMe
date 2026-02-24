@@ -1,6 +1,6 @@
 # GPU Passthrough and LLM Guide
 
-This guide explains how to configure GPU passthrough in AnKLuMe for
+This guide explains how to configure GPU passthrough in anklume for
 running local LLM inference with Ollama and Open WebUI.
 
 ## Prerequisites
@@ -42,7 +42,7 @@ complete working example. Key configuration points:
 
 ## GPU policy (ADR-018)
 
-By default, AnKLuMe enforces an **exclusive** GPU policy: only one
+By default, anklume enforces an **exclusive** GPU policy: only one
 instance across all domains can have GPU access. This prevents
 conflicts from multiple containers sharing the same GPU without
 isolation.

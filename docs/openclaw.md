@@ -1,10 +1,10 @@
 # OpenClaw — Self-Hosted AI Assistant
 
-AnKLuMe integrates [OpenClaw](https://github.com/openclaw/openclaw), an
+anklume integrates [OpenClaw](https://github.com/openclaw/openclaw), an
 open-source, self-hosted AI assistant that connects to messaging platforms
 (Telegram, WhatsApp, Signal, Discord, etc.) and drives multiple LLM backends.
 
-Running OpenClaw inside AnKLuMe provides network isolation, controlled
+Running OpenClaw inside anklume provides network isolation, controlled
 messaging access, and local LLM delegation for privacy-sensitive queries.
 
 ## Architecture
@@ -37,7 +37,7 @@ The reason is **Claude Code CLI licensing**. Claude modes (anklume and
 assistant) use Claude Code CLI, which requires a valid Anthropic
 subscription (Max plan). Claude Code authenticates via OAuth tokens
 stored in `~/.claude/`. These credentials live on `anklume-instance`
-(synced from the host) because that container is the AnKLuMe control
+(synced from the host) because that container is the anklume control
 plane — it has the Incus socket, the project repository, and Ansible.
 
 Running Claude Code directly in `openclaw` would require duplicating
@@ -70,7 +70,7 @@ at any time by messaging "passe en mode anklume", "switch to local", etc.
 
 | Mode | Backend | Description |
 |------|---------|-------------|
-| **anklume** | Claude Code (Opus) | Expert AnKLuMe: infra, Ansible, Incus, networking |
+| **anklume** | Claude Code (Opus) | Expert anklume: infra, Ansible, Incus, networking |
 | **assistant** | Claude Code (Opus) | General-purpose assistant (Ada persona) |
 | **local** | qwen3:30b-a3b (MoE) | Free, fast local LLM via Ollama on GPU |
 
@@ -136,13 +136,13 @@ The proxy on `anklume-instance:9090` exposes:
 Ada works directly in her `openclaw` container (where she is root) using
 `/api/incus_exec` with `instance: openclaw`. The container has internet
 access, Incus nesting (`security.nesting=true`), and a git clone of
-AnKLuMe at `/root/AnKLuMe/`. This allows full development, testing, and
+anklume at `/root/anklume/`. This allows full development, testing, and
 PR creation without creating additional containers.
 
 ## Agent reproducibility (ADR-036)
 
 All agent operational knowledge is stored as Jinja2 templates in the
-AnKLuMe repository (`roles/openclaw_server/templates/`). Every
+anklume repository (`roles/openclaw_server/templates/`). Every
 `make apply` deploys these templates to the agent's workspace,
 **overwriting** the previous versions. The git repository is the
 single source of truth.
@@ -183,7 +183,7 @@ Ada has two self-improvement loops:
 
 ### Framework contribution (primary loop)
 
-Ada improves her own operational knowledge AND the AnKLuMe framework
+Ada improves her own operational knowledge AND the anklume framework
 by contributing through the standard git workflow:
 
 ```
@@ -220,7 +220,7 @@ and is the only workspace file that does not go through the PR workflow.
 
 ## Value-add over native OpenClaw
 
-The AnKLuMe proxy architecture extends OpenClaw with capabilities
+The anklume proxy architecture extends OpenClaw with capabilities
 that go beyond what OpenClaw provides natively. Here is a comparison
 of what each layer brings:
 
@@ -307,7 +307,7 @@ isolation while still enabling web access through the bridge.
 
 **Native OpenClaw**: `openclaw update` updates itself.
 
-**With proxy**: the `self_upgrade` tool can check and apply AnKLuMe
+**With proxy**: the `self_upgrade` tool can check and apply anklume
 framework updates, re-sync configuration (`make sync`), and
 re-provision the openclaw container — all from a Telegram message.
 
@@ -323,7 +323,7 @@ auto-cleaned after 1 hour of inactivity.
 
 ### Summary table
 
-| Capability | Native OpenClaw | With AnKLuMe proxy |
+| Capability | Native OpenClaw | With anklume proxy |
 |------------|-----------------|-------------------|
 | LLM brain | API text completion | Agentic coding (tool use) |
 | Command scope | Own container only | Any Incus container |
@@ -339,7 +339,7 @@ auto-cleaned after 1 hour of inactivity.
 ## Deployment
 
 ### Prerequisites
-- AnKLuMe deployed with the `ai-tools` domain
+- anklume deployed with the `ai-tools` domain
 - Ollama running on `gpu-server` with a model loaded
 - A Telegram bot token (from [@BotFather](https://t.me/BotFather))
 

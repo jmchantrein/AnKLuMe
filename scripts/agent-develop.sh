@@ -16,7 +16,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # ── Configuration ────────────────────────────────────────────
 RUNNER_NAME="${ANKLUME_RUNNER_NAME:-anklume}"
 RUNNER_PROJECT="${ANKLUME_RUNNER_PROJECT:-default}"
-REPO_DIR="/root/AnKLuMe"
+REPO_DIR="/root/anklume"
 LOG_DIR="${ANKLUME_AGENT_LOG_DIR:-logs}"
 SESSION_ID="agent-dev-$(date +%Y%m%d-%H%M%S)"
 SESSION_LOG="${LOG_DIR}/${SESSION_ID}.log"

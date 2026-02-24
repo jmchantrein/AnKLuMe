@@ -1,6 +1,6 @@
 # Local Telemetry
 
-AnKLuMe includes opt-in, local-only telemetry to help you understand
+anklume includes opt-in, local-only telemetry to help you understand
 your usage patterns. Data never leaves your machine.
 
 ## Privacy Guarantees

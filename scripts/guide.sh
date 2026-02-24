@@ -73,7 +73,7 @@ header() {
     clear 2>/dev/null || true
     echo -e "${CYAN}${BOLD}"
     echo "  ┌─────────────────────────────────────────┐"
-    echo "  │         AnKLuMe Setup Guide              │"
+    echo "  │         anklume Setup Guide              │"
     echo "  │   Infrastructure Compartmentalization    │"
     echo "  └─────────────────────────────────────────┘"
     echo -e "${RESET}"
@@ -186,7 +186,7 @@ container_running() {
 step_0_environment() {
     step_header 0 "Environment Detection"
 
-    echo "  AnKLuMe uses an admin container (${CONTAINER_NAME}) as its"
+    echo "  anklume uses an admin container (${CONTAINER_NAME}) as its"
     echo "  control center. All infrastructure management happens from inside it."
     echo ""
 
@@ -233,7 +233,7 @@ step_0_environment() {
 
         # Offer to delegate to the container
         echo "  The guide will now continue inside ${CONTAINER_NAME}."
-        echo "  This is where all AnKLuMe commands run."
+        echo "  This is where all anklume commands run."
         echo ""
 
         if [[ "$AUTO" == "true" ]]; then
@@ -246,24 +246,24 @@ step_0_environment() {
             fi
             # shellcheck disable=SC2086
             exec incus exec "$CONTAINER_NAME" -- bash -c \
-                "cd /root/AnKLuMe && bash scripts/guide.sh --auto $step_arg"
+                "cd /root/anklume && bash scripts/guide.sh --auto $step_arg"
         fi
 
         echo -e "  ${BOLD}How to enter the admin container manually:${RESET}"
         echo ""
         echo -e "    ${CYAN}incus exec ${CONTAINER_NAME} -- bash${RESET}"
-        echo -e "    ${CYAN}cd /root/AnKLuMe${RESET}"
+        echo -e "    ${CYAN}cd /root/anklume${RESET}"
         echo ""
 
         if confirm "Continue the guide inside ${CONTAINER_NAME}?"; then
             local step_arg="--step 1"
             exec incus exec "$CONTAINER_NAME" -- bash -c \
-                "cd /root/AnKLuMe && bash scripts/guide.sh $step_arg"
+                "cd /root/anklume && bash scripts/guide.sh $step_arg"
         else
             echo ""
             info "To resume later from inside the container:"
             echo -e "    ${CYAN}incus exec ${CONTAINER_NAME} -- bash${RESET}"
-            echo -e "    ${CYAN}cd /root/AnKLuMe && make guide${RESET}"
+            echo -e "    ${CYAN}cd /root/anklume && make guide${RESET}"
             exit 0
         fi
     else
@@ -271,7 +271,7 @@ step_0_environment() {
         echo ""
 
         if [[ "$(hostname 2>/dev/null)" == "$CONTAINER_NAME" ]] || \
-           [[ -d /root/AnKLuMe ]]; then
+           [[ -d /root/anklume ]]; then
             ok "This looks like the admin container — good!"
         else
             warn "This does not look like ${CONTAINER_NAME}"
@@ -377,7 +377,7 @@ step_1_prerequisites() {
 
 step_2_use_case() {
     step_header 2 "Use Case Selection"
-    echo "  AnKLuMe ships with example configurations for common use cases."
+    echo "  anklume ships with example configurations for common use cases."
     echo "  Each example includes a ready-to-use infra.yml."
     echo ""
 
@@ -637,9 +637,9 @@ step_7_verify() {
     echo ""
     echo "  Networks:"
     if incus network list --format compact 2>/dev/null | grep "net-" | sed 's/^/    /'; then
-        ok "AnKLuMe networks found"
+        ok "anklume networks found"
     else
-        warn "No AnKLuMe networks found (net-* pattern)"
+        warn "No anklume networks found (net-* pattern)"
     fi
 
     pause
@@ -725,7 +725,7 @@ for i in sorted(data, key=lambda x: x.get('project','')):
 
 step_10_next_steps() {
     step_header 10 "Next Steps"
-    echo "  Your AnKLuMe infrastructure is set up. Here is what to explore next:"
+    echo "  Your anklume infrastructure is set up. Here is what to explore next:"
     echo ""
     echo -e "  ${CYAN}Network isolation${RESET}"
     info "  Block traffic between domains with nftables"

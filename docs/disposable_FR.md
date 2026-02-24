@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`disposable.md`](disposable.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte les instances a la demande, auto-detruites, en
+anklume supporte les instances a la demande, auto-detruites, en
 utilisant le drapeau natif `--ephemeral` d'Incus. Les instances jetables
 sont ideales pour les taches ponctuelles, les tests de logiciels non
 fiables et les bacs a sable temporaires.

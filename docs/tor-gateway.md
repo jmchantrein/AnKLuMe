@@ -1,6 +1,6 @@
 # Tor Gateway
 
-AnKLuMe supports setting up a Tor transparent proxy inside a container.
+anklume supports setting up a Tor transparent proxy inside a container.
 Traffic from selected domains can be routed through the gateway for
 anonymous internet access, controlled by `network_policies` in `infra.yml`.
 

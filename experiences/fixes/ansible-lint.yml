@@ -1,10 +1,10 @@
-# Ansible-lint fix patterns extracted from AnKLuMe git history.
+# Ansible-lint fix patterns extracted from anklume git history.
 # Each entry documents a known violation and its resolution.
 ---
 - id: FIX-LINT-001
   category: ansible-lint
   problem: "meta/main.yml missing author or license field"
-  solution: "Add author: AnKLuMe and license: AGPL-3.0 to galaxy_info"
+  solution: "Add author: anklume and license: AGPL-3.0 to galaxy_info"
   source_commit: "bd1852f"
   files_affected: ["roles/*/meta/main.yml"]
   prevention: "Template in molecule/shared/ includes required fields"

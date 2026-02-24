@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# AnKLuMe dm-verity Hook for initramfs-tools
+# anklume dm-verity Hook for initramfs-tools
 # Sets up dm-verity root filesystem protection during early boot
 # Reads kernel cmdline: anklume.verity_hash=<hash> anklume.slot=A|B
 
@@ -28,7 +28,7 @@ go() {
 
 	# Validate parameters
 	if [ -z "$VERITY_HASH" ]; then
-		log_warning_msg "AnKLuMe: No verity hash specified in kernel cmdline"
+		log_warning_msg "anklume: No verity hash specified in kernel cmdline"
 		return 0
 	fi
 
@@ -41,36 +41,36 @@ go() {
 			OS_PARTITION_NAME="ANKLUME-OS-B"
 			;;
 		*)
-			log_failure_msg "AnKLuMe: Invalid slot '$SLOT' (expected A or B)"
+			log_failure_msg "anklume: Invalid slot '$SLOT' (expected A or B)"
 			return 1
 			;;
 	esac
 
 	# Find the OS partition using blkid
-	log_begin_msg "AnKLuMe: Setting up dm-verity for slot $SLOT"
+	log_begin_msg "anklume: Setting up dm-verity for slot $SLOT"
 
 	OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
 	if [ -z "$OS_PARTITION" ]; then
-		log_failure_msg "AnKLuMe: Could not find partition '$OS_PARTITION_NAME'"
+		log_failure_msg "anklume: Could not find partition '$OS_PARTITION_NAME'"
 		return 1
 	fi
 
-	log_success_msg "AnKLuMe: Found OS partition at $OS_PARTITION"
+	log_success_msg "anklume: Found OS partition at $OS_PARTITION"
 
 	# Activate dm-verity using veritysetup
 	# Format: veritysetup create <name> <data_device> <hash_device> <root_hash>
 	if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
 		--hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
-		log_failure_msg "AnKLuMe: Failed to activate dm-verity device"
+		log_failure_msg "anklume: Failed to activate dm-verity device"
 		return 1
 	fi
 
-	log_success_msg "AnKLuMe: dm-verity device activated successfully"
+	log_success_msg "anklume: dm-verity device activated successfully"
 
 	# Set root device to the verity device mapping
 	export ROOT="/dev/mapper/anklume-root"
 
-	log_success_msg "AnKLuMe: Root device set to $ROOT"
+	log_success_msg "anklume: Root device set to $ROOT"
 	return 0
 }
 

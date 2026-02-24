@@ -503,7 +503,7 @@ def ai_develop_env(tmp_path):
     logs_dir = project_dir / "logs"
     logs_dir.mkdir()
 
-    (project_dir / "CLAUDE.md").write_text("# AnKLuMe\nTest conventions file.\n")
+    (project_dir / "CLAUDE.md").write_text("# anklume\nTest conventions file.\n")
     (project_dir / "docs").mkdir()
     (project_dir / "docs" / "ROADMAP.md").write_text("# ROADMAP\n## Current State\nTest\n---\n")
 

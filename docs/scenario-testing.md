@@ -1,6 +1,6 @@
 # End-to-End Scenario Testing (BDD)
 
-AnKLuMe includes human-readable acceptance scenarios that test complete
+anklume includes human-readable acceptance scenarios that test complete
 user workflows against real Incus infrastructure. Scenarios are written
 in Gherkin format using `pytest-bdd`.
 
@@ -47,7 +47,7 @@ scenarios/
 ### Best practices
 
 Validate recommended workflows. These scenarios serve as living
-documentation of how to use AnKLuMe correctly:
+documentation of how to use anklume correctly:
 
 - **Pro workstation setup**: Full deployment with network isolation
 - **Student lab deploy**: Teacher deploys a lab environment
@@ -57,7 +57,7 @@ documentation of how to use AnKLuMe correctly:
 
 ### Bad practices
 
-Verify that AnKLuMe catches mistakes early with clear error messages:
+Verify that anklume catches mistakes early with clear error messages:
 
 - **Apply without sync**: No inventory files, stale inventory
 - **Duplicate IPs**: Generator rejects duplicate IP addresses
@@ -88,7 +88,7 @@ Feature: Descriptive name
 ### Available steps
 
 **Given** (preconditions):
-- `a clean sandbox environment` — verify AnKLuMe project directory
+- `a clean sandbox environment` — verify anklume project directory
 - `images are pre-cached via shared repository` — skip if no Incus
 - `infra.yml from "<example>"` — copy example infra.yml
 - `infra.yml exists but no inventory files` — simulate missing sync

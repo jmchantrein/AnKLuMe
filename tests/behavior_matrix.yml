@@ -1,5 +1,5 @@
 ---
-# AnKLuMe Behavior Matrix — Source of truth for expected behaviors
+# anklume Behavior Matrix — Source of truth for expected behaviors
 # Each capability lists actions at 3 depth levels with expected reactions
 # LLM-generated tests verify each cell; coverage tracked automatically
 #

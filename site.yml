@@ -1,5 +1,5 @@
 ---
-# site.yml — Master playbook for AnKLuMe infrastructure
+# site.yml — Master playbook for anklume infrastructure
 #
 # Three-phase architecture (ADR-006):
 #

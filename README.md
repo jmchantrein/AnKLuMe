@@ -1,11 +1,11 @@
 # AnKLuMe
 
 <!-- Badges -->
-[![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions)
+[![CI](https://github.com/jmchantrein/anklume/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/anklume/actions)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![Last commit](https://img.shields.io/github/last-commit/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/commits/main)
-[![Issues](https://img.shields.io/github/issues/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/AnKLuMe)](https://github.com/jmchantrein/AnKLuMe/pulls)
+[![Last commit](https://img.shields.io/github/last-commit/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/commits/main)
+[![Issues](https://img.shields.io/github/issues/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/jmchantrein/anklume)](https://github.com/jmchantrein/anklume/pulls)
 
 <!-- Static badges — tech stack -->
 [![Ansible](https://img.shields.io/badge/ansible-%3E%3D2.16-EE0000?logo=ansible&logoColor=white)](https://www.ansible.com/)
@@ -28,13 +28,13 @@
 QubesOS-like isolation using native Linux kernel features (KVM/LXC),
 calmly orchestrated by you and forging standard tools together.
 
-> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) => **AnKLuMe** — from "enclume", French for [Incus](https://linuxcontainers.org/incus/) (anvil)
+> [Ansible](https://www.ansible.com/), [KVM](https://linux-kvm.org/), [LXC](https://linuxcontainers.org/lxc/), [Molecule](https://molecule.readthedocs.io/) => **anklume** — from "enclume", French for [Incus](https://linuxcontainers.org/incus/) (anvil)
 
 ---
 
-## What is AnKLuMe?
+## What is anklume?
 
-AnKLuMe is a declarative infrastructure compartmentalization framework.
+anklume is a declarative infrastructure compartmentalization framework.
 You describe your isolated environments in a single YAML file, run two
 commands, and get reproducible, disposable, network-isolated domains — each
 with its own subnet, Incus project, and set of containers or VMs.
@@ -43,7 +43,7 @@ Think [QubesOS](https://www.qubes-os.org/) philosophy, but:
 - **No custom OS** — runs on any Linux distribution
 - **No Xen** — uses native kernel features (KVM for VMs, LXC for containers)
 - **No black box** — standard tools you already know, glued together
-- **Declarative** — describe what you want, AnKLuMe converges
+- **Declarative** — describe what you want, anklume converges
 
 ## Who is it for?
 
@@ -69,7 +69,7 @@ infra.yml          ->    make sync    ->    Ansible files    ->    make apply   
 
 ## Prerequisites
 
-Before using AnKLuMe, you need:
+Before using anklume, you need:
 
 1. **A Linux host** with [Incus](https://linuxcontainers.org/incus/docs/main/installing/)
    installed and initialized
@@ -78,15 +78,15 @@ Before using AnKLuMe, you need:
    - Ansible, Python 3.11+, git installed
 3. **This repository** cloned inside the anklume instance
 
-AnKLuMe runs entirely from inside the anklume instance. It never modifies
+anklume runs entirely from inside the anklume instance. It never modifies
 the host directly — everything goes through the Incus socket.
 
 ## Quick start
 
 ```bash
 # Inside the anklume-instance container:
-git clone https://github.com/jmchantrein/AnKLuMe.git
-cd AnKLuMe
+git clone https://github.com/jmchantrein/anklume.git
+cd anklume
 
 # Install Ansible dependencies
 make init
@@ -217,7 +217,7 @@ Ready-to-use `infra.yml` configurations:
 | [Pro workstation](examples/pro-workstation/) | Anklume/pro/perso/homelab with GPU |
 | [Sandbox isolation](examples/sandbox-isolation/) | Maximum isolation for untrusted software |
 | [LLM supervisor](examples/llm-supervisor/) | 2 isolated LLMs + 1 supervisor |
-| [Developer](examples/developer/) | AnKLuMe dev setup with Incus-in-Incus |
+| [Developer](examples/developer/) | anklume dev setup with Incus-in-Incus |
 | [AI tools](examples/ai-tools/) | Full AI stack (Ollama, WebUI, LobeChat, STT) |
 | [Tor gateway](examples/tor-gateway/) | Anonymous browsing via Tor transparent proxy |
 | [Print service](examples/sys-print/) | Dedicated CUPS server with USB/network printers |
@@ -269,7 +269,7 @@ Ready-to-use `infra.yml` configurations:
 | `make nftables` | Generate nftables isolation rules |
 | `make nftables-deploy` | Deploy rules on host |
 | `make snap I=<name>` | Create snapshot |
-| `make flush` | Destroy all AnKLuMe infrastructure |
+| `make flush` | Destroy all anklume infrastructure |
 | `make upgrade` | Safe framework update |
 | `make import-infra` | Generate infra.yml from existing Incus state |
 | `make help` | List all available targets |
@@ -287,6 +287,64 @@ Ready-to-use `infra.yml` configurations:
 | [nftables](https://netfilter.org/projects/nftables/) | -- | Inter-bridge isolation |
 | [shellcheck](https://www.shellcheck.net/) | -- | Shell script validation |
 | [ruff](https://docs.astral.sh/ruff/) | -- | Python linting |
+
+## Credits
+
+anklume is a glue framework — it orchestrates these excellent open-source
+projects (ADR-040):
+
+### Core infrastructure
+
+| Tool | Role |
+|------|------|
+| [Incus](https://linuxcontainers.org/incus/) | LXC containers + KVM virtual machines |
+| [Ansible](https://www.ansible.com/) | Orchestration, roles, playbooks |
+| [community.general](https://docs.ansible.com/ansible/latest/collections/community/general/) | Incus connection plugin for Ansible |
+| [nftables](https://netfilter.org/projects/nftables/) | Inter-bridge network isolation |
+| [Python](https://www.python.org/) | PSOT generator and scripts |
+| [PyYAML](https://pyyaml.org/) | YAML parsing for the generator |
+| [Linux kernel](https://kernel.org/) | KVM, LXC, namespaces, cgroups |
+
+### AI / ML services
+
+| Tool | Role |
+|------|------|
+| [Ollama](https://ollama.com/) | Local LLM inference server |
+| [Open WebUI](https://openwebui.com/) | Chat frontend for LLMs |
+| [LobeChat](https://lobechat.com/) | Multi-provider web UI |
+| [Speaches](https://github.com/speaches-ai/speaches) | Speech-to-text (faster-whisper, OpenAI-compatible API) |
+| [OpenCode](https://opencode.ai/) | Headless AI coding server |
+| [OpenClaw](https://github.com/openclaw-ai/openclaw) | Self-hosted AI assistant |
+
+### Quality and testing
+
+| Tool | Role |
+|------|------|
+| [Molecule](https://molecule.readthedocs.io/) | Ansible role testing |
+| [pytest](https://docs.pytest.org/) | Generator and BDD testing |
+| [Hypothesis](https://hypothesis.readthedocs.io/) | Property-based testing |
+| [ansible-lint](https://ansible.readthedocs.io/projects/lint/) | Ansible linting |
+| [yamllint](https://yamllint.readthedocs.io/) | YAML validation |
+| [shellcheck](https://www.shellcheck.net/) | Shell script validation |
+| [ruff](https://docs.astral.sh/ruff/) | Python linting |
+
+### Desktop and networking
+
+| Tool | Role |
+|------|------|
+| [tmux](https://github.com/tmux/tmux) | Terminal multiplexer for colored console |
+| [libtmux](https://libtmux.git-pull.com/) | Python API for tmux |
+| [Tor](https://www.torproject.org/) | Anonymous routing gateway |
+| [CUPS](https://openprinting.github.io/cups/) | Print server |
+
+### Development
+
+| Tool | Role |
+|------|------|
+| [Claude Code](https://claude.ai/claude-code) | AI-assisted development |
+| [Aider](https://aider.chat/) | AI-assisted coding |
+| [uv](https://docs.astral.sh/uv/) | Python package management |
+| [Git](https://git-scm.com/) | Version control |
 
 ## License
 

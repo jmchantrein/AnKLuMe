@@ -6,7 +6,7 @@
 # Install: configure as a PreToolUse hook in .claude/settings.json
 set -euo pipefail
 
-LOG_DIR="${ANKLUME_AGENT_LOG_DIR:-/root/AnKLuMe/logs}"
+LOG_DIR="${ANKLUME_AGENT_LOG_DIR:-/root/anklume/logs}"
 SESSION_LOG="${LOG_DIR}/agent-session-$(date +%Y%m%d).jsonl"
 
 mkdir -p "$LOG_DIR"

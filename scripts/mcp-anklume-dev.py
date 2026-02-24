@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""MCP server exposing AnKLuMe development tools.
+"""MCP server exposing anklume development tools.
 
 Runs in anklume-instance, exposes tools for building, testing, and
-managing AnKLuMe infrastructure. Designed to be called by OpenClaw
+managing anklume infrastructure. Designed to be called by OpenClaw
 or any MCP client over SSE transport.
 
 Run with:
@@ -27,7 +27,7 @@ from mcp.server.fastmcp import FastMCP
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-PROJECT_DIR = os.environ.get("ANKLUME_PROJECT_DIR", "/root/AnKLuMe")
+PROJECT_DIR = os.environ.get("ANKLUME_PROJECT_DIR", "/root/anklume")
 # Safety: max output size to avoid flooding MCP responses
 MAX_OUTPUT = 10000
 # Command timeout in seconds
@@ -103,7 +103,7 @@ def _run(cmd: list[str], timeout: int = CMD_TIMEOUT, cwd: str = PROJECT_DIR) -> 
 
 @mcp.tool()
 def git_status() -> str:
-    """Show the current git status of the AnKLuMe repository."""
+    """Show the current git status of the anklume repository."""
     r = _run(["git", "status", "--short", "--branch"])
     return r["stdout"] or r["stderr"]
 
@@ -169,7 +169,7 @@ def make_target(target: str, args: str = "") -> str:
 
 @mcp.tool()
 def run_tests(scope: str = "all") -> str:
-    """Run tests for the AnKLuMe project.
+    """Run tests for the anklume project.
 
     Args:
         scope: "all" for all pytest tests, "generator" for generate.py tests,
@@ -254,7 +254,7 @@ def incus_exec(instance: str, command: str) -> str:
 
 @mcp.tool()
 def read_file(path: str) -> str:
-    """Read a file from the AnKLuMe repository.
+    """Read a file from the anklume repository.
 
     Args:
         path: Relative path from the project root (e.g., "infra.yml", "docs/SPEC.md")
@@ -317,7 +317,7 @@ def claude_chat(prompt: str, session: str = "default", max_turns: int = 25,
         prompt: Your message or task for Claude Code
         session: Session name to create or continue (default: "default")
         max_turns: Maximum agentic turns per call (default: 25, max: 50)
-        context: "anklume" = full AnKLuMe project context (codebase, git, make),
+        context: "anklume" = full anklume project context (codebase, git, make),
                  "pure" = general-purpose assistant, no project context
     """
     _clean_stale_sessions()
@@ -704,7 +704,7 @@ def web_fetch(url: str) -> str:
 # All modes go through the proxy (proxy-always architecture).
 # The proxy routes "local" to Ollama and "anklume"/"assistant" to Claude Code CLI.
 _BRAIN_MODES = {
-    "anklume": ("claude-code/anklume", "Claude Opus — expert AnKLuMe (infra, réseau, Ansible)"),
+    "anklume": ("claude-code/anklume", "Claude Opus — expert anklume (infra, réseau, Ansible)"),
     "assistant": ("claude-code/assistant", "Claude Opus — assistant général polyvalent"),
     "local": ("claude-code/local", "LLM local Ollama (gratuit, rapide)"),
 }
@@ -790,7 +790,7 @@ def _send_telegram_wakeup(mode: str) -> None:
 def switch_brain(mode: str) -> str:
     """Switch OpenClaw's brain mode. Available modes:
 
-    - "anklume" — Claude Opus with AnKLuMe project context (infra expert)
+    - "anklume" — Claude Opus with anklume project context (infra expert)
     - "assistant" — Claude Opus general assistant (no project context)
     - "local" — Local Ollama LLM (free, fast, no tools)
 
@@ -844,7 +844,7 @@ def switch_brain(mode: str) -> str:
 
 @mcp.tool()
 def self_upgrade(action: str = "check") -> str:
-    """Check for or apply AnKLuMe framework upgrades, and re-provision openclaw.
+    """Check for or apply anklume framework upgrades, and re-provision openclaw.
 
     Args:
         action: "check" to see if updates are available,
@@ -1087,7 +1087,7 @@ Rules:
 - Argue each proposal: explain WHY the change is beneficial
 - Prioritize proposals by impact (high/medium/low)
 - Do NOT propose changes to code you don't understand
-- Consider the AnKLuMe project conventions (KISS, DRY, no over-engineering)
+- Consider the anklume project conventions (KISS, DRY, no over-engineering)
 - Format as a numbered list of proposals
 
 ```{language.lower()}
@@ -1460,13 +1460,13 @@ def _cmd_help(model: str) -> str:
             "|-------|-------------|\n"
             "| `incus_exec` | Commande dans n'importe quel container |\n"
             "| `incus_list` | Lister les instances Incus |\n"
-            "| `git_status` / `git_log` / `git_diff` | État du repo AnKLuMe |\n"
+            "| `git_status` / `git_log` / `git_diff` | État du repo anklume |\n"
             "| `make_target` | Exécuter un target Makefile |\n"
             "| `run_tests` / `lint` | Tests et linting |\n"
             "| `read_file` | Lire un fichier du projet |\n"
             "| `web_search` / `web_fetch` | Recherche et fetch web |\n"
             "| `claude_chat` / `claude_code` | Sessions Claude Code |\n"
-            "| `self_upgrade` | Mise à jour AnKLuMe |\n"
+            "| `self_upgrade` | Mise à jour anklume |\n"
             "| `usage` | Statistiques de consommation |\n"
         )
 
@@ -1807,7 +1807,7 @@ def _add_rest_routes(app):
                 "curl, etc. You can use the `exec` tool to run shell "
                 "commands. Use it when the user asks you to do something "
                 "on the system (ls, cd, git pull, apt install, etc.).\n"
-                "AnKLuMe repo: `/root/AnKLuMe/`\n\n"
+                "anklume repo: `/root/anklume/`\n\n"
                 "## Rules\n"
                 "- Respond in the same language as the user\n"
                 "- Be concise and helpful — no preamble, no fluff\n"
@@ -2094,12 +2094,12 @@ def _add_rest_routes(app):
 
 if __name__ == "__main__":
     if _use_sse:
-        logger.info("Starting AnKLuMe MCP server (SSE + REST) on port %d", _port)
+        logger.info("Starting anklume MCP server (SSE + REST) on port %d", _port)
         # Get the Starlette app and add REST routes before running
         app = mcp.sse_app()
         _add_rest_routes(app)
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=_port)
     else:
-        logger.info("Starting AnKLuMe MCP server (stdio)")
+        logger.info("Starting anklume MCP server (stdio)")
         mcp.run()

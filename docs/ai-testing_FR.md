@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`ai-testing.md`](ai-testing.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte optionnellement la correction de tests et le developpement
+anklume supporte optionnellement la correction de tests et le developpement
 autonome assistes par IA. Un backend LLM analyse les echecs de tests, propose
 des corrections, et les applique optionnellement -- le tout dans le cadre
 des garde-fous de securite du projet.
@@ -87,7 +87,7 @@ Les variables d'environnement ont priorite sur le fichier de configuration.
 
 ## Garde-fous de securite
 
-AnKLuMe privilegie la securite maximale par defaut :
+anklume privilegie la securite maximale par defaut :
 
 | Garde-fou | Defaut | Description |
 |-----------|--------|-------------|

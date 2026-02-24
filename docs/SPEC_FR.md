@@ -1,10 +1,10 @@
-# SPEC.md -- Specification AnKLuMe
+# SPEC.md -- Specification anklume
 
 > Traduction francaise de [`SPEC.md`](SPEC.md). En cas de divergence, la version anglaise fait foi.
 
 ## 1. Vision
 
-AnKLuMe est un framework declaratif de cloisonnement d'infrastructure.
+anklume est un framework declaratif de cloisonnement d'infrastructure.
 Il fournit une isolation de type QubesOS en utilisant les fonctionnalites
 natives du noyau Linux (KVM/LXC), orchestrees par l'utilisateur via
 Ansible et Incus.
@@ -341,4 +341,4 @@ Gere manuellement ou par des scripts de bootstrap de l'hote :
 - Configuration nftables de l'hote (isolation inter-bridges, NAT)
 - Configuration Sway/Wayland pour le transfert d'interface graphique
 
-Le framework AnKLuMe ne modifie PAS l'hote. Il pilote Incus via le socket.
+Le framework anklume ne modifie PAS l'hote. Il pilote Incus via le socket.

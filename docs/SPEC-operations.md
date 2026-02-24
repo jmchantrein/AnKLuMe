@@ -1,4 +1,4 @@
-# SPEC-operations.md — AnKLuMe Operational Reference
+# SPEC-operations.md — anklume Operational Reference
 
 This file contains implementation and operational details extracted from
 SPEC.md. For the core specification (vision, concepts, PSOT model,
@@ -291,7 +291,7 @@ may be skipped — fix, add a regression test, validate, commit.
 
 ### Bootstrap script
 
-`bootstrap.sh` initializes AnKLuMe on a new machine:
+`bootstrap.sh` initializes anklume on a new machine:
 
 ```bash
 ./bootstrap.sh --prod                    # Production: auto-detect FS, configure Incus
@@ -340,7 +340,7 @@ to converge idempotently.
 
 ### Flush (reset to zero)
 
-`make flush` destroys all AnKLuMe infrastructure:
+`make flush` destroys all anklume infrastructure:
 - All instances, profiles, projects, and `net-*` bridges
 - Generated Ansible files (inventory/, group_vars/, host_vars/)
 - Preserves: infra.yml, roles/, scripts/, docs/
@@ -348,7 +348,7 @@ to converge idempotently.
 
 ### Upgrade
 
-`make upgrade` updates AnKLuMe framework files safely:
+`make upgrade` updates anklume framework files safely:
 - Pulls upstream changes
 - Detects locally modified framework files → creates `.bak`
 - Regenerates managed sections via `make sync`
@@ -373,7 +373,7 @@ Managed by `bootstrap.sh` or manual host configuration:
 - Sway/Wayland configuration for GUI forwarding
 - Filesystem snapshots for rollback (`bootstrap.sh --snapshot` assists)
 
-The AnKLuMe framework minimizes host modifications (ADR-004). It
+The anklume framework minimizes host modifications (ADR-004). It
 primarily drives Incus via the socket. Host-level operations that
 improve KISS/DRY without compromising security (e.g., nftables rules,
 prerequisites, systemd drop-ins) may be applied directly via dedicated
@@ -465,7 +465,7 @@ creates a systemd drop-in for `incus.service` with
 
 ## 18. Smoke testing
 
-Minimal real-world deployment test that verifies core AnKLuMe
+Minimal real-world deployment test that verifies core anklume
 functionality on actual Incus infrastructure (not mocked).
 
 **Usage**:

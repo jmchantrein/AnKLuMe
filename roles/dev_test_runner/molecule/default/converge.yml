@@ -13,5 +13,5 @@
   roles:
     - role: dev_test_runner
       vars:
-        dev_test_runner_repo_url: "https://github.com/jmchantrein/AnKLuMe.git"
+        dev_test_runner_repo_url: "https://github.com/jmchantrein/anklume.git"
         dev_test_runner_repo_branch: "main"

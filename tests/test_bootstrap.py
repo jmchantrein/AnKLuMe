@@ -741,7 +741,7 @@ class TestContainerCreationPhase23:
 
     def test_bind_mount_device(self):
         assert "anklume-repo" in self.content
-        assert "/root/AnKLuMe" in self.content
+        assert "/root/anklume" in self.content
 
     def test_idempotent_devices(self):
         assert self.content.count("anklume-repo") >= 2  # check + add

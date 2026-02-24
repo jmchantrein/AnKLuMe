@@ -191,7 +191,7 @@ class TestPrintReport:
         report = code_audit.build_report(fake_project)
         code_audit.print_report(report)
         captured = capsys.readouterr()
-        assert "AnKLuMe Code Audit Report" in captured.out
+        assert "anklume Code Audit Report" in captured.out
         assert "SUMMARY" in captured.out
         assert "ROLES BY SIZE" in captured.out
 

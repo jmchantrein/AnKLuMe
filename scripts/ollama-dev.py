@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone Ollama development assistant for AnKLuMe.
+"""Standalone Ollama development assistant for anklume.
 
 Three-step pipeline (plan -> code -> review) using local LLMs via Ollama API.
 Zero external dependencies -- stdlib only.
@@ -286,7 +286,7 @@ def load_reviewer_checklist(project_root: pathlib.Path) -> str:
 
 
 PLAN_SYSTEM = """\
-You are a senior infrastructure architect planning changes to the AnKLuMe framework.
+You are a senior infrastructure architect planning changes to the anklume framework.
 
 ## Project conventions
 {claude_md}
@@ -302,7 +302,7 @@ Be specific and actionable. Reference existing patterns from the included files.
 Output in English."""
 
 CODE_SYSTEM = """\
-You are an expert coder implementing changes to the AnKLuMe framework.
+You are an expert coder implementing changes to the anklume framework.
 
 ## Conventions
 - YAML: Ansible best practices, FQCN, task names as "RoleName | Description"
@@ -322,7 +322,7 @@ Include the COMPLETE file content, not just the changed parts.
 If multiple files are needed, repeat the format for each file."""
 
 REVIEW_SYSTEM = """\
-You are the quality reviewer of the AnKLuMe framework.
+You are the quality reviewer of the anklume framework.
 
 ## Review checklist
 {reviewer_checklist}
@@ -570,7 +570,7 @@ def display_results(pipeline: Pipeline) -> None:
 
 
 HELP_TEXT = """\
-{bold}AnKLuMe Local Dev Assistant{reset}
+{bold}anklume Local Dev Assistant{reset}
 
 {cyan}Context:{reset}
   @file <path>     Add file to context
@@ -786,7 +786,7 @@ def repl(args: argparse.Namespace) -> None:
     client = OllamaClient(args.ollama_url)
     models = FAST_MODELS if args.fast else FULL_MODELS
 
-    print(f"{C.bold}AnKLuMe Local Dev Assistant{C.reset}")
+    print(f"{C.bold}anklume Local Dev Assistant{C.reset}")
     print(f"{C.dim}Project: {project_root}{C.reset}")
     print(f"{C.dim}Ollama:  {args.ollama_url}{C.reset}")
 
@@ -861,7 +861,7 @@ def one_shot(args: argparse.Namespace) -> None:
 def main() -> None:
     """Parse arguments and dispatch to REPL or one-shot mode."""
     parser = argparse.ArgumentParser(
-        description="AnKLuMe local dev assistant -- plan/code/review with Ollama",
+        description="anklume local dev assistant -- plan/code/review with Ollama",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
             examples:

@@ -1,12 +1,12 @@
 # Advanced GPU Management
 
-AnKLuMe supports GPU passthrough for both LXC containers and KVM VMs,
+anklume supports GPU passthrough for both LXC containers and KVM VMs,
 with a security policy that controls how many instances can access the
 GPU simultaneously.
 
 ## GPU access policy (ADR-018)
 
-By default, AnKLuMe enforces **exclusive** GPU access: only one instance
+By default, anklume enforces **exclusive** GPU access: only one instance
 across all domains can have GPU access. This prevents VRAM conflicts and
 security risks from shared GPU memory on consumer GPUs.
 

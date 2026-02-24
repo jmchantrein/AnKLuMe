@@ -1,4 +1,4 @@
-# AnKLuMe
+# anklume
 
 A declarative infrastructure compartmentalization framework.
 QubesOS-like isolation using native Linux kernel features (KVM/LXC),
@@ -55,7 +55,7 @@ make shares        # Create host directories for shared_volumes
 make snapshot      # Snapshot all instances
 make nftables      # Generate nftables isolation rules
 make nftables-deploy  # Deploy rules on host (run FROM host)
-make flush         # Destroy all AnKLuMe infrastructure (dev mode)
+make flush         # Destroy all anklume infrastructure (dev mode)
 make upgrade       # Safe framework update with conflict detection
 make import-infra  # Generate infra.yml from existing Incus state
 make help          # List all commands

@@ -1,13 +1,13 @@
-# LLM Onboarding Prompt — AnKLuMe Project
+# LLM Onboarding Prompt — anklume Project
 
 Use this file as a system prompt or initial context when onboarding any
-LLM (Claude, GPT, Gemini, Mistral, local models) to work on AnKLuMe.
+LLM (Claude, GPT, Gemini, Mistral, local models) to work on anklume.
 
 ---
 
-## What is AnKLuMe?
+## What is anklume?
 
-AnKLuMe is a **declarative infrastructure compartmentalization framework**.
+anklume is a **declarative infrastructure compartmentalization framework**.
 It provides QubesOS-like isolation using native Linux kernel features
 (KVM/LXC), orchestrated by Ansible and Incus. The user describes their
 infrastructure in `infra.yml`, runs `make sync && make apply`, and gets
@@ -96,7 +96,7 @@ ALL must pass before committing. Zero violations tolerated.
 ## Project structure
 
 ```
-AnKLuMe/
+anklume/
 ├── CLAUDE.md              # LLM coding conventions
 ├── infra.yml              # Primary Source of Truth
 ├── site.yml               # Master playbook (at root, ADR-016)

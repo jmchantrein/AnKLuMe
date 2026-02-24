@@ -12,11 +12,11 @@ dev_agent_runner_node_version: "22"
 dev_agent_runner_permissions_mode: "bypassPermissions"
 
 # Git configuration for agent commits
-dev_agent_runner_git_user: "AnKLuMe Agent"
+dev_agent_runner_git_user: "anklume Agent"
 dev_agent_runner_git_email: "agent@anklume.local"
 
 # Project directory inside the runner container
-dev_agent_runner_project_dir: "/root/AnKLuMe"
+dev_agent_runner_project_dir: "/root/anklume"
 
 # Agent Teams feature flag
 dev_agent_runner_enable_teams: true

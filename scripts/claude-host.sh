@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch Claude Code as root for AnKLuMe host development.
+# Launch Claude Code as root for anklume host development.
 #
 # Two modes:
 #
@@ -40,9 +40,9 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-info()  { echo -e "${BLUE}[AnKLuMe]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[AnKLuMe]${NC} $*"; }
-error() { echo -e "${RED}[AnKLuMe]${NC} $*" >&2; }
+info()  { echo -e "${BLUE}[anklume]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[anklume]${NC} $*"; }
+error() { echo -e "${RED}[anklume]${NC} $*" >&2; }
 
 # --- Pre-flight checks ---
 
@@ -76,7 +76,7 @@ if [ -n "$YOLO" ]; then
     # ══════════════════════════════════════════════════
     echo ""
     warn "╔══════════════════════════════════════════════════╗"
-    warn "║       AnKLuMe Host — ${RED}${BOLD}YOLO MODE${NC}${YELLOW}                  ║"
+    warn "║       anklume Host — ${RED}${BOLD}YOLO MODE${NC}${YELLOW}                  ║"
     warn "╠══════════════════════════════════════════════════╣"
     warn "║  ${RED}No guard hook, no audit, no restrictions${NC}${YELLOW}        ║"
     warn "║  SANDBOX=1 (only to allow root execution)       ║"
@@ -114,7 +114,7 @@ SETTINGS_EOF
 
     echo ""
     info "╔══════════════════════════════════════════════════╗"
-    info "║       AnKLuMe Host — ${GREEN}${BOLD}GUARDED MODE${NC}${BLUE}              ║"
+    info "║       anklume Host — ${GREEN}${BOLD}GUARDED MODE${NC}${BLUE}              ║"
     info "╠══════════════════════════════════════════════════╣"
     info "║  SANDBOX=1 + --skip-permissions + guard hook    ║"
     info "║  Audit log: ~/.anklume/host-audit/              ║"

@@ -3,7 +3,7 @@
 > Note : En cas de divergence, la version anglaise (`sys-print.md`)
 > fait foi.
 
-AnKLuMe permet de configurer un serveur d'impression CUPS dedie dans
+anklume permet de configurer un serveur d'impression CUPS dedie dans
 un conteneur. Les imprimantes USB sont passees via le mecanisme de
 peripheriques Incus, et les imprimantes reseau sont accessibles via
 une interface macvlan donnant au conteneur un acces direct au reseau

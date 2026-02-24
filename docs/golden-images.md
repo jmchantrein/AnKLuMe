@@ -1,6 +1,6 @@
 # Golden Images and Templates
 
-AnKLuMe supports golden images — pre-provisioned instance templates
+anklume supports golden images — pre-provisioned instance templates
 that can be efficiently cloned to create new instances. This enables
 fast instance creation and centralized update management.
 

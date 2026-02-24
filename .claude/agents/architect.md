@@ -13,7 +13,7 @@ tools:
   - Bash
 ---
 
-You are the architect of the AnKLuMe framework.
+You are the architect of the anklume framework.
 
 Before answering any question:
 1. Read `docs/SPEC.md`, `docs/ARCHITECTURE.md`, and `docs/ROADMAP.md`

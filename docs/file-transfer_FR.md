@@ -3,7 +3,7 @@
 > **Note** : La version anglaise (`file-transfer.md`) fait foi en cas de
 > divergence.
 
-AnKLuMe fournit un transfert de fichiers controle entre instances et
+anklume fournit un transfert de fichiers controle entre instances et
 une sauvegarde/restauration chiffree via `scripts/transfer.sh`.
 
 ## Demarrage rapide

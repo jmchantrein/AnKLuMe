@@ -248,7 +248,7 @@ cmd_export() {
         echo "[Desktop Entry]"
         echo "Type=Application"
         echo "Name=[${domain}] ${app_name:-$APP}"
-        echo "Comment=AnKLuMe: ${APP} in ${INSTANCE} (${domain})"
+        echo "Comment=anklume: ${APP} in ${INSTANCE} (${domain})"
         echo "Exec=${wrapper_exec}"
         if [[ -n "$host_icon" && -f "$host_icon" ]]; then
             echo "Icon=${host_icon}"
@@ -256,11 +256,11 @@ cmd_export() {
             echo "Icon=${orig_icon}"
         fi
         echo "Terminal=false"
-        echo "Categories=AnKLuMe;${domain};"
+        echo "Categories=anklume;${domain};"
         echo "StartupNotify=true"
-        echo "X-AnKLuMe-Instance=${INSTANCE}"
-        echo "X-AnKLuMe-Domain=${domain}"
-        echo "X-AnKLuMe-App=${APP}"
+        echo "X-anklume-Instance=${INSTANCE}"
+        echo "X-anklume-Domain=${domain}"
+        echo "X-anklume-App=${APP}"
     } > "$desktop_file"
 
     chmod +x "$desktop_file"
@@ -344,16 +344,16 @@ cmd_list() {
     fi
 
     # List exported apps on the host
-    info "Exported AnKLuMe apps:"
+    info "Exported anklume apps:"
     local count=0
     for f in "${DESKTOP_DIR}"/anklume-*.desktop; do
         [[ -f "$f" ]] || continue
         local fname
         fname=$(basename "$f")
         local inst domain app_label
-        inst=$(grep -m1 '^X-AnKLuMe-Instance=' "$f" 2>/dev/null | sed 's/^X-AnKLuMe-Instance=//' || true)
-        domain=$(grep -m1 '^X-AnKLuMe-Domain=' "$f" 2>/dev/null | sed 's/^X-AnKLuMe-Domain=//' || true)
-        app_label=$(grep -m1 '^X-AnKLuMe-App=' "$f" 2>/dev/null | sed 's/^X-AnKLuMe-App=//' || true)
+        inst=$(grep -m1 '^X-anklume-Instance=' "$f" 2>/dev/null | sed 's/^X-anklume-Instance=//' || true)
+        domain=$(grep -m1 '^X-anklume-Domain=' "$f" 2>/dev/null | sed 's/^X-anklume-Domain=//' || true)
+        app_label=$(grep -m1 '^X-anklume-App=' "$f" 2>/dev/null | sed 's/^X-anklume-App=//' || true)
         echo "  ${fname}  (instance: ${inst:-?}, domain: ${domain:-?}, app: ${app_label:-?})"
         count=$((count + 1))
     done
@@ -386,7 +386,7 @@ cmd_remove() {
         [[ -f "$f" ]] || continue
         # Verify instance matches
         local inst
-        inst=$(grep -m1 '^X-AnKLuMe-Instance=' "$f" 2>/dev/null | sed 's/^X-AnKLuMe-Instance=//' || true)
+        inst=$(grep -m1 '^X-anklume-Instance=' "$f" 2>/dev/null | sed 's/^X-anklume-Instance=//' || true)
         if [[ "$inst" == "$INSTANCE" ]]; then
             rm -f "$f"
             info "Removed desktop file: $(basename "$f")"

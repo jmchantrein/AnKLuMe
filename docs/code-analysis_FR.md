@@ -3,7 +3,7 @@
 > **Note** : La version anglaise (`code-analysis.md`) fait foi en cas
 > de divergence.
 
-AnKLuMe fournit des outils d'analyse statique pour la detection de
+anklume fournit des outils d'analyse statique pour la detection de
 code mort, la generation de graphes d'appels et la visualisation des
 dependances entre modules.
 

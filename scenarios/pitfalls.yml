@@ -1,4 +1,4 @@
-# Pitfall database for AnKLuMe scenario testing.
+# Pitfall database for anklume scenario testing.
 # Maps bad-practice scenarios to guide.sh steps and warning messages.
 # Used by scripts/guide.sh to display proactive warnings.
 ---

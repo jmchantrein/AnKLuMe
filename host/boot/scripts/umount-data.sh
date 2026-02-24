@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# umount-data.sh — Unmount AnKLuMe data partition and close LUKS encryption
+# umount-data.sh — Unmount anklume data partition and close LUKS encryption
 # Usage: umount-data.sh
 #
 # This script safely unmounts the encrypted data partition and closes the
@@ -148,7 +148,7 @@ close_luks() {
 # ── Main function ─────────────────────────────────────────
 
 main() {
-    info "Starting AnKLuMe data partition unmount sequence..."
+    info "Starting anklume data partition unmount sequence..."
 
     # Detect pool type
     local pool_type

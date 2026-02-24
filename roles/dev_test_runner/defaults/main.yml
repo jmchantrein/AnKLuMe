@@ -2,11 +2,11 @@
 # Default variables for dev_test_runner
 # Override in group_vars or host_vars as needed.
 
-dev_test_runner_repo_url: "https://github.com/jmchantrein/AnKLuMe.git"
+dev_test_runner_repo_url: "https://github.com/jmchantrein/anklume.git"
 dev_test_runner_repo_branch: "main"
-dev_test_runner_repo_dest: "/root/AnKLuMe"
+dev_test_runner_repo_dest: "/root/anklume"
 
-dev_test_runner_git_user_name: "AnKLuMe Runner"
+dev_test_runner_git_user_name: "anklume Runner"
 dev_test_runner_git_user_email: "runner@anklume.local"
 
 # Preseed configuration for nested Incus

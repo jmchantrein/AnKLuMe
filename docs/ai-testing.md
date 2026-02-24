@@ -1,6 +1,6 @@
 # AI-Assisted Testing and Development
 
-AnKLuMe supports optional AI-assisted test fixing and autonomous
+anklume supports optional AI-assisted test fixing and autonomous
 development. An LLM backend analyzes test failures, proposes fixes,
 and optionally applies them — all within the project's safety guardrails.
 
@@ -84,7 +84,7 @@ Environment variables take precedence over the config file.
 
 ## Safety guardrails
 
-AnKLuMe defaults to maximum safety:
+anklume defaults to maximum safety:
 
 | Guardrail | Default | Description |
 |-----------|---------|-------------|

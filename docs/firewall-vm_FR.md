@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`firewall-vm.md`](firewall-vm.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte deux modes de pare-feu pour l'isolation inter-domaines :
+anklume supporte deux modes de pare-feu pour l'isolation inter-domaines :
 
 - **Mode `host`** (defaut) : regles nftables sur le noyau de l'hote (Phase 8)
 - **Mode `vm`** : trafic route a travers une VM pare-feu dediee
@@ -122,7 +122,7 @@ make apply         # Creer l'infrastructure + provisionner
 ```
 
 Le role `incus_firewall_vm` automatiquement :
-1. Decouvre tous les bridges AnKLuMe
+1. Decouvre tous les bridges anklume
 2. Cree un profil `firewall-multi-nic` avec une carte reseau par bridge
 3. Attache le profil a la VM sys-firewall
 

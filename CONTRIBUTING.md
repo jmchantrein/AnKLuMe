@@ -1,4 +1,4 @@
-# Contributing to AnKLuMe
+# Contributing to anklume
 
 ## Development workflow
 

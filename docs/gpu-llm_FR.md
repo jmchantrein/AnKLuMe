@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`gpu-llm.md`](gpu-llm.md). En cas de divergence, la version anglaise fait foi.
 
-Ce guide explique comment configurer le passthrough GPU dans AnKLuMe pour
+Ce guide explique comment configurer le passthrough GPU dans anklume pour
 executer de l'inference LLM locale avec Ollama et Open WebUI.
 
 ## Prerequis
@@ -44,7 +44,7 @@ exemple complet fonctionnel. Points cles de configuration :
 
 ## Politique GPU (ADR-018)
 
-Par defaut, AnKLuMe applique une politique GPU **exclusive** : une seule
+Par defaut, anklume applique une politique GPU **exclusive** : une seule
 instance dans tous les domaines peut avoir acces au GPU. Cela previent
 les conflits lies a plusieurs containers partageant le meme GPU sans
 isolation.

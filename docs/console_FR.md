@@ -3,7 +3,7 @@
 > **Note** : Ce document est une traduction de `console.md`. En cas de divergence,
 > la version anglaise fait autorité.
 
-AnKLuMe génère automatiquement une session tmux depuis `infra.yml` avec
+anklume génère automatiquement une session tmux depuis `infra.yml` avec
 des volets colorés reflétant les niveaux de confiance des domaines, offrant
 une isolation visuelle similaire aux bordures colorées de QubesOS.
 
@@ -150,11 +150,11 @@ Options:
 
 ## tmux imbriqué (touche prefix)
 
-La console AnKLuMe utilise **`Ctrl-a`** comme touche prefix (au lieu du
+La console anklume utilise **`Ctrl-a`** comme touche prefix (au lieu du
 `Ctrl-b` par défaut). Cela évite les conflits avec tmux à l'intérieur des
 conteneurs :
 
-- **`Ctrl-a`** contrôle la session **extérieure** AnKLuMe (changer de
+- **`Ctrl-a`** contrôle la session **extérieure** anklume (changer de
   fenêtre, de volet)
 - **`Ctrl-b`** passe directement aux sessions tmux **intérieures** dans
   les conteneurs
@@ -205,9 +205,9 @@ création avec les raccourcis tmux standards :
 
 ## Navigation
 
-La session AnKLuMe utilise `Ctrl-a` comme prefix (voir ci-dessus) :
+La session anklume utilise `Ctrl-a` comme prefix (voir ci-dessus) :
 
-| Action | Session AnKLuMe | tmux interne (dans le conteneur) |
+| Action | Session anklume | tmux interne (dans le conteneur) |
 |--------|----------------|----------------------------------|
 | Changer de fenêtre | `Ctrl-a 0`, `Ctrl-a 1`, ... | `Ctrl-b 0`, `Ctrl-b 1`, ... |
 | Fenêtre suivante | `Ctrl-a n` | `Ctrl-b n` |

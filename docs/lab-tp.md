@@ -1,12 +1,12 @@
 # Lab Deployment Guide for Teachers
 
-This guide explains how to use AnKLuMe to deploy networking labs for
+This guide explains how to use anklume to deploy networking labs for
 students. Each student gets an isolated domain with its own subnet,
 Incus project, and set of containers.
 
 ## Concept: domain-per-student
 
-AnKLuMe's domain model maps naturally to lab deployments:
+anklume's domain model maps naturally to lab deployments:
 
 ```
 admin domain       = teacher's management environment

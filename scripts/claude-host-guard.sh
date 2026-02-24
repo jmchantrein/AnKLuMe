@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PreToolUse guard hook for Claude Code running with host root access.
-# AnKLuMe-specific: allows infrastructure operations, blocks destructive ones.
+# anklume-specific: allows infrastructure operations, blocks destructive ones.
 #
 # Exit codes:
 #   0 = allow (auto-approve)
@@ -73,13 +73,13 @@ BLOCK_PATTERNS=(
 for pattern in "${BLOCK_PATTERNS[@]}"; do
     if echo "$CMD" | grep -qE "$pattern"; then
         echo "{\"ts\":\"$(date -Iseconds)\",\"tool\":\"Bash\",\"cmd\":$(echo "$CMD" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))'),\"action\":\"BLOCKED\",\"pattern\":\"$pattern\"}" >> "$SESSION_LOG"
-        echo "BLOCKED by AnKLuMe host guard: matches dangerous pattern '$pattern'" >&2
+        echo "BLOCKED by anklume host guard: matches dangerous pattern '$pattern'" >&2
         exit 2
     fi
 done
 
 # === ALLOW LIST (exit 0 = auto-approve) ===
-# AnKLuMe infrastructure commands
+# anklume infrastructure commands
 ALLOW_PATTERNS=(
     # Incus operations
     '^incus '
@@ -91,7 +91,7 @@ ALLOW_PATTERNS=(
     'deploy-nftables'
     'incus-guard'
 
-    # Systemd (AnKLuMe and Incus services only)
+    # Systemd (anklume and Incus services only)
     '^systemctl .* incus'
     '^systemctl .* anklume'
     '^systemctl .* llama-server'
@@ -116,7 +116,7 @@ ALLOW_PATTERNS=(
     '^curl '
     '^wget '
 
-    # AnKLuMe make targets
+    # anklume make targets
     '^make '
 
     # Ansible
@@ -212,7 +212,7 @@ ALLOW_PATTERNS=(
     '^sleep '
     '^wait'
 
-    # AnKLuMe scripts
+    # anklume scripts
     'scripts/'
     'host/'
 

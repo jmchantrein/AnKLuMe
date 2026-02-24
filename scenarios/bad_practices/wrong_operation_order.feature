@@ -1,6 +1,6 @@
 # Matrix: PG-001
 Feature: Wrong operation order
-  AnKLuMe has a required workflow: edit -> sync -> lint -> apply.
+  anklume has a required workflow: edit -> sync -> lint -> apply.
   Skipping or reordering steps leads to errors.
 
   Background:

@@ -1,6 +1,6 @@
 # Exclusive AI-Tools Network Access (ai-switch)
 
-AnKLuMe supports an exclusive AI access mode where only one domain at
+anklume supports an exclusive AI access mode where only one domain at
 a time can reach the `ai-tools` domain. This prevents data leakage
 between domains through shared AI services and enables VRAM flushing
 between access switches to clear residual model state.

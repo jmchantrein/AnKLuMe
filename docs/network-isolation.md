@@ -1,6 +1,6 @@
 # Network Isolation with nftables
 
-AnKLuMe uses nftables to enforce inter-bridge isolation on the host.
+anklume uses nftables to enforce inter-bridge isolation on the host.
 By default, Incus bridges allow forwarding between them, meaning a
 container in one domain can reach containers in other domains. The
 `incus_nftables` role generates rules that block all cross-domain
@@ -8,7 +8,7 @@ traffic.
 
 ## How domain isolation works
 
-Each AnKLuMe domain has its own bridge (e.g., `net-anklume`, `net-pro`,
+Each anklume domain has its own bridge (e.g., `net-anklume`, `net-pro`,
 `net-perso`, `net-ai-tools`). Without isolation rules, the Linux kernel
 forwards packets between these bridges freely.
 
@@ -50,7 +50,7 @@ Key design choices:
 - **`priority -1`**: runs before Incus-managed chains (priority 0),
   ensuring isolation rules are evaluated first
 - **`policy accept`**: default accept, with explicit drop rules for
-  inter-bridge traffic. This avoids interfering with non-AnKLuMe traffic
+  inter-bridge traffic. This avoids interfering with non-anklume traffic
 
 ### Atomic replacement
 
@@ -60,7 +60,7 @@ without a gap where no rules are active.
 
 ### Coexistence with Incus
 
-AnKLuMe rules use a separate table (`inet anklume`), priority -1 (before
+anklume rules use a separate table (`inet anklume`), priority -1 (before
 Incus chains), and `policy accept`. Non-matching traffic falls through to
 Incus-managed NAT and per-bridge chains without interference.
 
@@ -72,7 +72,7 @@ connections. Invalid packets are dropped.
 ## Two-step workflow
 
 Generating and deploying nftables rules is a two-step process because
-AnKLuMe runs inside the anklume container but nftables rules must be
+anklume runs inside the anklume container but nftables rules must be
 applied on the host.
 
 ### Step 1: Generate rules (inside anklume container)
@@ -84,7 +84,7 @@ make nftables
 This runs the `incus_nftables` Ansible role, which:
 
 1. Queries `incus network list` to discover all bridges
-2. Filters for AnKLuMe bridges (names starting with `net-`)
+2. Filters for anklume bridges (names starting with `net-`)
 3. Templates the nftables rules to `/opt/anklume/nftables-isolation.nft`
 
 The generated file is stored inside the anklume container and can be
@@ -112,7 +112,7 @@ scripts/deploy-nftables.sh --dry-run
 
 ### Why two steps?
 
-AnKLuMe follows ADR-004: Ansible does not modify the host directly.
+anklume follows ADR-004: Ansible does not modify the host directly.
 The anklume container drives Incus via the socket, but nftables must be
 applied on the host kernel. Splitting generation (safe, inside container)
 from deployment (requires host access) maintains this boundary while
@@ -124,7 +124,7 @@ Variables in `roles/incus_nftables/defaults/main.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `incus_nftables_bridge_pattern` | `net-` | Prefix used to identify AnKLuMe bridges |
+| `incus_nftables_bridge_pattern` | `net-` | Prefix used to identify anklume bridges |
 | `incus_nftables_output_path` | `/opt/anklume/nftables-isolation.nft` | Where to write the generated rules |
 | `incus_nftables_apply` | `false` | Apply rules immediately (use with caution) |
 
@@ -136,7 +136,7 @@ This only works if the role runs on the host (not in a container).
 After deploying, verify the rules are active:
 
 ```bash
-# List the AnKLuMe table
+# List the anklume table
 nft list table inet anklume
 
 # Test isolation: from a non-anklume container, try to ping another domain
@@ -165,13 +165,13 @@ incus exec perso-desktop -- ping -c1 1.1.1.1       # Should work
 
 ### Internet access broken from containers
 
-The AnKLuMe rules only affect `forward` chain traffic between bridges.
+The anklume rules only affect `forward` chain traffic between bridges.
 NAT (masquerade) rules managed by Incus use separate chains. If internet
 is broken:
 
 1. Check Incus NAT rules: `nft list ruleset | grep masquerade`
 2. Verify the bridge has `ipv4.nat: "true"`: `incus network show net-<domain>`
-3. The AnKLuMe `policy accept` should not block non-matching traffic
+3. The anklume `policy accept` should not block non-matching traffic
 
 ### Removing isolation rules
 

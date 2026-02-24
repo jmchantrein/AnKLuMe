@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`vm-support.md`](vm-support.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte a la fois les containers LXC et les machines virtuelles KVM.
+anklume supporte a la fois les containers LXC et les machines virtuelles KVM.
 Ce guide couvre comment declarer, creer et provisionner des VMs aux cotes
 des containers.
 

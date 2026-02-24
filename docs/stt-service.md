@@ -1,6 +1,6 @@
 # Speech-to-Text (STT) Service
 
-AnKLuMe provides a local, GPU-accelerated speech-to-text service using
+anklume provides a local, GPU-accelerated speech-to-text service using
 faster-whisper and the Speaches API server. This integrates with Open
 WebUI for voice input and with any client supporting the OpenAI STT API.
 

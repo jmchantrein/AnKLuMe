@@ -1,6 +1,6 @@
 # Inter-Container Services via MCP
 
-AnKLuMe provides controlled service exposure between containers using
+anklume provides controlled service exposure between containers using
 MCP (Model Context Protocol) over Incus proxy devices. A container can
 declare services that other containers are allowed to call, with access
 controlled by an allow-list in `infra.yml`.
@@ -108,11 +108,11 @@ The PSOT generator validates service declarations:
 
 ### Why the official `mcp` Python SDK
 
-AnKLuMe uses the official MCP Python SDK (`pip install mcp`) with the
+anklume uses the official MCP Python SDK (`pip install mcp`) with the
 FastMCP server framework and ClientSession client. This provides correct
 protocol implementation, automatic capability negotiation, type-safe
 tool definitions via decorators, and future-proofing as the MCP protocol
-evolves. The dependency is acceptable — AnKLuMe already requires pip
+evolves. The dependency is acceptable — anklume already requires pip
 packages (pyyaml, pytest, libtmux).
 
 ### Transport

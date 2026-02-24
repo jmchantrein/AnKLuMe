@@ -38,7 +38,7 @@ fi
 # ── Main function ─────────────────────────────────────────
 
 main() {
-    info "=== AnKLuMe Data Mount ==="
+    info "=== anklume Data Mount ==="
 
     # Step 1: Ensure persist partition is mounted
     info "Step 1: Mounting persist partition..."
@@ -161,7 +161,7 @@ main() {
     esac
 
     # Success summary
-    info "=== AnKLuMe Data Mount Complete ==="
+    info "=== anklume Data Mount Complete ==="
     ok "Data partition successfully mounted/imported"
     ok "Pool: $pool_name ($pool_type)"
     ok "LUKS device: $luks_mapper_name"

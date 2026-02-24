@@ -2,10 +2,10 @@
 {# Do NOT edit the deployed file directly. Edit THIS template instead. #}
 # TOOLS.md - Local Notes
 
-## AnKLuMe Development Server
+## anklume Development Server
 
 An MCP/REST server runs in `anklume-instance` ({{ openclaw_server_proxy_ip }}:{{ openclaw_server_proxy_port }}),
-giving you full access to the AnKLuMe infrastructure and codebase.
+giving you full access to the anklume infrastructure and codebase.
 
 ### REST API (simple HTTP calls)
 
@@ -74,11 +74,11 @@ Same tools, accessible via standard MCP protocol.
 
 Blocked make targets: `flush`, `nftables-deploy`, `claude-host`
 Blocked incus commands: `rm -rf /`, `dd`, `mkfs`, `reboot`, `shutdown`
-File reads restricted to the AnKLuMe repository.
+File reads restricted to the anklume repository.
 
 ### Workflow
 
-To develop and test AnKLuMe:
+To develop and test anklume:
 1. `read_file` to understand current code
 2. `git_status` / `git_diff` to see current state
 3. `make_target` with `sync-dry` to preview changes

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# live-os-lib.sh — Shared library for AnKLuMe live OS operations
+# live-os-lib.sh — Shared library for anklume live OS operations
 # This is a library file to be sourced by other scripts, not executed directly.
 #
 # Provides:

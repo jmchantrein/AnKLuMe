@@ -370,22 +370,22 @@ description appears as an nftables comment.
 ## ADR-022: nftables priority -1 — coexist with Incus chains
 
 **Context**: Incus manages its own nftables chains at priority 0 for NAT
-and per-bridge filtering. AnKLuMe needs isolation rules that run before
+and per-bridge filtering. anklume needs isolation rules that run before
 Incus chains without disabling or conflicting with them.
 
-**Decision**: Use `priority -1` in the AnKLuMe `inet anklume` table's
-forward chain. AnKLuMe and Incus nftables coexist peacefully in separate
+**Decision**: Use `priority -1` in the anklume `inet anklume` table's
+forward chain. anklume and Incus nftables coexist peacefully in separate
 tables. Non-matching traffic falls through to Incus chains with
 `policy accept`.
 
 **Consequence**: No interference with Incus NAT, DHCP, or per-bridge
-rules. AnKLuMe isolation is evaluated first.
+rules. anklume isolation is evaluated first.
 
 ---
 
 ## ADR-023: Two-step nftables deployment (anklume → host)
 
-**Context**: AnKLuMe runs inside the anklume container (ADR-004) but
+**Context**: anklume runs inside the anklume container (ADR-004) but
 nftables rules must be applied on the host kernel.
 
 **Decision**: Split into two steps:
@@ -448,12 +448,12 @@ manage other instances.
 
 ## ADR-029: dev_test_runner in VM (not LXC)
 
-**Context**: Testing AnKLuMe inside AnKLuMe required privileged LXC
+**Context**: Testing anklume inside anklume required privileged LXC
 containers, conflicting with ADR-020. Triple nesting caused AppArmor
 issues on Debian 13.
 
 **Decision**: The test runner (`anklume-test`) is a VM. Inside the VM,
-AnKLuMe bootstraps as on a fresh host. Tests run at level 1 and 2
+anklume bootstraps as on a fresh host. Tests run at level 1 and 2
 within the VM's kernel — no AppArmor interference from the host.
 
 **Consequence**: Slower boot (~30s) but hardware-isolated. Triple
@@ -476,7 +476,7 @@ backward compatible.
 
 ## ADR-031: User data protection during upgrades
 
-**Context**: AnKLuMe is distributed as a git repository. Framework
+**Context**: anklume is distributed as a git repository. Framework
 upgrades must not destroy user configuration, custom roles, or
 generated file customizations.
 
@@ -537,7 +537,7 @@ isolation.
 container is destroyed, all operational knowledge is lost unless it
 comes from the framework.
 
-**Decision**: The AnKLuMe git repository is the **single source of
+**Decision**: The anklume git repository is the **single source of
 truth** for agent operational knowledge. All agent files are Jinja2
 templates deployed with `force: true` on every `make apply`. Agents
 MUST NOT modify their operational files directly — they follow the
@@ -550,6 +550,28 @@ See SPEC-operations.md for the template file list and deploy rules.
 **Consequence**: Any agent can be fully reproduced from the framework
 alone (minus personality). Destroying and rebuilding a container
 restores full operational capability.
+
+---
+
+## ADR-040: Acknowledge external tools and dependencies
+
+**Context**: anklume is a glue framework (principle 9: "no wheel
+reinvented"). It orchestrates many external open-source tools but
+does not always credit them explicitly. Users and contributors
+should know what the framework depends on and be able to find each
+tool's documentation.
+
+**Decision**: Maintain a CREDITS section in README.md listing every
+external tool that anklume uses, with a link to each project. The
+list is organized by category (core infrastructure, provisioning,
+AI/ML, quality, development). When a new dependency is added to the
+framework, its entry must be added to the CREDITS section as part of
+the same commit.
+
+**Consequence**: Contributors always know the full dependency graph.
+External projects receive proper attribution. Users can verify
+licensing compatibility. The CREDITS section serves as a quick
+reference for the technology stack.
 
 ---
 
@@ -605,7 +627,7 @@ DNS leaks, packet leaks — disqualifies the framework.
 
 **Why zone_base=100**: avoids `10.0-60.x.x` used by enterprise VPNs,
 home routers, and container orchestrators. `10.1xx` is a visual marker
-for AnKLuMe traffic.
+for anklume traffic.
 
 **Consequence**: IP addresses are human-readable. From `10.140.0.5`,
 an admin immediately knows: zone 140 = 100+40 = untrusted.

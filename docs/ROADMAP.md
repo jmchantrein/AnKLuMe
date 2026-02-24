@@ -159,7 +159,7 @@ Phase 12 will provide proper isolation via Incus-in-Incus.
   - `examples/llm-supervisor.infra.yml` — 2 LLMs isolated in separate
     domains + 1 supervisor container communicating with both via API,
     for testing LLM monitoring/management by another LLM
-  - `examples/developer.infra.yml` — AnKLuMe developer: includes a
+  - `examples/developer.infra.yml` — anklume developer: includes a
     dev-test domain with Incus-in-Incus (Phase 12)
   - Each example accompanied by a README explaining the use case,
     hardware requirements, and how to get started
@@ -293,11 +293,11 @@ kernel, unlike LXC containers that share the host kernel).
 
 ## Phase 12: Incus-in-Incus Test Environment ✅ COMPLETE
 
-**Goal**: Test AnKLuMe in an isolated sandbox (AnKLuMe testing itself)
+**Goal**: Test anklume in an isolated sandbox (anklume testing itself)
 without impacting production infrastructure.
 
 **Principle**: A test-runner container with `security.nesting: "true"`
-runs its own Incus and deploys a complete AnKLuMe instance inside.
+runs its own Incus and deploys a complete anklume instance inside.
 Molecule tests execute within this nested environment.
 
 **Deliverables**:
@@ -307,7 +307,7 @@ Molecule tests execute within this nested environment.
 - Role `dev_test_runner` that provisions the test container:
   - Installs Incus inside the container (`apt install incus`)
   - Initializes Incus (`incus admin init --minimal`)
-  - Clones the AnKLuMe repo
+  - Clones the anklume repo
   - Installs Molecule + ansible-lint + dependencies
 - Script `scripts/run-tests.sh` that:
   1. Creates the test-runner container (or reuses it)
@@ -804,7 +804,7 @@ e) **Bootstrap script** (`bootstrap.sh`):
    - `--import` for existing infrastructure import
 
 f) **Lifecycle tooling**:
-   - `make flush` — destroy all AnKLuMe infrastructure
+   - `make flush` — destroy all anklume infrastructure
    - `make upgrade` — safe framework update with conflict detection
    - `make import-infra` — reverse-generate infra.yml from Incus state
    - `roles_custom/` directory for user role customization
@@ -1133,7 +1133,7 @@ container-work                host              container-vault
 **Deliverables**:
 - MCP server template (Python) for common services: file signing,
   clipboard get/set, file transfer accept/provide.
-- MCP client library for AnKLuMe containers.
+- MCP client library for anklume containers.
 - Incus proxy device automation: `infra.yml` `services:` section
   declares which containers expose which MCP tools, and which
   containers can access them.
@@ -1230,7 +1230,7 @@ access control via host bind mounts (ADR-039).
 
 ## Phase 21: Desktop Integration ✅ COMPLETE
 
-**Goal**: Visual desktop integration for users running AnKLuMe on
+**Goal**: Visual desktop integration for users running anklume on
 a workstation with a graphical environment.
 
 **Prerequisites**: Phase 19a (tmux console).
@@ -1282,8 +1282,8 @@ guide (Phase 18c) to steer users toward correct usage.
   readable by non-developers. Runner: `pytest-bdd`.
 - **Two scenario categories**:
   - **Best practices**: validate recommended workflows, serve as living
-    documentation of how to use AnKLuMe correctly.
-  - **Bad practices**: verify that AnKLuMe catches mistakes early with
+    documentation of how to use anklume correctly.
+  - **Bad practices**: verify that anklume catches mistakes early with
     clear error messages and guides the user toward the correct approach.
     No silent failures, no partial state left behind.
 - **Latency-optimized**: scenarios pre-cache images at the start via
@@ -1350,7 +1350,7 @@ Feature: Pro workstation setup
 ```gherkin
 # scenarios/bad_practices/apply_without_sync.feature
 Feature: Apply without sync
-  AnKLuMe must detect and guide the user when steps are skipped
+  anklume must detect and guide the user when steps are skipped
 
   Scenario: No inventory files exist
     Given infra.yml exists but no inventory files
@@ -1474,7 +1474,7 @@ host-side components.
 **Architecture**:
 
 ```
-AnKLuMe/                           ← Cloned on the host
+anklume/                           ← Cloned on the host
 ├── bootstrap.sh                   ← Phase 0: installs Incus, creates container,
 │                                     sets up bind mount, runs first make apply
 ├── host/
@@ -1496,7 +1496,7 @@ AnKLuMe/                           ← Cloned on the host
 The repo lives on the host and is bind-mounted into the container:
 
 ```
-/home/user/AnKLuMe/ ──disk device──> /root/AnKLuMe/ (in container)
+/home/user/anklume/ ──disk device──> /root/anklume/ (in container)
 ```
 
 **Two bootstrap paths** (K3s-inspired):
@@ -1506,8 +1506,8 @@ The repo lives on the host and is bind-mounted into the container:
 curl -sfL https://raw.githubusercontent.com/.../bootstrap.sh | bash
 
 # Verify-first path
-git clone https://github.com/jmchantrein/AnKLuMe.git
-cd AnKLuMe && bash bootstrap.sh
+git clone https://github.com/jmchantrein/anklume.git
+cd anklume && bash bootstrap.sh
 ```
 
 **Deliverables**:
@@ -1586,7 +1586,7 @@ works out of the box.
 
 ```
 Host
-├── AnKLuMe/                      ← User's projects and framework
+├── anklume/                      ← User's projects and framework
 │
 ├── Container: ai-coder           ← Sandboxed coding environment
 │   ├── Claude Code CLI           ← API-based, supervised
@@ -1909,7 +1909,7 @@ e) **Standalone assistant** (`scripts/ollama-dev.py`):
 ## Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
 
 **Goal**: Install and sandbox [OpenClaw](https://github.com/openclaw/openclaw)
-within AnKLuMe infrastructure, following best practices for
+within anklume infrastructure, following best practices for
 self-hosted AI assistants.
 
 **Prerequisites**: Phase 23b (sandboxed AI coding environment),
@@ -1919,7 +1919,7 @@ Phase 5 (Ollama).
 self-hosted personal AI assistant that connects to multiple
 messaging platforms (WhatsApp, Telegram, Signal, Discord, Slack,
 Matrix, Teams, iMessage) and drives LLMs (Claude, GPT, local
-models via Ollama). Running it inside AnKLuMe provides:
+models via Ollama). Running it inside anklume provides:
 - Network isolation (the bot only reaches authorized services)
 - Controlled messaging access (policy-based)
 - Local LLM delegation for privacy-sensitive queries
@@ -2066,14 +2066,14 @@ f) **Test rationalization** (deferred — Phase 22 dependency):
 
 ## Phase 30: Educational Platform and Guided Labs
 
-**Goal**: Turn AnKLuMe into a learning platform where students or
+**Goal**: Turn anklume into a learning platform where students or
 self-learners can follow guided tutorials and execute commands in
 sandboxed environments.
 
 **Prerequisites**: Phase 22 (BDD scenarios), Phase 23 (bootstrap),
 Phase 12 (Incus-in-Incus).
 
-**Context**: AnKLuMe's architecture (declarative YAML, isolated
+**Context**: anklume's architecture (declarative YAML, isolated
 domains, reproducible environments) makes it a natural fit for
 teaching system administration, networking, and security. The
 existing `make guide` and example configurations provide a starting
@@ -2084,7 +2084,7 @@ sandboxed execution, and progress tracking.
 
 ```
 Student flow:
-  1. Clone AnKLuMe, run bootstrap
+  1. Clone anklume, run bootstrap
   2. Select a lab: make lab LIST → choose "Networking 101"
   3. Lab creates sandboxed environment (Incus-in-Incus)
   4. Student follows guided steps with validation at each step
@@ -2140,7 +2140,7 @@ d) **Teacher mode**:
 
 ## Phase 31: Live OS with Encrypted Persistent Storage
 
-**Goal**: Provide a bootable AnKLuMe image (USB/SD card) with an
+**Goal**: Provide a bootable anklume image (USB/SD card) with an
 immutable OS that mounts an encrypted ZFS or BTRFS pool on a
 separate disk for all container data.
 
@@ -2156,7 +2156,7 @@ The current deployment requires a full Linux installation. A live
 OS approach separates the **OS** (small, immutable, disposable)
 from the **data** (large, encrypted, persistent). This yields:
 
-- **Portability** (Tails-like): carry AnKLuMe on a USB stick, boot
+- **Portability** (Tails-like): carry anklume on a USB stick, boot
   on any compatible machine, unplug and nothing remains
 - **Immutability** (IncusOS-like): OS cannot be corrupted at
   runtime, impossible to tamper with
@@ -2166,7 +2166,7 @@ from the **data** (large, encrypted, persistent). This yields:
 - **Security**: data encrypted at rest, OS integrity verified
 
 The OS itself is small (~1-2 GB): kernel + systemd + Incus +
-nftables + AnKLuMe framework. All the actual value (containers,
+nftables + anklume framework. All the actual value (containers,
 VMs, images, user configuration, secrets) lives on the encrypted
 data pool on a separate disk.
 
@@ -2179,7 +2179,7 @@ Boot media (USB / SD card / small disk):
 ├── OS-A partition (read-only squashfs, ~1.5 GB)
 │   ├── Minimal Linux (Debian or Arch)
 │   ├── Incus daemon
-│   ├── AnKLuMe framework
+│   ├── anklume framework
 │   ├── All hardware drivers (modules)
 │   └── dm-verity hash tree (integrity)
 ├── OS-B partition (read-only squashfs, ~1.5 GB)
@@ -2237,7 +2237,7 @@ Each layer has a different security objective:
 | **3. RAM contents** | Cold boot attack (frozen RAM) | AMD SME/SEV or Intel TME |
 
 **Layer 1 — OS integrity (NOT encryption)**:
-The AnKLuMe code is open source — there is nothing secret in the
+The anklume code is open source — there is nothing secret in the
 OS image. The goal is **integrity** (detect tampering), not
 confidentiality. dm-verity computes a Merkle hash tree of every
 block; any modification is detected at read time. UEFI Secure Boot
@@ -2265,7 +2265,7 @@ user configuration). Two options depending on storage backend:
   - Simpler setup, widely supported
   - Slightly less granular but perfectly adequate
 
-ZFS native encryption is recommended for AnKLuMe because the
+ZFS native encryption is recommended for anklume because the
 per-dataset granularity aligns with the per-domain isolation model.
 A compromised domain key does not expose other domains' data.
 
@@ -2277,7 +2277,7 @@ Modern CPUs support transparent memory encryption:
 This protects against physical attacks where an attacker freezes
 RAM modules to extract encryption keys (cold boot attack). It is
 transparent to software and has minimal performance impact (<2%).
-AnKLuMe should enable this when hardware supports it.
+anklume should enable this when hardware supports it.
 
 ### Storage backend comparison
 
@@ -2320,7 +2320,7 @@ a GPL-only stack or have constraints on kernel modules.
 9. Prompts for LUKS passphrase (or TPM + PIN)
 10. ZFS pool imported / BTRFS volume mounted
 11. Incus daemon starts with storage on encrypted pool
-12. AnKLuMe containers resume — system operational
+12. anklume containers resume — system operational
 ```
 
 If the data disk is not present (first boot or new machine):
@@ -2330,14 +2330,14 @@ If the data disk is not present (first boot or new machine):
     - Ask: create new encrypted pool or mount existing
     - Select backend (ZFS recommended, BTRFS alternative)
     - LUKS setup + pool creation
-    - Run AnKLuMe bootstrap
+    - Run anklume bootstrap
     - Store config in persistent partition
 ```
 
 ### Deliverables
 
 a) **Image builder** (`scripts/build-image.sh`):
-   - Build a minimal bootable ISO/image with Incus + AnKLuMe
+   - Build a minimal bootable ISO/image with Incus + anklume
    - Support Debian and Arch base
    - toram mode configurable via kernel parameter
    - A/B partition scheme for safe updates (IncusOS-inspired)
@@ -2350,7 +2350,7 @@ b) **First-boot wizard**:
    - Backend selection (ZFS/BTRFS) with recommendation
    - LUKS + pool setup with secure passphrase
    - GPU detection for AI services (Phase 23b integration)
-   - Run `bootstrap.sh` to set up AnKLuMe infrastructure
+   - Run `bootstrap.sh` to set up anklume infrastructure
    - Store minimal config in persistent partition
 
 c) **Update mechanism**:
@@ -2433,7 +2433,7 @@ e) **Upgrade notification** (admin_bootstrap role):
 
 ## Phase 33: Student Mode and Internationalization
 
-**Goal**: Make AnKLuMe a learning tool with bilingual CLI support
+**Goal**: Make anklume a learning tool with bilingual CLI support
 and transparent command execution for educational contexts.
 
 **Prerequisites**: Phase 32 (Makefile UX), Phase 30 (educational platform).
@@ -2485,7 +2485,7 @@ d) **Internationalization (i18n)**:
 
 **Goal**: Replace manual subnet_id assignment with a trust-level-aware
 addressing convention that encodes security zones in the IP address,
-introduce the canonical infra.yml covering all AnKLuMe capabilities,
+introduce the canonical infra.yml covering all anklume capabilities,
 and add domain enable/disable support.
 
 **Prerequisites**: Phase 29 (codebase simplification). POC mode — no
@@ -2498,7 +2498,7 @@ zone from the IP alone. The VLAN best practice (encoding zone in the
 IP octet) is not followed. Additionally, the committed `infra.yml`
 is a minimal example that does not match the real deployed
 infrastructure. A canonical `infra.yml` is needed as a reference
-covering all AnKLuMe capabilities with enable/disable support.
+covering all anklume capabilities with enable/disable support.
 
 **Deliverables**:
 
@@ -2651,7 +2651,7 @@ Phase 36 (Naming).
 ai-tools that acts as a pass-through to a complex proxy. OpenClaw's
 real strengths — heartbeat, cron, memory, multi-agent, messaging
 multi-platform — are unexploited. Repositioning OpenClaw as a per-domain
-assistant aligns with AnKLuMe's compartmentalization philosophy: each
+assistant aligns with anklume's compartmentalization philosophy: each
 domain gets its own AI agent that sees only its own network.
 
 See: `docs/vision-ai-integration.md` (Layer 2: Per-domain AI assistant).
@@ -2705,7 +2705,7 @@ d) **Retire centralized OpenClaw**:
 e) **Security model**:
    - Each instance sees only its domain's network (enforced by Incus)
    - ClawHub third-party skills only in sandbox domains
-   - Custom AnKLuMe skills deployed via Ansible templates (ADR-036)
+   - Custom anklume skills deployed via Ansible templates (ADR-036)
 
 **Validation criteria**:
 - [ ] Two OpenClaw instances in different domains coexist
@@ -2740,7 +2740,7 @@ a) **HEARTBEAT.md template** per domain:
    - Service health (systemd units in containers)
    - Network scan diff (detect new/missing hosts)
 
-b) **Custom AnKLuMe monitoring skills**:
+b) **Custom anklume monitoring skills**:
    - `anklume-health` skill: checks container status, disk, services
    - `anklume-network-diff` skill: compares network state to baseline
    - Deployed via Ansible templates (not ClawHub)
@@ -2808,7 +2808,7 @@ a) **Evaluate and select base implementation**:
      performance (< 200ms added latency), audit logging
 
 b) **IaC-specific detection patterns**:
-   - RFC1918 IP ranges (especially AnKLuMe 10.1xx convention)
+   - RFC1918 IP ranges (especially anklume 10.1xx convention)
    - Incus resource names (project, bridge, instance names)
    - FQDN patterns (*.internal, *.corp, *.local, custom)
    - Service identifiers (database names, API endpoints)
@@ -2863,7 +2863,7 @@ anomaly detection, and forensic analysis via the three-level pipeline.
 
 **Context**: Network captures and scans are significantly more sensitive
 than IaC code. The three-level pipeline (collect → triage local → analyze
-cloud) maps naturally onto AnKLuMe domains. OpenClaw's heartbeat triggers
+cloud) maps naturally onto anklume domains. OpenClaw's heartbeat triggers
 the collection and triage cycle. Cloud analysis (level 3) always passes
 through the sanitization proxy.
 

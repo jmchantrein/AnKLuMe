@@ -1,4 +1,4 @@
-# Testing patterns for AnKLuMe (pytest and Molecule).
+# Testing patterns for anklume (pytest and Molecule).
 # Documents the standard test structures and conventions.
 ---
 - id: PAT-TEST-001
