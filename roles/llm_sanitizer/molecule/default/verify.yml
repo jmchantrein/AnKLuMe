@@ -1,0 +1,26 @@
+---
+- name: Verify llm_sanitizer
+  hosts: molecule-test-instance
+  gather_facts: false
+  tasks:
+    - name: Verify | Check sanitizer config deployed
+      ansible.builtin.stat:
+        path: /etc/llm-sanitizer/config.yml
+      register: verify_config
+
+    - name: Verify | Config file exists
+      ansible.builtin.assert:
+        that:
+          - verify_config.stat.exists
+        fail_msg: "Sanitizer config not deployed"
+
+    - name: Verify | Check patterns file deployed
+      ansible.builtin.stat:
+        path: /etc/llm-sanitizer/patterns.yml
+      register: verify_patterns
+
+    - name: Verify | Patterns file exists
+      ansible.builtin.assert:
+        that:
+          - verify_patterns.stat.exists
+        fail_msg: "Sanitizer patterns not deployed"
