@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 DEPLOY_SH = Path(__file__).resolve().parent.parent / "scripts" / "deploy-nftables.sh"
 
 
@@ -111,13 +113,6 @@ def run_deploy(args, env, cwd=None, script=None):
         capture_output=True, text=True, env=env, cwd=cwd, timeout=15,
     )
     return result
-
-
-def read_log(log_file):
-    """Return list of commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── Dry-run mode ────────────────────────────────────────────

@@ -43,15 +43,7 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
     die "Not a git repository. Cannot upgrade."
 fi
 
-# Check for uncommitted changes — auto-stash if needed
-STASHED=false
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    warn "Uncommitted changes detected — stashing automatically."
-    git stash push -m "anklume-upgrade-$(date +%Y%m%d-%H%M%S)"
-    STASHED=true
-fi
-
-# Detect locally modified framework files
+# Detect locally modified framework files (before stash)
 info "--- Checking for locally modified framework files ---"
 MODIFIED=()
 for file in "${FRAMEWORK_FILES[@]}"; do
@@ -68,6 +60,14 @@ if [ ${#MODIFIED[@]} -gt 0 ]; then
         printf "  %s → %s\n" "$file" "$backup"
         cp "$file" "$backup"
     done
+fi
+
+# Check for uncommitted changes — auto-stash if needed
+STASHED=false
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    warn "Uncommitted changes detected — stashing automatically."
+    git stash push -m "anklume-upgrade-$(date +%Y%m%d-%H%M%S)"
+    STASHED=true
 fi
 
 # Pull upstream

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import read_log
+
 FLUSH_SH = Path(__file__).resolve().parent.parent / "scripts" / "flush.sh"
 
 
@@ -110,13 +112,6 @@ def run_flush(args, env, cwd=None, input_text=None):
         capture_output=True, text=True, env=env, cwd=cwd, input=input_text,
     )
     return result
-
-
-def read_log(log_file):
-    """Return list of incus commands from the log file."""
-    if log_file.exists():
-        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
-    return []
 
 
 # ── basic operations ────────────────────────────────────────

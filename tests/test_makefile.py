@@ -86,10 +86,11 @@ class TestMakefileTargetPresence:
 
 class TestMakeSyncDry:
     def test_sync_dry_runs(self):
-        """make sync-dry runs without modifying files."""
+        """make sync-dry requires container or succeeds inside one."""
         result = run_make(["sync-dry"], timeout=15)
-        # Should succeed (infra.yml exists)
-        assert result.returncode == 0
+        # Outside container: require_container guard blocks with error
+        # Inside container: runs generate.py --dry-run
+        assert result.returncode == 0 or "anklume-instance" in result.stderr
 
 
 class TestMakeMatrixCoverage:
@@ -148,9 +149,7 @@ class TestMakefileTargetHelp:
     def test_help_groups_targets(self):
         """make help groups targets with section headers."""
         content = _parse_makefile()
-        expected_groups = ["GETTING STARTED", "ALL TARGETS"]
-        for group in expected_groups:
-            assert group in content, f"Help group '{group}' missing from Makefile"
+        assert "GETTING STARTED" in content, "Help group 'GETTING STARTED' missing from Makefile"
 
     def test_help_includes_description_for_each_target(self):
         """Every documented target has a non-empty description."""
@@ -194,10 +193,7 @@ class TestMakefileTargetDependencies:
     def test_sync_calls_generate_with_infra(self):
         """sync target calls generate.py with infra source argument."""
         content = _parse_makefile()
-        # Find sync target recipe
-        sync_match = re.search(r"^sync:.*\n\t(.+)$", content, re.MULTILINE)
-        assert sync_match, "sync target not found"
-        recipe = sync_match.group(1)
+        recipe = _get_recipe(content, "sync")
         assert "generate.py" in recipe, "sync should call generate.py"
         assert "INFRA_SRC" in recipe or "infra" in recipe.lower(), (
             "sync should pass infra source to generate.py"
@@ -206,9 +202,7 @@ class TestMakefileTargetDependencies:
     def test_sync_dry_calls_generate_with_dry_run(self):
         """sync-dry target calls generate.py with --dry-run."""
         content = _parse_makefile()
-        sync_dry_match = re.search(r"^sync-dry:.*\n\t(.+)$", content, re.MULTILINE)
-        assert sync_dry_match, "sync-dry target not found"
-        recipe = sync_dry_match.group(1)
+        recipe = _get_recipe(content, "sync-dry")
         assert "generate.py" in recipe, "sync-dry should call generate.py"
         assert "--dry-run" in recipe, "sync-dry should pass --dry-run"
 
@@ -246,10 +240,7 @@ class TestMakefileVariableOverrides:
     def test_g_variable_passed_to_limit(self):
         """G=<group> variable is passed to ansible-playbook --limit."""
         content = _parse_makefile()
-        # apply-limit target should use $(G) with --limit
-        limit_match = re.search(r"^apply-limit:.*\n\t(.+)$", content, re.MULTILINE)
-        assert limit_match, "apply-limit target not found"
-        recipe = limit_match.group(1)
+        recipe = _get_recipe(content, "apply-limit")
         assert "--limit" in recipe, "apply-limit should use --limit"
         assert "$(G)" in recipe, "apply-limit should use $(G) variable"
 

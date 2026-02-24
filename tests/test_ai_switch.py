@@ -3,6 +3,7 @@
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -48,9 +49,9 @@ def switch_env(tmp_path):
         },
     }, sort_keys=False))
 
-    # Mock python3
+    # Mock python3 — use the venv interpreter so PyYAML is available
     mock_python = mock_bin / "python3"
-    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
+    mock_python.write_text(f"#!/usr/bin/env bash\n{sys.executable} \"$@\"\n")
     mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
 
     # Mock incus
@@ -562,9 +563,9 @@ class TestAiSwitchScriptStructure:
         assert 'LOG_FILE="$LOG_DIR/ai-switch.log"' in content
 
     def test_ai_project_set_to_ai_tools(self):
-        """AI_PROJECT is set to 'ai-tools'."""
+        """AI_PROJECT defaults to 'ai-tools'."""
         content = AI_SWITCH_SH.read_text()
-        assert 'AI_PROJECT="ai-tools"' in content
+        assert "ai-tools" in content and "AI_PROJECT" in content
 
     def test_services_list_ollama(self):
         """Script stops/starts ollama service."""

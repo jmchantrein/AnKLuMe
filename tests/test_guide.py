@@ -18,11 +18,20 @@ def guide_env(tmp_path):
     mock_bin.mkdir()
 
     # Mock commands that the guide checks for
-    for cmd in ["incus", "ansible-playbook", "ansible-lint",
+    for cmd in ["ansible-playbook", "ansible-lint",
                 "yamllint", "python3", "git", "make"]:
         mock_cmd = mock_bin / cmd
         mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
         mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+
+    # Mock incus — output RUNNING for list commands (Step 0 checks container_running)
+    mock_incus = mock_bin / "incus"
+    mock_incus.write_text(
+        '#!/usr/bin/env bash\n'
+        'if [[ "$1" == "list" ]]; then echo "RUNNING"; fi\n'
+        'exit 0\n'
+    )
+    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Real python3 for actual use
     mock_python = mock_bin / "python3"
@@ -52,7 +61,10 @@ class TestGuideAutoMode:
     def test_auto_mode_runs(self, guide_env):
         """--auto mode runs without prompts."""
         result = run_guide(["--auto"], guide_env)
-        assert "Step 1" in result.stdout or "Prerequisites" in result.stdout
+        # On host: Step 0 detects environment and delegates to container
+        # Inside container: proceeds to Step 1
+        assert result.returncode == 0
+        assert "Step" in result.stdout or "delegating" in result.stdout
 
     def test_auto_mode_checks_prerequisites(self, guide_env):
         """Auto mode checks for required tools in step 1."""

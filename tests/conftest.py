@@ -1,9 +1,56 @@
-"""Make scripts/ importable for tests."""
+"""Make scripts/ importable for tests. Shared fixtures and helpers."""
 
+import os
+import stat
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers (importable by test files)
+# ---------------------------------------------------------------------------
+
+
+def read_log(log_file):
+    """Return list of commands from a log file.
+
+    Used by shell script tests that create mock binaries which log their
+    invocations to a file.  Shared here to avoid duplication across 10+
+    test files (ADR-009).
+    """
+    if log_file.exists():
+        return [line.strip() for line in log_file.read_text().splitlines() if line.strip()]
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mock_bin_env(tmp_path):
+    """Create a mock bin directory and environment with PATH pointing to it.
+
+    Returns (mock_bin, env) where mock_bin is a Path to the bin directory
+    and env is a copy of os.environ with mock_bin prepended to PATH.
+    Used as a base for per-file mock_env fixtures (ADR-009).
+    """
+    mock_bin = tmp_path / "bin"
+    mock_bin.mkdir()
+    env = os.environ.copy()
+    env["PATH"] = f"{mock_bin}:{env['PATH']}"
+    return mock_bin, env
+
+
+def make_mock_script(path, content="#!/usr/bin/env bash\nexit 0\n"):
+    """Write an executable shell script to path."""
+    path.write_text(content)
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
 def pytest_configure(config):
