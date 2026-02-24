@@ -70,7 +70,7 @@
   ansible.builtin.command:
     cmd: "ollama pull {{ ollama_default_model }}"
   when: ollama_default_model | length > 0
-  changed_when: false
+  changed_when: true
   timeout: 600
 
 - name: OllamaServer | Pull extra models
@@ -78,5 +78,5 @@
     cmd: "ollama pull {{ item }}"
   loop: "{{ ollama_extra_models }}"
   when: ollama_extra_models | length > 0
-  changed_when: false
+  changed_when: true
   timeout: 600
