@@ -379,6 +379,22 @@ def validate(infra, *, check_host_subnets=True):
         if openclaw is not None and not isinstance(openclaw, bool):
             errors.append(f"Domain '{dname}': openclaw must be a boolean, got {type(openclaw).__name__}")
 
+        # ai_provider and ai_sanitize validation (Phase 39)
+        valid_ai_providers = ("local", "cloud", "local-first")
+        ai_provider = domain.get("ai_provider")
+        if ai_provider is not None and ai_provider not in valid_ai_providers:
+            errors.append(
+                f"Domain '{dname}': ai_provider must be one of "
+                f"{valid_ai_providers}, got '{ai_provider}'"
+            )
+        valid_ai_sanitize = (True, False, "always")
+        ai_sanitize = domain.get("ai_sanitize")
+        if ai_sanitize is not None and ai_sanitize not in valid_ai_sanitize:
+            errors.append(
+                f"Domain '{dname}': ai_sanitize must be true, false, "
+                f"or 'always', got '{ai_sanitize}'"
+            )
+
         domain_profiles = domain.get("profiles") or {}
         domain_profile_names = set(domain_profiles)
         for mname, machine in (domain.get("machines") or {}).items():
@@ -1493,12 +1509,19 @@ def generate(infra, base_dir, dry_run=False):
         # group_vars/<domain>.yml
         domain_ephemeral = domain.get("ephemeral", False)
         domain_openclaw = domain.get("openclaw", False)
+        # AI provider/sanitize defaults (Phase 39)
+        ai_provider = domain.get("ai_provider", "local")
+        ai_sanitize = domain.get("ai_sanitize")
+        if ai_sanitize is None:
+            ai_sanitize = ai_provider in ("cloud", "local-first")
         gvars = {k: v for k, v in {
             "domain_name": dname,
             "domain_description": domain.get("description", ""),
             "domain_ephemeral": domain_ephemeral,
             "domain_trust_level": domain.get("trust_level"),
             "domain_openclaw": domain_openclaw if domain_openclaw else None,
+            "domain_ai_provider": ai_provider,
+            "domain_ai_sanitize": ai_sanitize,
             "incus_project": f"{prefix}{dname}",
             "incus_network": {
                 "name": f"{prefix}net-{dname}",
