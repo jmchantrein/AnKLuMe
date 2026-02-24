@@ -370,3 +370,78 @@ class TestSharedVolumesGeneration:
         hv = yaml.safe_load((tmp_path / "host_vars" / "pro-dev.yml").read_text())
         dev = hv["instance_devices"]["sv-docs"]
         assert "shift" not in dev
+
+    def test_shared_volumes_nesting_prefix_addressing(self, tmp_path):  # Matrix: SV-3-001
+        """Shared volumes + nesting prefix + addressing: devices have correct
+        unprefixed paths, instance names are prefixed, IPs are zone-aware."""
+        from unittest.mock import patch
+
+        infra = {
+            "project_name": "test",
+            "global": {
+                "addressing": {"base_octet": 10, "zone_base": 100},
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "nesting_prefix": True,
+            },
+            "domains": {
+                "pro": {
+                    "description": "Production",
+                    "trust_level": "semi-trusted",
+                    "machines": {
+                        "pro-dev": {
+                            "description": "Dev",
+                            "type": "lxc",
+                        },
+                    },
+                },
+                "ai-tools": {
+                    "description": "AI",
+                    "trust_level": "trusted",
+                    "machines": {
+                        "gpu-server": {
+                            "description": "GPU",
+                            "type": "lxc",
+                        },
+                    },
+                },
+            },
+            "shared_volumes": {
+                "datasets": {
+                    "source": "/mnt/data/datasets",
+                    "path": "/shared/datasets",
+                    "consumers": {"pro": "ro", "gpu-server": "rw"},
+                },
+            },
+        }
+        enrich_infra(infra)
+        with patch("generate._read_absolute_level", return_value=1):
+            generate(infra, str(tmp_path))
+        # Instance names are prefixed
+        hv_dev = yaml.safe_load(
+            (tmp_path / "host_vars" / "pro-dev.yml").read_text()
+        )
+        assert hv_dev["instance_name"] == "001-pro-dev"
+        # Device paths are NOT prefixed (ADR-039: host paths stay absolute)
+        dev = hv_dev["instance_devices"]["sv-datasets"]
+        assert dev["source"] == "/mnt/data/datasets"
+        assert dev["path"] == "/shared/datasets"
+        assert dev["readonly"] == "true"
+        # gpu-server has rw access
+        hv_gpu = yaml.safe_load(
+            (tmp_path / "host_vars" / "gpu-server.yml").read_text()
+        )
+        assert hv_gpu["instance_name"] == "001-gpu-server"
+        gpu_dev = hv_gpu["instance_devices"]["sv-datasets"]
+        assert "readonly" not in gpu_dev
+        assert gpu_dev["source"] == "/mnt/data/datasets"
+        # IPs are zone-aware (semi-trusted=120, trusted=110)
+        gv_pro = yaml.safe_load(
+            (tmp_path / "group_vars" / "pro.yml").read_text()
+        )
+        assert "120" in gv_pro["incus_network"]["subnet"]
+        gv_ai = yaml.safe_load(
+            (tmp_path / "group_vars" / "ai-tools.yml").read_text()
+        )
+        assert "110" in gv_ai["incus_network"]["subnet"]
