@@ -1,14 +1,15 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# Print service example: dedicated CUPS container with USB printer
+# Shared services example: dedicated CUPS container with USB printer
 # passthrough and network printer access via macvlan.
 #
 # IPs: anklume -> 10.100.0.x (admin)
-#       print-service/pro -> 10.110.x.x (trusted)
-#       perso -> 10.120.0.x (semi-trusted)
+#       shared  -> 10.120.x.x (semi-trusted)
+#       pro     -> 10.110.x.x (trusted)
+#       perso   -> 10.120.x.x (semi-trusted)
 
-project_name: sys-print-example
+project_name: shared-services-example
 
 global:
   addressing:
@@ -31,11 +32,11 @@ domains:
         roles:
           - base_system
 
-  print-service:
-    trust_level: trusted
-    description: "Dedicated print service domain"
+  shared:
+    trust_level: semi-trusted
+    description: "User-facing shared services (print, DNS, VPN)"
     machines:
-      sys-print:
+      shared-print:
         description: "CUPS print server"
         type: lxc
         roles:
@@ -63,19 +64,19 @@ domains:
 
 # Allow pro and perso domains to access CUPS via IPP (port 631).
 # After `make apply`, run:
-#   make apply-print I=sys-print
+#   make apply-print I=shared-print
 # to install CUPS, then add printers:
-#   scripts/sys-print.sh add-usb sys-print --vendor 04b8 --product 0005
-#   scripts/sys-print.sh add-network sys-print --nic-parent enp3s0
+#   scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
+#   scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
 network_policies:
   - description: "Pro domain prints via CUPS"
     from: pro
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp
 
   - description: "Perso domain prints via CUPS"
     from: perso
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp

@@ -1,9 +1,12 @@
-# Print Service (sys-print)
+# Print Service
 
 anklume supports a dedicated CUPS print server container. USB printers
 are passed through via Incus device passthrough, and network printers
 are accessed via a macvlan NIC that gives the container direct LAN access.
 Other domains print via IPP (port 631) through `network_policies`.
+
+The recommended setup uses a `shared` domain with `shared-print` as the
+container name (see SPEC.md "Naming conventions").
 
 ## Architecture
 
@@ -14,7 +17,7 @@ Other domains print via IPP (port 631) through `network_policies`.
 │  net-pro ────────────┐                                  │
 │    pro-dev           │  IPP :631     ┌───────────────┐  │
 │                      ├──────────────▶│ net-print      │  │
-│  net-perso ──────────┤               │  sys-print     │  │
+│  net-perso ──────────┤               │  shared-print  │  │
 │    perso-desktop     │               │  CUPS :631     │  │
 │                      │               │                │  │
 │                      │               │  USB: printer  │  │
@@ -32,11 +35,11 @@ Other domains print via IPP (port 631) through `network_policies`.
 
 ```yaml
 domains:
-  print-service:
-    description: "Dedicated print service domain"
-    trust_level: trusted
+  shared:
+    description: "User-facing shared services (print, DNS, VPN)"
+    trust_level: semi-trusted
     machines:
-      sys-print:
+      shared-print:
         description: "CUPS print server"
         type: lxc
         roles:
@@ -45,13 +48,13 @@ domains:
 network_policies:
   - description: "Pro domain prints via CUPS"
     from: pro
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp
 
   - description: "Perso domain prints via CUPS"
     from: perso
-    to: print-service
+    to: shared
     ports: [631]
     protocol: tcp
 ```
@@ -66,23 +69,23 @@ make apply
 ### 3. Setup CUPS in the container
 
 ```bash
-make apply-print I=sys-print
+make apply-print I=shared-print
 ```
 
 ### 4. Add printers
 
 ```bash
 # USB printer (requires vendor and product IDs)
-scripts/sys-print.sh add-usb sys-print --vendor 04b8 --product 0005
+scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
 
 # Network printer (macvlan NIC for physical LAN access)
-scripts/sys-print.sh add-network sys-print --nic-parent enp3s0
+scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
 ```
 
 ### 5. Check status
 
 ```bash
-scripts/sys-print.sh status sys-print
+scripts/sys-print.sh status shared-print
 ```
 
 ## Commands
@@ -175,7 +178,7 @@ incus exec pro-dev --project pro -- apt install -y cups-client
 
 # Add the remote printer
 incus exec pro-dev --project pro -- \
-    lpadmin -p remote-printer -v ipp://sys-print:631/printers/MyPrinter -E
+    lpadmin -p remote-printer -v ipp://shared-print:631/printers/MyPrinter -E
 
 # Print a test page
 incus exec pro-dev --project pro -- \
@@ -206,7 +209,7 @@ lsusb
 ### Removing a USB device
 
 ```bash
-incus config device remove sys-print printer-04b8-0005 --project print-service
+incus config device remove shared-print printer-04b8-0005 --project shared
 ```
 
 ## Network printer access via macvlan
@@ -232,7 +235,7 @@ Limitations:
 Check the service logs:
 
 ```bash
-incus exec sys-print --project print-service -- journalctl -u cups -f
+incus exec shared-print --project shared -- journalctl -u cups -f
 ```
 
 ### USB printer not detected
@@ -240,7 +243,7 @@ incus exec sys-print --project print-service -- journalctl -u cups -f
 Verify the device is attached:
 
 ```bash
-incus config device show sys-print --project print-service
+incus config device show shared-print --project shared
 ```
 
 Check that the USB device is plugged in on the host:
@@ -254,13 +257,13 @@ lsusb | grep <vendor-id>
 After adding a macvlan NIC, restart the instance:
 
 ```bash
-incus restart sys-print --project print-service
+incus restart shared-print --project shared
 ```
 
 Verify the NIC is up:
 
 ```bash
-incus exec sys-print --project print-service -- ip addr show
+incus exec shared-print --project shared -- ip addr show
 ```
 
 ### Permission denied on printing

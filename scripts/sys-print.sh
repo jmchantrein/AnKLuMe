@@ -303,10 +303,10 @@ access to the physical LAN for discovering network printers (WiFi/Ethernet).
 Other domains access the CUPS service via IPP (port 631) through network_policies.
 
 Examples:
-  sys-print.sh setup sys-print                                # Install CUPS
-  sys-print.sh add-usb sys-print --vendor 04b8 --product 0005 # Add Epson USB
-  sys-print.sh add-network sys-print --nic-parent enp3s0      # LAN access
-  sys-print.sh status sys-print                               # Check status
+  sys-print.sh setup shared-print                                # Install CUPS
+  sys-print.sh add-usb shared-print --vendor 04b8 --product 0005 # Add Epson USB
+  sys-print.sh add-network shared-print --nic-parent enp3s0      # LAN access
+  sys-print.sh status shared-print                               # Check status
 USAGE
 }
 

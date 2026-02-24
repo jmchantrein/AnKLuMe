@@ -195,11 +195,11 @@ The following features are planned but not yet implemented:
   migration via `incus copy local: remote:`.
 - **Tor gateway domain**: transparent Tor proxy container with
   network_policies routing traffic from selected domains.
-- **sys-print**: dedicated CUPS container. USB printers via Incus
-  `usb` device passthrough. Network printers (WiFi/Ethernet) via
-  macvlan NIC giving the container access to the physical LAN.
-  Other domains access `sys-print` via IPP (port 631) through
-  network_policies.
+- **shared-print**: dedicated CUPS container in the `shared` domain.
+  USB printers via Incus `usb` device passthrough. Network printers
+  (WiFi/Ethernet) via macvlan NIC giving the container access to the
+  physical LAN. Other domains access `shared-print` via IPP (port 631)
+  through network_policies.
 
 ### Phase 21: Desktop Integration (optional)
 - **Terminal background coloring**: per-domain colors via tmux
