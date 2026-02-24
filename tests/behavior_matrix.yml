@@ -833,3 +833,35 @@ capabilities:
         action: "Shared volumes + nesting prefix + addressing"
         expected: "Devices use correct paths, names prefixed, IPs zone-aware"
         deterministic: true
+
+  llm_sanitizer:
+    description: "LLM sanitization proxy — ai_provider/ai_sanitize validation and patterns (Phase 39)"
+    depth_1:
+      - id: SAN-001
+        action: "Valid ai_provider values (local, cloud, local-first)"
+        expected: "Validation passes for all three values"
+        deterministic: true
+      - id: SAN-002
+        action: "Invalid ai_provider value"
+        expected: "Validation error mentioning ai_provider"
+        deterministic: true
+      - id: SAN-003
+        action: "Valid ai_sanitize values (true, false, 'always')"
+        expected: "Validation passes for all three values"
+        deterministic: true
+      - id: SAN-004
+        action: "Invalid ai_sanitize value"
+        expected: "Validation error mentioning ai_sanitize"
+        deterministic: true
+      - id: SAN-005
+        action: "Default propagation (local->false, cloud->true)"
+        expected: "group_vars contains correct domain_ai_provider and domain_ai_sanitize"
+        deterministic: true
+      - id: SAN-006
+        action: "Explicit ai_sanitize overrides auto-default"
+        expected: "group_vars contains user-specified ai_sanitize value"
+        deterministic: true
+      - id: SAN-007
+        action: "IaC detection patterns match infrastructure identifiers"
+        expected: "Regex patterns match anklume IPs, Incus names, FQDNs, credentials"
+        deterministic: true

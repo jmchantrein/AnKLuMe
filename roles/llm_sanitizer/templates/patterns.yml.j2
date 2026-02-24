@@ -1,0 +1,123 @@
+# {{ ansible_managed }}
+# IaC detection patterns for LLM sanitization proxy
+# Each category contains regex patterns that match infrastructure identifiers
+# to be anonymized before cloud-bound LLM requests.
+
+categories:
+  # RFC 1918 IP addresses — especially anklume 10.1xx convention (ADR-038)
+  ip_addresses:
+    - name: anklume_zone_ips
+      description: "Trust-zone IPs (10.100-159.x.x)"
+      pattern: '\b10\.1[0-5][0-9]\.\d{1,3}\.\d{1,3}\b'
+      replacement: "10.ZONE.SEQ.HOST"
+    - name: rfc1918_class_a
+      description: "RFC 1918 Class A private range (10.x.x.x/8)"
+      pattern: '\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+      replacement: "10.X.X.X"
+    - name: rfc1918_class_b
+      description: "RFC 1918 172.16-31.x.x"
+      pattern: '\b172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}\b'
+      replacement: "172.16.X.X"
+    - name: rfc1918_class_c
+      description: "RFC 1918 192.168.x.x"
+      pattern: '\b192\.168\.\d{1,3}\.\d{1,3}\b'
+      replacement: "192.168.X.X"
+    - name: subnet_cidr
+      description: "CIDR notation subnets"
+      pattern: '\b10\.1[0-5][0-9]\.\d{1,3}\.0/24\b'
+      replacement: "10.ZONE.SEQ.0/24"
+
+  # Incus resource names (project, bridge, instance naming conventions)
+  incus_resources:
+    - name: incus_project
+      description: "Incus project names (with optional nesting prefix)"
+      pattern: '\b(\d{3}-)?[a-z][a-z0-9-]*(?=\s+(project|proj))'
+      replacement: "INCUS_PROJECT"
+    - name: incus_bridge
+      description: "Network bridges (net-<domain>)"
+      pattern: '\b(\d{3}-)?net-[a-z][a-z0-9-]*\b'
+      replacement: "net-DOMAIN"
+    - name: incus_instance
+      description: "Instance names (<domain>-<machine>)"
+      pattern: '\b(\d{3}-)?[a-z][a-z0-9]+-[a-z][a-z0-9-]+\b'
+      replacement: "INSTANCE_NAME"
+    - name: incus_commands
+      description: "Incus CLI with resource arguments"
+      pattern: 'incus\s+(exec|config|start|stop|delete|launch)\s+\S+'
+      replacement: "incus \\1 RESOURCE"
+
+  # FQDN patterns (internal naming conventions)
+  fqdn:
+    - name: internal_domain
+      description: "*.internal domains"
+      pattern: '\b[a-z0-9][a-z0-9.-]*\.internal\b'
+      replacement: "host.internal"
+    - name: corp_domain
+      description: "*.corp domains"
+      pattern: '\b[a-z0-9][a-z0-9.-]*\.corp\b'
+      replacement: "host.corp"
+    - name: local_domain
+      description: "*.local mDNS domains"
+      pattern: '\b[a-z0-9][a-z0-9.-]*\.local\b'
+      replacement: "host.local"
+    - name: lan_domain
+      description: "*.lan domains"
+      pattern: '\b[a-z0-9][a-z0-9.-]*\.lan\b'
+      replacement: "host.lan"
+
+  # Service identifiers (ports, URLs, socket paths)
+  service_identifiers:
+    - name: incus_socket
+      description: "Incus Unix socket path"
+      pattern: '/var/(?:lib|run)/incus/unix\.socket'
+      replacement: "/var/run/SERVICE/socket"
+    - name: ollama_endpoint
+      description: "Ollama API endpoint"
+      pattern: 'https?://[^/\s]+:11434\b'
+      replacement: "http://LLM_ENDPOINT:PORT"
+    - name: local_service_urls
+      description: "Local service URLs on private IPs"
+      pattern: 'https?://10\.1[0-5][0-9]\.\d+\.\d+:\d+'
+      replacement: "http://SERVICE_HOST:PORT"
+
+  # Ansible hostnames, group names, and inventory patterns
+  ansible_names:
+    - name: ansible_host_var
+      description: "ansible_host with IP value"
+      pattern: 'ansible_host:\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+      replacement: "ansible_host: REDACTED_IP"
+    - name: group_vars_path
+      description: "group_vars file paths"
+      pattern: 'group_vars/[a-z][a-z0-9-]+\.yml'
+      replacement: "group_vars/DOMAIN.yml"
+    - name: host_vars_path
+      description: "host_vars file paths"
+      pattern: 'host_vars/[a-z][a-z0-9-]+\.yml'
+      replacement: "host_vars/HOST.yml"
+    - name: inventory_path
+      description: "inventory file paths"
+      pattern: 'inventory/[a-z][a-z0-9-]+\.yml'
+      replacement: "inventory/DOMAIN.yml"
+
+  # Credential patterns (API keys, tokens, secrets)
+  credentials:
+    - name: bearer_token
+      description: "Bearer authorization tokens"
+      pattern: 'Bearer\s+[A-Za-z0-9._~+/=-]{20,}'
+      replacement: "Bearer [REDACTED]"
+    - name: api_key_header
+      description: "API key headers"
+      pattern: '(?i)(x-api-key|authorization|api[_-]?key)\s*[:=]\s*\S{10,}'
+      replacement: "\\1: [REDACTED]"
+    - name: generic_secret
+      description: "Common secret variable patterns"
+      pattern: '(?i)(password|secret|token|api_key)\s*[:=]\s*[^\s,;}]{8,}'
+      replacement: "\\1=[REDACTED]"
+    - name: ssh_private_key
+      description: "SSH private key headers"
+      pattern: '-----BEGIN\s+(RSA|OPENSSH|EC|DSA)\s+PRIVATE\s+KEY-----'
+      replacement: "[REDACTED_PRIVATE_KEY]"
+    - name: base64_long_string
+      description: "Long base64 strings (likely secrets)"
+      pattern: '\b[A-Za-z0-9+/]{64,}={0,2}\b'
+      replacement: "[REDACTED_BASE64]"

@@ -631,3 +631,45 @@ for anklume traffic.
 
 **Consequence**: IP addresses are human-readable. From `10.140.0.5`,
 an admin immediately knows: zone 140 = 100+40 = untrusted.
+
+---
+
+## ADR-044: LLM sanitization proxy — transparent anonymization
+
+**Context**: When domains use cloud LLM providers (`ai_provider:
+cloud` or `local-first`), prompts may contain infrastructure-specific
+data: internal IPs (especially the anklume `10.1xx` convention),
+Incus resource names, Ansible hostnames, credentials, or internal
+FQDNs. Sending this data to external APIs leaks the infrastructure
+topology.
+
+**Decision**: Add a per-domain `ai_provider` / `ai_sanitize`
+directive in `infra.yml`. The generator validates and propagates
+these to group_vars (`domain_ai_provider`, `domain_ai_sanitize`).
+A new `llm_sanitizer` Ansible role deploys a transparent proxy that
+applies regex-based detection patterns to anonymize IaC identifiers
+before requests leave the local perimeter.
+
+**Key design choices**:
+- **Domain-level, not global**: Different domains have different
+  sensitivity levels. A `disposable` domain may use cloud LLMs
+  freely, while an `admin` domain must sanitize everything.
+- **Opt-in by default for local**: `ai_provider: local` defaults
+  to `ai_sanitize: false` because data never leaves the perimeter.
+- **Opt-out requires explicit action for cloud**: `ai_provider:
+  cloud` defaults to `ai_sanitize: true`. The user must explicitly
+  set `ai_sanitize: false` to disable it.
+- **Pattern-based, not AI-based**: Detection uses curated regex
+  patterns (IaC-specific), not ML classifiers. Predictable,
+  auditable, no false positives from model drift.
+- **Audit trail**: Every redaction is logged with before/after
+  context for compliance review.
+
+**Why not a global proxy**: Per-domain configuration allows
+fine-grained control. An `admin` domain might use `ai_sanitize:
+always` while a `disposable` domain uses `false`.
+
+**Consequence**: Cloud-bound LLM requests are automatically
+stripped of infrastructure identifiers. The sanitizer is
+transparent to the LLM client — it sees the same API. Local
+requests bypass sanitization by default (no latency penalty).
