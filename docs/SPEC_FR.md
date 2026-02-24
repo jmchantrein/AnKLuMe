@@ -418,11 +418,35 @@ du domaine.
   - Un domaine `ai-tools` doit exister
   - Au plus une `network_policy` peut cibler `ai-tools` comme destination
 
-### Auto-creation de sys-firewall (firewall_mode: vm)
+### Conventions de nommage
+
+Les noms de machines suivent le schema `<domaine>-<role>`. Deux
+domaines ont une signification speciale :
+
+**Domaine `anklume`** (infrastructure/admin) :
+- Niveau de confiance : `admin`
+- Machines prefixees `anklume-`
+- Objectif : infrastructure du framework (orchestration, firewall)
+- Exemples : `anklume-instance`, `anklume-firewall`
+
+**Domaine `shared`** (services partages) :
+- Niveau de confiance : `semi-trusted`
+- Machines prefixees `shared-`
+- Objectif : services accessibles depuis plusieurs domaines via
+  `network_policies` (impression, DNS, VPN)
+- Exemples : `shared-print`, `shared-dns`, `shared-vpn`
+
+**Autres domaines** : schema standard `<domaine>-<role>` :
+- `pro-dev`, `perso-desktop`, `ai-gpu`, `torgw-proxy`
+
+Le prefixe `sys-` est retire. Les declarations legacy `sys-firewall`
+sont toujours acceptees pour la retrocompatibilite (voir ci-dessous).
+
+### Auto-creation de anklume-firewall (firewall_mode: vm)
 
 Quand `global.firewall_mode` est defini a `vm`, le generateur cree
-automatiquement une machine `sys-firewall` dans le domaine anklume si
-elle n'est pas deja declaree. Cette etape d'enrichissement
+automatiquement une machine `anklume-firewall` dans le domaine anklume
+si elle n'est pas deja declaree. Cette etape d'enrichissement
 (`enrich_infra()`) s'execute apres la validation mais avant la
 generation de fichiers. La machine auto-creee utilise :
 - type : `vm`, ip : `<base_octet>.<zone>.<anklume_seq>.253`
@@ -430,9 +454,11 @@ generation de fichiers. La machine auto-creee utilise :
 - roles : `[base_system, firewall_router]`
 - ephemeral : `false`
 
-Si l'utilisateur declare `sys-firewall` explicitement (dans n'importe
-quel domaine), sa definition a la priorite et aucune auto-creation ne
-se produit. Si `firewall_mode` est `vm` mais qu'aucun domaine `anklume`
+Si l'utilisateur declare `anklume-firewall` explicitement (dans
+n'importe quel domaine), sa definition a la priorite et aucune
+auto-creation ne se produit. Pour la retrocompatibilite, une
+declaration `sys-firewall` empeche egalement l'auto-creation.
+Si `firewall_mode` est `vm` mais qu'aucun domaine `anklume`
 n'existe, le generateur quitte avec une erreur.
 
 ### Politique de securite (containers privilegies)
