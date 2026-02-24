@@ -43,7 +43,6 @@
   ansible.builtin.command:
     cmd: npm install -g openclaw@latest
     creates: /usr/bin/openclaw
-  changed_when: false
 
 - name: OpenclawServer | Create data directory
   ansible.builtin.file:
@@ -78,7 +77,7 @@
       - --json
       - models.providers.ollama
       - "{{ _openclaw_ollama_provider }}"
-  changed_when: false
+  changed_when: true
 
 - name: OpenclawServer | Build memory search JSON
   ansible.builtin.set_fact:
@@ -98,7 +97,7 @@
       - --json
       - agents.defaults.memorySearch
       - "{{ _openclaw_memory_search }}"
-  changed_when: false
+  changed_when: true
 
 # -- Git identity and credentials ------------------------------------------
 

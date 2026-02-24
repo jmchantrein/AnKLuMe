@@ -149,6 +149,13 @@
       {{ (_incus_instances_config_raw.stdout | from_yaml).profiles | default(['default']) }}
   when: _incus_instances_config_raw is not skipped
 
+- name: IncusInstances | Parse current config keys
+  ansible.builtin.set_fact:
+    _incus_instances_current_config: >-
+      {{ (_incus_instances_config_raw.stdout | from_yaml).config | default({})
+         if (_incus_instances_config_raw is defined and _incus_instances_config_raw is not skipped)
+         else {} }}
+
 - name: IncusInstances | Assign profiles if changed
   ansible.builtin.command:
     argv:
@@ -177,8 +184,10 @@
   loop: "{{ instance_config | default({}) | dict2items }}"
   loop_control:
     label: "{{ item.key }}={{ item.value }}"
-  when: instance_config is defined and (instance_config | length > 0)
-  changed_when: false
+  when:
+    - instance_config is defined and (instance_config | length > 0)
+    - (_incus_instances_current_config[item.key] | default('') | string) != (item.value | string)
+  changed_when: true
 
 # ── Boot autostart (from instance_boot_autostart / instance_boot_priority) ──
 
@@ -192,8 +201,10 @@
       - "boot.autostart={{ instance_boot_autostart | lower }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_boot_autostart is defined
-  changed_when: false
+  when:
+    - instance_boot_autostart is defined
+    - (_incus_instances_current_config['boot.autostart'] | default('')) != (instance_boot_autostart | string | lower)
+  changed_when: true
 
 - name: IncusInstances | Set boot.autostart.priority
   ansible.builtin.command:
@@ -205,8 +216,10 @@
       - "boot.autostart.priority={{ instance_boot_priority }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_boot_priority is defined
-  changed_when: false
+  when:
+    - instance_boot_priority is defined
+    - (_incus_instances_current_config['boot.autostart.priority'] | default('') | string) != (instance_boot_priority | string)
+  changed_when: true
 
 # ── Delete protection (from instance_ephemeral) ─────────────────────────────
 # ephemeral: false → security.protection.delete=true (protected)
@@ -222,8 +235,11 @@
       - "security.protection.delete={{ 'false' if (instance_ephemeral | bool) else 'true' }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_ephemeral is defined
-  changed_when: false
+  when:
+    - instance_ephemeral is defined
+    - (_incus_instances_current_config['security.protection.delete'] | default(''))
+      != ('false' if (instance_ephemeral | bool) else 'true')
+  changed_when: true
 
 # ── Snapshot scheduling (from instance_snapshots_schedule / _expiry) ─────────
 
@@ -237,8 +253,10 @@
       - "snapshots.schedule={{ instance_snapshots_schedule }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_snapshots_schedule is defined
-  changed_when: false
+  when:
+    - instance_snapshots_schedule is defined
+    - (_incus_instances_current_config['snapshots.schedule'] | default('')) != instance_snapshots_schedule
+  changed_when: true
 
 - name: IncusInstances | Set snapshots.expiry
   ansible.builtin.command:
@@ -250,8 +268,10 @@
       - "snapshots.expiry={{ instance_snapshots_expiry }}"
       - --project
       - "{{ instance_domain }}"
-  when: instance_snapshots_expiry is defined
-  changed_when: false
+  when:
+    - instance_snapshots_expiry is defined
+    - (_incus_instances_current_config['snapshots.expiry'] | default('')) != instance_snapshots_expiry
+  changed_when: true
 
 - name: IncusInstances | Check if eth0 is already overridden
   ansible.builtin.command:
@@ -385,7 +405,7 @@
   when:
     - instance_storage_volumes is defined and (instance_storage_volumes | length > 0)
     - item.value.size is defined
-  changed_when: false
+  changed_when: true
 
 - name: IncusInstances | Attach storage volumes as disk devices
   ansible.builtin.command:
@@ -554,6 +574,23 @@
       {{ incus_instances_parent_yolo.content | default('ZmFsc2U=') | b64decode | trim }}
   when: incus_instances_parent_abs is defined
 
+- name: IncusInstances | Check /etc/anklume exists in child
+  ansible.builtin.command:
+    argv:
+      - incus
+      - exec
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+      - --
+      - test
+      - -d
+      - /etc/anklume
+  register: _incus_instances_anklume_dir_check
+  changed_when: false
+  failed_when: false
+  when: incus_instances_child_abs is defined
+
 - name: IncusInstances | Create /etc/anklume in child instance
   ansible.builtin.command:
     argv:
@@ -566,6 +603,24 @@
       - mkdir
       - -p
       - /etc/anklume
+  changed_when: true
+  when:
+    - incus_instances_child_abs is defined
+    - _incus_instances_anklume_dir_check.rc | default(1) != 0
+
+- name: IncusInstances | Read current child context files
+  ansible.builtin.command:
+    cmd: >-
+      incus exec {{ instance_name }} --project {{ instance_domain }}
+      -- bash -c 'cat /etc/anklume/{{ item.key }} 2>/dev/null || echo __MISSING__'
+  loop:
+    - { key: "absolute_level", value: "{{ incus_instances_child_abs | trim }}" }
+    - { key: "relative_level", value: "{{ incus_instances_child_rel | trim }}" }
+    - { key: "vm_nested", value: "{{ incus_instances_child_vm_nested | trim }}" }
+    - { key: "yolo", value: "{{ incus_instances_child_yolo | trim }}" }
+  loop_control:
+    label: "{{ item.key }}"
+  register: _incus_instances_child_context_current
   changed_when: false
   when: incus_instances_child_abs is defined
 
@@ -573,13 +628,12 @@
   ansible.builtin.command:
     cmd: >-
       incus exec {{ instance_name }} --project {{ instance_domain }}
-      -- bash -c 'echo "{{ item.value }}" > /etc/anklume/{{ item.key }}'
-  loop:
-    - { key: "absolute_level", value: "{{ incus_instances_child_abs | trim }}" }
-    - { key: "relative_level", value: "{{ incus_instances_child_rel | trim }}" }
-    - { key: "vm_nested", value: "{{ incus_instances_child_vm_nested | trim }}" }
-    - { key: "yolo", value: "{{ incus_instances_child_yolo | trim }}" }
+      -- bash -c 'echo "{{ item.item.value }}" > /etc/anklume/{{ item.item.key }}'
+  loop: "{{ _incus_instances_child_context_current.results | default([]) }}"
   loop_control:
-    label: "{{ item.key }}={{ item.value | trim }}"
-  changed_when: false
-  when: incus_instances_child_abs is defined
+    label: "{{ item.item.key }}={{ item.item.value | trim }}"
+  changed_when: true
+  when:
+    - incus_instances_child_abs is defined
+    - item is not skipped
+    - (item.stdout | default('') | trim) != (item.item.value | trim)

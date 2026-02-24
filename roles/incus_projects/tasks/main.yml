@@ -38,6 +38,22 @@
     and 'UNIQUE constraint failed' not in (incus_projects_create_result.stderr | default(''))
     and 'already exists' not in (incus_projects_create_result.stderr | default(''))
 
+- name: IncusProjects | Read project config
+  ansible.builtin.command:
+    argv:
+      - incus
+      - project
+      - show
+      - "{{ incus_project }}"
+  register: incus_projects_show_raw
+  changed_when: false
+  check_mode: false  # Safe: read-only command
+
+- name: IncusProjects | Parse current project config
+  ansible.builtin.set_fact:
+    _incus_projects_current_config: >-
+      {{ (incus_projects_show_raw.stdout | from_yaml).config | default({}) }}
+
 - name: IncusProjects | Configure project features
   ansible.builtin.command:
     argv:
@@ -49,18 +65,12 @@
       - "features.profiles=true"
       - "features.storage.volumes=true"
       - "features.networks=false"
-  changed_when: false
-
-- name: IncusProjects | Read project config
-  ansible.builtin.command:
-    argv:
-      - incus
-      - project
-      - show
-      - "{{ incus_project }}"
-  register: incus_projects_show_raw
-  changed_when: false
-  check_mode: false  # Safe: read-only command
+  when: >-
+    (_incus_projects_current_config['features.images'] | default('')) != 'true'
+    or (_incus_projects_current_config['features.profiles'] | default('')) != 'true'
+    or (_incus_projects_current_config['features.storage.volumes'] | default('')) != 'true'
+    or (_incus_projects_current_config['features.networks'] | default('')) != 'false'
+  changed_when: true
 
 - name: IncusProjects | Set project description if needed
   ansible.builtin.command:
