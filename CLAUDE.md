@@ -175,6 +175,7 @@ Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/desktop-integration.md` — GUI app forwarding (Phase 19b)
 - `docs/live-os.md` — Live OS / USB boot
 - `docs/openclaw.md` — OpenClaw AI agent framework
+- `docs/claude-code-workflow.md` — Development workflow with Claude Code
 - `docs/mcp-services.md` — MCP services architecture
 - `docs/golden-images.md` — Pre-built OS images
 - `docs/disposable.md` — Disposable containers

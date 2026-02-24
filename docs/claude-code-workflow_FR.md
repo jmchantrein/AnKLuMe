@@ -4,6 +4,21 @@
 
 Comment travailler efficacement sur anklume avec Claude Code.
 
+## Architecture (Phase 35)
+
+Le flux de developpement utilise Claude Code directement sur l'hote, avec
+deux mecanismes complementaires pour la delegation aux LLM locaux :
+
+| Composant | Role |
+|---|---|
+| **Claude Code** | Orchestrateur principal (terminal/IDE), tourne sur l'hote |
+| **mcp-ollama-coder** | Outils MCP pour delegation explicite au GPU local (generate, review, fix, test, explain) |
+| **claude-code-router** | Optionnel : route les taches de fond vers Ollama via `ANTHROPIC_BASE_URL` |
+
+Aucun serveur proxy n'est necessaire. Le precedent proxy MCP
+(`scripts/mcp-anklume-dev.py`) a ete archive en Phase 35. Voir
+`docs/vision-ai-integration.md` pour la justification.
+
 ## Demarrer une session
 
 Claude Code lit automatiquement `CLAUDE.md` au demarrage de la session. Pour
@@ -22,8 +37,8 @@ un contexte plus approfondi sur une tache specifique, chargez le document pertin
    mettez-la a jour d'abord.
 
 2. **Ecrire les tests** : Avant d'ecrire du code, ecrivez les tests :
-   - Roles -> test Molecule (`roles/<n>/molecule/default/`)
-   - Generateur -> pytest (`tests/test_generate.py`)
+   - Roles : test Molecule (`roles/<n>/molecule/default/`)
+   - Generateur : pytest (`tests/test_generate.py`)
 
 3. **Implementer** : Ecrivez le code jusqu'a ce que les tests passent.
 
@@ -35,6 +50,21 @@ un contexte plus approfondi sur une tache specifique, chargez le document pertin
    ```
 
 6. **Commiter** : Seulement quand `make lint && make test` passent.
+
+## Delegation aux LLM locaux
+
+Utilisez les outils MCP `mcp-ollama-coder` quand vous voulez deleguer du
+travail au GPU local (gratuit, sans cout API) :
+
+- `generate_code` -- generer du code a partir d'une description en langage naturel
+- `review_code` -- analyser le code pour la qualite, les bugs, la securite
+- `fix_code` -- corriger du code a partir d'un message d'erreur
+- `generate_tests` -- generer des tests pour du code donne
+- `explain_code` -- expliquer du code en langage courant
+- `list_models` -- lister les modeles Ollama disponibles
+
+Ces outils sont configures dans les parametres MCP de Claude Code et
+appellent Ollama sur le serveur GPU local directement.
 
 ## Utiliser les agents
 
@@ -63,3 +93,5 @@ et les commandes Incus courantes.
 - **Utilisez des sous-agents pour des taches distinctes** : Evitez la pollution de contexte.
 - **Executez `make lint` frequemment** : Detectez les problemes tot.
 - **Consultez ROADMAP.md** : Sachez dans quelle phase vous etes.
+- **Le mode local est le defaut** : Utilisez les outils `mcp-ollama-coder`
+  pour la generation et la revue de code afin d'economiser les tokens API.
