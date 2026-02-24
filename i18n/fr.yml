@@ -1,0 +1,172 @@
+---
+# i18n/fr.yml — French translations for Makefile targets
+# Used by `make help` in student mode (ANKLUME_MODE=student)
+# Format: target_name: "Description en francais"
+
+# ── Getting started ──────────────────────────────────────
+guide: "Tutoriel interactif pas-a-pas"
+quickstart: "Copier l'exemple infra.yml et generer les fichiers Ansible"
+init: "Installation initiale : dependances Ansible + outils"
+
+# ── Core workflow ────────────────────────────────────────
+sync: "Generer/mettre a jour les fichiers Ansible depuis infra.yml"
+sync-dry: "Apercu des changements sans ecriture"
+sync-clean: "Supprimer les fichiers orphelins sans confirmation"
+apply: "Appliquer toute l'infrastructure + provisionnement"
+apply-limit: "Appliquer un seul domaine (G=<groupe>)"
+apply-infra: "Appliquer l'infrastructure uniquement (reseaux, projets, instances)"
+apply-provision: "Appliquer le provisionnement uniquement (paquets, services)"
+apply-base: "Appliquer le role base_system uniquement"
+apply-images: "Telecharger les images OS dans le cache local"
+apply-llm: "Appliquer les roles LLM (Ollama + Open WebUI)"
+apply-stt: "Appliquer le role STT (Speaches + faster-whisper)"
+apply-ai: "Deployer tous les services IA"
+apply-code-sandbox: "Appliquer le role code_sandbox (IDE IA en bac a sable)"
+apply-openclaw: "Appliquer le role openclaw_server (assistant IA auto-heberge)"
+check: "Execution a blanc (--check --diff)"
+syntax: "Verification de syntaxe uniquement"
+nftables: "Generer les regles d'isolation nftables"
+nftables-deploy: "Deployer les regles nftables sur l'hote (depuis l'hote)"
+doctor: "Diagnostiquer la sante de l'infrastructure"
+
+# ── Snapshots ────────────────────────────────────────────
+snapshot: "Creer un instantane de toutes les instances"
+snapshot-domain: "Creer un instantane d'un domaine (D=domaine)"
+restore: "Restaurer un instantane (NAME=obligatoire)"
+restore-domain: "Restaurer un instantane pour un domaine (D=domaine NAME=obligatoire)"
+snapshot-delete: "Supprimer un instantane (NAME=obligatoire)"
+snapshot-list: "Lister les instantanes de toutes les instances"
+rollback: "Restaurer le dernier instantane pre-apply"
+rollback-list: "Lister les instantanes pre-apply disponibles"
+rollback-cleanup: "Supprimer les anciens instantanes pre-apply (KEEP=3 par defaut)"
+
+# ── AI / LLM ────────────────────────────────────────────
+llm-switch: "Changer de backend LLM (B=llama|ollama [MODEL=<nom>])"
+llm-status: "Afficher le backend actif, le modele et l'usage VRAM"
+llm-bench: "Benchmark d'inference LLM (MODEL=<nom|all> COMPARE=1)"
+llm-dev: "Assistant de dev local LLM (pas de credits API)"
+ai-switch: "Changer l'acces exclusif aux outils IA (DOMAIN=<nom>)"
+ai-test: "Tests + correction assistee par IA"
+ai-test-role: "Test assiste par IA pour un role (R=nom_role)"
+ai-develop: "Developpement autonome (TASK=\"description\")"
+ai-improve: "Boucle d'amelioration guidee par les specs"
+claude-host: "Lancer Claude Code avec acces root + hook de garde (sudo)"
+claude-host-resume: "Reprendre la derniere session Claude Code en mode hote"
+claude-host-audit: "Afficher le journal d'audit du jour en mode hote"
+
+# ── Console ──────────────────────────────────────────────
+console: "Lancer la console tmux avec panneaux colores par domaine"
+dashboard: "Tableau de bord web (PORT=8888)"
+desktop-config: "Generer la config d'environnement de bureau depuis infra.yml"
+
+# ── Instance management ──────────────────────────────────
+disp: "Lancer une instance ephemere jetable"
+instance-remove: "Supprimer une instance (I=<nom> ou DOMAIN=<d> SCOPE=<portee>)"
+backup: "Sauvegarder une instance (I=<instance> [GPG=<destinataire>])"
+restore-backup: "Restaurer depuis une sauvegarde (FILE=<fichier>)"
+file-copy: "Copier un fichier entre instances (SRC=inst:/chemin DST=inst:/chemin)"
+clipboard-to: "Copier le presse-papier de l'hote VERS le conteneur"
+clipboard-from: "Copier le presse-papier du conteneur VERS l'hote"
+domain-exec: "Ouvrir un terminal vers l'instance avec les couleurs du domaine"
+shares: "Creer les repertoires hote pour les shared_volumes"
+data-dirs: "Creer les repertoires hote pour les persistent_data"
+
+# ── App export ───────────────────────────────────────────
+export-app: "Exporter une appli conteneur vers le bureau hote"
+export-list: "Lister les applis conteneur exportees"
+export-remove: "Supprimer une appli exportee"
+
+# ── File portal ──────────────────────────────────────────
+portal-open: "Ouvrir un fichier depuis un conteneur via le portail"
+portal-push: "Envoyer un fichier vers un conteneur via le portail"
+portal-pull: "Recuperer un fichier depuis un conteneur via le portail"
+portal-list: "Lister les portails de fichiers configures"
+
+# ── Golden images ────────────────────────────────────────
+golden-create: "Creer une image de reference depuis une instance"
+golden-derive: "Deriver une instance depuis une image de reference"
+golden-publish: "Publier une image de reference comme image Incus"
+golden-list: "Lister les images de reference"
+
+# ── MCP services ─────────────────────────────────────────
+mcp-list: "Lister les outils MCP disponibles sur une instance"
+mcp-call: "Appeler un outil MCP sur une instance"
+
+# ── Network services ─────────────────────────────────────
+apply-tor: "Configurer le proxy transparent Tor dans un conteneur"
+apply-print: "Configurer le service d'impression CUPS dans un conteneur"
+
+# ── Live OS ──────────────────────────────────────────────
+build-image: "Construire une image live OS anklume demarrable"
+live-update: "Telecharger et appliquer une mise a jour A/B"
+live-status: "Afficher l'etat du live OS (slot actif, demarrage, pool)"
+
+# ── Lifecycle ────────────────────────────────────────────
+upgrade: "Mise a jour securisee du framework"
+flush: "Detruire toute l'infrastructure (FORCE=true en prod)"
+import-infra: "Generer infra.yml depuis l'etat Incus existant"
+install-update-notifier: "Installer la notification de mise a jour au login"
+install-hooks: "Installer les hooks git pre-commit"
+
+# ── Education ────────────────────────────────────────────
+lab-list: "Lister les TPs disponibles"
+lab-start: "Demarrer un TP (L=01)"
+lab-check: "Verifier l'etape en cours (L=01)"
+lab-hint: "Afficher un indice (L=01)"
+lab-reset: "Reinitialiser le TP (L=01)"
+lab-solution: "Afficher la solution (L=01)"
+
+# ── Development ──────────────────────────────────────────
+lint: "Executer TOUS les validateurs"
+lint-yaml: "Valider tous les fichiers YAML"
+lint-ansible: "Valider les roles et playbooks Ansible"
+lint-shell: "Valider les scripts shell"
+lint-python: "Valider les fichiers Python"
+test: "Executer tous les tests"
+test-generator: "Executer les tests pytest du generateur"
+test-roles: "Executer les tests Molecule pour tous les roles"
+test-role: "Executer le test Molecule d'un role (R=nom_role)"
+test-sandboxed: "Executer les tests Molecule dans un bac a sable isole"
+test-sandboxed-role: "Executer le test d'un role dans le bac a sable"
+runner-create: "Creer le conteneur runner anklume"
+runner-destroy: "Detruire le conteneur runner anklume"
+test-report: "Executer les tests et produire un rapport JSON"
+smoke: "Test de fumee en conditions reelles"
+matrix-coverage: "Afficher la couverture de la matrice de comportements"
+matrix-generate: "Generer les tests pour les cellules non couvertes"
+mine-experiences: "Extraire les patterns de correction depuis l'historique git"
+dead-code: "Detection de code mort (vulture + shellcheck)"
+call-graph: "Generer le graphe d'appels Python (DOT + SVG)"
+dep-graph: "Generer le graphe de dependances modules (SVG)"
+code-graph: "Executer tous les outils d'analyse statique"
+audit: "Produire un rapport d'audit du code (code mort, metriques, couverture)"
+audit-json: "Produire le rapport d'audit en JSON"
+scenario-test: "Executer tous les scenarios E2E (lent, a la demande)"
+scenario-test-best: "Executer les scenarios de bonnes pratiques uniquement"
+scenario-test-bad: "Executer les scenarios de mauvaises pratiques uniquement"
+scenario-list: "Lister tous les scenarios disponibles"
+export-images: "Exporter les images pour le partage Incus imbrique"
+agent-runner-setup: "Installer Claude Code + Agent Teams dans le conteneur runner"
+agent-fix: "Correction autonome de tests avec Claude Code Agent Teams"
+agent-develop: "Developpement autonome avec Agent Teams (TASK=\"description\")"
+
+# ── Telemetry ────────────────────────────────────────────
+telemetry-on: "Activer la telemetrie locale (opt-in, locale uniquement)"
+telemetry-off: "Desactiver la telemetrie locale"
+telemetry-status: "Afficher l'etat et le nombre d'evenements de telemetrie"
+telemetry-clear: "Supprimer toutes les donnees de telemetrie"
+telemetry-report: "Graphiques terminaux des usages"
+
+# ── Help / Mode ──────────────────────────────────────────
+help: "Afficher l'aide categorisee (help-all pour toutes les cibles)"
+help-all: "Afficher toutes les cibles disponibles"
+mode-student: "Passer en mode etudiant (aide bilingue)"
+mode-user: "Passer en mode utilisateur (defaut)"
+mode-dev: "Passer en mode developpeur (toutes les cibles)"
+
+# ── Deprecated ───────────────────────────────────────────
+ollama-dev: "Alias pour llm-dev (obsolete)"
+mcp-dev-start: "[RETIRE] Proxy MCP archive (Phase 35)"
+mcp-dev-stop: "[RETIRE] Proxy MCP archive (Phase 35)"
+mcp-dev-status: "[RETIRE] Proxy MCP archive (Phase 35)"
+mcp-dev-logs: "[RETIRE] Proxy MCP archive (Phase 35)"
