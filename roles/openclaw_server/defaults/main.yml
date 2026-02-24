@@ -42,3 +42,20 @@ openclaw_server_agent_emoji: "\U0001F99E"
 openclaw_server_user_name: "anklume"
 openclaw_server_user_timezone: "Europe/Paris"
 openclaw_server_user_languages: "French (primary), English (technical)"
+
+# --- Heartbeat monitoring (Phase 38) ---
+
+# Domain and Incus project (set by generator in host_vars)
+openclaw_server_domain: ""
+openclaw_server_incus_project: "default"
+
+# Health check interval in seconds
+openclaw_server_heartbeat_interval: 300
+
+# Disk space thresholds (percentage)
+openclaw_server_disk_warn_pct: 80
+openclaw_server_disk_crit_pct: 95
+
+# Daily summary cron schedule (hour and minute, 24h format)
+openclaw_server_cron_daily_hour: 8
+openclaw_server_cron_daily_minute: 0

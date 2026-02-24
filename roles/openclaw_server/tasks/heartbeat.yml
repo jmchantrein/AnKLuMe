@@ -1,0 +1,40 @@
+---
+# OpenclawServer | Deploy heartbeat monitoring templates (Phase 38)
+#
+# Deploys HEARTBEAT.md, CRON.md, and monitoring skills to the agent's
+# workspace. All files are overwritten on every apply (ADR-036).
+# Domain-scoped: each agent monitors only its own Incus project.
+
+- name: OpenclawServer | Create skills directory
+  ansible.builtin.file:
+    path: /root/.openclaw/workspace/skills
+    state: directory
+    mode: "0755"
+
+- name: OpenclawServer | Deploy heartbeat instructions
+  ansible.builtin.template:
+    src: HEARTBEAT.md.j2
+    dest: /root/.openclaw/workspace/HEARTBEAT.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy cron configuration
+  ansible.builtin.template:
+    src: CRON.md.j2
+    dest: /root/.openclaw/workspace/CRON.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy health check skill
+  ansible.builtin.template:
+    src: skills/anklume-health.md.j2
+    dest: /root/.openclaw/workspace/skills/anklume-health.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy network diff skill
+  ansible.builtin.template:
+    src: skills/anklume-network-diff.md.j2
+    dest: /root/.openclaw/workspace/skills/anklume-network-diff.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)

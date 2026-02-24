@@ -1,0 +1,80 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Skill: anklume-health
+
+Check container status, disk usage, and service health for the
+**{{ openclaw_server_domain | default('unknown') }}** domain.
+
+## Inputs
+
+- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+  (Incus project, auto-configured)
+- **disk_warn_pct**: `{{ openclaw_server_disk_warn_pct }}`
+  (disk warning threshold percentage)
+- **disk_crit_pct**: `{{ openclaw_server_disk_crit_pct }}`
+  (disk critical threshold percentage)
+
+## Procedure
+
+### 1. List containers
+
+```bash
+incus list --project {{ openclaw_server_incus_project | default('default') }} \
+  --format csv -c n,s
+```
+
+Parse output: each line is `<name>,<status>`.
+Collect all instances and their states.
+
+### 2. Check disk for running instances
+
+For each instance with status `RUNNING`:
+
+```bash
+incus exec <instance> \
+  --project {{ openclaw_server_incus_project | default('default') }} -- \
+  df --output=pcent / | tail -1
+```
+
+Parse the percentage. Compare against thresholds:
+- `< {{ openclaw_server_disk_warn_pct }}`: OK
+- `>= {{ openclaw_server_disk_warn_pct }}`: WARNING
+- `>= {{ openclaw_server_disk_crit_pct }}`: CRITICAL
+
+### 3. Check systemd services
+
+For each running instance, check expected services:
+
+```bash
+incus exec <instance> \
+  --project {{ openclaw_server_incus_project | default('default') }} -- \
+  systemctl is-active <service>
+```
+
+Services to check (if installed):
+- `networking.service` or `systemd-networkd.service`
+- `openclaw.service` (OpenClaw instances only)
+- `ollama.service` (GPU instances only)
+
+### 4. Compose report
+
+Output format:
+
+```
+Domain: {{ openclaw_server_domain | default('unknown') }}
+Project: {{ openclaw_server_incus_project | default('default') }}
+Timestamp: <ISO 8601>
+Overall: OK | WARNING | CRITICAL
+
+Instances:
+  <name>: <status> (disk: <pct>%, services: OK|WARN)
+  ...
+
+Alerts:
+  - [LEVEL] <description>
+```
+
+## Output
+
+Return the report as text. Save to
+`~/.openclaw/workspace/memory/health-latest.md`.

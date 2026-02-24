@@ -119,12 +119,47 @@ templates deployed with `force: true` on every `make apply`:
 - `TOOLS.md.j2` → `~/.openclaw/workspace/TOOLS.md`
 - `USER.md.j2` → `~/.openclaw/workspace/USER.md`
 - `IDENTITY.md.j2` → `~/.openclaw/workspace/IDENTITY.md`
+- `HEARTBEAT.md.j2` → `~/.openclaw/workspace/HEARTBEAT.md`
+- `CRON.md.j2` → `~/.openclaw/workspace/CRON.md`
+- `skills/anklume-health.md.j2` → `~/.openclaw/workspace/skills/anklume-health.md`
+- `skills/anklume-network-diff.md.j2` → `~/.openclaw/workspace/skills/anklume-network-diff.md`
 
 Exceptions:
 - `SOUL.md`: personality file, agent-owned, `.gitignored` globally.
   The only file lost permanently if the container is destroyed.
 - `MEMORY.md` and `memory/`: deployed with `force: false` (seed once,
   never overwrite). Lost on container rebuild — acceptable.
+
+#### Heartbeat monitoring (Phase 38)
+
+The `openclaw_server` role deploys heartbeat monitoring templates that
+enable per-domain OpenClaw agents to proactively monitor their domain's
+health. All monitoring is domain-scoped: an agent only checks containers,
+networks, and services within its own Incus project.
+
+**HEARTBEAT.md** defines monitoring procedures with configurable
+thresholds and intervals:
+- Container status checks (`incus list` within domain project)
+- Disk space monitoring (warning/critical thresholds)
+- Service health (systemd unit checks)
+- Network scan diff (detect new/missing hosts vs baseline)
+
+**CRON.md** defines scheduled tasks for the OpenClaw cron system:
+- Daily domain health summary report
+- Pre-maintenance snapshot triggers
+- Log rotation alerts
+
+**Skills** (`skills/anklume-health.md`, `skills/anklume-network-diff.md`)
+are self-contained monitoring procedures that OpenClaw can invoke on
+demand or via cron. Each skill documents its inputs, outputs, and
+expected behavior.
+
+Configuration defaults in `roles/openclaw_server/defaults/main.yml`:
+- `openclaw_server_heartbeat_interval`: check interval (default: `300`)
+- `openclaw_server_disk_warn_pct`: disk warning threshold (default: `80`)
+- `openclaw_server_disk_crit_pct`: disk critical threshold (default: `95`)
+- `openclaw_server_cron_daily_hour`: daily summary hour (default: `8`)
+- `openclaw_server_cron_daily_minute`: daily summary minute (default: `0`)
 
 ### Reconciliation pattern (all infra roles)
 
