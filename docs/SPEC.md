@@ -357,6 +357,20 @@ adapt behavior based on domain trust posture.
 - `resource_policy.overcommit`: must be a boolean (if present)
 - `resource_policy.host_reserve.cpu` and `.memory`: must be `"N%"` or a
   positive number (if present)
+- `shared_volumes_base`: must be an absolute path if present
+  (default: `/srv/anklume/shares`)
+- `shared_volumes` volume names: DNS-safe
+  (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+- `shared_volumes.*.source` and `.path`: must be absolute paths
+- `shared_volumes.*.shift`: must be a boolean if present (default: true)
+- `shared_volumes.*.propagate`: must be a boolean if present
+  (default: false)
+- `shared_volumes.*.consumers`: must be a non-empty mapping; keys must
+  be known domain or machine names; values must be `"ro"` or `"rw"`
+- Device name collision: `sv-<name>` must not collide with user-declared
+  devices on any consumer
+- Path uniqueness: two volumes cannot mount at the same `path` on the
+  same consumer machine
 - When `ai_access_policy: exclusive`:
   - `ai_access_default` is required and must reference a known domain
   - `ai_access_default` cannot be `ai-tools` itself
@@ -502,6 +516,65 @@ generator never overwrites explicit configuration.
 **Detection**: Host resources are detected via `incus info --resources`
 (preferred) or `/proc/cpuinfo` + `/proc/meminfo` (fallback). If
 detection fails, resource allocation is skipped with a warning.
+
+### Shared volumes
+
+The optional top-level `shared_volumes:` section declares host
+directories shared with consumers (machines or entire domains)
+via Incus disk devices.
+
+```yaml
+global:
+  shared_volumes_base: /mnt/anklume-data/shares  # Default: /srv/anklume/shares
+
+shared_volumes:
+  docs:
+    source: /mnt/anklume-data/shares/docs  # Optional, default: <base>/<name>
+    path: /shared/docs                      # Optional, default: /shared/<name>
+    shift: true                             # Optional, default: true
+    propagate: false                        # Optional, default: false
+    consumers:
+      pro: ro            # Domain -> all machines in domain get ro access
+      pro-dev: rw        # Machine -> override with rw for this machine
+      ai-tools: ro       # Another domain
+```
+
+**Fields**:
+- `source`: absolute host path to the directory. Default:
+  `<shared_volumes_base>/<volume_name>`.
+- `path`: mount path inside consumers. Default: `/shared/<volume_name>`.
+- `shift`: enable idmap shifting (`shift=true` on the Incus disk device).
+  Default: `true`. Required for unprivileged containers to access
+  host-owned files.
+- `propagate`: if `true`, the volume is also mounted in instances that
+  have `security.nesting=true` in their config, allowing nested AnKLuMe
+  instances to re-declare the volume. Default: `false`.
+- `consumers`: mapping of domain or machine names to access mode
+  (`ro` or `rw`). Machine-level entries override domain-level entries
+  for that specific machine.
+
+**Mechanism**: The generator resolves `shared_volumes` into Incus disk
+devices injected into `instance_devices` in each consumer's host_vars.
+No new Ansible role is needed — the existing `incus_instances` role
+handles arbitrary disk devices.
+
+- Device naming: `sv-<volume_name>` (prefix `sv-` avoids collisions
+  with user-declared devices).
+- Consumer resolution: domain name expands to all machines in that
+  domain; machine name targets that machine specifically; machine-level
+  access overrides domain-level access for the same machine.
+- Merge: `sv-*` devices are added alongside user-declared
+  `instance_devices`. Validation prevents naming collisions.
+
+**Cross-nesting**: `propagate: true` mounts the volume in
+nesting-enabled instances. The child AnKLuMe can then re-declare the
+volume with `source:` pointing to the propagated mount path. There is
+no automatic recursive propagation — each nesting level must explicitly
+declare its volumes.
+
+**Host directories**: `make shares` creates the host-side directories
+for all declared shared volumes. `global.shared_volumes_base` sets
+the base path (default: `/srv/anklume/shares`).
 
 ### infra.yml as a directory
 

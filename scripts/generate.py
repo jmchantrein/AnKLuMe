@@ -533,6 +533,106 @@ def validate(infra, *, check_host_subnets=True):
                 f"network_policies target ai-tools (max 1 allowed)"
             )
 
+    # shared_volumes_base validation
+    sv_base = g.get("shared_volumes_base")
+    if sv_base is not None and (not isinstance(sv_base, str) or not sv_base.startswith("/")):
+        errors.append("global.shared_volumes_base must be an absolute path")
+
+    # shared_volumes validation (ADR-039)
+    shared_volumes = infra.get("shared_volumes") or {}
+    if shared_volumes and not isinstance(shared_volumes, dict):
+        errors.append("shared_volumes must be a mapping")
+        shared_volumes = {}
+    # Build domain→machines and machine→domain maps for consumer resolution
+    sv_domain_machines = {}
+    sv_machine_to_domain = {}
+    for dname, domain in domains.items():
+        machines_in_domain = list((domain.get("machines") or {}).keys())
+        sv_domain_machines[dname] = machines_in_domain
+        for mname in machines_in_domain:
+            sv_machine_to_domain[mname] = dname
+    # Track (machine, path) pairs across all volumes for duplicate detection
+    sv_mount_paths = {}  # (machine_name, path) -> volume_name
+    for vname, vconfig in shared_volumes.items():
+        if not isinstance(vconfig, dict):
+            errors.append(f"shared_volumes.{vname}: must be a mapping")
+            continue
+        if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", vname):
+            errors.append(
+                f"shared_volumes.{vname}: invalid name "
+                f"(lowercase alphanumeric + hyphen, no trailing hyphen)"
+            )
+        source = vconfig.get("source")
+        if source is not None and (not isinstance(source, str) or not source.startswith("/")):
+            errors.append(f"shared_volumes.{vname}: source must be an absolute path")
+        path = vconfig.get("path")
+        if path is not None and (not isinstance(path, str) or not path.startswith("/")):
+            errors.append(f"shared_volumes.{vname}: path must be an absolute path")
+        shift = vconfig.get("shift")
+        if shift is not None and not isinstance(shift, bool):
+            errors.append(
+                f"shared_volumes.{vname}: shift must be a boolean, "
+                f"got {type(shift).__name__}"
+            )
+        propagate = vconfig.get("propagate")
+        if propagate is not None and not isinstance(propagate, bool):
+            errors.append(
+                f"shared_volumes.{vname}: propagate must be a boolean, "
+                f"got {type(propagate).__name__}"
+            )
+        consumers = vconfig.get("consumers")
+        if consumers is None or not isinstance(consumers, dict):
+            errors.append(f"shared_volumes.{vname}: consumers must be a non-empty mapping")
+            continue
+        if len(consumers) == 0:
+            errors.append(f"shared_volumes.{vname}: consumers must be a non-empty mapping")
+            continue
+        device_name = f"sv-{vname}"
+        mount_path = path if path else f"/shared/{vname}"
+        for cname, access in consumers.items():
+            if access not in ("ro", "rw"):
+                errors.append(
+                    f"shared_volumes.{vname}: consumer '{cname}' access "
+                    f"must be 'ro' or 'rw', got '{access}'"
+                )
+            if cname not in domain_names and cname not in all_machines:
+                errors.append(
+                    f"shared_volumes.{vname}: consumer '{cname}' is "
+                    f"not a known domain or machine"
+                )
+            # Resolve consumer to machine list for collision/path checks
+            if cname in domain_names:
+                resolved = sv_domain_machines.get(cname, [])
+            elif cname in all_machines:
+                resolved = [cname]
+            else:
+                resolved = []
+            for mname in resolved:
+                # Device name collision check
+                dname_for_m = sv_machine_to_domain.get(mname)
+                if dname_for_m:
+                    m_devices = (
+                        domains.get(dname_for_m, {})
+                        .get("machines", {})
+                        .get(mname, {})
+                        .get("devices") or {}
+                    )
+                    if device_name in m_devices:
+                        errors.append(
+                            f"shared_volumes.{vname}: device name '{device_name}' "
+                            f"conflicts with existing device on machine '{mname}'"
+                        )
+                # Duplicate mount path check
+                path_key = (mname, mount_path)
+                if path_key in sv_mount_paths:
+                    errors.append(
+                        f"shared_volumes.{vname}: duplicate mount path "
+                        f"'{mount_path}' on machine '{mname}' "
+                        f"(already used by volume '{sv_mount_paths[path_key]}')"
+                    )
+                else:
+                    sv_mount_paths[path_key] = vname
+
     # Resource policy validation
     resource_policy = g.get("resource_policy")
     if resource_policy is not None and resource_policy is not True:
@@ -707,6 +807,7 @@ def enrich_infra(infra):
     _enrich_firewall(infra)
     _enrich_ai_access(infra)
     _enrich_resources(infra)
+    _enrich_shared_volumes(infra)
 
 
 def _enrich_addressing(infra):
@@ -1053,6 +1154,75 @@ def _enrich_resources(infra):
             print(f"WARNING: {msg}", file=sys.stderr)
 
 
+def _enrich_shared_volumes(infra):
+    """Resolve shared_volumes into per-machine disk devices.
+
+    Builds infra['_shared_volume_devices']: {machine_name: {device_name: device_dict}}.
+    Called from enrich_infra() after addressing enrichment.
+    """
+    shared_volumes = infra.get("shared_volumes")
+    if not shared_volumes:
+        return
+
+    g = infra.get("global", {})
+    sv_base = g.get("shared_volumes_base", "/srv/anklume/shares")
+    domains = infra.get("domains") or {}
+
+    # Build domain → machine list mapping
+    domain_machines = {}
+    machine_to_domain = {}
+    for dname, domain in domains.items():
+        machines_in_domain = list((domain.get("machines") or {}).keys())
+        domain_machines[dname] = machines_in_domain
+        for mname in machines_in_domain:
+            machine_to_domain[mname] = dname
+
+    # Resolve consumers and build device map
+    sv_devices = {}  # {machine_name: {device_name: device_dict}}
+
+    for vname, vconfig in shared_volumes.items():
+        if not isinstance(vconfig, dict):
+            continue
+        source = vconfig.get("source") or f"{sv_base}/{vname}"
+        path = vconfig.get("path") or f"/shared/{vname}"
+        shift = vconfig.get("shift", True)
+        device_name = f"sv-{vname}"
+        consumers = vconfig.get("consumers") or {}
+
+        # First pass: collect domain-level defaults
+        domain_access = {}  # domain_name -> access
+        machine_access = {}  # machine_name -> access (overrides)
+        for cname, access in consumers.items():
+            if cname in domains:
+                domain_access[cname] = access
+            else:
+                machine_access[cname] = access
+
+        # Resolve to per-machine access
+        resolved = {}  # machine_name -> access
+        for dname, access in domain_access.items():
+            for mname in domain_machines.get(dname, []):
+                resolved[mname] = access
+        # Machine-level overrides domain-level
+        for mname, access in machine_access.items():
+            resolved[mname] = access
+
+        # Build device dict for each resolved machine
+        for mname, access in resolved.items():
+            device = {
+                "type": "disk",
+                "source": source,
+                "path": path,
+            }
+            if shift:
+                device["shift"] = "true"
+            if access == "ro":
+                device["readonly"] = "true"
+            sv_devices.setdefault(mname, {})[device_name] = device
+
+    infra["_shared_volume_devices"] = sv_devices
+
+
 def _apply_memory_enforce(infra):
     """Set limits.memory.enforce: soft on all machines with limits.memory."""
     for domain in (infra.get("domains") or {}).values():
@@ -1189,9 +1359,22 @@ def generate(infra, base_dir, dry_run=False):
         written.append(fp)
 
         # host_vars/<machine>.yml
+        sv_devices_map = infra.get("_shared_volume_devices") or {}
         for mname, m in machines.items():
             machine_eph = m.get("ephemeral")
             instance_ephemeral = machine_eph if machine_eph is not None else domain_ephemeral
+
+            # Merge user devices + shared volume devices
+            user_devices = m.get("devices")
+            sv_devs = sv_devices_map.get(mname)
+            if sv_devs:
+                merged_devices = dict(sv_devs)  # sv-* first
+                if user_devices:
+                    merged_devices.update(user_devices)  # user overrides
+                final_devices = merged_devices
+            else:
+                final_devices = user_devices
+
             hvars = {k: v for k, v in {
                 "instance_name": f"{prefix}{mname}",
                 "instance_type": m.get("type", "lxc"),
@@ -1203,7 +1386,7 @@ def generate(infra, base_dir, dry_run=False):
                 "instance_gpu": m.get("gpu"),
                 "instance_profiles": m.get("profiles"),
                 "instance_config": m.get("config"),
-                "instance_devices": m.get("devices"),
+                "instance_devices": final_devices,
                 "instance_storage_volumes": m.get("storage_volumes"),
                 "instance_roles": m.get("roles"),
                 "instance_boot_autostart": m.get("boot_autostart"),

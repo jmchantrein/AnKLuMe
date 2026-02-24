@@ -1202,6 +1202,30 @@ print management.
 - [x] Network policies control which domains can print
 - [x] Other domains cannot access the physical LAN directly
 
+### Phase 20f: Shared Volumes
+
+**Goal**: Declarative inter-domain directory sharing with RO/RW
+access control via host bind mounts (ADR-039).
+
+**Deliverables**:
+- `shared_volumes:` top-level section in `infra.yml` with
+  domain and machine consumers, RO/RW access modes
+- Generator resolves consumers into `sv-*` Incus disk devices
+  injected into `instance_devices` (host_vars)
+- `make shares` creates host-side directories
+- Validation: DNS-safe names, absolute paths, consumer
+  resolution, device collision detection, path uniqueness
+- `global.shared_volumes_base` for configurable base path
+  (default: `/srv/anklume/shares`)
+- `shift` and `propagate` options for idmap and nesting support
+
+**Validation criteria**:
+- [ ] Domain consumer gives all machines the shared device
+- [ ] Machine consumer overrides domain-level access
+- [ ] Device name collision detected
+- [ ] Duplicate mount paths detected
+- [ ] `make sync-dry` shows sv-* devices in host_vars
+
 ---
 
 ## Phase 21: Desktop Integration ✅ COMPLETE
@@ -2923,7 +2947,7 @@ d) **Alerting pipeline**:
 - Phase 17: CI/CD pipeline + complete Molecule test coverage (18/18 roles)
 - Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
 - Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
-- Phase 20: Native Incus Features and QubesOS Parity (20a-20e)
+- Phase 20: Native Incus Features and QubesOS Parity (20a-20f)
 - Phase 21: Desktop Integration (clipboard, Sway, dashboard)
 - Phase 22: End-to-End Scenario Testing (BDD)
 - Phase 23: Host Bootstrap and Thin Host Layer

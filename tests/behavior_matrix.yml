@@ -607,3 +607,56 @@ capabilities:
         action: "Exclusive AI + GPU exclusive + firewall_mode=vm"
         expected: "All features coexist, no interference"
         deterministic: true
+
+  shared_volumes:
+    description: "Declarative inter-domain directory sharing via host bind mounts"
+    depth_1:
+      - id: SV-001
+        action: "Valid shared volume with domain consumer"
+        expected: "All machines in domain get sv-* disk device in host_vars"
+        deterministic: true
+      - id: SV-002
+        action: "Valid shared volume with machine consumer"
+        expected: "Only that machine gets sv-* disk device"
+        deterministic: true
+      - id: SV-003
+        action: "Invalid volume name (uppercase, special chars)"
+        expected: "Validation error about invalid name"
+        deterministic: true
+      - id: SV-004
+        action: "Unknown consumer name"
+        expected: "Validation error about unknown domain/machine"
+        deterministic: true
+      - id: SV-005
+        action: "Invalid access mode (not ro/rw)"
+        expected: "Validation error about access mode"
+        deterministic: true
+      - id: SV-006
+        action: "Empty consumers mapping"
+        expected: "Validation error about empty consumers"
+        deterministic: true
+      - id: SV-007
+        action: "No shared_volumes section"
+        expected: "No change to existing behavior"
+        deterministic: true
+    depth_2:
+      - id: SV-2-001
+        action: "Machine consumer overrides domain consumer access"
+        expected: "Machine gets rw, other domain machines get ro"
+        deterministic: true
+      - id: SV-2-002
+        action: "Shared volume + existing user devices"
+        expected: "sv-* merged alongside user devices"
+        deterministic: true
+      - id: SV-2-003
+        action: "Device name collision (user device named sv-*)"
+        expected: "Validation error about device collision"
+        deterministic: true
+      - id: SV-2-004
+        action: "Two volumes same mount path on same consumer"
+        expected: "Validation error about duplicate path"
+        deterministic: true
+      - id: SV-2-005
+        action: "Disabled domain as consumer"
+        expected: "Disabled domain machines skipped"
+        deterministic: true

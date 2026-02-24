@@ -526,6 +526,9 @@ main() {
     echo "absolute_level: $ABS_LEVEL"
     echo "relative_level: $REL_LEVEL"
 
+    # ── Create shared_volumes base directory ─────────────────
+    mkdir -p /srv/anklume/shares
+
     # ── Create /etc/anklume context files ───────────────────
     echo "--- Setting up /etc/anklume context ---"
     mkdir -p /etc/anklume

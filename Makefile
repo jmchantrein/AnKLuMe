@@ -38,6 +38,9 @@ sync-clean: ## Remove orphan files without confirmation
 	$(call require_container,sync-clean)
 	python3 scripts/generate.py $(INFRA_SRC) --clean-orphans
 
+shares: ## Create host directories for shared_volumes
+	@python3 scripts/create-shares.py $(INFRA_SRC)
+
 # ── Telemetry (Phase 19b) ────────────────────────────────
 # Shell function to wrap a command with telemetry logging.
 # Usage in recipes: $(call tele_wrap,<target>,<command>)
@@ -645,7 +648,7 @@ help-all: ## Show all available targets
 		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 	@printf "\n"
 
-.PHONY: sync sync-dry sync-clean console lint lint-yaml lint-ansible lint-shell \
+.PHONY: sync sync-dry sync-clean shares console lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
         export-images test-report \
