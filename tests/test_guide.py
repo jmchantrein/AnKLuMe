@@ -286,6 +286,27 @@ class TestGuideStep3InfraYml:
 class TestGuideStepSkipsInAuto:
     """Test that steps 6, 7, 8 skip cleanly in auto mode."""
 
+    @pytest.fixture(autouse=True)
+    def _ensure_inventory(self):
+        """Create a dummy inventory dir so step 6 pitfall check passes.
+
+        guide.sh step_6_apply checks for $PROJECT_DIR/inventory/*.yml
+        before reaching the auto-mode skip logic.  In CI the generated
+        inventory is not committed, so create a placeholder here.
+        """
+        inv_dir = PROJECT_ROOT / "inventory"
+        created = not inv_dir.exists()
+        if created:
+            inv_dir.mkdir(exist_ok=True)
+            (inv_dir / "_ci_placeholder.yml").write_text("---\n")
+        yield
+        if created:
+            placeholder = inv_dir / "_ci_placeholder.yml"
+            if placeholder.exists():
+                placeholder.unlink()
+            if inv_dir.exists() and not any(inv_dir.iterdir()):
+                inv_dir.rmdir()
+
     def test_step_6_skips_in_auto(self, guide_env):
         """Step 6 (Apply) skips in auto mode — requires live Incus."""
         result = run_guide(["--auto", "--step", "6"], guide_env)
