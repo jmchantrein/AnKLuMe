@@ -37,7 +37,7 @@ _green()  { printf '\033[32m%s\033[0m' "$*"; }
 _find_project() {
     local name="$1"
     while IFS= read -r proj; do
-        proj=$(echo "$proj" | sed 's/ (current)$//')
+        proj="${proj% (current)}"
         if incus list --project "$proj" --format csv -c n 2>/dev/null | grep -qx "$name"; then
             echo "$proj"
             return 0
