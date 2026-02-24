@@ -682,3 +682,45 @@ protection flag already set by `incus_instances` role. Users who
 truly want to destroy everything use `FORCE=true`. A targeted
 `make instance-remove` provides surgical removal of individual
 instances.
+
+---
+
+## ADR-043: Per-domain OpenClaw instances
+
+**Context**: Phase 28b deployed OpenClaw as a single centralized
+instance in the `ai-tools` domain. This works for a single-user
+setup but violates domain isolation principles: the centralized
+assistant can see all domains via network policies, and all domains
+share one assistant configuration.
+
+**Decision**: Reposition OpenClaw from a centralized service to
+per-domain optional instances. Each domain can opt in via
+`openclaw: true` in infra.yml. The generator auto-creates a
+`<domain>-openclaw` LXC container with `roles: [base_system,
+openclaw_server]`, following the same pattern as `anklume-firewall`
+auto-creation (ADR-024).
+
+The `openclaw_server` role is made domain-aware:
+- Templates receive `openclaw_server_domain` (the domain name)
+  and `openclaw_server_instance_name` (the Incus instance name)
+- Systemd service name is per-instance (`openclaw-<domain>.service`)
+- Agent identity defaults to domain-scoped values
+- Each instance sees only its own domain's network
+
+If the user explicitly declares `<domain>-openclaw`, that definition
+takes precedence (no auto-creation). The generator propagates
+`domain_openclaw: true/false` to group_vars.
+
+**Why per-domain, not centralized**: Domain isolation is a core
+anklume principle. A centralized assistant with cross-domain network
+access is an information leakage vector. Per-domain instances inherit
+the domain's trust level and network boundaries automatically.
+
+**Why auto-creation**: Minimizes UX friction (design principle).
+Adding `openclaw: true` to a domain is a single-line change. No need
+to manually declare the machine, assign an IP, or configure roles.
+
+**Consequence**: Each domain can have its own isolated AI assistant.
+The centralized `ai-tools` OpenClaw remains as one possible
+deployment pattern (user declares it explicitly). Per-domain
+instances are fully independent and cannot see other domains.

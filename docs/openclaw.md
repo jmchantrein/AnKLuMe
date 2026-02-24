@@ -7,7 +7,55 @@ open-source, self-hosted AI assistant that connects to messaging platforms
 Running OpenClaw inside anklume provides network isolation, controlled
 messaging access, and local LLM delegation for privacy-sensitive queries.
 
-## Architecture
+## Per-domain architecture (ADR-043)
+
+OpenClaw can be deployed as per-domain instances. Each domain that sets
+`openclaw: true` in `infra.yml` gets its own `<domain>-openclaw` LXC
+container, automatically created by the generator. Each instance:
+
+- Sees only its own domain's network (inherits domain isolation)
+- Has its own agent identity, memory, and persona
+- Uses a domain-scoped systemd service name (`openclaw-<domain>`)
+- Receives domain-specific template variables for agent configuration
+
+```yaml
+# infra.yml
+domains:
+  pro:
+    trust_level: trusted
+    openclaw: true         # Auto-creates pro-openclaw
+    machines:
+      pw-dev:
+        type: lxc
+  perso:
+    trust_level: trusted
+    openclaw: true         # Auto-creates perso-openclaw
+    machines:
+      perso-ws:
+        type: lxc
+```
+
+This results in:
+
+```
+Host
++-- pro-openclaw     (pro project, sees only 10.110.x.x)
++-- perso-openclaw   (perso project, sees only 10.110.y.x)
++-- gpu-server       (ai-tools project, shared LLM backend)
+```
+
+Each per-domain instance connects to the shared Ollama backend for LLM
+inference. Cross-domain AI access requires explicit `network_policies`
+in `infra.yml`.
+
+If a user explicitly declares `<domain>-openclaw` in `machines:`,
+their definition takes precedence over auto-creation. Setting
+`openclaw: false` (or omitting it) on a domain skips auto-creation.
+
+The centralized `ai-tools` OpenClaw deployment pattern (documented
+below) remains valid for single-assistant setups.
+
+## Centralized architecture (legacy)
 
 ```
 Host

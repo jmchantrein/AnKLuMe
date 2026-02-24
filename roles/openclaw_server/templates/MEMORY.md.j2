@@ -1,9 +1,12 @@
-{# Jinja2 template — deployed with force:false (ADR-036) #}
+{# Jinja2 template — deployed with force:false (ADR-036, ADR-043) #}
 {# This file is seeded once and never overwritten. The agent accumulates #}
 {# memories here across sessions. Lost only on container rebuild. #}
 # Long-Term Memory ({{ openclaw_server_agent_name }})
 
 > Curated memories — distilled from daily logs.
 > Updated during heartbeats and main sessions.
+{% if openclaw_server_domain | default('') %}
+> Domain: {{ openclaw_server_domain }}
+{% endif %}
 
 ---
