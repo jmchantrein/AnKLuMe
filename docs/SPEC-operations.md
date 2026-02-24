@@ -81,7 +81,7 @@ declarative property of the infrastructure.
 | `incus_nftables` | Generate inter-bridge isolation rules | `nftables`, `infra` |
 | `incus_firewall_vm` | Multi-NIC profile for firewall VM | `firewall`, `infra` |
 | `incus_images` | Pre-download OS images to cache | `images`, `infra` |
-| `incus_nesting` | Nesting context propagation | `nesting`, `infra` |
+| `incus_snapshots` | Declarative snapshot management | `snapshots`, `infra` |
 
 ### Phase 2: Provisioning (connection: community.general.incus)
 
@@ -95,6 +95,10 @@ declarative property of the infrastructure.
 | `opencode_server` | OpenCode headless AI coding server | `provision`, `opencode` |
 | `firewall_router` | nftables routing inside firewall VM | `provision`, `firewall` |
 | `dev_test_runner` | Incus-in-Incus sandbox provisioning | `provision`, `test` |
+| `admin_bootstrap` | Bootstrap admin tooling in anklume-instance | `provision`, `bootstrap` |
+| `dev_agent_runner` | AI agent runner setup | `provision`, `agent` |
+| `code_sandbox` | AI coding sandbox (Claude Code, Aider, etc.) | `provision`, `sandbox` |
+| `openclaw_server` | OpenClaw agent server | `provision`, `openclaw` |
 | (user-defined) | Application-specific setup | `provision` |
 
 ### Role implementation notes
@@ -143,15 +147,6 @@ scripts/snap.sh create  <instance|self> [snap-name]    # Default name: snap-YYYY
 scripts/snap.sh restore <instance|self> <snap-name>
 scripts/snap.sh list    [instance|self]                 # All instances if omitted
 scripts/snap.sh delete  <instance|self> <snap-name>
-```
-
-### Makefile targets
-
-```bash
-make snap              I=<name|self> [S=<snap>]   # Create
-make snap-restore      I=<name|self>  S=<snap>    # Restore
-make snap-list        [I=<name|self>]              # List
-make snap-delete       I=<name|self>  S=<snap>    # Delete
 ```
 
 ### Instance-to-project resolution

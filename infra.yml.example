@@ -7,26 +7,26 @@
 #
 # See docs/SPEC.md section 5 for the full format reference.
 
-# IMPORTANT: Subnet selection
+# IMPORTANT: Addressing convention (ADR-038)
 #
-# base_subnet defines the first two octets of all your domain networks.
-# Each domain gets: <base_subnet>.<subnet_id>.0/24
-# Gateway is always <base_subnet>.<subnet_id>.254
+# IP addresses encode trust zones: 10.<zone_base+offset>.<domain_seq>.<host>/24
+# Trust levels: admin(+0), trusted(+10), semi-trusted(+20), untrusted(+40), disposable(+50)
+# Default zone_base is 100, so semi-trusted domains get 10.120.x.x
 #
-# Choose a range that does NOT conflict with your existing LAN:
-#   - 10.x.x.x      — large private range (recommended: 10.100)
-#   - 172.16-31.x.x  — another private range option
-#   - 192.168.x.x    — common home/office LANs (likely conflicts!)
+# Choose a zone_base that does NOT conflict with your existing LAN.
+# Default 100 avoids 10.0-60.x.x used by enterprise VPNs, home routers,
+# and container orchestrators.
 #
-# RFC 1918 private address ranges:
-#   10.0.0.0/8       (10.0.0.0 – 10.255.255.255)
-#   172.16.0.0/12    (172.16.0.0 – 172.31.255.255)
-#   192.168.0.0/16   (192.168.0.0 – 192.168.255.255)
+# IPs are auto-assigned within each domain subnet (.1-.99 static range).
+# Gateway is always .254 (immutable convention).
 
 project_name: my-infra
 
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10        # Always 10 (RFC 1918)
+    zone_base: 100        # Starting second octet (default: 100)
+    zone_step: 10         # Gap between zones (default: 10)
   default_os_image: "images:debian/13"
   # default_connection and default_user are stored in group_vars/all.yml as
   # psot_default_connection / psot_default_user (informational only).
@@ -40,13 +40,12 @@ global:
 domains:
   anklume:
     description: "Administration and orchestration"
-    subnet_id: 0
+    trust_level: admin
     ephemeral: false  # Protected — cannot be accidentally deleted
     machines:
       anklume-instance:
         description: "Ansible controller — drives the whole infra"
         type: lxc
-        ip: "10.100.0.10"
         config:
           security.nesting: "true"
         roles:
@@ -54,13 +53,12 @@ domains:
 
   work:
     description: "Professional workspace"
-    subnet_id: 1
+    trust_level: semi-trusted
     ephemeral: false
     machines:
       work-dev:
         description: "Development workspace"
         type: lxc
-        ip: "10.100.1.10"
         config:
           limits.cpu: "4"
           limits.memory: "8GiB"
@@ -70,10 +68,9 @@ domains:
   # Example: an ephemeral sandbox domain for testing
   # sandbox:
   #   description: "Disposable test environment"
-  #   subnet_id: 10
+  #   trust_level: disposable
   #   ephemeral: true  # Can be freely destroyed and recreated
   #   machines:
   #     sandbox-test:
   #       description: "Throwaway test container"
   #       type: lxc
-  #       ip: "10.100.10.10"

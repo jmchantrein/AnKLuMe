@@ -648,7 +648,7 @@ help-all: ## Show all available targets
 .PHONY: sync sync-dry sync-clean console lint lint-yaml lint-ansible lint-shell \
         lint-python check syntax apply apply-infra apply-provision \
         apply-base apply-limit apply-images apply-llm apply-stt apply-ai \
-        export-images \
+        export-images test-report \
         nftables nftables-deploy \
         snapshot snapshot-domain restore \
         restore-domain snapshot-delete snapshot-list \

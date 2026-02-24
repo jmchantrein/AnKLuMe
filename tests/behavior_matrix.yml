@@ -415,7 +415,7 @@ capabilities:
         deterministic: true
       - id: FM-008
         action: "firewall_mode: vm without admin domain"
-        expected: "SystemExit error"
+        expected: "ValueError"
         deterministic: true
     depth_2:
       - id: FM-2-001
@@ -448,8 +448,8 @@ capabilities:
         expected: "network_policies present in result"
         deterministic: true
       - id: ID-004
-        action: "Missing base.yml exits with error"
-        expected: "SystemExit"
+        action: "Missing base.yml raises ValueError"
+        expected: "ValueError"
         deterministic: true
       - id: ID-005
         action: "Auto-detect file format"

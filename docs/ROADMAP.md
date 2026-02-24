@@ -361,7 +361,7 @@ fixes, and optionally submit PRs autonomously.
 |  7. if fail again -> report + stop (max retries) |
 |                                                   |
 |  LLM backend (configurable):                    |
-|  - Ollama (homelab-llm:11434 or local)           |
+|  - Ollama (gpu-server:11434 or local)           |
 |  - Claude API (ANTHROPIC_API_KEY)                |
 |  - Claude Code CLI (claude -p "...")              |
 |  - Aider (aider --model ollama_chat/...)          |
@@ -380,7 +380,7 @@ a) Script `scripts/ai-test-loop.sh` — main orchestrator:
    - Dry-run mode: displays the patch without applying it
 
 b) LLM backend integrations (uniform pattern: send context, receive patch):
-   - Ollama (local): `curl http://homelab-llm:11434/api/generate`
+   - Ollama (local): `curl http://gpu-server:11434/api/generate`
    - Claude Code CLI: `claude -p "Analyze this failure..."`
    - Aider: `aider --model ollama_chat/... --message "Fix..."`
    - Direct API (Claude, OpenAI): REST call with structured prompt
@@ -389,7 +389,7 @@ c) Configuration (`anklume.conf.yml` or environment variables):
    ```yaml
    ai:
      mode: none
-     ollama_url: "http://homelab-llm:11434"
+     ollama_url: "http://gpu-server:11434"
      ollama_model: "qwen2.5-coder:32b"
      anthropic_api_key: ""
      max_retries: 3
@@ -456,7 +456,7 @@ philosophy. Open WebUI already supports custom STT endpoints natively.
 │ homelab domain (net-homelab, 10.100.3.0/24)     │
 │                                                   │
 │  ┌──────────────┐    ┌──────────────────────┐   │
-│  │ homelab-stt   │    │ homelab-llm          │   │
+│  │ homelab-stt   │    │ gpu-server          │   │
 │  │ GPU (shared)  │    │ GPU (shared)         │   │
 │  │               │    │                      │   │
 │  │ faster-whisper│    │ Ollama               │   │
@@ -471,7 +471,7 @@ philosophy. Open WebUI already supports custom STT endpoints natively.
 │  │ homelab-webui                │                │
 │  │ Open WebUI :3000             │                │
 │  │ STT → homelab-stt:8000      │                │
-│  │ LLM → homelab-llm:11434     │                │
+│  │ LLM → gpu-server:11434     │                │
 │  └──────────────────────────────┘                │
 └─────────────────────────────────────────────────┘
 ```

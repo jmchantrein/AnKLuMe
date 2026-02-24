@@ -514,10 +514,10 @@ class TestFirewallVMAutoCreation:
         assert sys_fw["roles"] == ["base_system", "firewall_router"]
 
     def test_firewall_mode_vm_no_anklume_domain_error(self, sample_infra):  # Matrix: FM-008
-        """firewall_mode: vm without anklume domain exits with error."""
+        """firewall_mode: vm without anklume domain raises ValueError."""
         sample_infra["global"]["firewall_mode"] = "vm"
         del sample_infra["domains"]["anklume"]
-        with pytest.raises(SystemExit):
+        with pytest.raises(ValueError, match="anklume"):
             enrich_infra(sample_infra)
 
     def test_firewall_mode_vm_user_override_not_overwritten(self, sample_infra):  # Matrix: FM-2-001
@@ -855,10 +855,10 @@ class TestInfraDirectory:
         assert len(result["network_policies"]) == 1
 
     def test_directory_missing_base_yml_exits(self, tmp_path):  # Matrix: ID-004
-        """Missing base.yml triggers exit."""
+        """Missing base.yml raises ValueError."""
         infra_dir = tmp_path / "infra"
         infra_dir.mkdir()
-        with pytest.raises(SystemExit):
+        with pytest.raises(ValueError, match="base.yml"):
             load_infra(infra_dir)
 
     def test_load_autodetects_file(self, sample_infra, tmp_path):  # Matrix: ID-005
@@ -1694,7 +1694,7 @@ class TestResourcePolicy:
         infra = self._make_infra(
             policy={"overcommit": False, "cpu_mode": "count"}, machines=machines
         )
-        with pytest.raises(SystemExit):
+        with pytest.raises(ValueError, match="overcommit"):
             enrich_infra(infra)
 
     def test_overcommit_true_no_error(self, monkeypatch, capsys):
