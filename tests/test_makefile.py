@@ -37,11 +37,23 @@ class TestMakeHelp:
         assert "help" in result.stdout.lower()
 
     def test_help_shows_categories(self):
-        """make help shows organized categories."""
+        """make help shows all expected category headers."""
         result = run_make(["help"])
         output = result.stdout
-        # Should have category headers
-        assert "GETTING STARTED" in output or "GENERATOR" in output
+        expected_categories = [
+            "GETTING STARTED",
+            "CORE WORKFLOW",
+            "SNAPSHOTS",
+            "AI / LLM",
+            "CONSOLE",
+            "INSTANCE MANAGEMENT",
+            "LIFECYCLE",
+            "DEVELOPMENT",
+        ]
+        for category in expected_categories:
+            assert category in output, (
+                f"Category '{category}' missing from make help output"
+            )
 
     def test_help_shows_key_targets(self):
         """make help lists essential targets."""
@@ -50,6 +62,20 @@ class TestMakeHelp:
         essential = ["sync", "lint", "apply", "test", "help"]
         for target in essential:
             assert target in output, f"Target '{target}' missing from help"
+
+    def test_help_all_target(self):
+        """make help-all shows all documented targets."""
+        result = run_make(["help-all"])
+        assert result.returncode == 0
+        output = result.stdout
+        assert "All targets" in output
+        # help-all should list many more targets than help
+        # Check for some internal targets not in help
+        internal_targets = ["lint-yaml", "apply-infra", "test-generator"]
+        for target in internal_targets:
+            assert target in output, (
+                f"Target '{target}' missing from help-all output"
+            )
 
 
 class TestMakefileTargetPresence:
@@ -149,7 +175,20 @@ class TestMakefileTargetHelp:
     def test_help_groups_targets(self):
         """make help groups targets with section headers."""
         content = _parse_makefile()
-        assert "GETTING STARTED" in content, "Help group 'GETTING STARTED' missing from Makefile"
+        expected_groups = [
+            "GETTING STARTED",
+            "CORE WORKFLOW",
+            "SNAPSHOTS",
+            "AI / LLM",
+            "CONSOLE",
+            "INSTANCE MANAGEMENT",
+            "LIFECYCLE",
+            "DEVELOPMENT",
+        ]
+        for group in expected_groups:
+            assert group in content, (
+                f"Help group '{group}' missing from Makefile"
+            )
 
     def test_help_includes_description_for_each_target(self):
         """Every documented target has a non-empty description."""
@@ -175,9 +214,9 @@ class TestMakefileTargetHelp:
     def test_help_mentions_make_guide_in_getting_started(self):
         """make help mentions 'make guide' in the GETTING STARTED section."""
         content = _parse_makefile()
-        # Find the GETTING STARTED section
+        # Find the GETTING STARTED section (ends at next category header)
         getting_started_match = re.search(
-            r"GETTING STARTED.*?(?=ALL TARGETS|\Z)", content, re.DOTALL
+            r"GETTING STARTED.*?(?=CORE WORKFLOW|\Z)", content, re.DOTALL
         )
         assert getting_started_match, "GETTING STARTED section not found"
         section = getting_started_match.group(0)
