@@ -1,6 +1,6 @@
 # Dedicated Firewall VM (sys-firewall)
 
-AnKLuMe supports two firewall modes for inter-domain isolation:
+anklume supports two firewall modes for inter-domain isolation:
 
 - **`host` mode** (default): nftables rules on the host kernel (Phase 8)
 - **`vm` mode**: traffic routed through a dedicated firewall VM
@@ -120,7 +120,7 @@ make apply         # Create infrastructure + provision
 ```
 
 The `incus_firewall_vm` role automatically:
-1. Discovers all AnKLuMe bridges
+1. Discovers all anklume bridges
 2. Creates a `firewall-multi-nic` profile with one NIC per bridge
 3. Attaches the profile to the sys-firewall VM
 
@@ -182,7 +182,7 @@ instance_config:
         addresses:
           - 10.110.1.1/24      # Example: trusted zone
         routes:
-          - to: 10.0.0.0/8     # All AnKLuMe zones via firewall
+          - to: 10.0.0.0/8     # All anklume zones via firewall
             via: 10.110.1.253
           - to: default
             via: 10.110.1.254

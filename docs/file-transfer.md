@@ -1,6 +1,6 @@
 # File Transfer and Backup
 
-AnKLuMe provides controlled file transfer between instances and
+anklume provides controlled file transfer between instances and
 encrypted backup/restore via `scripts/transfer.sh`.
 
 For persistent, declarative cross-domain directory sharing, see

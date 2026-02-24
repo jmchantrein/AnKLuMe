@@ -1,6 +1,6 @@
 # VM Support (KVM Instances)
 
-AnKLuMe supports both LXC containers and KVM virtual machines. This guide
+anklume supports both LXC containers and KVM virtual machines. This guide
 covers how to declare, create, and provision VMs alongside containers.
 
 ## When to use VMs vs containers

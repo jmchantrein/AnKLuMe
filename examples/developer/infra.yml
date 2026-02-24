@@ -1,7 +1,7 @@
 ---
 # infra.yml — Primary Source of Truth (PSOT)
 #
-# AnKLuMe developer: anklume domain + dev-test domain with nesting
+# anklume developer: anklume domain + dev-test domain with nesting
 # enabled for Incus-in-Incus testing (Phase 12).
 #
 # IPs: anklume -> 10.100.0.x (admin), dev-test -> 10.120.0.x (semi-trusted)

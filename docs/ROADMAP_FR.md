@@ -161,7 +161,7 @@ La Phase 12 fournira une isolation appropriee via Incus-in-Incus.
   - `examples/llm-supervisor.infra.yml` -- 2 LLMs isoles dans des domaines
     separes + 1 container superviseur communiquant avec les deux via API,
     pour tester la supervision/gestion de LLM par un autre LLM
-  - `examples/developer.infra.yml` -- Developpeur AnKLuMe : inclut un
+  - `examples/developer.infra.yml` -- Developpeur anklume : inclut un
     domaine dev-test avec Incus-in-Incus (Phase 12)
   - Chaque exemple accompagne d'un README expliquant le cas d'usage,
     les exigences materielles et comment demarrer
@@ -295,11 +295,11 @@ noyau, contrairement aux containers LXC qui partagent le noyau de l'hote).
 
 ## Phase 12 : Environnement de Test Incus-in-Incus -- COMPLETE
 
-**Objectif** : Tester AnKLuMe dans un bac a sable isole (AnKLuMe se testant lui-meme)
+**Objectif** : Tester anklume dans un bac a sable isole (anklume se testant lui-meme)
 sans impacter l'infrastructure de production.
 
 **Principe** : Un container test-runner avec `security.nesting: "true"` execute
-son propre Incus et deploie une instance complete d'AnKLuMe a l'interieur.
+son propre Incus et deploie une instance complete d'anklume a l'interieur.
 Les tests Molecule s'executent dans cet environnement imbrique.
 
 **Livrables** :
@@ -309,7 +309,7 @@ Les tests Molecule s'executent dans cet environnement imbrique.
 - Role `dev_test_runner` qui provisionne le container de test :
   - Installe Incus dans le container (`apt install incus`)
   - Initialise Incus (`incus admin init --minimal`)
-  - Clone le depot AnKLuMe
+  - Clone le depot anklume
   - Installe Molecule + ansible-lint + dependances
 - Script `scripts/run-tests.sh` qui :
   1. Cree le container test-runner (ou le reutilise)
@@ -802,7 +802,7 @@ e) **Script de bootstrap** (`bootstrap.sh`) :
    - Mode `--YOLO`
 
 f) **Outillage de cycle de vie** :
-   - `make flush` -- detruire toute l'infrastructure AnKLuMe
+   - `make flush` -- detruire toute l'infrastructure anklume
    - `make upgrade` -- mise a jour securisee du framework
    - `make import-infra` -- generer infra.yml depuis l'etat Incus existant
 

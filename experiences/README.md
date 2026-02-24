@@ -1,6 +1,6 @@
 # Experience Library
 
-Structured knowledge extracted from AnKLuMe's development history.
+Structured knowledge extracted from anklume's development history.
 Used by AI-assisted tools to resolve known issues without LLM cost.
 
 ## Directory structure

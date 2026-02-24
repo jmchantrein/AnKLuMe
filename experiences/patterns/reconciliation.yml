@@ -1,4 +1,4 @@
-# 6-step reconciliation pattern used by all AnKLuMe infrastructure roles.
+# 6-step reconciliation pattern used by all anklume infrastructure roles.
 # Every infra role follows exactly this pattern (ADR-005, SPEC section 7).
 ---
 - id: PAT-RECON-001

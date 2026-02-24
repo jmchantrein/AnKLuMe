@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# anklume — Host-side CLI for AnKLuMe sandboxed environments
+# anklume — Host-side CLI for anklume sandboxed environments
 #
 # Usage:
 #   anklume code [dir]        Launch Claude Code in the ai-coder container
@@ -20,7 +20,7 @@ err()   { echo -e "\033[0;31m[anklume]\033[0m $*" >&2; }
 
 usage() {
     cat <<'EOF'
-anklume — Host-side CLI for AnKLuMe sandboxed environments
+anklume — Host-side CLI for anklume sandboxed environments
 
 Usage:
   anklume code [dir]        Launch Claude Code in the ai-coder container

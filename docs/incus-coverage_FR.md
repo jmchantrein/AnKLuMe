@@ -3,14 +3,14 @@
 
 # Couverture des fonctionnalites natives Incus
 
-AnKLuMe est une interface declarative haut niveau pour Incus. Il gere les
+anklume est une interface declarative haut niveau pour Incus. Il gere les
 ressources Incus (projets, reseaux, profils, instances) via le CLI, en
 exploitant les fonctionnalites natives autant que possible et en ajoutant
 une logique specifique uniquement la ou Incus ne couvre pas le besoin.
 
 ## Positionnement
 
-AnKLuMe ne remplace pas Incus. Il fournit :
+anklume ne remplace pas Incus. Il fournit :
 - Un fichier YAML unique (`infra.yml`) decrivant toute l'infrastructure
 - La generation automatique de l'inventaire et des variables Ansible
 - Une gestion idempotente par reconciliation des ressources Incus
@@ -18,7 +18,7 @@ AnKLuMe ne remplace pas Incus. Il fournit :
 - Des outils de cycle de vie (snapshots, flush, import, upgrade)
 
 Toutes les fonctionnalites Incus restent accessibles via le CLI
-en parallele d'AnKLuMe.
+en parallele d'anklume.
 
 ## Matrice de couverture
 
@@ -50,18 +50,18 @@ en parallele d'AnKLuMe.
 | **Network ACLs** | Non utilise | Voir explication ci-dessous |
 | **Network Zones** | Non utilise | Voir explication ci-dessous |
 | **Reseau OVN** | Non utilise | Voir explication ci-dessous |
-| **Clustering** | Hors perimetre | AnKLuMe cible les deploiements mono-hote |
-| **Conteneurs OCI** | Hors perimetre | AnKLuMe gere LXC et KVM uniquement |
+| **Clustering** | Hors perimetre | anklume cible les deploiements mono-hote |
+| **Conteneurs OCI** | Hors perimetre | anklume gere LXC et KVM uniquement |
 | **SR-IOV** | Hors perimetre | Necessite du materiel entreprise |
 | **VMs confidentielles (SEV/TDX)** | Hors perimetre | Fonctionnalites CPU specifiques |
-| **Authentification OIDC** | Hors perimetre | AnKLuMe utilise le socket Unix local |
+| **Authentification OIDC** | Hors perimetre | anklume utilise le socket Unix local |
 | **Serveurs distants** | Hors perimetre | Toutes les operations sont locales |
 | **Migration d'instances** | Non couvert | Potentiel pour le multi-hote |
 | **pause/resume** | Non couvert | Commande operationnelle, pas de besoin declaratif |
 
 ## Fonctionnalites utilisees nativement
 
-AnKLuMe utilise les fonctionnalites natives Incus pour :
+anklume utilise les fonctionnalites natives Incus pour :
 
 - **Isolation par projet** : Chaque domaine est un projet Incus avec un
   namespace separe (`features.networks=false` pour les bridges partages).
@@ -86,7 +86,7 @@ Les Network ACLs Incus operent **au sein d'un seul bridge** (filtrage
 intra-reseau). Elles controlent le trafic entre instances sur le meme
 bridge.
 
-Le besoin d'isolation d'AnKLuMe est **cross-bridge** : bloquer le
+Le besoin d'isolation d'anklume est **cross-bridge** : bloquer le
 forwarding entre `net-pro` et `net-perso`. Les ACLs ne peuvent pas
 appliquer cela car elles ne voient pas le trafic traversant les
 limites des bridges au niveau du noyau hote.
@@ -102,8 +102,8 @@ n'est pas actuellement implemente.
 ### Network Zones
 
 Les Network Zones Incus fournissent des enregistrements DNS auto-generes
-pour les instances. C'est complementaire a la gestion d'IP d'AnKLuMe
-mais ne la remplace pas. AnKLuMe utilise des IPs statiques attribuees
+pour les instances. C'est complementaire a la gestion d'IP d'anklume
+mais ne la remplace pas. anklume utilise des IPs statiques attribuees
 via des overrides de devices, pas de resolution DNS. Les Network Zones
 pourraient etre integrees dans une phase future pour la decouverte de
 services basee sur DNS.
@@ -112,7 +112,7 @@ services basee sur DNS.
 
 OVN (Open Virtual Network) fournit un reseau defini par logiciel avec
 des routeurs distribues et des ACLs. Il est concu pour les clusters
-multi-hotes et ajoute une complexite significative. AnKLuMe cible les
+multi-hotes et ajoute une complexite significative. anklume cible les
 deploiements mono-hote ou les bridges Linux + nftables fournissent
 une isolation suffisante avec moins de surcharge.
 

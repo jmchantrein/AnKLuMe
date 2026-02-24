@@ -103,16 +103,16 @@ et le filtrage par bridge. Nous avons besoin de regles d'isolation qui s'execute
 avant les chaines Incus sans les desactiver ni entrer en conflit.
 
 **Decision** : Utiliser `priority -1` dans la chaine forward de la table `inet anklume`
-d'AnKLuMe. Cela garantit que nos regles d'isolation sont evaluees avant les chaines
+d'anklume. Cela garantit que nos regles d'isolation sont evaluees avant les chaines
 Incus. Nous ne desactivons PAS le pare-feu Incus (`security.ipv4_firewall`)
 car les chaines Incus fournissent des regles NAT et DHCP par bridge utiles.
 
-**Consequence** : AnKLuMe et les nftables d'Incus coexistent pacifiquement. Le trafic
+**Consequence** : anklume et les nftables d'Incus coexistent pacifiquement. Le trafic
 non correspondant tombe dans les chaines Incus avec `policy accept`.
 
 ### D-008 : Deploiement en deux etapes (generation dans admin, deploiement sur l'hote)
 
-**Contexte** : AnKLuMe s'execute dans le container admin (ADR-004 : Ansible ne
+**Contexte** : anklume s'execute dans le container admin (ADR-004 : Ansible ne
 modifie pas l'hote). Cependant, les regles nftables doivent etre appliquees sur
 le noyau de l'hote, pas dans un container.
 
@@ -136,7 +136,7 @@ le trafic intra-bridge entre containers du meme domaine serait rejete par
 la regle de rejet inter-bridges.
 
 **Decision** : Ajouter des regles d'acceptation explicites intra-bridge pour chaque
-bridge AnKLuMe avant la regle de rejet inter-bridges :
+bridge anklume avant la regle de rejet inter-bridges :
 ```nft
 iifname "net-anklume" oifname "net-anklume" accept
 iifname "net-perso" oifname "net-perso" accept
@@ -256,7 +256,7 @@ passe. Les avertissements sont affiches sur stderr avec le prefixe `WARNING:`.
 ### D-017 : GPU VM documente mais pas applique
 
 **Contexte** : Le ROADMAP mentionne le GPU dans les VMs via vfio-pci. Cependant,
-vfio-pci necessite une configuration IOMMU au niveau de l'hote qu'AnKLuMe ne peut
+vfio-pci necessite une configuration IOMMU au niveau de l'hote qu'anklume ne peut
 pas valider depuis l'interieur du container admin.
 
 **Decision** : Documenter la configuration GPU VM dans `docs/gpu-advanced.md` mais

@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`network-isolation.md`](network-isolation.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe utilise nftables pour appliquer l'isolation inter-bridges sur l'hote.
+anklume utilise nftables pour appliquer l'isolation inter-bridges sur l'hote.
 Par defaut, les bridges Incus permettent le forwarding entre eux, ce qui
 signifie qu'un container dans un domaine peut atteindre les containers
 d'autres domaines. Le role `incus_nftables` genere des regles qui bloquent
@@ -10,7 +10,7 @@ ce trafic inter-domaines tout en preservant l'acces anklume.
 
 ## Fonctionnement de l'isolation des domaines
 
-Chaque domaine AnKLuMe a son propre bridge (ex. `net-anklume`, `net-pro`,
+Chaque domaine anklume a son propre bridge (ex. `net-anklume`, `net-pro`,
 `net-perso`, `net-homelab`). Sans regles d'isolation, le noyau Linux
 fait transiter les paquets entre ces bridges librement.
 
@@ -47,7 +47,7 @@ Choix de conception :
 - **`priority -1`** : s'execute avant les chaines gerees par Incus (priorite 0),
   garantissant que les regles d'isolation sont evaluees en premier
 - **`policy accept`** : acceptation par defaut, avec des regles de rejet explicites
-  pour le trafic inter-bridges. Cela evite d'interferer avec le trafic non-AnKLuMe
+  pour le trafic inter-bridges. Cela evite d'interferer avec le trafic non-anklume
 
 ### Remplacement atomique
 
@@ -57,7 +57,7 @@ atomiquement sans intervalle ou aucune regle n'est active.
 
 ### Coexistence avec Incus
 
-Les regles AnKLuMe utilisent une table separee (`inet anklume`), priorite -1
+Les regles anklume utilisent une table separee (`inet anklume`), priorite -1
 (avant les chaines Incus), et `policy accept`. Le trafic non correspondant
 tombe dans les chaines NAT et par bridge gerees par Incus sans interference.
 
@@ -69,7 +69,7 @@ etablies. Les paquets invalides sont rejetes.
 ## Flux de travail en deux etapes
 
 La generation et le deploiement des regles nftables est un processus en deux
-etapes car AnKLuMe s'execute dans le container anklume mais les regles nftables
+etapes car anklume s'execute dans le container anklume mais les regles nftables
 doivent etre appliquees sur l'hote.
 
 ### Etape 1 : Generer les regles (dans le container anklume)
@@ -81,7 +81,7 @@ make nftables
 Cela execute le role Ansible `incus_nftables`, qui :
 
 1. Interroge `incus network list` pour decouvrir tous les bridges
-2. Filtre les bridges AnKLuMe (noms commencant par `net-`)
+2. Filtre les bridges anklume (noms commencant par `net-`)
 3. Genere les regles nftables dans `/opt/anklume/nftables-isolation.nft`
 
 Le fichier genere est stocke dans le container anklume et peut etre
@@ -109,7 +109,7 @@ scripts/deploy-nftables.sh --dry-run
 
 ### Pourquoi deux etapes ?
 
-AnKLuMe suit l'ADR-004 : Ansible ne modifie pas l'hote directement.
+anklume suit l'ADR-004 : Ansible ne modifie pas l'hote directement.
 Le container anklume pilote Incus via le socket, mais nftables doit etre
 applique sur le noyau de l'hote. Separer la generation (sure, dans le container)
 du deploiement (necessite un acces hote) maintient cette frontiere tout en
@@ -121,7 +121,7 @@ Variables dans `roles/incus_nftables/defaults/main.yml` :
 
 | Variable | Defaut | Description |
 |----------|--------|-------------|
-| `incus_nftables_bridge_pattern` | `net-` | Prefixe utilise pour identifier les bridges AnKLuMe |
+| `incus_nftables_bridge_pattern` | `net-` | Prefixe utilise pour identifier les bridges anklume |
 | `incus_nftables_output_path` | `/opt/anklume/nftables-isolation.nft` | Ou ecrire les regles generees |
 | `incus_nftables_apply` | `false` | Appliquer les regles immediatement (a utiliser avec precaution) |
 
@@ -133,7 +133,7 @@ Cela ne fonctionne que si le role s'execute sur l'hote (pas dans un container).
 Apres le deploiement, verifiez que les regles sont actives :
 
 ```bash
-# Lister la table AnKLuMe
+# Lister la table anklume
 nft list table inet anklume
 
 # Tester l'isolation : depuis un container non-anklume, essayer de pinger un autre domaine
@@ -162,13 +162,13 @@ incus exec perso-desktop -- ping -c1 1.1.1.1       # Devrait fonctionner
 
 ### Acces Internet coupe depuis les containers
 
-Les regles AnKLuMe n'affectent que le trafic de la chaine `forward` entre les bridges.
+Les regles anklume n'affectent que le trafic de la chaine `forward` entre les bridges.
 Les regles NAT (masquerade) gerees par Incus utilisent des chaines separees. Si Internet
 est coupe :
 
 1. Verifier les regles NAT d'Incus : `nft list ruleset | grep masquerade`
 2. Verifier que le bridge a `ipv4.nat: "true"` : `incus network show net-<domaine>`
-3. La `policy accept` d'AnKLuMe ne devrait pas bloquer le trafic non correspondant
+3. La `policy accept` d'anklume ne devrait pas bloquer le trafic non correspondant
 
 ### Supprimer les regles d'isolation
 

@@ -12,9 +12,9 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 RUNNER_NAME="${ANKLUME_RUNNER_NAME:-anklume}"
 RUNNER_IMAGE="${ANKLUME_RUNNER_IMAGE:-images:debian/13}"
 RUNNER_PROJECT="${ANKLUME_RUNNER_PROJECT:-default}"
-REPO_URL="${ANKLUME_RUNNER_REPO_URL:-https://github.com/jmchantrein/AnKLuMe.git}"
+REPO_URL="${ANKLUME_RUNNER_REPO_URL:-https://github.com/jmchantrein/anklume.git}"
 REPO_BRANCH="${ANKLUME_RUNNER_REPO_BRANCH:-main}"
-REPO_DIR="/root/AnKLuMe"
+REPO_DIR="/root/anklume"
 MAX_WAIT=120
 
 # ── Pre-flight check ──────────────────────────────────────────────
@@ -102,7 +102,7 @@ PRESEED
         ansible-galaxy collection install community.general -q
 
         # Configure git
-        git config --global user.name 'AnKLuMe Runner'
+        git config --global user.name 'anklume Runner'
         git config --global user.email 'runner@anklume.local'
 
         # Clone or update repo

@@ -93,7 +93,7 @@
 
 # ── Clone repository ─────────────────────────────────────────────
 
-- name: DevTestRunner | Clone AnKLuMe repository
+- name: DevTestRunner | Clone anklume repository
   ansible.builtin.git:
     repo: "{{ dev_test_runner_repo_url }}"
     dest: "{{ dev_test_runner_repo_dest }}"

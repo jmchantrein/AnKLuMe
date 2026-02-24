@@ -95,7 +95,7 @@
 - id: DEC-ADR-022
   category: architecture
   decision: "nftables priority -1 to coexist with Incus chains"
-  rationale: "Incus manages chains at priority 0; AnKLuMe runs before"
+  rationale: "Incus manages chains at priority 0; anklume runs before"
   consequence: "Separate table inet anklume; no interference with Incus NAT/DHCP"
   adr: "ADR-022"
 

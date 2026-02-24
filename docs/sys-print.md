@@ -1,6 +1,6 @@
 # Print Service (sys-print)
 
-AnKLuMe supports a dedicated CUPS print server container. USB printers
+anklume supports a dedicated CUPS print server container. USB printers
 are passed through via Incus device passthrough, and network printers
 are accessed via a macvlan NIC that gives the container direct LAN access.
 Other domains print via IPP (port 631) through `network_policies`.

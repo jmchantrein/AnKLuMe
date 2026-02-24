@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`guide.md`](guide.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe inclut un guide interactif etape par etape qui vous accompagne
+anklume inclut un guide interactif etape par etape qui vous accompagne
 dans la mise en place de votre infrastructure depuis zero.
 
 ## Utilisation

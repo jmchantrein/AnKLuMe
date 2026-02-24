@@ -1,6 +1,6 @@
 # Claude Code Workflow
 
-How to work on AnKLuMe with Claude Code effectively.
+How to work on anklume with Claude Code effectively.
 
 ## Starting a session
 

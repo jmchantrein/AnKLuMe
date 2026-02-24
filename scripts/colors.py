@@ -1,4 +1,4 @@
-"""Shared color mappings for AnKLuMe trust levels.
+"""Shared color mappings for anklume trust levels.
 
 Used by desktop_config.py, console.py, and domain-exec.sh (via inline
 references). Centralizes all trust-level → color mappings in one place.

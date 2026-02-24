@@ -3,7 +3,7 @@
 
 # Integration Bureau
 
-AnKLuMe fournit une integration avec les environnements de bureau pour
+anklume fournit une integration avec les environnements de bureau pour
 les utilisateurs de stations de travail. Les codes couleur par domaine
 dans les terminaux et gestionnaires de fenetres donnent un retour visuel
 instantane sur le domaine de securite en cours — le meme modele que les

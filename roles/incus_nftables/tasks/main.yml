@@ -2,13 +2,13 @@
 # IncusNftables | Generate inter-bridge isolation rules
 #
 # Runs on the controller via connection:local.
-# Reads current Incus bridges, filters AnKLuMe bridges,
+# Reads current Incus bridges, filters anklume bridges,
 # and generates nftables rules that isolate all domains.
 # The admin container communicates via the Incus socket,
 # not the network, so it needs no special accept rule.
 #
 # Input variables (from defaults/main.yml):
-#   - incus_nftables_bridge_pattern (string): prefix for AnKLuMe bridges
+#   - incus_nftables_bridge_pattern (string): prefix for anklume bridges
 #   - incus_nftables_output_path (string): where to write the rules
 #   - incus_nftables_apply (boolean): whether to apply rules immediately
 
@@ -19,7 +19,7 @@
   changed_when: false
   check_mode: false
 
-- name: IncusNftables | Filter AnKLuMe bridges
+- name: IncusNftables | Filter anklume bridges
   ansible.builtin.set_fact:
     incus_nftables_all_bridges: >-
       {{ incus_nftables_networks_raw.stdout | from_json

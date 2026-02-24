@@ -3,7 +3,7 @@
 > Note : En cas de divergence, la version anglaise (`tor-gateway.md`)
 > fait foi.
 
-AnKLuMe permet de configurer un proxy transparent Tor dans un conteneur.
+anklume permet de configurer un proxy transparent Tor dans un conteneur.
 Le trafic de domaines choisis peut etre route via la passerelle pour un
 acces internet anonyme, controle par `network_policies` dans `infra.yml`.
 

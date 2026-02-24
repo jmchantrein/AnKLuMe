@@ -1,20 +1,20 @@
 # Incus Native Feature Coverage
 
-AnKLuMe is a declarative high-level interface to Incus. It manages Incus
+anklume is a declarative high-level interface to Incus. It manages Incus
 resources (projects, networks, profiles, instances) via the CLI, leveraging
 native Incus features wherever possible and adding custom logic only where
 Incus does not provide the needed functionality.
 
 ## Positioning
 
-AnKLuMe does not replace Incus. It provides:
+anklume does not replace Incus. It provides:
 - A single YAML file (`infra.yml`) describing the entire infrastructure
 - Automatic generation of Ansible inventory and variables
 - Reconciliation-based idempotent management of Incus resources
 - Inter-domain network isolation via nftables
 - Lifecycle tooling (snapshots, flush, import, upgrade)
 
-All Incus features remain accessible via the CLI alongside AnKLuMe.
+All Incus features remain accessible via the CLI alongside anklume.
 
 ## Coverage matrix
 
@@ -46,18 +46,18 @@ All Incus features remain accessible via the CLI alongside AnKLuMe.
 | **Network ACLs** | Not used | See explanation below |
 | **Network zones** | Not used | See explanation below |
 | **OVN networking** | Not used | See explanation below |
-| **Clustering** | Out of scope | AnKLuMe targets single-host deployments |
-| **OCI containers** | Out of scope | AnKLuMe manages LXC and KVM only |
+| **Clustering** | Out of scope | anklume targets single-host deployments |
+| **OCI containers** | Out of scope | anklume manages LXC and KVM only |
 | **SR-IOV** | Out of scope | Requires enterprise hardware |
 | **Confidential VMs (SEV/TDX)** | Out of scope | Requires specific CPU features |
-| **OIDC authentication** | Out of scope | AnKLuMe uses the local Unix socket |
+| **OIDC authentication** | Out of scope | anklume uses the local Unix socket |
 | **Remote servers** | Out of scope | All operations are local |
 | **Instance migration** | Not covered | Could be added for multi-host setups |
 | **pause/resume** | Not covered | Operational command, no declarative need |
 
 ## Features we use natively
 
-AnKLuMe uses native Incus features for:
+anklume uses native Incus features for:
 
 - **Project isolation**: Each domain is an Incus project with separate
   namespace for instances and profiles (`features.networks=false` for
@@ -82,7 +82,7 @@ AnKLuMe uses native Incus features for:
 Incus Network ACLs operate **within a single bridge** (intra-network
 filtering). They control traffic between instances on the same bridge.
 
-AnKLuMe's isolation requirement is **cross-bridge**: block forwarding
+anklume's isolation requirement is **cross-bridge**: block forwarding
 between `net-pro` and `net-perso`. Network ACLs cannot enforce this
 because they do not see traffic crossing bridge boundaries at the host
 kernel level.
@@ -98,8 +98,8 @@ implemented.
 ### Network zones
 
 Incus Network Zones provide auto-generated DNS records for instances.
-This is complementary to AnKLuMe's IP management but does not replace
-it. AnKLuMe uses static IPs assigned via device overrides, not DNS
+This is complementary to anklume's IP management but does not replace
+it. anklume uses static IPs assigned via device overrides, not DNS
 resolution. Network Zones could be integrated in a future phase to
 provide DNS-based service discovery.
 
@@ -107,7 +107,7 @@ provide DNS-based service discovery.
 
 OVN (Open Virtual Network) provides software-defined networking with
 distributed routers and ACLs. It is designed for multi-host clusters
-and adds significant complexity. AnKLuMe targets single-host
+and adds significant complexity. anklume targets single-host
 deployments where Linux bridges + nftables provide sufficient isolation
 with lower overhead.
 

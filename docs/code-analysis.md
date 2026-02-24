@@ -1,6 +1,6 @@
 # Static Code Analysis
 
-AnKLuMe provides static code analysis tools for dead code detection,
+anklume provides static code analysis tools for dead code detection,
 call graph generation, and module dependency visualization.
 
 ## Quick start

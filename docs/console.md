@@ -1,6 +1,6 @@
 # tmux Console — QubesOS-Style Visual Domain Isolation
 
-AnKLuMe automatically generates a tmux session from `infra.yml` with
+anklume automatically generates a tmux session from `infra.yml` with
 color-coded panes that reflect domain trust levels, providing visual
 domain isolation similar to QubesOS colored window borders.
 
@@ -141,10 +141,10 @@ Options:
 
 ## Nested tmux (prefix key)
 
-The AnKLuMe console uses **`Ctrl-a`** as its prefix key (not the default
+The anklume console uses **`Ctrl-a`** as its prefix key (not the default
 `Ctrl-b`). This avoids conflicts when running tmux inside containers:
 
-- **`Ctrl-a`** controls the **outer** AnKLuMe session (switch windows, panes)
+- **`Ctrl-a`** controls the **outer** anklume session (switch windows, panes)
 - **`Ctrl-b`** passes through to **inner** tmux sessions inside containers
 
 This is essential for sysadmins who use tmux as their daily workflow
@@ -192,9 +192,9 @@ tmux keybindings:
 
 ## Navigation
 
-The AnKLuMe session uses `Ctrl-a` as prefix (see above):
+The anklume session uses `Ctrl-a` as prefix (see above):
 
-| Action | AnKLuMe session | Inner tmux (in container) |
+| Action | anklume session | Inner tmux (in container) |
 |--------|----------------|--------------------------|
 | Switch window | `Ctrl-a 0`, `Ctrl-a 1`, ... | `Ctrl-b 0`, `Ctrl-b 1`, ... |
 | Next window | `Ctrl-a n` | `Ctrl-b n` |

@@ -1,4 +1,4 @@
-# PSOT generator fix patterns from AnKLuMe development.
+# PSOT generator fix patterns from anklume development.
 # Each entry documents a generator issue and its resolution.
 ---
 - id: FIX-GEN-001

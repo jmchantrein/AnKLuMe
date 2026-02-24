@@ -3,7 +3,7 @@
 > Traduction francaise de [`quickstart.md`](quickstart.md). En cas de divergence, la version anglaise fait foi.
 
 Ce guide vous accompagne dans le deploiement de votre premiere infrastructure
-AnKLuMe depuis zero.
+anklume depuis zero.
 
 ## Prerequis
 
@@ -16,7 +16,7 @@ AnKLuMe depuis zero.
 
 ### Instance d'administration
 
-AnKLuMe fonctionne entierement depuis un container d'administration. Creez-le
+anklume fonctionne entierement depuis un container d'administration. Creez-le
 manuellement sur votre hote :
 
 ```bash

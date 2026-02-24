@@ -49,7 +49,7 @@ for file in $staged; do
 done
 
 if [ -n "$errors" ]; then
-    printf '[AnKLuMe] BLOCKED: Staged files contain personal infrastructure data.\n\n'
+    printf '[anklume] BLOCKED: Staged files contain personal infrastructure data.\n\n'
     printf '  Detected:'
     printf '%b\n' "$errors"
     printf '\n  These files belong to YOUR infrastructure, not the framework repo.\n\n'

@@ -36,7 +36,7 @@ ok()   { printf "${GREEN}%s${NC}\n" "$1"; }
 warn() { printf "${YELLOW}%s${NC}\n" "$1"; }
 die()  { printf "${RED}ERROR: %s${NC}\n" "$1" >&2; exit 1; }
 
-printf '\n%b=== AnKLuMe Upgrade ===%b\n\n' "$BOLD" "$NC"
+printf '\n%b=== anklume Upgrade ===%b\n\n' "$BOLD" "$NC"
 
 # Check we're in a git repository
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then

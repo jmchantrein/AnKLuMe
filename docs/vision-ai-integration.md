@@ -1,15 +1,15 @@
-# Vision: AI Integration in AnKLuMe
+# Vision: AI Integration in anklume
 
 **Date**: 2026-02-23
 **Status**: Draft — consolidation of design discussions, pending ROADMAP formalization
 
 ## 1. Context and motivation
 
-AnKLuMe provides QubesOS-like compartmentalization using Incus and Ansible.
+anklume provides QubesOS-like compartmentalization using Incus and Ansible.
 Today, AI tools (Claude Code, Ollama, OpenClaw) are used during development
 but are not treated as first-class citizens of the compartmentalized
 infrastructure. This document proposes a vision where AI is integrated
-into AnKLuMe with the same isolation guarantees as everything else.
+into anklume with the same isolation guarantees as everything else.
 
 Three converging needs drive this vision:
 
@@ -100,7 +100,7 @@ GPU container's IP) for local mode. No intermediate proxy needed.
 | Cron | Scheduled reports, maintenance tasks, snapshot triggers |
 | Memory + RAG | Accumulate operational knowledge per domain (SQLite hybrid search) |
 | Multi-agent | Infra monitoring agent + personal assistant agent |
-| Skills (custom) | AnKLuMe-specific automation skills (NOT ClawHub third-party, except in sandbox) |
+| Skills (custom) | anklume-specific automation skills (NOT ClawHub third-party, except in sandbox) |
 | Sessions spawn | Isolated sub-tasks without polluting main session |
 
 **Heartbeat monitoring pattern:**
@@ -154,7 +154,7 @@ quality very little for this use case.
 | Privacy Proxy (Ogou) | Python | 30+ regex patterns, zero-trust |
 
 None of these understand IaC-specific data (Incus project names, bridge names,
-AnKLuMe addressing convention IPs). AnKLuMe would add IaC-specific detection
+anklume addressing convention IPs). anklume would add IaC-specific detection
 patterns on top of a proven base.
 
 **Transparent integration:** The sanitizer exposes an Anthropic-compatible
@@ -385,7 +385,7 @@ combines:
 | Ansible Lightspeed | No | Yes (code gen) | Partial (PII) | No |
 | LLM Guard / Sentinel | No | No | Yes (generic PII) | No |
 | Proxmox MCP ecosystem | Partial | Yes | No | No |
-| **AnKLuMe (this vision)** | **Yes** | **Yes** | **Yes** | **Yes** |
+| **anklume (this vision)** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 **Challengers to watch:**
 
@@ -398,7 +398,7 @@ combines:
 
 The combination is unique today, but the landscape moves fast.
 
-### AnKLuMe's strongest differentiators
+### anklume's strongest differentiators
 
 - **Feature 4 (per-domain AI isolation)** is genuinely novel. No tool
   provides different AI instances per security zone with network-enforced
@@ -442,7 +442,7 @@ in ClawHub. Third-party skills must be treated as untrusted code.
 
 **Policy:** ClawHub skills are installed ONLY in sandbox domains
 (`trust_level: disposable`). Production domains use custom skills
-defined in the AnKLuMe repository and deployed via Ansible templates
+defined in the anklume repository and deployed via Ansible templates
 (ADR-036 pattern).
 
 ## 9. What this vision retires

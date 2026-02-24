@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# export-desktops.sh — Install AnKLuMe .desktop files to user menu
+# export-desktops.sh — Install anklume .desktop files to user menu
 #
 # Generates .desktop files via desktop_config.py and installs them to
 # ~/.local/share/applications/ for XDG desktop integration.
@@ -27,7 +27,7 @@ err()   { echo -e "\033[0;31m[ERR ]\033[0m $*" >&2; }
 usage() {
     echo "Usage: $(basename "$0") [--remove] [--help]"
     echo ""
-    echo "Install or remove AnKLuMe .desktop files."
+    echo "Install or remove anklume .desktop files."
     echo ""
     echo "Options:"
     echo "  --remove   Uninstall all anklume-*.desktop files from user menu"
@@ -36,7 +36,7 @@ usage() {
 }
 
 remove_desktops() {
-    info "Removing AnKLuMe .desktop files from ${INSTALL_DIR}..."
+    info "Removing anklume .desktop files from ${INSTALL_DIR}..."
     local count=0
     for f in "${INSTALL_DIR}"/anklume-*.desktop; do
         [[ -f "$f" ]] || continue
@@ -46,7 +46,7 @@ remove_desktops() {
     done
 
     if [[ $count -eq 0 ]]; then
-        ok "No AnKLuMe .desktop files found to remove"
+        ok "No anklume .desktop files found to remove"
     else
         ok "Removed $count .desktop file(s)"
     fi

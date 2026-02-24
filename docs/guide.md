@@ -1,6 +1,6 @@
 # Interactive Onboarding Guide
 
-AnKLuMe includes a step-by-step interactive guide that walks you through
+anklume includes a step-by-step interactive guide that walks you through
 setting up your infrastructure from scratch.
 
 ## Usage

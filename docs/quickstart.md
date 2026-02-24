@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-This guide walks you through deploying your first AnKLuMe infrastructure
+This guide walks you through deploying your first anklume infrastructure
 from scratch.
 
 ## Prerequisites
@@ -14,7 +14,7 @@ from scratch.
 
 ### Admin instance
 
-AnKLuMe runs entirely from inside an admin container. Create it manually
+anklume runs entirely from inside an admin container. Create it manually
 on your host:
 
 ```bash

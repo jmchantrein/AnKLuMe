@@ -41,7 +41,7 @@ if is_on_host; then
     # Handle --dry-run
     if [[ "${1:-}" == "--dry-run" ]]; then
         exec incus exec "$CONTAINER_NAME" -- bash -c \
-            "cd /root/AnKLuMe && python3 scripts/console.py --dry-run"
+            "cd /root/anklume && python3 scripts/console.py --dry-run"
     fi
 
     # Check if session already exists inside the container
@@ -50,7 +50,7 @@ if is_on_host; then
     else
         # Create the session (detached) inside the container
         incus exec "$CONTAINER_NAME" -- bash -c \
-            "cd /root/AnKLuMe && python3 scripts/console.py --no-attach"
+            "cd /root/anklume && python3 scripts/console.py --no-attach"
     fi
 
     # Attach the user's terminal to the tmux session inside the container

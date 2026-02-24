@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`stt-service.md`](stt-service.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe fournit un service local de reconnaissance vocale (speech-to-text)
+anklume fournit un service local de reconnaissance vocale (speech-to-text)
 accelere par GPU en utilisant faster-whisper et le serveur API Speaches.
 Ce service s'integre avec Open WebUI pour la saisie vocale et avec tout
 client supportant l'API STT d'OpenAI.

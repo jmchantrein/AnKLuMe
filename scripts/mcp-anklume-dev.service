@@ -1,14 +1,14 @@
 [Unit]
-Description=AnKLuMe MCP Development Server
+Description=anklume MCP Development Server
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/AnKLuMe
-ExecStart=/usr/bin/python3 /root/AnKLuMe/scripts/mcp-anklume-dev.py --sse --port 9090
+WorkingDirectory=/root/anklume
+ExecStart=/usr/bin/python3 /root/anklume/scripts/mcp-anklume-dev.py --sse --port 9090
 Restart=on-failure
 RestartSec=5
-Environment=ANKLUME_PROJECT_DIR=/root/AnKLuMe
+Environment=ANKLUME_PROJECT_DIR=/root/anklume
 
 [Install]
 WantedBy=multi-user.target

@@ -10,11 +10,11 @@ define require_container
 		echo "" >&2; \
 		echo "  ERROR: This command must be run inside anklume-instance." >&2; \
 		echo "" >&2; \
-		echo "  You are on the host. AnKLuMe commands run from the admin container." >&2; \
+		echo "  You are on the host. anklume commands run from the admin container." >&2; \
 		echo "  Enter the container first:" >&2; \
 		echo "" >&2; \
 		echo "    incus exec anklume-instance -- bash" >&2; \
-		echo "    cd /root/AnKLuMe" >&2; \
+		echo "    cd /root/anklume" >&2; \
 		echo "    make $(1)" >&2; \
 		echo "" >&2; \
 		echo "  Or run the interactive guide: make guide" >&2; \
@@ -112,7 +112,7 @@ export-remove: ## Remove exported app (I=<instance> APP=<app>)
 	scripts/export-app.sh remove $(I) $(APP)
 
 # ── Live OS (Phase 31) ───────────────────────────────────
-build-image: ## Build bootable AnKLuMe live OS image (OUT=output.img)
+build-image: ## Build bootable anklume live OS image (OUT=output.img)
 	scripts/build-image.sh $(if $(OUT),--output $(OUT)) $(if $(BASE),--base $(BASE)) $(if $(ARCH),--arch $(ARCH))
 
 live-update: ## Download and apply A/B update (URL=<image-url>)
@@ -283,10 +283,10 @@ test-sandboxed: ## Run all Molecule tests in isolated sandbox
 test-sandboxed-role: ## Run one role's test in sandbox (R=role_name)
 	@scripts/run-tests.sh full $(R)
 
-runner-create: ## Create the AnKLuMe runner container
+runner-create: ## Create the anklume runner container
 	@scripts/run-tests.sh create
 
-runner-destroy: ## Destroy the AnKLuMe runner container
+runner-destroy: ## Destroy the anklume runner container
 	@scripts/run-tests.sh destroy
 
 # ── Scenario Testing (Phase 22) ──────────────────────────
@@ -368,9 +368,9 @@ for e in (json.loads(l) for l in sys.stdin if l.strip())]" 2>/dev/null; \
 # ── MCP Dev Server (OpenClaw integration) ─────────────────
 ANKLUME_INSTANCE ?= anklume-instance
 
-mcp-dev-start: ## Start the AnKLuMe MCP dev server in anklume-instance
+mcp-dev-start: ## Start the anklume MCP dev server in anklume-instance
 	@echo "Deploying MCP dev server to $(ANKLUME_INSTANCE)..."
-	@incus file push scripts/mcp-anklume-dev.py $(ANKLUME_INSTANCE)/root/AnKLuMe/scripts/mcp-anklume-dev.py
+	@incus file push scripts/mcp-anklume-dev.py $(ANKLUME_INSTANCE)/root/anklume/scripts/mcp-anklume-dev.py
 	@incus file push scripts/mcp-anklume-dev.service $(ANKLUME_INSTANCE)/etc/systemd/system/mcp-anklume-dev.service
 	@incus exec $(ANKLUME_INSTANCE) -- bash -c '\
 		pip install --quiet --break-system-packages --ignore-installed "mcp[cli]" 2>/dev/null || true; \
@@ -381,7 +381,7 @@ mcp-dev-start: ## Start the AnKLuMe MCP dev server in anklume-instance
 	@echo "MCP dev server running on $(ANKLUME_INSTANCE):9090"
 	@echo "Tools: git_status, git_log, make_target, run_tests, incus_list, incus_exec, read_file, claude_code, lint"
 
-mcp-dev-stop: ## Stop the AnKLuMe MCP dev server
+mcp-dev-stop: ## Stop the anklume MCP dev server
 	@incus exec $(ANKLUME_INSTANCE) -- systemctl disable --now mcp-anklume-dev.service 2>/dev/null || true
 	@echo "MCP dev server stopped."
 
@@ -474,7 +474,7 @@ doctor: ## Diagnose infrastructure health (FIX=1 to auto-fix, CHECK=network|inst
 
 # ── Smoke Testing (Phase 29) ────────────────────────────
 smoke: ## Real-world smoke test (requires running Incus daemon)
-	@echo "=== AnKLuMe Smoke Test ==="
+	@echo "=== anklume Smoke Test ==="
 	@echo ""
 	@echo "--- Step 1/5: Generator (make sync-dry) ---"
 	@python3 scripts/generate.py $(INFRA_SRC) --dry-run
@@ -541,7 +541,7 @@ apply-print: ## Setup CUPS print service in container (I=<instance> [PROJECT=<pr
 	scripts/sys-print.sh setup $(I) $(if $(PROJECT),--project $(PROJECT))
 
 # ── Lifecycle ─────────────────────────────────────────────
-flush: ## Destroy all AnKLuMe infrastructure (FORCE=true required in prod)
+flush: ## Destroy all anklume infrastructure (FORCE=true required in prod)
 	$(call require_container,flush)
 	@scripts/flush.sh $(if $(FORCE),--force)
 
@@ -586,7 +586,7 @@ install-hooks: ## Install git pre-commit hooks
 # ── Help ──────────────────────────────────────────────────
 help: ## Show categorized help (use help-all for all targets)
 	@printf "\n"
-	@printf "  \033[1mAnKLuMe\033[0m — Infrastructure Compartmentalization\n"
+	@printf "  \033[1manklume\033[0m — Infrastructure Compartmentalization\n"
 	@printf "\n"
 	@printf "  \033[1mGETTING STARTED\033[0m\n"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make guide" "Interactive step-by-step tutorial"
@@ -642,7 +642,7 @@ help: ## Show categorized help (use help-all for all targets)
 
 help-all: ## Show all available targets
 	@printf "\n"
-	@printf "  \033[1mAnKLuMe\033[0m — All targets\n"
+	@printf "  \033[1manklume\033[0m — All targets\n"
 	@printf "\n"
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "    \033[36m%-22s\033[0m %s\n", $$1, $$2}'

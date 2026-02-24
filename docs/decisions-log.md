@@ -16,7 +16,7 @@ or documented in [SPEC.md](SPEC.md) / [ROADMAP.md](ROADMAP.md) if
 implementation-level.
 
 For architecture-level decisions, see [ARCHITECTURE.md](ARCHITECTURE.md)
-(ADR-001 to ADR-039).
+(ADR-001 to ADR-040).
 
 ---
 
@@ -355,7 +355,7 @@ conflicts with nftables isolation).
 **Rationale**: The official SDK provides correct protocol implementation,
 automatic capability discovery, type-safe tool definitions via decorators,
 and future-proofing as MCP evolves. The `pip install mcp` dependency is
-acceptable — AnKLuMe already requires pip packages (pyyaml, pytest,
+acceptable — anklume already requires pip packages (pyyaml, pytest,
 libtmux). The stdio transport maps naturally to `incus exec` and Incus
 proxy devices.
 

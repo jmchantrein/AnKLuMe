@@ -24,7 +24,7 @@ err()   { echo -e "\033[0;31m[ERR ]\033[0m $*" >&2; }
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
     echo ""
-    echo "Interactive domain/instance launcher for AnKLuMe."
+    echo "Interactive domain/instance launcher for anklume."
     echo ""
     echo "Options:"
     echo "  --exec CMD   Run CMD inside the selected instance instead of a terminal"
@@ -93,7 +93,7 @@ detect_launcher() {
 
 show_menu() {
     local launcher="$1"
-    local prompt="AnKLuMe instance"
+    local prompt="anklume instance"
 
     case "$launcher" in
         fuzzel) fuzzel --dmenu --prompt "$prompt > " ;;

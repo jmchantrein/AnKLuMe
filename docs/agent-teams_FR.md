@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`agent-teams.md`](agent-teams.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte le developpement et les tests entierement autonomes en
+anklume supporte le developpement et les tests entierement autonomes en
 utilisant Claude Code Agent Teams. Plusieurs instances de Claude Code
 travaillent en parallele dans un bac a sable Incus-in-Incus, avec une
 supervision humaine au niveau de la fusion des PRs.
@@ -144,7 +144,7 @@ Chaque entree contient :
 |----------|--------|-------------|
 | `dev_agent_runner_node_version` | `22` | Version de Node.js |
 | `dev_agent_runner_permissions_mode` | `bypassPermissions` | Mode Claude Code |
-| `dev_agent_runner_git_user` | `AnKLuMe Agent` | Auteur des commits git |
+| `dev_agent_runner_git_user` | `anklume Agent` | Auteur des commits git |
 | `dev_agent_runner_git_email` | `agent@anklume.local` | Email des commits git |
 | `dev_agent_runner_enable_teams` | `true` | Activer Agent Teams |
 | `dev_agent_runner_audit_hook` | `true` | Activer la journalisation d'audit |

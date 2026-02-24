@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# live-update.sh — Live A/B OS image update mechanism for AnKLuMe
+# live-update.sh — Live A/B OS image update mechanism for anklume
 # Implements atomic slot-based updates with dm-verity, rollback support, and boot counting.
 #
 # Usage: live-update.sh [OPTIONS]
@@ -53,7 +53,7 @@ usage() {
     cat << 'EOF'
 Usage: live-update.sh [OPTIONS]
 
-AnKLuMe Live OS A/B Update Manager
+anklume Live OS A/B Update Manager
 Safely download, verify, and install new OS images with automatic rollback.
 
 Options:
@@ -382,7 +382,7 @@ update_bootloader() {
         info "  Updating boot entry: $(basename "$entry_file")"
 
         # Read current entry and update tries-left
-        local entry_title="AnKLuMe (Slot $TARGET_SLOT)"
+        local entry_title="anklume (Slot $TARGET_SLOT)"
         cat > "$entry_file.tmp" << ENTRY_EOF
 title           $entry_title
 linux           /vmlinuz
@@ -507,7 +507,7 @@ rollback() {
 
 status() {
     echo ""
-    echo "=== AnKLuMe Update Status ==="
+    echo "=== anklume Update Status ==="
     echo ""
 
     ensure_persist_mounted || {
@@ -588,7 +588,7 @@ main() {
     VERITY_FILE="$DOWNLOAD_DIR/image.verity"
     CHECKSUM_FILE="$DOWNLOAD_DIR/image.sha256"
 
-    echo "=== AnKLuMe Live Update Manager ==="
+    echo "=== anklume Live Update Manager ==="
     echo ""
 
     case "$OPERATION" in

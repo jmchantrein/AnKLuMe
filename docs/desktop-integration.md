@@ -1,6 +1,6 @@
 # Desktop Integration
 
-AnKLuMe provides desktop environment integration for workstation users.
+anklume provides desktop environment integration for workstation users.
 Domain-colored visual cues in terminals and window managers give instant
 feedback about which security domain you're working in — the same model
 as QubesOS colored window borders.

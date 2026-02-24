@@ -3,7 +3,7 @@
 > Note : En cas de divergence, la version anglaise (`golden-images.md`)
 > fait foi.
 
-AnKLuMe prend en charge les images de référence (golden images) —
+anklume prend en charge les images de référence (golden images) —
 des modèles d'instances pré-provisionnés qui peuvent être clonés
 efficacement pour créer de nouvelles instances. Cela permet une
 création rapide d'instances et une gestion centralisée des mises à jour.

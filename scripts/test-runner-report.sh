@@ -497,7 +497,7 @@ PYEOF
 # ── Main ──────────────────────────────────────────────────
 
 cd "$PROJECT_DIR"
-echo "AnKLuMe Test Runner — $(date -u +"%Y-%m-%d %H:%M UTC")"
+echo "anklume Test Runner — $(date -u +"%Y-%m-%d %H:%M UTC")"
 echo "Output: $OUTPUT_DIR"
 echo "Suites: ${ALL_SUITES[*]}"
 echo ""

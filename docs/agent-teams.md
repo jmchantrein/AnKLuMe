@@ -1,6 +1,6 @@
 # Claude Code Agent Teams — Autonomous Development
 
-AnKLuMe supports fully autonomous development and testing using Claude
+anklume supports fully autonomous development and testing using Claude
 Code Agent Teams. Multiple Claude Code instances work in parallel inside
 an Incus-in-Incus sandbox, with human oversight at the PR merge level.
 
@@ -141,7 +141,7 @@ Each entry contains:
 |----------|---------|-------------|
 | `dev_agent_runner_node_version` | `22` | Node.js version |
 | `dev_agent_runner_permissions_mode` | `bypassPermissions` | Claude Code mode |
-| `dev_agent_runner_git_user` | `AnKLuMe Agent` | Git commit author |
+| `dev_agent_runner_git_user` | `anklume Agent` | Git commit author |
 | `dev_agent_runner_git_email` | `agent@anklume.local` | Git commit email |
 | `dev_agent_runner_enable_teams` | `true` | Enable Agent Teams |
 | `dev_agent_runner_audit_hook` | `true` | Enable audit logging |

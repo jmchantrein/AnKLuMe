@@ -12,7 +12,7 @@ tools:
   - Bash
 ---
 
-You are the quality reviewer of the AnKLuMe framework.
+You are the quality reviewer of the anklume framework.
 
 Before reviewing, read `CLAUDE.md` for conventions.
 

@@ -24,7 +24,7 @@ run_hook() {
 
     # Validate parameters
     if [ -z "$VERITY_HASH" ]; then
-        warn "AnKLuMe: No verity hash specified in kernel cmdline"
+        warn "anklume: No verity hash specified in kernel cmdline"
         return 0
     fi
 
@@ -37,34 +37,34 @@ run_hook() {
             OS_PARTITION_NAME="ANKLUME-OS-B"
             ;;
         *)
-            warn "AnKLuMe: Invalid slot '$SLOT' (expected A or B)"
+            warn "anklume: Invalid slot '$SLOT' (expected A or B)"
             return 1
             ;;
     esac
 
     # Find the OS partition using blkid
-    msg "AnKLuMe: Setting up dm-verity for slot $SLOT"
+    msg "anklume: Setting up dm-verity for slot $SLOT"
 
     OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
     if [ -z "$OS_PARTITION" ]; then
-        warn "AnKLuMe: Could not find partition '$OS_PARTITION_NAME'"
+        warn "anklume: Could not find partition '$OS_PARTITION_NAME'"
         return 1
     fi
 
-    msg "AnKLuMe: Found OS partition at $OS_PARTITION"
+    msg "anklume: Found OS partition at $OS_PARTITION"
 
     # Activate dm-verity using veritysetup
     if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
         --hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
-        warn "AnKLuMe: Failed to activate dm-verity device"
+        warn "anklume: Failed to activate dm-verity device"
         return 1
     fi
 
-    msg "AnKLuMe: dm-verity device activated successfully"
+    msg "anklume: dm-verity device activated successfully"
 
     # Set root device to the verity device mapping
     export ROOT="/dev/mapper/anklume-root"
 
-    msg "AnKLuMe: Root device set to $ROOT"
+    msg "anklume: Root device set to $ROOT"
     return 0
 }

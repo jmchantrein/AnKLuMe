@@ -2,13 +2,13 @@
 
 > Traduction francaise de [`lab-tp.md`](lab-tp.md). En cas de divergence, la version anglaise fait foi.
 
-Ce guide explique comment utiliser AnKLuMe pour deployer des TPs reseau
+Ce guide explique comment utiliser anklume pour deployer des TPs reseau
 pour les etudiants. Chaque etudiant obtient un domaine isole avec son propre
 sous-reseau, projet Incus et ensemble de containers.
 
 ## Concept : un domaine par etudiant
 
-Le modele de domaine d'AnKLuMe s'adapte naturellement aux deploiements de TP :
+Le modele de domaine d'anklume s'adapte naturellement aux deploiements de TP :
 
 ```
 domaine admin       = environnement de gestion de l'enseignant

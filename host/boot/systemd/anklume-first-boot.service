@@ -1,5 +1,5 @@
 [Unit]
-Description=AnKLuMe First Boot Wizard
+Description=anklume First Boot Wizard
 ConditionPathExists=!/mnt/anklume-persist/pool.conf
 After=local-fs.target network-online.target
 Wants=network-online.target

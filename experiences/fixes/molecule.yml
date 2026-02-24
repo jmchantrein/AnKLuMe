@@ -1,4 +1,4 @@
-# Molecule test fix patterns extracted from AnKLuMe git history.
+# Molecule test fix patterns extracted from anklume git history.
 # Each entry documents a test failure and its resolution.
 ---
 - id: FIX-MOL-001

@@ -3,7 +3,7 @@
 
 # Tests de scénarios end-to-end (BDD)
 
-AnKLuMe inclut des scénarios d'acceptation lisibles par un humain qui
+anklume inclut des scénarios d'acceptation lisibles par un humain qui
 testent des workflows utilisateur complets contre une infrastructure
 Incus réelle. Les scénarios sont écrits au format Gherkin avec
 `pytest-bdd`.
@@ -51,7 +51,7 @@ scenarios/
 ### Bonnes pratiques
 
 Valident les workflows recommandés. Ces scénarios servent de
-documentation vivante sur la bonne utilisation d'AnKLuMe :
+documentation vivante sur la bonne utilisation d'anklume :
 
 - **Pro workstation setup** : Déploiement complet avec isolation réseau
 - **Student lab deploy** : Un enseignant déploie un environnement de TP
@@ -61,7 +61,7 @@ documentation vivante sur la bonne utilisation d'AnKLuMe :
 
 ### Mauvaises pratiques
 
-Vérifient qu'AnKLuMe détecte les erreurs tôt avec des messages clairs :
+Vérifient qu'anklume détecte les erreurs tôt avec des messages clairs :
 
 - **Apply without sync** : Pas de fichiers d'inventaire, inventaire obsolète
 - **Duplicate IPs** : Le générateur rejette les adresses IP dupliquées

@@ -1,7 +1,7 @@
 ---
 # Phase 31 Example: Live OS with Encrypted Persistent Storage
 #
-# This example demonstrates AnKLuMe configured for boot-from-USB with encrypted data disk.
+# This example demonstrates anklume configured for boot-from-USB with encrypted data disk.
 # Ideal for:
 #   - Portable secure workstation (boot USB + external SSD)
 #   - Live environment that persists across reboots

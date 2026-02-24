@@ -2,7 +2,7 @@
 
 > Traduction francaise de [`ai-switch.md`](ai-switch.md). En cas de divergence, la version anglaise fait foi.
 
-AnKLuMe supporte un mode d'acces IA exclusif ou un seul domaine a la
+anklume supporte un mode d'acces IA exclusif ou un seul domaine a la
 fois peut atteindre le domaine `ai-tools`. Cela empeche les fuites de
 donnees entre domaines via les services IA partages et permet le vidage
 de la VRAM entre les changements d'acces pour effacer l'etat residuel

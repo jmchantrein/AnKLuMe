@@ -4,7 +4,7 @@
 # Creates a profile with one NIC per domain bridge, attached to
 # the sys-firewall VM in the anklume project.
 
-# Bridge prefix to discover AnKLuMe bridges
+# Bridge prefix to discover anklume bridges
 incus_firewall_vm_bridge_pattern: "net-"
 
 # Admin bridge name (first NIC, eth0)

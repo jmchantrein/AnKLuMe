@@ -1,4 +1,4 @@
-# Incus CLI quirks and workarounds discovered during AnKLuMe development.
+# Incus CLI quirks and workarounds discovered during anklume development.
 # Each entry documents a CLI behavior issue and its resolution.
 ---
 - id: FIX-INCUS-001

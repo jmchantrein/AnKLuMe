@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-check.sh — Check for AnKLuMe updates (called at login)
+# update-check.sh — Check for anklume updates (called at login)
 #
 # Usage: scripts/update-check.sh
 #
@@ -14,7 +14,7 @@ set -euo pipefail
 CACHE_DIR="${HOME}/.anklume"
 CACHE_FILE="${CACHE_DIR}/update-check-cache"
 CACHE_TTL=3600  # 1 hour in seconds
-REPO_DIR="${1:-/root/AnKLuMe}"
+REPO_DIR="${1:-/root/anklume}"
 
 # Skip if not a git repo
 if [ ! -d "${REPO_DIR}/.git" ]; then
@@ -56,6 +56,6 @@ fi
 # Count commits behind
 BEHIND=$(git -C "$REPO_DIR" rev-list --count "HEAD..origin/${BRANCH}" 2>/dev/null || echo "?")
 
-MSG=$'\033[33m'"AnKLuMe: ${BEHIND} update(s) available. Run 'make upgrade' to update."$'\033[0m'
+MSG=$'\033[33m'"anklume: ${BEHIND} update(s) available. Run 'make upgrade' to update."$'\033[0m'
 echo "$MSG" > "$CACHE_FILE"
 echo "$MSG"

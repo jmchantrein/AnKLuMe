@@ -15,10 +15,10 @@
 #       on_failure: what the admin should see if it fails
 #
 # These chains are designed to be:
-# 1. Exhaustive — cover every AnKLuMe capability
+# 1. Exhaustive — cover every anklume capability
 # 2. Sequential — each step depends on the previous
 # 3. Mechanically verifiable — a local LLM can check pass/fail
-# 4. Living documentation — updated as AnKLuMe evolves
+# 4. Living documentation — updated as anklume evolves
 #
 # Usage:
 #   python3 scripts/run-behavioral-tests.py              # run all chains

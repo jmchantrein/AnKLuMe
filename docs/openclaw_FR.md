@@ -3,12 +3,12 @@
 > **Note** : La version anglaise (`docs/openclaw.md`) fait reference en cas
 > de divergence.
 
-AnKLuMe integre [OpenClaw](https://github.com/openclaw/openclaw), un
+anklume integre [OpenClaw](https://github.com/openclaw/openclaw), un
 assistant IA open-source et auto-heberge qui se connecte aux plateformes
 de messagerie (Telegram, WhatsApp, Signal, Discord, etc.) et pilote
 plusieurs backends LLM.
 
-Faire tourner OpenClaw dans AnKLuMe apporte l'isolation reseau, un acces
+Faire tourner OpenClaw dans anklume apporte l'isolation reseau, un acces
 controle aux messageries, et la delegation vers des LLM locaux pour les
 requetes sensibles.
 
@@ -43,7 +43,7 @@ Claude (anklume et assistant) utilisent Claude Code CLI, qui necessite
 un abonnement Anthropic valide (plan Max). Claude Code s'authentifie
 via des tokens OAuth stockes dans `~/.claude/`. Ces credentials vivent
 sur `anklume-instance` (synchronises depuis l'hote) car ce conteneur
-est le plan de controle AnKLuMe — il a le socket Incus, le depot git
+est le plan de controle anklume — il a le socket Incus, le depot git
 et Ansible.
 
 Faire tourner Claude Code directement dans `openclaw` necessiterait de
@@ -77,7 +77,7 @@ local", etc.
 
 | Mode | Backend | Description |
 |------|---------|-------------|
-| **anklume** | Claude Code (Opus) | Expert AnKLuMe : infra, Ansible, Incus, reseau |
+| **anklume** | Claude Code (Opus) | Expert anklume : infra, Ansible, Incus, reseau |
 | **assistant** | Claude Code (Opus) | Assistant general polyvalent (persona Ada) |
 | **local** | qwen3:30b-a3b (MoE) | LLM local gratuit et rapide via llama-server sur GPU |
 
@@ -144,13 +144,13 @@ Le proxy sur `anklume-instance:9090` expose :
 Ada travaille directement dans son conteneur `openclaw` (ou elle est root)
 via `/api/incus_exec` avec `instance: openclaw`. Le conteneur a acces a
 internet, l'imbrication Incus (`security.nesting=true`), et un clone git
-d'AnKLuMe dans `/root/AnKLuMe/`. Cela permet le developpement complet,
+d'anklume dans `/root/anklume/`. Cela permet le developpement complet,
 les tests et la creation de PR sans creer de conteneurs supplementaires.
 
 ## Reproductibilite de l'agent (ADR-036)
 
 Toute la connaissance operationnelle de l'agent est stockee sous forme
-de templates Jinja2 dans le depot AnKLuMe
+de templates Jinja2 dans le depot anklume
 (`roles/openclaw_server/templates/`). Chaque `make apply` deploie ces
 templates dans le workspace de l'agent, **ecrasant** les versions
 precedentes. Le depot git est la source unique de verite.
@@ -193,7 +193,7 @@ Ada dispose de deux boucles d'auto-amelioration :
 ### Contribution au framework (boucle principale)
 
 Ada ameliore sa propre connaissance operationnelle ET le framework
-AnKLuMe en contribuant via le workflow git standard :
+anklume en contribuant via le workflow git standard :
 
 ```
 Ada sur Telegram → identifie une amelioration
@@ -231,7 +231,7 @@ le workflow PR.
 
 ## Valeur ajoutee par rapport a OpenClaw natif
 
-L'architecture proxy d'AnKLuMe etend OpenClaw avec des capacites qui
+L'architecture proxy d'anklume etend OpenClaw avec des capacites qui
 vont au-dela de ce qu'OpenClaw fournit nativement.
 
 ### 1. Cerveau agentique (Claude Code CLI)
@@ -313,7 +313,7 @@ reste hors ligne. Cela maintient l'isolation reseau.
 **OpenClaw natif** : `openclaw update` se met a jour lui-meme.
 
 **Avec proxy** : l'outil `self_upgrade` peut verifier et appliquer les
-mises a jour du framework AnKLuMe, re-synchroniser la configuration
+mises a jour du framework anklume, re-synchroniser la configuration
 et re-provisionner le conteneur openclaw — depuis un message Telegram.
 
 ### 10. Sessions persistantes multi-tours
@@ -326,7 +326,7 @@ conserve le contexte complet du codebase entre les messages.
 
 ### Tableau recapitulatif
 
-| Capacite | OpenClaw natif | Avec proxy AnKLuMe |
+| Capacite | OpenClaw natif | Avec proxy anklume |
 |----------|---------------|-------------------|
 | Cerveau LLM | Completion textuelle API | Codage agentique (outils) |
 | Portee des commandes | Son conteneur uniquement | Tout conteneur Incus |
@@ -342,7 +342,7 @@ conserve le contexte complet du codebase entre les messages.
 ## Deploiement
 
 ### Prerequis
-- AnKLuMe deploye avec le domaine `ai-tools`
+- anklume deploye avec le domaine `ai-tools`
 - Ollama ou llama-server en fonctionnement avec un modele charge
 - Un token de bot Telegram (via [@BotFather](https://t.me/BotFather))
 

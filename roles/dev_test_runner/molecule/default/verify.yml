@@ -61,19 +61,19 @@
     - name: Verify | Assert git user is configured
       ansible.builtin.assert:
         that:
-          - "'AnKLuMe Runner' in verify_git_name.stdout"
+          - "'anklume Runner' in verify_git_name.stdout"
         fail_msg: "Git user name not configured"
 
     - name: Verify | Check repo is cloned
       ansible.builtin.stat:
-        path: /root/AnKLuMe/CLAUDE.md
+        path: /root/anklume/CLAUDE.md
       register: verify_repo
 
     - name: Verify | Assert repo exists
       ansible.builtin.assert:
         that:
           - verify_repo.stat.exists
-        fail_msg: "AnKLuMe repo not cloned to /root/AnKLuMe"
+        fail_msg: "anklume repo not cloned to /root/anklume"
 
     - name: Verify | Check community.general collection
       ansible.builtin.command:

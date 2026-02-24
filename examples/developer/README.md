@@ -1,11 +1,11 @@
 # Developer
 
-An AnKLuMe developer setup with a dev-test domain configured for
+An anklume developer setup with a dev-test domain configured for
 Incus-in-Incus testing.
 
 ## Use case
 
-You are contributing to AnKLuMe and need a test environment where you
+You are contributing to anklume and need a test environment where you
 can run Molecule tests in isolation using nested Incus containers. The
 dev-runner container runs its own Incus daemon inside, creating a
 complete sandbox for testing without affecting production.

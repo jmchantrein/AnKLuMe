@@ -1,6 +1,6 @@
 """Tests for Phase 31 — Live OS with Encrypted Persistent Storage.
 
-This module tests all scripts and configurations for the AnKLuMe live OS phase:
+This module tests all scripts and configurations for the anklume live OS phase:
   - live-os-lib.sh (shared library)
   - build-image.sh (image building)
   - first-boot.sh (initial setup)
