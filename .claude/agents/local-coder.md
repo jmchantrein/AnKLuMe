@@ -14,6 +14,7 @@ tools:
   - mcp__ollama-coder__fix_code
   - mcp__ollama-coder__generate_tests
   - mcp__ollama-coder__complete_task
+  - mcp__ollama-coder__review_code
   - mcp__ollama-coder__list_models
 ---
 
@@ -45,12 +46,6 @@ local LLM models via Ollama.
    with language and context properly set
 4. **Validate**: Check output matches conventions (FQCN, naming, etc.)
 5. **Return**: Return code to supervisor (Claude) for review
-
-## Model selection
-
-- Ansible roles, Python scripts: qwen2.5-coder:32b (default)
-- Simple shell scripts, config files: model="qwen2.5-coder:7b-instruct"
-- Complex architecture decisions: model="qwen3:30b-a3b"
 
 ## Rules
 

@@ -51,6 +51,7 @@ make check         # Dry-run (ansible-playbook --check --diff)
 make apply         # Apply full infrastructure
 make apply-limit G=<group>  # Apply a single domain
 make test          # Run Molecule + pytest
+make shares        # Create host directories for shared_volumes
 make snapshot      # Snapshot all instances
 make nftables      # Generate nftables isolation rules
 make nftables-deploy  # Deploy rules on host (run FROM host)
@@ -59,19 +60,6 @@ make upgrade       # Safe framework update with conflict detection
 make import-infra  # Generate infra.yml from existing Incus state
 make help          # List all commands
 ```
-
-## Validators — every file type has its checker
-
-| Tool | Scope | Config |
-|------|-------|--------|
-| `ansible-lint` | `roles/`, `*.yml` playbooks | `.ansible-lint` (production profile) |
-| `yamllint` | All `*.yml` / `*.yaml` files | `.yamllint.yml` |
-| `shellcheck` | All `*.sh` files in `scripts/` | Inline directives if needed |
-| `ruff` | All `*.py` files | `pyproject.toml` |
-| `markdownlint` | All `*.md` files (optional) | `.markdownlint.yml` |
-
-**Rule**: No file escapes validation. `make lint` chains all validators.
-CI must pass all of them before merge.
 
 ## Ansible code conventions
 
@@ -85,14 +73,17 @@ CI must pass all of them before merge.
 
 ## Quality gates
 
-- `ansible-lint` production profile, 0 violations
-- `yamllint` clean
-- `shellcheck` clean on all shell scripts
-- `ruff` clean on all Python files
-- `--syntax-check` passes
-- Molecule tests for each infra role
-- `pytest` for the generator (`scripts/generate.py`)
-- Review via `.claude/agents/reviewer.md` before committing
+No file escapes validation. `make lint` chains all validators (0 violations):
+
+| Tool | Scope | Config |
+|------|-------|--------|
+| `ansible-lint` | `roles/`, `*.yml` playbooks | `.ansible-lint` (production profile) |
+| `yamllint` | All `*.yml` / `*.yaml` | `.yamllint.yml` |
+| `shellcheck` | `scripts/*.sh` | Inline directives |
+| `ruff` | All `*.py` | `pyproject.toml` |
+
+Additional gates: `--syntax-check` passes, Molecule tests for infra roles,
+`pytest` for the generator, review via `.claude/agents/reviewer.md` before commit.
 
 ## Quality guardrails (learned from audits)
 
@@ -169,12 +160,22 @@ Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/SPEC-operations.md` — Operational reference (generator, roles, snapshots, validators, bootstrap)
 - `docs/ROADMAP.md` — Implementation phases and priorities
 - `docs/decisions-log.md` — Autonomous decisions pending review
-- `docs/network-isolation.md` — nftables inter-bridge isolation (Phase 8)
-- `docs/vm-support.md` — KVM VM support guide (Phase 9)
-- `docs/gpu-advanced.md` — GPU management and security policy (Phase 10)
-- `docs/firewall-vm.md` — Dedicated firewall VM guide (Phase 11)
-- `docs/ai-testing.md` — AI-assisted testing and development (Phase 13)
-- `docs/stt-service.md` — Speech-to-Text service guide (Phase 14)
-- `docs/agent-teams.md` — Claude Code Agent Teams guide (Phase 15)
-- `docs/ai-switch.md` — Exclusive AI-tools network access (Phase 18a)
-- `docs/guide.md` — Interactive onboarding guide (Phase 18c)
+- `docs/addressing-convention.md` — Trust-level IP addressing (ADR-038)
+- `docs/network-isolation.md` — nftables inter-bridge isolation
+- `docs/vm-support.md` — KVM VM support guide
+- `docs/gpu-advanced.md` — GPU management and security policy
+- `docs/firewall-vm.md` — Dedicated firewall VM
+- `docs/ai-testing.md` — AI-assisted testing and development
+- `docs/stt-service.md` — Speech-to-Text service
+- `docs/agent-teams.md` — Claude Code Agent Teams
+- `docs/ai-switch.md` — Exclusive AI-tools network access
+- `docs/guide.md` — Interactive onboarding guide
+- `docs/quickstart.md` — Quick start tutorial
+- `docs/console.md` — Console / domain launcher (Phase 19a)
+- `docs/desktop-integration.md` — GUI app forwarding (Phase 19b)
+- `docs/live-os.md` — Live OS / USB boot
+- `docs/openclaw.md` — OpenClaw AI agent framework
+- `docs/mcp-services.md` — MCP services architecture
+- `docs/golden-images.md` — Pre-built OS images
+- `docs/disposable.md` — Disposable containers
+- `docs/tor-gateway.md` — Tor gateway routing
