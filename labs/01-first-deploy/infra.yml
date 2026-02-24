@@ -1,0 +1,28 @@
+---
+# Lab 01 — First Deployment
+# A single domain with two containers for learning the basic workflow.
+
+project_name: lab-01
+
+global:
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  lab-net:
+    description: "Lab network for first deployment exercise"
+    trust_level: semi-trusted
+    machines:
+      lab-web:
+        description: "Web server container"
+        type: lxc
+        roles: [base_system]
+      lab-db:
+        description: "Database container"
+        type: lxc
+        roles: [base_system]

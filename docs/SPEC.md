@@ -736,6 +736,87 @@ The generator auto-detects the format:
 
 Both formats produce identical output after merging.
 
+## 6. Educational Labs
+
+anklume ships with guided labs for learning system administration,
+networking, and security concepts in isolated environments.
+
+### Lab directory structure
+
+Each lab is a self-contained directory under `labs/`:
+
+```
+labs/
+  lab-schema.yml              # Validation schema for lab.yml
+  README.md                   # Framework documentation
+  01-first-deploy/
+    lab.yml                   # Metadata (title, difficulty, steps)
+    infra.yml                 # Lab-specific infrastructure
+    steps/                    # Ordered instruction files
+      01-create-infra.md
+      02-verify.md
+    solution/
+      commands.sh             # Reference commands
+```
+
+### lab.yml format
+
+```yaml
+title: "Lab title"
+description: "What the student will learn"
+difficulty: beginner          # beginner | intermediate | advanced
+duration: "30m"               # Estimated time (e.g., 15m, 1h, 2h)
+prerequisites: []             # List of prior lab IDs
+objectives:
+  - "Objective 1"
+steps:
+  - id: "01"
+    title: "Step title"
+    instruction_file: "steps/01-step-name.md"
+    hint: "Optional hint text"
+    validation: "shell command returning 0 on success"
+```
+
+Required fields: `title`, `description`, `difficulty`, `duration`,
+`objectives`, `steps`. Each step requires `id`, `title`, and
+`instruction_file`. The `hint` and `validation` fields are optional.
+
+Step IDs must be two-digit strings (`01`, `02`, ...) in sequential
+order. Instruction files must exist relative to the lab directory.
+
+### Step validation
+
+Each step may include a `validation` field containing a shell command.
+The lab runner executes this command; exit code 0 means the step is
+complete. On success, the runner advances to the next step and
+displays its instructions.
+
+### Make targets
+
+```bash
+make lab-list              # List all labs (number, title, difficulty)
+make lab-start L=01        # Start lab 01, display first step
+make lab-check L=01        # Validate current step
+make lab-hint  L=01        # Show hint for current step
+make lab-reset L=01        # Reset lab progress
+make lab-solution L=01     # Show solution (marks as assisted)
+```
+
+### Progress tracking
+
+Lab progress is stored in `~/.anklume/labs/<lab-id>/progress.yml`:
+
+```yaml
+current_step: 2
+started_at: "2026-02-25T10:00:00+00:00"
+assisted: false
+completed_steps:
+  - "01"
+  - "02"
+```
+
+Viewing the solution marks the lab as `assisted: true`.
+
 ---
 
 For operational details (generator, roles, snapshots, validators,
