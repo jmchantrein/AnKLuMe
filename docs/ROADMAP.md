@@ -1178,7 +1178,7 @@ backup/restore.
 - [x] Encrypted backup created and restorable
 - [x] Cross-machine migration via `incus copy local: remote:`
 
-### Phase 20e: Tor Gateway and sys-print
+### Phase 20e: Tor Gateway and Print Service
 
 **Goal**: Network service containers for Tor anonymization and
 print management.
@@ -1187,12 +1187,12 @@ print management.
 - **Tor gateway**: domain `tor-gateway` with container running Tor
   as transparent proxy. `network_policies` route traffic from
   selected domains through the gateway.
-- **sys-print**: dedicated CUPS container.
+- **shared-print**: dedicated CUPS container in the `shared` domain.
   - USB printers: Incus `usb` device passthrough
     (`vendorid`/`productid`).
   - Network printers (WiFi/Ethernet): macvlan NIC profile gives
-    `sys-print` access to the physical LAN. Other domains access
-    `sys-print` via IPP (port 631) through `network_policies`.
+    `shared-print` access to the physical LAN. Other domains access
+    `shared-print` via IPP (port 631) through `network_policies`.
 - Example `infra.yml` configurations for both.
 - `make apply-print` and `make apply-tor` targets.
 
@@ -2675,10 +2675,10 @@ d) **Test updates**:
 
 **Validation criteria**:
 - [x] `sys-firewall` auto-created as `anklume-firewall` in anklume domain
-- [ ] `shared` domain documented in SPEC.md
-- [ ] `examples/shared-services/` validates successfully
-- [ ] All tests pass
-- [ ] `make lint` passes
+- [x] `shared` domain documented in SPEC.md
+- [x] `examples/shared-services/` validates successfully
+- [x] All tests pass
+- [x] `make lint` passes
 
 ---
 
