@@ -833,3 +833,75 @@ capabilities:
         action: "Shared volumes + nesting prefix + addressing"
         expected: "Devices use correct paths, names prefixed, IPs zone-aware"
         deterministic: true
+
+  persistent_data:
+    description: "Per-machine persistent data volumes via host bind mounts"
+    depth_1:
+      - id: PD-001
+        action: "Valid persistent_data with path"
+        expected: "pd-* disk device in host_vars instance_devices"
+        deterministic: true
+      - id: PD-002
+        action: "Invalid volume name (uppercase, special chars)"
+        expected: "Validation error about invalid name"
+        deterministic: true
+      - id: PD-003
+        action: "Missing path field"
+        expected: "Validation error about required path"
+        deterministic: true
+      - id: PD-004
+        action: "Relative path (not absolute)"
+        expected: "Validation error about absolute path"
+        deterministic: true
+      - id: PD-005
+        action: "Invalid readonly (string, int)"
+        expected: "Validation error about boolean type"
+        deterministic: true
+      - id: PD-006
+        action: "No persistent_data section"
+        expected: "No change to existing behavior"
+        deterministic: true
+      - id: PD-007
+        action: "Invalid persistent_data_base (relative path)"
+        expected: "Validation error about absolute path"
+        deterministic: true
+    depth_2:
+      - id: PD-2-001
+        action: "persistent_data + shared_volumes on same machine"
+        expected: "Both pd-* and sv-* devices in instance_devices"
+        deterministic: true
+      - id: PD-2-002
+        action: "Device name collision (pd-* with user device)"
+        expected: "Validation error about device collision"
+        deterministic: true
+    depth_3:
+      - id: PD-3-001
+        action: "persistent_data + shared_volumes + nesting prefix"
+        expected: "All devices correct, names prefixed, paths absolute"
+        deterministic: true
+
+  flush_protection:
+    description: "Flush respects delete protection on instances"
+    depth_1:
+      - id: FP-001
+        action: "flush.sh skips protected instances"
+        expected: "PROTECTED message, instance not deleted"
+        deterministic: true
+      - id: FP-002
+        action: "flush.sh deletes unprotected instances"
+        expected: "Instance deleted normally"
+        deterministic: true
+      - id: FP-003
+        action: "FORCE=true bypasses protection"
+        expected: "All instances deleted regardless of protection"
+        deterministic: true
+    depth_2:
+      - id: FP-2-001
+        action: "Projects with remaining instances skipped"
+        expected: "Project not deleted when instances remain"
+        deterministic: true
+    depth_3:
+      - id: FP-3-001
+        action: "Flush + protected instances + FORCE override + data dirs"
+        expected: "FORCE deletes all, data dirs never touched"
+        deterministic: true
