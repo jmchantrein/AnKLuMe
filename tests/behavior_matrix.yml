@@ -939,3 +939,41 @@ capabilities:
         action: "Flush + protected instances + FORCE override + data dirs"
         expected: "FORCE deletes all, data dirs never touched"
         deterministic: true
+
+  educational_labs:
+    description: "Educational lab framework, lab.yml validation, lab runner"
+    depth_1:
+      - id: ED-001
+        action: "Validate lab.yml against schema (required fields, enums)"
+        expected: "All lab.yml files pass schema validation"
+        deterministic: true
+      - id: ED-002
+        action: "Validate step structure (IDs, instruction files, sequence)"
+        expected: "All steps have required fields, files exist, IDs sequential"
+        deterministic: true
+      - id: ED-003
+        action: "Lab-runner CLI argument parsing (list, start, errors)"
+        expected: "list succeeds, missing args error, unknown lab errors"
+        deterministic: true
+      - id: ED-004
+        action: "Lab infra.yml files are valid PSOT definitions"
+        expected: "Each lab has infra.yml with project_name, domains, addressing"
+        deterministic: true
+      - id: ED-005
+        action: "Solution files exist and have bash shebang"
+        expected: "Each lab has solution/commands.sh with correct shebang"
+        deterministic: true
+    depth_2:
+      - id: ED-2-001
+        action: "Lab start + check integration (progress advances)"
+        expected: "Starting lab sets step 0, checking advances when validation passes"
+        deterministic: true
+      - id: ED-2-002
+        action: "Lab runner + progress persistence (reset clears state)"
+        expected: "Reset removes progress file, start creates fresh state"
+        deterministic: true
+    depth_3:
+      - id: ED-3-001
+        action: "Lab start + check + solution (marks as assisted)"
+        expected: "Solution marks assisted:true in progress, step still tracked"
+        deterministic: true

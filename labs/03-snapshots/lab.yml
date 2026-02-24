@@ -1,0 +1,47 @@
+---
+# Lab 03: Snapshots and Recovery
+# Create a snapshot, break something, then restore.
+
+title: "Snapshots and Recovery"
+description: >-
+  Learn to use anklume's snapshot capabilities to save, break, and
+  restore container state. You will create a baseline snapshot,
+  intentionally break a container, then restore it to the saved
+  state. This is essential for safe experimentation.
+
+difficulty: beginner
+duration: "30m"
+
+prerequisites:
+  - "01-first-deploy"
+
+objectives:
+  - "Create a named snapshot of a running container"
+  - "Verify snapshot exists with make snapshot-list"
+  - "Intentionally break container state"
+  - "Restore from snapshot and verify recovery"
+  - "Delete old snapshots to reclaim space"
+
+steps:
+  - id: "01"
+    title: "Create the lab environment"
+    instruction_file: "steps/01-setup.md"
+    hint: "Copy the lab infra.yml and run make sync && make apply"
+    validation: "test -f inventory/lab-snap.yml"
+  - id: "02"
+    title: "Create a baseline snapshot"
+    instruction_file: "steps/02-snapshot.md"
+    hint: "Run make snapshot NAME=baseline"
+    validation: "incus info snap-server --project lab-snap 2>/dev/null | grep -q baseline"
+  - id: "03"
+    title: "Break the container"
+    instruction_file: "steps/03-break.md"
+    hint: "Delete a critical file or stop a service inside the container"
+  - id: "04"
+    title: "Restore from snapshot"
+    instruction_file: "steps/04-restore.md"
+    hint: "Run make restore NAME=baseline"
+  - id: "05"
+    title: "Clean up snapshots"
+    instruction_file: "steps/05-cleanup.md"
+    hint: "Use make snapshot-delete NAME=baseline"

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # DECISIONS.md -- Autonomous Implementation Decisions
 
 Decisions made during autonomous implementation.
@@ -142,3 +143,31 @@ removed (still needed by OpenClaw). Only the sync timer was archived.
 
 ### Backward compatibility approach
 - `ollama-dev`: Added as a Make alias target that depends on `llm-dev`.
+
+---
+
+## Phase 30: Educational Lab Framework
+
+### Lab framework split into runner + library
+Split into `scripts/lab-runner.sh` (commands, dispatch, 190L) and
+`scripts/lab-lib.sh` (shared helpers: YAML parsing, progress tracking,
+125L). Follows the existing pattern (`snap.sh`, `live-os-lib.sh`).
+
+### Three labs instead of five
+Implemented labs 01 (first deploy), 02 (network isolation), 03
+(snapshots). Labs 04 (GPU) and 05 (security audit) deferred — they
+require running infrastructure. Three labs fully exercise the framework.
+
+### Progress tracking via YAML in ~/.anklume/labs/
+YAML files in `~/.anklume/labs/<lab-id>/progress.yml`. Consistent with
+YAML-first approach. `~/.anklume/` already used by telemetry.
+
+### Inline Python for YAML parsing in shell
+Python heredoc (`python3 - "$arg" <<'PYEOF'`) — consistent with
+disp.sh, console.sh, ai-switch.sh pattern. PyYAML already a dependency.
+
+### Matrix prefix: ED-* (not EL-*)
+Used `ED-*` for educational_labs to avoid collision with existing
+`EL-*` (ephemeral_lifecycle).
+
+---

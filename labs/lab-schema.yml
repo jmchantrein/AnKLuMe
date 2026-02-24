@@ -1,0 +1,43 @@
+---
+# lab-schema.yml — Validation schema for lab.yml files
+#
+# Every lab must provide a lab.yml conforming to this schema.
+# Validated by tests/test_labs.py (EL-001).
+
+required_fields:
+  - title
+  - description
+  - difficulty
+  - duration
+  - objectives
+  - steps
+
+field_types:
+  title: string
+  description: string
+  difficulty: enum
+  duration: string
+  prerequisites: list
+  objectives: list
+  steps: list
+
+enums:
+  difficulty:
+    - beginner
+    - intermediate
+    - advanced
+
+step_fields:
+  required:
+    - id
+    - title
+    - instruction_file
+  optional:
+    - hint
+    - validation
+
+duration_pattern: "^[0-9]+[mh]$"
+# Examples: 15m, 30m, 1h, 2h
+
+step_id_pattern: "^[0-9]{2}$"
+# Examples: 01, 02, 03

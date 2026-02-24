@@ -1,0 +1,37 @@
+---
+# Lab 02 — Network Isolation
+# Two domains on separate subnets to demonstrate network isolation.
+
+project_name: lab-02
+
+global:
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  lab-office:
+    description: "Trusted office network"
+    trust_level: trusted
+    machines:
+      office-pc:
+        description: "Office workstation"
+        type: lxc
+        roles: [base_system]
+      office-server:
+        description: "Office file server"
+        type: lxc
+        roles: [base_system]
+
+  lab-dmz:
+    description: "Untrusted DMZ for public services"
+    trust_level: untrusted
+    machines:
+      dmz-web:
+        description: "Public web server"
+        type: lxc
+        roles: [base_system]
