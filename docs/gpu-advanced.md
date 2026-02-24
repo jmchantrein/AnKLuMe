@@ -15,12 +15,14 @@ security risks from shared GPU memory on consumer GPUs.
 ```yaml
 # infra.yml — only ONE machine can have gpu: true
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   # gpu_policy: exclusive  # This is the default
 
 domains:
-  homelab:
-    subnet_id: 3
+  ai-tools:
+    trust_level: semi-trusted
     profiles:
       nvidia-compute:
         devices:
@@ -28,7 +30,7 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      homelab-ai:
+      gpu-server:
         type: lxc
         gpu: true
         profiles: [default, nvidia-compute]
@@ -40,7 +42,7 @@ If you add a second GPU machine in exclusive mode, `make sync` will fail:
 ```
 Validation errors:
   - GPU policy is 'exclusive' but 2 instances have GPU access:
-    homelab-ai, work-gpu. Set global.gpu_policy: shared to allow this.
+    gpu-server, work-gpu. Set global.gpu_policy: shared to allow this.
 ```
 
 ### Shared mode
@@ -115,7 +117,7 @@ machines:
 ### Verification
 
 ```bash
-incus exec homelab-ai --project homelab -- nvidia-smi
+incus exec gpu-server --project ai-tools -- nvidia-smi
 ```
 
 ## GPU in KVM VMs

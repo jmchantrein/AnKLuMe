@@ -32,31 +32,30 @@ through residual model weights or inference cache.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   ai_access_policy: exclusive    # Only one domain accesses ai-tools
   ai_access_default: pro         # Default domain with AI access
 
 domains:
   ai-tools:
-    subnet_id: 10
+    trust_level: semi-trusted
     machines:
       gpu-server:
         type: lxc
-        ip: "10.100.10.10"
         gpu: true
         roles: [base_system, ollama_server]
   pro:
-    subnet_id: 2
+    trust_level: trusted
     machines:
       pro-dev:
         type: lxc
-        ip: "10.100.2.10"
   perso:
-    subnet_id: 1
+    trust_level: trusted
     machines:
       perso-desktop:
         type: lxc
-        ip: "10.100.1.10"
 ```
 
 Running `make sync` with `ai_access_policy: exclusive` auto-creates a

@@ -7,16 +7,16 @@ WebUI for voice input and with any client supporting the OpenAI STT API.
 ## Architecture
 
 The recommended architecture co-locates Ollama and Speaches in a single
-container (`homelab-ai`), sharing the GPU within one process namespace.
+container (`gpu-server`), sharing the GPU within one process namespace.
 This avoids the need for `gpu_policy: shared` and keeps the default
 exclusive GPU policy.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ homelab domain (net-homelab, 10.100.3.0/24)         │
+│ ai-tools domain (net-ai-tools, 10.120.0.0/24)       │
 │                                                      │
 │  ┌────────────────────────────────────┐             │
-│  │ homelab-ai                         │             │
+│  │ gpu-server                         │             │
 │  │ GPU (exclusive)                    │             │
 │  │                                    │             │
 │  │  ┌─────────────┐ ┌──────────────┐ │             │
@@ -31,10 +31,10 @@ exclusive GPU policy.
 │             │              │                        │
 │             ▼              ▼                        │
 │  ┌──────────────────────────────────┐              │
-│  │ homelab-webui                    │              │
+│  │ webui                    │              │
 │  │ Open WebUI :3000                 │              │
-│  │ LLM → homelab-ai:11434          │              │
-│  │ STT → homelab-ai:8000           │              │
+│  │ LLM → gpu-server:11434          │              │
+│  │ STT → gpu-server:8000           │              │
 │  └──────────────────────────────────┘              │
 └─────────────────────────────────────────────────────┘
 ```
@@ -45,12 +45,15 @@ exclusive GPU policy.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
   # gpu_policy: exclusive  # Default — one container owns the GPU
 
 domains:
-  homelab:
-    subnet_id: 3
+  ai-tools:
+    trust_level: semi-trusted
     profiles:
       nvidia-compute:
         devices:
@@ -58,16 +61,14 @@ domains:
             type: gpu
             gputype: physical
     machines:
-      homelab-ai:
+      gpu-server:
         description: "AI server — Ollama + Speaches STT"
         type: lxc
-        ip: "10.100.3.10"
         gpu: true
         profiles: [default, nvidia-compute]
         roles: [base_system, ollama_server, stt_server]
-      homelab-webui:
+      webui:
         type: lxc
-        ip: "10.100.3.30"
         roles: [base_system, open_webui]
 ```
 
@@ -82,11 +83,11 @@ make apply-stt     # STT role only
 
 ### 3. Configure Open WebUI
 
-Set the STT endpoint in `host_vars/homelab-webui.yml`:
+Set the STT endpoint in `host_vars/webui.yml`:
 
 ```yaml
-open_webui_ollama_url: "http://10.100.3.10:11434"
-open_webui_stt_url: "http://10.100.3.10:8000/v1"
+open_webui_ollama_url: "http://10.120.0.1:11434"
+open_webui_stt_url: "http://10.120.0.1:8000/v1"
 ```
 
 The `open_webui_stt_url` variable automatically configures Open WebUI
@@ -139,7 +140,7 @@ model (`medium`, `small`).
 If VRAM or latency is a concern:
 
 ```yaml
-# In host_vars/homelab-ai.yml (outside managed section)
+# In host_vars/gpu-server.yml (outside managed section)
 stt_server_model: "medium"
 stt_server_quantization: "int8_float16"
 ```
@@ -179,18 +180,18 @@ device overhead for each container.
 
 ```bash
 # Check service status
-incus exec homelab-ai --project homelab -- systemctl status speaches
+incus exec gpu-server --project ai-tools -- systemctl status speaches
 
 # Test the API endpoint
-incus exec homelab-ai --project homelab -- \
+incus exec gpu-server --project ai-tools -- \
   curl -s http://localhost:8000/health
 
 # Verify both services are running
-incus exec homelab-ai --project homelab -- systemctl status ollama
-incus exec homelab-ai --project homelab -- systemctl status speaches
+incus exec gpu-server --project ai-tools -- systemctl status ollama
+incus exec gpu-server --project ai-tools -- systemctl status speaches
 
 # Test transcription (from any container with network access)
-curl -X POST http://homelab-ai:8000/v1/audio/transcriptions \
+curl -X POST http://gpu-server:8000/v1/audio/transcriptions \
   -H "Content-Type: multipart/form-data" \
   -F "file=@audio.wav" \
   -F "model=large-v3-turbo"
@@ -228,7 +229,7 @@ If both Ollama and STT run out of VRAM:
 nvidia-smi
 
 # Switch to smaller model or quantization
-# Edit host_vars/homelab-ai.yml:
+# Edit host_vars/gpu-server.yml:
 stt_server_model: "small"
 stt_server_quantization: "int8"
 
@@ -240,8 +241,8 @@ make apply-stt
 
 ```bash
 # Check logs
-incus exec homelab-ai --project homelab -- journalctl -u speaches -f
+incus exec gpu-server --project ai-tools -- journalctl -u speaches -f
 
 # Verify ffmpeg is installed (required dependency)
-incus exec homelab-ai --project homelab -- ffmpeg -version
+incus exec gpu-server --project ai-tools -- ffmpeg -version
 ```

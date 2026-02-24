@@ -31,12 +31,11 @@ Set `type: vm` on any machine:
 domains:
   secure:
     description: "High-isolation domain"
-    subnet_id: 4
+    trust_level: untrusted
     machines:
       secure-sandbox:
         description: "Untrusted workload sandbox"
         type: vm
-        ip: "10.100.4.10"
         roles: [base_system]
         config:
           limits.cpu: "2"
@@ -48,14 +47,12 @@ VMs and LXC containers can coexist in the same domain:
 ```yaml
 domains:
   work:
-    subnet_id: 2
+    trust_level: trusted
     machines:
       work-dev:
         type: lxc
-        ip: "10.100.2.10"
       work-sandbox:
         type: vm
-        ip: "10.100.2.20"
         config:
           limits.cpu: "2"
           limits.memory: "2GiB"

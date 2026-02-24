@@ -30,7 +30,7 @@ python3 scripts/console.py --kill
 │ │ admin-ctrl   │ │ pro-dev  │ │ perso-desktop    │      │
 │ │ incus exec...│ │          │ │                  │      │
 │ └─────────────┘ └──────────┘ └──────────────────┘      │
-│ [0:admin]  [1:pro]  [2:perso]  [3:homelab]              │
+│ [0:admin]  [1:pro]  [2:perso]  [3:ai-tools]             │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -62,21 +62,17 @@ Add `trust_level` to any domain:
 domains:
   admin:
     description: "Administration"
-    subnet_id: 0
     trust_level: admin
     machines:
       sa-admin:
         type: lxc
-        ip: "10.100.0.10"
 
   lab:
     description: "Lab environment"
-    subnet_id: 1
     trust_level: disposable
     machines:
       lab-web:
         type: lxc
-        ip: "10.100.1.10"
 ```
 
 ### Auto-inferred trust level

@@ -72,8 +72,8 @@ See `infra.yml.example` for a complete template, or copy one from the
 
 - **Domain names**: lowercase alphanumeric + hyphens only
 - **Machine names**: must be globally unique across all domains
-- **subnet_id**: integer 0-254, unique per domain
-- **IPs**: must match the subnet (`<base_subnet>.<subnet_id>.X`, X = 1-253)
+- **trust_level**: determines IP zone (`admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable`)
+- **IPs**: auto-assigned from `10.<zone>.<seq>.<host>` (see ADR-038)
 - **Gateway**: `.254` is auto-assigned, do not use it for machines
 
 See [SPEC.md section 5](SPEC.md) for the full format reference.

@@ -9,7 +9,7 @@ traffic.
 ## How domain isolation works
 
 Each AnKLuMe domain has its own bridge (e.g., `net-anklume`, `net-pro`,
-`net-perso`, `net-homelab`). Without isolation rules, the Linux kernel
+`net-perso`, `net-ai-tools`). Without isolation rules, the Linux kernel
 forwards packets between these bridges freely.
 
 The nftables rules enforce:
@@ -140,11 +140,11 @@ After deploying, verify the rules are active:
 nft list table inet anklume
 
 # Test isolation: from a non-anklume container, try to ping another domain
-incus exec perso-desktop -- ping -c1 10.100.2.10   # Should fail (pro)
-incus exec perso-desktop -- ping -c1 10.100.1.254  # Should work (own gateway)
+incus exec perso -- ping -c1 10.110.1.1    # Should fail (pro zone)
+incus exec perso -- ping -c1 10.110.0.254  # Should work (own gateway)
 
 # Test anklume isolation: anklume cannot reach other domains via network
-incus exec anklume-instance -- ping -c1 10.100.2.10   # Should fail (dropped)
+incus exec anklume-instance -- ping -c1 10.110.1.1   # Should fail (dropped)
 
 # Verify anklume can still manage instances via Incus socket
 incus exec anklume-instance -- incus list             # Should work (socket, not network)

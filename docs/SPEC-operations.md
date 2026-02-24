@@ -24,7 +24,7 @@ host_vars/<machine>.yml     # Machine-specific variables
 # Do not edit this section — it will be overwritten by `make sync`
 incus_network:
   name: net-example
-  subnet: 10.100.0.0/24
+  subnet: 10.100.0.0/24   # Zone-aware: 10.<zone_base+offset>.<seq>.0/24
   gateway: 10.100.0.254
 # === END MANAGED ===
 
@@ -190,7 +190,7 @@ before every apply and `snapshot-apply.sh cleanup` after. Controlled by
 
 ```bash
 make apply                      # Auto-snapshots all instances before apply
-make apply-limit G=homelab      # Auto-snapshots only homelab instances
+make apply-limit G=ai-tools     # Auto-snapshots only ai-tools instances
 make rollback                   # Restore most recent pre-apply snapshot
 make rollback T=20260219-143022 # Restore specific pre-apply snapshot
 make rollback-list              # List available pre-apply snapshots

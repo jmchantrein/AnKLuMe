@@ -14,13 +14,13 @@ kernel, with centralized logging and full nftables control inside the VM.
 ┌──────────────────────────────────────────────────────────┐
 │ Host                                                      │
 │                                                           │
-│  net-anklume  net-perso    net-pro    net-homelab         │
+│  net-anklume  net-perso    net-pro    net-ai-tools        │
 │    │              │           │           │                │
 │    └──────┬───────┴───────┬──┘           │                │
 │           │               │              │                │
 │    ┌──────┴───────────────┴──────────────┴──────┐        │
 │    │         sys-firewall (KVM VM)               │        │
-│    │  eth0=anklume  eth1=perso  eth2=pro  eth3=hl │        │
+│    │  eth0=anklume  eth1=perso  eth2=pro  eth3=ai │        │
 │    │                                              │        │
 │    │  nftables: all inter-domain dropped            │        │
 │    │            anklume uses Incus socket (not net)  │        │
@@ -41,22 +41,23 @@ machine in the anklume domain if you have not declared one yourself:
 ```yaml
 # infra.yml — just add firewall_mode: vm
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   firewall_mode: vm
 
 domains:
   anklume:
-    subnet_id: 0
+    trust_level: admin
     machines:
       anklume-instance:
         type: lxc
-        ip: "10.100.0.10"
         roles: [base_system]
   # ... other domains ...
 ```
 
 ```bash
-make sync    # Auto-creates sys-firewall (10.100.0.253) in anklume domain
+make sync    # Auto-creates sys-firewall (.253) in anklume domain
 make apply   # Creates infrastructure + provisions the firewall VM
 ```
 
@@ -65,6 +66,8 @@ The generator prints an informational message when auto-creating:
 ```
 INFO: firewall_mode is 'vm' — auto-created sys-firewall in anklume domain (ip: 10.100.0.253)
 ```
+
+(IP depends on zone addressing; shown here for admin zone at zone_base=100.)
 
 The auto-created `sys-firewall` has: type `vm`, IP `.253` in the anklume
 subnet, 2 vCPU, 2 GiB memory, roles `[base_system, firewall_router]`,
@@ -80,7 +83,9 @@ definition instead. See the manual configuration section below.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   firewall_mode: vm  # Enable firewall VM mode
 ```
 
@@ -91,16 +96,14 @@ To override the defaults, add `sys-firewall` to the anklume domain:
 ```yaml
 domains:
   anklume:
-    subnet_id: 0
+    trust_level: admin
     machines:
       anklume-instance:
         type: lxc
-        ip: "10.100.0.10"
         roles: [base_system]
       sys-firewall:
         description: "Centralized firewall VM"
         type: vm
-        ip: "10.100.0.253"
         config:
           limits.cpu: "4"
           limits.memory: "4GiB"
@@ -177,12 +180,12 @@ instance_config:
     ethernets:
       eth0:
         addresses:
-          - 10.100.1.10/24
+          - 10.110.1.1/24      # Example: trusted zone
         routes:
-          - to: 10.100.0.0/16
-            via: 10.100.1.253
+          - to: 10.0.0.0/8     # All AnKLuMe zones via firewall
+            via: 10.110.1.253
           - to: default
-            via: 10.100.1.254
+            via: 10.110.1.254
 ```
 
 ### Via Ansible provisioning
@@ -192,7 +195,7 @@ Add a route configuration task in the `base_system` role or a custom role:
 ```yaml
 - name: Add route to firewall VM for inter-domain traffic
   ansible.builtin.command:
-    cmd: ip route add 10.100.0.0/16 via {{ firewall_vm_ip }}
+    cmd: ip route add 10.0.0.0/8 via {{ firewall_vm_ip }}
   when: firewall_mode == 'vm'
 ```
 

@@ -986,7 +986,7 @@ QubesOS-style visual domain isolation in the terminal.
 │ │ anklume-instance   │ │ pro-dev  │ │ perso-desktop    │  │
 │ │ incus exec...│ │          │ │                  │  │
 │ └─────────────┘ └──────────┘ └──────────────────┘  │
-│ [0:anklume]  [1:pro]  [2:perso]  [3:homelab]        │
+│ [0:anklume]  [1:pro]  [2:perso]  [3:ai-tools]       │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -2535,14 +2535,14 @@ e) **Updated SPEC.md, examples, and tests**:
    - New tests for zone addressing, enabled/disabled, auto-IP
 
 **Validation criteria**:
-- [ ] `make sync` with canonical infra.yml produces correct files
-- [ ] IPs encode trust zones (admin=10.100, trusted=10.110, etc.)
-- [ ] Disabled domains produce no generated files
-- [ ] Auto-IP assigns within correct subnet
-- [ ] `make lint` passes
-- [ ] All tests pass
-- [ ] `detect_orphans()` ignores disabled domains
-- [ ] Machine names follow `<domain>-<role>` convention
+- [x] `make sync` with canonical infra.yml produces correct files
+- [x] IPs encode trust zones (admin=10.100, trusted=10.110, etc.)
+- [x] Disabled domains produce no generated files
+- [x] Auto-IP assigns within correct subnet
+- [x] `make lint` passes
+- [x] All tests pass
+- [x] `detect_orphans()` ignores disabled domains
+- [x] Machine names follow `<domain>-<role>` convention
 
 ---
 
@@ -2958,10 +2958,10 @@ d) **Alerting pipeline**:
 - Phase 28: Local LLM Delegation for Claude Code
 - Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
 - Phase 29: Codebase Simplification and Real-World Testing
+- Phase 34: Addressing Convention and Canonical Infrastructure
 
 **In progress**:
 - Phase 31: Live OS with Encrypted Persistent Storage
-- Phase 34: Addressing Convention and Canonical Infrastructure
 
 **Short-term**:
 - Phase 32: Makefile UX and Robustness
