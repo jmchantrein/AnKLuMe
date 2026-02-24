@@ -348,6 +348,10 @@ llm-bench: ## Benchmark LLM inference (MODEL=<name|all> COMPARE=1)
 llm-dev: ## Interactive local LLM dev assistant (no API credits needed)
 	python3 scripts/ollama-dev.py $(if $(TASK),"$(TASK)") $(if $(DRY_RUN),--dry-run) $(if $(FAST),--fast)
 
+# ── Backward Compatibility Aliases ────────────────────────
+# Old target names still work but delegate to the new name.
+ollama-dev: llm-dev  ## Alias for llm-dev (deprecated)
+
 # ── Host Development Mode ─────────────────────────────────
 claude-host: ## Launch Claude Code with root access + guard hook (requires sudo)
 	@$(if $(YOLO),YOLO=1) scripts/claude-host.sh
@@ -676,7 +680,7 @@ help-all: ## Show all available targets
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         clipboard-to clipboard-from domain-exec desktop-config dashboard \
         export-app export-list export-remove \
-        llm-switch llm-status llm-bench llm-dev \
+        llm-switch llm-status llm-bench llm-dev ollama-dev \
         claude-host claude-host-resume claude-host-audit \
         mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
         guide quickstart init install-hooks help help-all
