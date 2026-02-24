@@ -86,7 +86,9 @@ except: print(0)
     tokens=$(echo "$result" | awk '{print $1}')
     duration_ms=$(echo "$result" | awk '{print $2}')
 
-    if [ "$tokens" -gt 0 ] && [ "$duration_ms" -gt 0 ]; then
+    # Guard against empty or non-numeric values from failed benchmarks
+    if [[ "$tokens" =~ ^[0-9]+$ ]] && [[ "$duration_ms" =~ ^[0-9]+$ ]] \
+       && [ "$tokens" -gt 0 ] && [ "$duration_ms" -gt 0 ]; then
         local tok_per_sec
         tok_per_sec=$(python3 -c "print(f'{${tokens} / (${duration_ms} / 1000):.1f}')")
         echo "$tokens $duration_ms $tok_per_sec"
@@ -163,12 +165,12 @@ cmd_bench() {
     for model in "${models[@]}"; do
         printf "  ${DIM}Benchmarking %-40s${NC}\r" "$model"
         local result
-        result=$(bench_endpoint "$backend_url" "$model")
+        result=$(bench_endpoint "$backend_url" "$model" || echo "0 0 0")
         local tokens duration_ms tok_s
         tokens=$(echo "$result" | awk '{print $1}')
         duration_ms=$(echo "$result" | awk '{print $2}')
         tok_s=$(echo "$result" | awk '{print $3}')
-        print_result_row "$backend_name" "$model" "$tokens" "$duration_ms" "$tok_s"
+        print_result_row "$backend_name" "$model" "${tokens:-0}" "${duration_ms:-0}" "${tok_s:-0}"
     done
     echo ""
 }
@@ -203,20 +205,20 @@ cmd_compare() {
     # Benchmark on llama-server
     info "  Testing llama-server..."
     if [ "$current_backend" != "llama" ]; then
-        scripts/llm-switch.sh llama "$model" >/dev/null 2>&1
+        scripts/llm-switch.sh llama "$model" >/dev/null 2>&1 || true
         sleep 5  # Let model load
     fi
     local result
-    result=$(bench_endpoint "http://127.0.0.1:${LLAMA_PORT}" "$model")
+    result=$(bench_endpoint "http://127.0.0.1:${LLAMA_PORT}" "$model" || echo "0 0 0")
     local llama_tokens llama_ms llama_tps
     llama_tokens=$(echo "$result" | awk '{print $1}')
     llama_ms=$(echo "$result" | awk '{print $2}')
     llama_tps=$(echo "$result" | awk '{print $3}')
-    print_result_row "llama" "" "$llama_tokens" "$llama_ms" "$llama_tps"
+    print_result_row "llama" "" "$llama_tokens" "$llama_ms" "${llama_tps:-0}"
 
     # Benchmark on Ollama
     info "  Testing Ollama..."
-    scripts/llm-switch.sh ollama >/dev/null 2>&1
+    scripts/llm-switch.sh ollama >/dev/null 2>&1 || true
     sleep 3
     # Warm up: first request loads the model
     _exec curl -sf -X POST "http://127.0.0.1:${OLLAMA_PORT}/v1/chat/completions" \
@@ -225,20 +227,22 @@ cmd_compare() {
         >/dev/null 2>&1 || true
     sleep 2
 
-    result=$(bench_endpoint "http://127.0.0.1:${OLLAMA_PORT}" "$model")
+    result=$(bench_endpoint "http://127.0.0.1:${OLLAMA_PORT}" "$model" || echo "0 0 0")
     local ollama_tokens ollama_ms ollama_tps
     ollama_tokens=$(echo "$result" | awk '{print $1}')
     ollama_ms=$(echo "$result" | awk '{print $2}')
     ollama_tps=$(echo "$result" | awk '{print $3}')
-    print_result_row "ollama" "" "$ollama_tokens" "$ollama_ms" "$ollama_tps"
+    print_result_row "ollama" "" "$ollama_tokens" "$ollama_ms" "${ollama_tps:-0}"
 
     echo ""
 
     # Comparison
-    if [ "$llama_tps" != "0" ] && [ "$ollama_tps" != "0" ]; then
+    if [[ "${llama_tps:-0}" != "0" ]] && [[ "${ollama_tps:-0}" != "0" ]]; then
         local speedup
-        speedup=$(python3 -c "print(f'{float(${llama_tps}) / float(${ollama_tps}):.2f}')")
+        speedup=$(python3 -c "print(f'{float(${llama_tps}) / float(${ollama_tps}):.2f}')" 2>/dev/null || echo "?")
         echo -e "  ${BOLD}llama-server is ${GREEN}${speedup}x${NC}${BOLD} vs Ollama${NC}"
+    else
+        warn "  One or both backends failed — cannot compare."
     fi
 
     # Restore original backend

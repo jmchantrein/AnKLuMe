@@ -78,18 +78,26 @@ MOVED_UNTRACKED=()
 if git remote | grep -q origin; then
     git fetch origin
 
-    # Detect untracked files that would conflict with incoming changes
+    # Detect untracked files that would conflict with incoming changes.
     # git merge fails with "The following untracked working tree files would
-    # be overwritten by merge" — we handle this proactively.
+    # be overwritten by merge" — we handle this proactively by moving them
+    # to a backup directory under /tmp.
+    BACKUP_DIR=""
     INCOMING_FILES=$(git diff --name-only HEAD "origin/$CURRENT_BRANCH" 2>/dev/null || true)
     if [ -n "$INCOMING_FILES" ]; then
         while IFS= read -r file; do
             # File exists locally, is untracked, and incoming from upstream
             if [ -e "$file" ] && ! git ls-files --error-unmatch "$file" &>/dev/null; then
-                backup="${file}.local-backup.$(date +%Y%m%d-%H%M%S)"
-                warn "Untracked file conflicts with upstream: $file → $backup"
-                mv "$file" "$backup"
-                MOVED_UNTRACKED+=("$file|$backup")
+                # Create backup directory on first conflict
+                if [ -z "$BACKUP_DIR" ]; then
+                    BACKUP_DIR="/tmp/anklume-upgrade-backup-$(date +%Y%m%d-%H%M%S)"
+                    mkdir -p "$BACKUP_DIR"
+                fi
+                backup_path="$BACKUP_DIR/$file"
+                mkdir -p "$(dirname "$backup_path")"
+                warn "Untracked file conflicts with upstream: $file"
+                mv "$file" "$backup_path"
+                MOVED_UNTRACKED+=("$file|$backup_path")
             fi
         done <<< "$INCOMING_FILES"
     fi
@@ -98,10 +106,11 @@ if git remote | grep -q origin; then
         printf '\n%bERROR: Merge conflict detected. Resolve manually.%b\n' "$RED" "$NC"
         echo "Backups of modified files have been created (.bak)."
         if [ ${#MOVED_UNTRACKED[@]} -gt 0 ]; then
-            echo "Moved untracked files:"
+            echo "Moved untracked files to: $BACKUP_DIR"
             for entry in "${MOVED_UNTRACKED[@]}"; do
-                printf "  %s\n" "${entry#*|}"
+                printf "  %s → %s\n" "${entry%%|*}" "${entry#*|}"
             done
+            echo "To restore: cp -r $BACKUP_DIR/* ."
         fi
         if $STASHED; then
             echo "Your stashed changes can be restored with: git stash pop"
@@ -121,7 +130,10 @@ if [ ${#MOVED_UNTRACKED[@]} -gt 0 ]; then
         backup="${entry#*|}"
         printf "  %s → %s\n" "$orig" "$backup"
     done
-    echo "Review and merge manually if needed."
+    echo ""
+    echo "Backup directory: $BACKUP_DIR"
+    echo "To restore a file:  cp $BACKUP_DIR/<file> ./<file>"
+    echo "To restore all:     cp -r $BACKUP_DIR/* ."
 fi
 
 # Regenerate managed sections
