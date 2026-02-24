@@ -436,7 +436,9 @@ def validate(infra, *, check_host_subnets=True):
                 )
             boot_priority = machine.get("boot_priority")
             if boot_priority is not None and (
-                not isinstance(boot_priority, int) or not 0 <= boot_priority <= 100
+                isinstance(boot_priority, bool)
+                or not isinstance(boot_priority, int)
+                or not 0 <= boot_priority <= 100
             ):
                 errors.append(
                     f"Machine '{mname}': boot_priority must be an integer 0-100, "
@@ -465,7 +467,7 @@ def validate(infra, *, check_host_subnets=True):
 
             # Validate weight for resource_policy
             weight = machine.get("weight")
-            if weight is not None and (not isinstance(weight, int) or weight < 1):
+            if weight is not None and (isinstance(weight, bool) or not isinstance(weight, int) or weight < 1):
                 errors.append(
                     f"Machine '{mname}': weight must be a positive integer, got {weight}"
                 )

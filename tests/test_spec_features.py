@@ -90,13 +90,13 @@ class TestBootAutostartValidation:
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_autostart"] = False
         assert validate(infra) == []
 
-    def test_invalid_boot_autostart_string(self):  # Matrix: BA-001
+    def test_invalid_boot_autostart_string(self):  # Matrix: BA-004
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_autostart"] = "yes"
         errors = validate(infra)
         assert any("boot_autostart must be a boolean" in e for e in errors)
 
-    def test_invalid_boot_autostart_int(self):  # Matrix: BA-001
+    def test_invalid_boot_autostart_int(self):  # Matrix: BA-004
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_autostart"] = 1
         errors = validate(infra)
@@ -117,31 +117,31 @@ class TestBootAutostartValidation:
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 50
         assert validate(infra) == []
 
-    def test_invalid_boot_priority_negative(self):  # Matrix: BA-002
+    def test_invalid_boot_priority_negative(self):  # Matrix: BA-005
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = -1
         errors = validate(infra)
         assert any("boot_priority must be an integer 0-100" in e for e in errors)
 
-    def test_invalid_boot_priority_over_100(self):  # Matrix: BA-002
+    def test_invalid_boot_priority_over_100(self):  # Matrix: BA-005
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 101
         errors = validate(infra)
         assert any("boot_priority must be an integer 0-100" in e for e in errors)
 
-    def test_invalid_boot_priority_string(self):  # Matrix: BA-002
+    def test_invalid_boot_priority_string(self):  # Matrix: BA-005
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = "high"
         errors = validate(infra)
         assert any("boot_priority must be an integer 0-100" in e for e in errors)
 
-    def test_invalid_boot_priority_float(self):  # Matrix: BA-002
+    def test_invalid_boot_priority_float(self):  # Matrix: BA-005
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = 50.5
         errors = validate(infra)
         assert any("boot_priority must be an integer 0-100" in e for e in errors)
 
-    def test_omitted_boot_fields_valid(self):  # Matrix: BA-001
+    def test_omitted_boot_fields_valid(self):  # Matrix: BA-006
         """Omitted boot fields should not cause errors."""
         infra = _base_infra()
         assert validate(infra) == []
@@ -318,12 +318,12 @@ class TestNestingPrefixValidation:
         infra = _base_infra(nesting_prefix=False)
         assert validate(infra) == []
 
-    def test_invalid_nesting_prefix_string(self):  # Matrix: NX-001
+    def test_invalid_nesting_prefix_string(self):  # Matrix: NX-004
         infra = _base_infra(nesting_prefix="yes")
         errors = validate(infra)
         assert any("nesting_prefix must be a boolean" in e for e in errors)
 
-    def test_invalid_nesting_prefix_int(self):  # Matrix: NX-001
+    def test_invalid_nesting_prefix_int(self):  # Matrix: NX-004
         infra = _base_infra(nesting_prefix=1)
         errors = validate(infra)
         assert any("nesting_prefix must be a boolean" in e for e in errors)
@@ -652,6 +652,13 @@ class TestResourcePolicyValidation:
     def test_weight_float_invalid(self):  # Matrix: RP-003
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["weight"] = 1.5
+        errors = validate(infra)
+        assert any("weight must be a positive integer" in e for e in errors)
+
+    def test_weight_boolean_true(self):  # Matrix: RP-003
+        """weight=True is bool (subclass of int) — must be rejected."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["weight"] = True
         errors = validate(infra)
         assert any("weight must be a positive integer" in e for e in errors)
 
@@ -1036,6 +1043,13 @@ class TestBootAutostartDepth1:
         """boot_priority='low' (string) is not an integer."""
         infra = _base_infra()
         infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = "low"
+        errors = validate(infra)
+        assert any("boot_priority must be an integer 0-100" in e for e in errors)
+
+    def test_boot_priority_boolean_true(self):  # Matrix: BA-005
+        """boot_priority=True is bool (subclass of int) — must be rejected."""
+        infra = _base_infra()
+        infra["domains"]["pro"]["machines"]["pro-dev"]["boot_priority"] = True
         errors = validate(infra)
         assert any("boot_priority must be an integer 0-100" in e for e in errors)
 
