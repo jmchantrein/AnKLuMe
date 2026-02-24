@@ -74,3 +74,11 @@ Thumbs.db
 
 # Agent personality (never tracked — ADR-036 reproducibility constraint)
 SOUL.md
+
+# Package manager lockfiles (uv)
+uv.lock
+
+# Temporary dev artifacts
+watch_*
+control
+control.tar.xz
