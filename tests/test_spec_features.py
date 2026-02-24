@@ -422,6 +422,135 @@ class TestNestingPrefixGeneration:
         assert not (tmp_path / "group_vars" / "001-pro.yml").exists()
 
 
+class TestNestingPrefixValidationExtra:
+    """Additional validation tests for nesting_prefix (depth 1)."""
+
+    def test_invalid_nesting_prefix_list(self):  # Matrix: NX-004
+        """nesting_prefix as list should fail validation."""
+        infra = _base_infra(nesting_prefix=[True])
+        errors = validate(infra)
+        assert any("nesting_prefix must be a boolean" in e for e in errors)
+
+    def test_invalid_nesting_prefix_string_false(self):  # Matrix: NX-004
+        """nesting_prefix as string 'false' is not a boolean — must fail."""
+        infra = _base_infra(nesting_prefix="false")
+        errors = validate(infra)
+        assert any("nesting_prefix must be a boolean" in e for e in errors)
+
+
+class TestNestingPrefixFilePaths:
+    """File paths must never be prefixed, even with active nesting (depth 1)."""
+
+    def test_inventory_and_host_vars_paths_unprefixed(self, tmp_path):  # Matrix: NX-005
+        """Ansible file paths remain unprefixed at nesting level 2."""
+        infra = _base_infra()
+        enrich_infra(infra)
+        with patch("generate._read_absolute_level", return_value=2):
+            generate(infra, str(tmp_path))
+        # Unprefixed paths must exist
+        assert (tmp_path / "inventory" / "pro.yml").exists()
+        assert (tmp_path / "group_vars" / "pro.yml").exists()
+        assert (tmp_path / "host_vars" / "pro-dev.yml").exists()
+        assert (tmp_path / "host_vars" / "pro-web.yml").exists()
+        # Prefixed paths must NOT exist
+        assert not (tmp_path / "inventory" / "002-pro.yml").exists()
+        assert not (tmp_path / "host_vars" / "002-pro-dev.yml").exists()
+
+
+class TestNestingPrefixDepth2:
+    """Depth 2 pairwise interaction tests for nesting_prefix."""
+
+    def test_prefix_disabled_with_context_file(self, tmp_path):  # Matrix: NX-2-001
+        """nesting_prefix: false + absolute_level present → no prefix on names."""
+        infra = _base_infra(nesting_prefix=False)
+        enrich_infra(infra)
+        with patch("generate._read_absolute_level", return_value=1):
+            generate(infra, str(tmp_path))
+        gvars = _read_group_vars(tmp_path, "pro")
+        assert gvars["incus_project"] == "pro"
+        assert gvars["incus_network"]["name"] == "net-pro"
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        assert hvars["instance_name"] == "pro-dev"
+
+    def test_prefix_with_shared_volumes(self, tmp_path):  # Matrix: NX-2-002
+        """Prefix applies to Incus names but not to shared volume mount paths."""
+        infra = _base_infra()
+        infra["shared_volumes"] = {
+            "docs": {
+                "source": "/srv/shares/docs",
+                "path": "/shared/docs",
+                "consumers": {"pro": "ro"},
+            },
+        }
+        enrich_infra(infra)
+        with patch("generate._read_absolute_level", return_value=1):
+            generate(infra, str(tmp_path))
+        hvars = _read_host_vars(tmp_path, "pro-dev")
+        # Instance name should be prefixed
+        assert hvars["instance_name"] == "001-pro-dev"
+        # Shared volume device paths should remain unprefixed
+        assert "sv-docs" in hvars.get("instance_devices", {})
+        dev = hvars["instance_devices"]["sv-docs"]
+        assert dev["path"] == "/shared/docs"
+        assert dev["source"] == "/srv/shares/docs"
+
+
+class TestNestingPrefixDepth3:
+    """Depth 3 three-way interaction tests for nesting_prefix."""
+
+    def test_prefix_addressing_firewall_vm(self, tmp_path):  # Matrix: NX-3-001
+        """Prefix + addressing + firewall_mode=vm: names prefixed, IPs correct."""
+        infra = {
+            "project_name": "test",
+            "global": {
+                "addressing": {"base_octet": 10, "zone_base": 100},
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "firewall_mode": "vm",
+            },
+            "domains": {
+                "anklume": {
+                    "description": "Admin domain",
+                    "trust_level": "admin",
+                    "machines": {
+                        "anklume-instance": {
+                            "description": "Controller",
+                            "type": "lxc",
+                        },
+                    },
+                },
+                "pro": {
+                    "description": "Production",
+                    "trust_level": "semi-trusted",
+                    "machines": {
+                        "pro-dev": {
+                            "description": "Dev machine",
+                            "type": "lxc",
+                        },
+                    },
+                },
+            },
+        }
+        enrich_infra(infra)
+        with patch("generate._read_absolute_level", return_value=1):
+            generate(infra, str(tmp_path))
+        # Admin zone: 100 + 0 = 100
+        gvars_anklume = _read_group_vars(tmp_path, "anklume")
+        assert gvars_anklume["incus_project"] == "001-anklume"
+        assert gvars_anklume["incus_network"]["name"] == "001-net-anklume"
+        assert "100" in gvars_anklume["incus_network"]["subnet"]
+        # Semi-trusted zone: 100 + 20 = 120
+        gvars_pro = _read_group_vars(tmp_path, "pro")
+        assert gvars_pro["incus_project"] == "001-pro"
+        assert gvars_pro["incus_network"]["name"] == "001-net-pro"
+        assert "120" in gvars_pro["incus_network"]["subnet"]
+        # sys-firewall auto-created with prefix
+        hvars_fw = _read_host_vars(tmp_path, "sys-firewall")
+        assert hvars_fw["instance_name"] == "001-sys-firewall"
+        assert hvars_fw["instance_type"] == "vm"
+
+
 # =============================================================================
 # Resource policy
 # =============================================================================
@@ -705,6 +834,122 @@ class TestResourcePolicyEnrichment:
         if "limits.memory" in c:
             mem = _parse_memory_value(c["limits.memory"])
             assert mem >= 128 * 1024 * 1024  # 128 MiB minimum
+
+
+class TestResourcePolicyDepth2:
+    """Depth 2 pairwise interaction tests for resource_policy."""
+
+    @staticmethod
+    def _mock_host(cpu=8, memory_gib=16):
+        """Return a mock host resources dict."""
+        return {"cpu": cpu, "memory_bytes": memory_gib * 1024**3}
+
+    def test_explicit_cpu_excluded_auto_memory_allocated(self):  # Matrix: RP-2-001
+        """Machine with explicit limits.cpu keeps it, gets auto-allocated memory."""
+        infra = _base_infra(resource_policy={"mode": "proportional"})
+        infra["domains"]["pro"]["machines"]["pro-dev"]["config"] = {"limits.cpu": "4"}
+        host = self._mock_host(cpu=8, memory_gib=16)
+        with patch("generate._detect_host_resources", return_value=host):
+            enrich_infra(infra)
+        c = infra["domains"]["pro"]["machines"]["pro-dev"]["config"]
+        # Explicit CPU value preserved
+        assert c["limits.cpu"] == "4"
+        # Memory auto-allocated (no explicit limits.memory was set)
+        assert "limits.memory" in c
+        # pro-web (no explicit config) should get both CPU and memory
+        c2 = infra["domains"]["pro"]["machines"]["pro-web"].get("config", {})
+        assert "limits.cpu.allowance" in c2
+        assert "limits.memory" in c2
+
+    def test_weighted_machines_across_domains(self):  # Matrix: RP-2-002
+        """Weight respected across all domains, not just within one."""
+        infra = _base_infra(resource_policy={"mode": "proportional"})
+        infra["domains"]["perso"] = {
+            "description": "Personal",
+            "subnet_id": 1,
+            "machines": {
+                "perso-app": {
+                    "description": "App",
+                    "type": "lxc",
+                    "ip": "10.100.1.1",
+                    "weight": 4,
+                },
+            },
+        }
+        # pro-dev and pro-web have default weight=1, perso-app has weight=4
+        host = self._mock_host(cpu=12, memory_gib=24)
+        with patch("generate._detect_host_resources", return_value=host):
+            enrich_infra(infra)
+        c_heavy = infra["domains"]["perso"]["machines"]["perso-app"].get("config", {})
+        c_light = infra["domains"]["pro"]["machines"]["pro-dev"].get("config", {})
+        # Heavy (weight=4) should get more memory than light (weight=1)
+        mem_heavy = _parse_memory_value(c_heavy["limits.memory"])
+        mem_light = _parse_memory_value(c_light["limits.memory"])
+        assert mem_heavy > mem_light
+        # Ratio should be approximately 4:1
+        assert abs(mem_heavy / mem_light - 4.0) < 1.0
+
+
+class TestResourcePolicyDepth3:
+    """Depth 3 three-way interaction tests for resource_policy."""
+
+    @staticmethod
+    def _mock_host(cpu=8, memory_gib=16):
+        """Return a mock host resources dict."""
+        return {"cpu": cpu, "memory_bytes": memory_gib * 1024**3}
+
+    def test_resource_policy_gpu_ephemeral_addressing(self):  # Matrix: RP-3-001
+        """resource_policy + GPU (shared) + ephemeral + addressing coexist."""
+        infra = {
+            "project_name": "test",
+            "global": {
+                "addressing": {"base_octet": 10, "zone_base": 100},
+                "default_os_image": "images:debian/13",
+                "default_connection": "community.general.incus",
+                "default_user": "root",
+                "gpu_policy": "shared",
+                "resource_policy": {"mode": "proportional"},
+            },
+            "domains": {
+                "pro": {
+                    "description": "Production",
+                    "trust_level": "semi-trusted",
+                    "ephemeral": True,
+                    "machines": {
+                        "pro-gpu": {
+                            "description": "GPU worker",
+                            "type": "lxc",
+                            "gpu": True,
+                            "weight": 3,
+                            "ephemeral": False,
+                        },
+                        "pro-web": {
+                            "description": "Web",
+                            "type": "lxc",
+                        },
+                    },
+                },
+            },
+        }
+        host = self._mock_host(cpu=8, memory_gib=16)
+        with patch("generate._detect_host_resources", return_value=host):
+            enrich_infra(infra)
+        # Resource allocation happened
+        c_gpu = infra["domains"]["pro"]["machines"]["pro-gpu"].get("config", {})
+        c_web = infra["domains"]["pro"]["machines"]["pro-web"].get("config", {})
+        assert "limits.memory" in c_gpu
+        assert "limits.memory" in c_web
+        # Weight 3 vs 1: GPU machine gets more
+        mem_gpu = _parse_memory_value(c_gpu["limits.memory"])
+        mem_web = _parse_memory_value(c_web["limits.memory"])
+        assert mem_gpu > mem_web
+        # Ephemeral override preserved
+        assert infra["domains"]["pro"]["machines"]["pro-gpu"]["ephemeral"] is False
+        # Domain ephemeral stays True
+        assert infra["domains"]["pro"]["ephemeral"] is True
+        # Addressing computed
+        assert "_addressing" in infra
+        assert "pro" in infra["_addressing"]
 
 
 # =============================================================================
