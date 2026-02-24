@@ -39,14 +39,21 @@ def load_matrix(path=None):
 
 
 def scan_test_files():
-    """Scan test files for matrix ID references."""
+    """Scan test files for matrix ID references.
+
+    Excludes test_matrix_coverage.py because it contains fake matrix IDs
+    used as test fixtures for the coverage checker itself.
+    """
     covered = set()
+    skip = {"test_matrix_coverage.py"}
     patterns = [
         PROJECT_ROOT / "tests" / "*.py",
         PROJECT_ROOT / "roles" / "*" / "molecule" / "*" / "verify.yml",
     ]
     for pattern in patterns:
         for filepath in sorted(PROJECT_ROOT.glob(str(pattern.relative_to(PROJECT_ROOT)))):
+            if filepath.name in skip:
+                continue
             try:
                 text = filepath.read_text()
             except OSError:
