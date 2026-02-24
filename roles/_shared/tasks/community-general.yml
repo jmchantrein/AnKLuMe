@@ -1,0 +1,26 @@
+---
+# Shared task: Ensure community.general Ansible collection is installed
+#
+# No required variables.
+# Usage: ansible.builtin.include_tasks: roles/_shared/tasks/community-general.yml
+
+- name: Check community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - list
+      - community.general
+  register: _collection_check
+  changed_when: false
+  failed_when: false
+
+- name: Install community.general collection
+  ansible.builtin.command:
+    argv:
+      - ansible-galaxy
+      - collection
+      - install
+      - community.general
+  when: _collection_check.rc != 0
+  changed_when: true

@@ -20,17 +20,9 @@
 
 # ── Install Incus ────────────────────────────────────────────────
 
-- name: DevTestRunner | Wait for dpkg lock to be released
-  ansible.builtin.command:
-    argv:
-      - fuser
-      - /var/lib/dpkg/lock-frontend
-  register: dev_test_runner_dpkg_lock
-  changed_when: false
-  failed_when: false
-  retries: 30
-  delay: 5
-  until: dev_test_runner_dpkg_lock.rc != 0
+- name: DevTestRunner | Wait for dpkg lock
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/dpkg-wait.yml
 
 - name: DevTestRunner | Update apt cache
   ansible.builtin.apt:
@@ -95,26 +87,9 @@
     extra_args: --break-system-packages
     state: present
 
-- name: DevTestRunner | Check community.general collection
-  ansible.builtin.command:
-    argv:
-      - ansible-galaxy
-      - collection
-      - list
-      - community.general
-  register: dev_test_runner_collection_check
-  changed_when: false
-  failed_when: false
-
-- name: DevTestRunner | Install community.general collection
-  ansible.builtin.command:
-    argv:
-      - ansible-galaxy
-      - collection
-      - install
-      - community.general
-  when: dev_test_runner_collection_check.rc != 0
-  changed_when: true
+- name: DevTestRunner | Ensure community.general collection
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/community-general.yml
 
 # ── Clone repository ─────────────────────────────────────────────
 

@@ -10,17 +10,15 @@
 #   - lobechat_node_version (int): Node.js major version
 #   - lobechat_version (string): git branch or tag to deploy
 
-- name: LobeChat | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: >-
-      curl -fsSL https://deb.nodesource.com/setup_{{ lobechat_node_version }}.x
-      | bash -
-    creates: /etc/apt/sources.list.d/nodesource.list
+- name: LobeChat | Install Node.js
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/nodejs.yml
+  vars:
+    _nodejs_version: "{{ lobechat_node_version }}"
 
 - name: LobeChat | Install system dependencies
   ansible.builtin.apt:
     name:
-      - nodejs
       - git
     state: present
     update_cache: true

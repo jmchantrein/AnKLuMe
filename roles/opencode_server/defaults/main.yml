@@ -2,6 +2,9 @@
 # Default variables for opencode_server
 # Override in group_vars or host_vars as needed.
 
+# Node.js major version for NodeSource setup
+opencode_server_node_version: "22"
+
 # Port for OpenCode server to listen on
 opencode_server_port: 4096
 

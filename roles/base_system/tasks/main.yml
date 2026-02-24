@@ -10,18 +10,9 @@
 #   - base_system_locale (string): locale to generate and set as default
 #   - base_system_timezone (string): timezone name (e.g. Europe/Paris)
 
-- name: BaseSystem | Wait for dpkg lock to be released
-  ansible.builtin.command:
-    argv:
-      - fuser
-      - /var/lib/dpkg/lock-frontend
-  register: base_system_dpkg_lock
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  retries: 30
-  delay: 5
-  until: base_system_dpkg_lock.rc != 0
+- name: BaseSystem | Wait for dpkg lock
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/dpkg-wait.yml
 
 - name: BaseSystem | Update apt cache
   ansible.builtin.apt:

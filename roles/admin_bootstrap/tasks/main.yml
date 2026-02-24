@@ -42,24 +42,6 @@
     name: "{{ admin_bootstrap_packages }}"
     state: present
 
-- name: AdminBootstrap | Check community.general collection
-  ansible.builtin.command:
-    argv:
-      - ansible-galaxy
-      - collection
-      - list
-      - community.general
-  register: admin_bootstrap_collection_check
-  changed_when: false
-  failed_when: false
-
-- name: AdminBootstrap | Install community.general collection
-  ansible.builtin.command:
-    argv:
-      - ansible-galaxy
-      - collection
-      - install
-      - community.general
-  register: admin_bootstrap_collection_install
-  when: admin_bootstrap_collection_check.rc != 0
-  changed_when: true
+- name: AdminBootstrap | Ensure community.general collection
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/community-general.yml

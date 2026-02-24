@@ -2,6 +2,11 @@
 # Default variables for openclaw_server
 # Override in group_vars or host_vars as needed.
 
+# --- Node.js ---
+
+# Node.js major version for NodeSource setup
+openclaw_server_node_version: "22"
+
 # --- LLM backend ---
 
 # Ollama API URL (single LLM backend)

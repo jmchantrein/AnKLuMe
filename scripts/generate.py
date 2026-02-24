@@ -13,9 +13,6 @@ from pathlib import Path
 
 import yaml
 
-# Known MCP tool names (must match scripts/mcp-server.py TOOLS list)
-_KNOWN_MCP_TOOLS = {"gpg_sign", "clipboard_get", "clipboard_set", "file_accept", "file_provide"}
-
 # Zone offsets for trust-level-aware addressing (ADR-038)
 ZONE_OFFSETS = {
     "admin": 0,
@@ -430,28 +427,6 @@ def validate(infra, *, check_host_subnets=True):
                 if p != "default" and p not in domain_profile_names:
                     errors.append(f"Machine '{mname}': profile '{p}' not defined in domain '{dname}'")
 
-            # Validate services declarations (Phase 20c MCP) — name/tool checks
-            svc_names_seen = set()
-            for svc in machine.get("services") or []:
-                if not isinstance(svc, dict):
-                    errors.append(f"Machine '{mname}': each service must be a mapping")
-                    continue
-                svc_name = svc.get("name")
-                if not svc_name:
-                    errors.append(f"Machine '{mname}': service missing 'name'")
-                elif svc_name in svc_names_seen:
-                    errors.append(f"Machine '{mname}': duplicate service name '{svc_name}'")
-                else:
-                    svc_names_seen.add(svc_name)
-                svc_tool = svc.get("tool")
-                if not svc_tool:
-                    errors.append(f"Machine '{mname}': service '{svc_name}' missing 'tool'")
-                elif svc_tool not in _KNOWN_MCP_TOOLS:
-                    errors.append(
-                        f"Machine '{mname}': service '{svc_name}' references unknown "
-                        f"tool '{svc_tool}'. Known tools: {', '.join(sorted(_KNOWN_MCP_TOOLS))}"
-                    )
-
             # Validate boot_autostart (boolean) and boot_priority (int 0-100)
             boot_autostart = machine.get("boot_autostart")
             if boot_autostart is not None and not isinstance(boot_autostart, bool):
@@ -494,20 +469,6 @@ def validate(infra, *, check_host_subnets=True):
                 errors.append(
                     f"Machine '{mname}': weight must be a positive integer, got {weight}"
                 )
-
-    # Services consumer validation (second pass — all machines now known)
-    for _dname, domain in domains.items():
-        for mname, machine in (domain.get("machines") or {}).items():
-            for svc in machine.get("services") or []:
-                if not isinstance(svc, dict):
-                    continue
-                svc_name = svc.get("name", "")
-                for consumer in svc.get("consumers") or []:
-                    if consumer not in all_machines:
-                        errors.append(
-                            f"Machine '{mname}': service '{svc_name}' consumer "
-                            f"'{consumer}' is not a known machine"
-                        )
 
     # GPU policy enforcement (ADR-018)
     gpu_instances = _collect_gpu_instances(infra)
@@ -1244,7 +1205,6 @@ def generate(infra, base_dir, dry_run=False):
                 "instance_config": m.get("config"),
                 "instance_devices": m.get("devices"),
                 "instance_storage_volumes": m.get("storage_volumes"),
-                "instance_services": m.get("services"),
                 "instance_roles": m.get("roles"),
                 "instance_boot_autostart": m.get("boot_autostart"),
                 "instance_boot_priority": m.get("boot_priority"),

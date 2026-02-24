@@ -15,15 +15,15 @@
 #   - opencode_server_model (string): default model name
 #   - opencode_server_password (string): HTTP Basic Auth password
 
-- name: OpencodeServer | Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    creates: /etc/apt/sources.list.d/nodesource.list
+- name: OpencodeServer | Install Node.js
+  ansible.builtin.include_tasks:
+    file: roles/_shared/tasks/nodejs.yml
+  vars:
+    _nodejs_version: "{{ opencode_server_node_version }}"
 
 - name: OpencodeServer | Install system dependencies
   ansible.builtin.apt:
     name:
-      - nodejs
       - git
     state: present
     update_cache: true
