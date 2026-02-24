@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -82,6 +83,7 @@ def read_log(log_file):
 
 
 class TestScriptQuality:
+    @pytest.mark.skipif(not shutil.which("shellcheck"), reason="shellcheck not installed")
     def test_script_shellcheck_clean(self):
         """transfer.sh passes shellcheck."""
         result = subprocess.run(

@@ -1,5 +1,9 @@
 """Property-based tests for the PSOT generator using Hypothesis."""
 
+import pytest
+
+hypothesis = pytest.importorskip("hypothesis", reason="hypothesis not installed")
+
 from generate import MANAGED_BEGIN, MANAGED_END, detect_orphans, generate, validate
 from hypothesis import given, settings
 from hypothesis import strategies as st

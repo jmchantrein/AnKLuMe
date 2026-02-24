@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -33,6 +34,7 @@ class TestScriptBasics:
         """disp.sh has executable permissions."""
         assert os.access(DISP_SH, os.X_OK)
 
+    @pytest.mark.skipif(not shutil.which("shellcheck"), reason="shellcheck not installed")
     def test_script_shellcheck_clean(self):
         """disp.sh passes shellcheck validation."""
         result = subprocess.run(

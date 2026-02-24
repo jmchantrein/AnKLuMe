@@ -52,7 +52,7 @@ class TestRoleStructure:
         """EXPECTED_ROLES constant matches actual directories under roles/."""
         actual = sorted(
             d.name for d in ROLES_DIR.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
+            if d.is_dir() and not d.name.startswith(".") and not d.name.startswith("_")
         )
         assert actual == EXPECTED_ROLES, (
             f"Mismatch:\n  on disk only: {set(actual) - set(EXPECTED_ROLES)}"
@@ -130,7 +130,7 @@ class TestTemplateCoherence:
     _VAR_RE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*[\|}\s]")
 
     # Variables set at runtime (registered vars, set_fact) — not in defaults
-    _RUNTIME_VARS = {"incus_nftables_all_bridges"}
+    _RUNTIME_VARS = {"incus_nftables_all_bridges", "stt_server_effective_compute"}
 
     def test_template_vars_exist_in_defaults(self):
         errors = []

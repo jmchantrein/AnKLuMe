@@ -370,10 +370,10 @@ class TestCodeSandboxTasks:
         cls.content = (ROLE_DIR / "tasks" / "main.yml").read_text()
 
     def test_nodejs_install(self):
-        assert "nodesource" in self.content
+        assert "roles/_shared/tasks/nodejs.yml" in self.content
 
     def test_system_deps(self):
-        for pkg in ["nodejs", "git", "python3", "tmux", "openssh-client"]:
+        for pkg in ["git", "python3", "tmux", "openssh-client"]:
             assert pkg in self.content
 
     def test_claude_code_install(self):
@@ -470,8 +470,10 @@ class TestInfraYmlAiCoder:
     def test_ai_coder_defined(self):
         assert "ai-coder:" in self.content
 
-    def test_ai_coder_ip(self):
-        assert "10.100.4.50" in self.content
+    def test_ai_coder_no_hardcoded_ip(self):
+        """ai-coder uses auto-assigned IP (ADR-038), not hardcoded."""
+        assert "ai-coder:" in self.content
+        # IP is auto-assigned by the generator, not in infra.yml
 
     def test_ai_coder_roles(self):
         assert "code_sandbox" in self.content

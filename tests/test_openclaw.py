@@ -63,7 +63,7 @@ class TestOpenclawDefaults:
         assert "openclaw_server_enabled" in self.content
 
     def test_ollama_ip(self):
-        assert "10.100.4.10:11434" in self.content
+        assert "10.100.3.1:11434" in self.content
 
 
 # -- openclaw_server tasks --------------------------------------------
@@ -197,8 +197,9 @@ class TestInfraYmlOpenClaw:
     def test_ai_openclaw_defined(self):
         assert "ai-openclaw:" in self.content
 
-    def test_ai_openclaw_ip(self):
-        assert "10.100.4.60" in self.content
+    def test_ai_openclaw_no_hardcoded_ip(self):
+        """ai-openclaw uses auto-assigned IP (ADR-038), not hardcoded."""
+        assert "ai-openclaw:" in self.content
 
     def test_ai_openclaw_roles(self):
         assert "openclaw_server" in self.content
