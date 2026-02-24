@@ -631,3 +631,54 @@ for anklume traffic.
 
 **Consequence**: IP addresses are human-readable. From `10.140.0.5`,
 an admin immediately knows: zone 140 = 100+40 = untrusted.
+
+---
+
+## ADR-041: Persistent data volumes via host bind mounts
+
+**Context**: Containers are ephemeral by design. Users need certain
+data to survive container destruction and recreation (databases,
+project files, configuration). Unlike shared_volumes which share
+data *between* instances, persistent_data binds data *to* a specific
+instance — its lifecycle is tied to the machine, not shared across
+consumers.
+
+**Decision**: Add `persistent_data` per-machine in infra.yml. Each
+volume is an Incus disk device (`pd-<name>`) with source on the host
+at `<persistent_data_base>/<machine>/<volume>`. The generator injects
+devices into `instance_devices` alongside `sv-*` shared volume devices.
+The existing `incus_instances` role handles the devices transparently.
+
+**Naming convention**: Injected devices use the prefix `pd-` to avoid
+collisions with user-declared devices and `sv-*` shared volume devices.
+
+**Host directories**: `make data-dirs` creates the host-side
+directories. `persistent_data_base` defaults to `/srv/anklume/data`.
+
+**Why not Incus custom volumes**: Same reasoning as ADR-039 — custom
+storage volumes cannot span projects and cross-project attachment is
+fragile. Host bind mounts are native and reliable.
+
+**Consequence**: Data survives `make flush`, container rebuilds, and
+upgrades. Adding persistent storage is a declarative change in
+`infra.yml`. No new Ansible role needed.
+
+---
+
+## ADR-042: Flush protection for non-ephemeral instances
+
+**Context**: `make flush` destroys all infrastructure indiscriminately.
+This is dangerous for instances with `ephemeral: false` (protected)
+and their associated persistent data directories.
+
+**Decision**: `scripts/flush.sh` checks `security.protection.delete`
+on each instance before deleting. Protected instances are skipped
+unless `FORCE=true` is set. Projects with remaining instances are
+also skipped. Host data directories (`/srv/anklume/data/`,
+`/srv/anklume/shares/`) are never deleted by flush.
+
+**Consequence**: `make flush` is safe by default — it respects the
+protection flag already set by `incus_instances` role. Users who
+truly want to destroy everything use `FORCE=true`. A targeted
+`make instance-remove` provides surgical removal of individual
+instances.

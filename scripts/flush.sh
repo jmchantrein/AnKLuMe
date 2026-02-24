@@ -5,18 +5,25 @@
 # Destroys: all Incus instances, profiles, projects, and net-* bridges
 #           managed by anklume. Also removes generated Ansible files.
 # Preserves: infra.yml, roles/, scripts/, docs/, CLAUDE.md
+# Preserves: /srv/anklume/data/, /srv/anklume/shares/ (NEVER deleted)
+#
+# Protection (ADR-042): instances with security.protection.delete=true
+#   are skipped unless FORCE env var is set.
 #
 # Safety: requires --force on production (absolute_level == 0 and yolo != true)
 
 set -euo pipefail
 
-FORCE=false
+CLI_FORCE=false
 for arg in "$@"; do
     case "$arg" in
-        --force) FORCE=true ;;
+        --force) CLI_FORCE=true ;;
         *) echo "Usage: $0 [--force]"; exit 1 ;;
     esac
 done
+
+# FORCE env var (from Makefile) or --force flag
+BYPASS_PROTECTION="${FORCE:-false}"
 
 # Safety check: production requires --force
 ABS_LEVEL=""
@@ -28,7 +35,7 @@ if [ -f /etc/anklume/yolo ]; then
     YOLO=$(cat /etc/anklume/yolo)
 fi
 
-if [ "$ABS_LEVEL" = "0" ] && [ "$YOLO" != "true" ] && [ "$FORCE" != "true" ]; then
+if [ "$ABS_LEVEL" = "0" ] && [ "$YOLO" != "true" ] && [ "$CLI_FORCE" != "true" ]; then
     echo "ERROR: Running on production host (absolute_level=0, yolo=false)."
     echo "       Use 'make flush FORCE=true' to confirm destruction."
     exit 1
@@ -45,7 +52,7 @@ if ! incus project list --format csv >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ "$FORCE" != "true" ]; then
+if [ "$CLI_FORCE" != "true" ]; then
     read -rp "Type 'yes' to confirm: " confirm
     if [ "$confirm" != "yes" ]; then
         echo "Aborted."
@@ -54,17 +61,33 @@ if [ "$FORCE" != "true" ]; then
 fi
 
 deleted=0
+skipped=0
+
+# Color helpers
+_red()    { printf '\033[31m%s\033[0m' "$*"; }
+_yellow() { printf '\033[33m%s\033[0m' "$*"; }
+_green()  { printf '\033[32m%s\033[0m' "$*"; }
 
 # Helper: list projects as one-per-line (strip " (current)" suffix from CSV)
 _list_projects() {
     incus project list --format csv -c n 2>/dev/null | sed 's/ (current)$//'
 }
 
-# 1. Destroy instances in all projects
+# 1. Destroy instances in all projects (with protection check)
 echo "--- Destroying instances ---"
 while IFS= read -r project; do
     while IFS= read -r instance; do
         [ -z "$instance" ] && continue
+        # Check delete protection (ADR-042)
+        if [ "$BYPASS_PROTECTION" != "true" ]; then
+            protected=$(incus config get "$instance" security.protection.delete \
+                --project "$project" 2>/dev/null || echo "")
+            if [ "$protected" = "true" ]; then
+                echo "  $(_yellow "PROTECTED (skipped)"): $instance (project: $project)"
+                skipped=$((skipped + 1))
+                continue
+            fi
+        fi
         echo "  Deleting: $instance (project: $project)"
         if incus delete "$instance" --project "$project" --force; then
             deleted=$((deleted + 1))
@@ -100,22 +123,29 @@ while IFS= read -r project; do
     done < <(incus profile list --project "$project" --format csv -c n 2>/dev/null)
 done < <(_list_projects)
 
-# 4. Reset default profile in non-default projects (remove device references to net-* bridges)
+# 4. Reset default profile in non-default projects
 echo "--- Resetting default profiles ---"
 while IFS= read -r project; do
     [ "$project" = "default" ] && continue
-    # Remove all devices from default profile so it no longer references bridges
-    for device in $(incus profile device list default --project "$project" --format csv 2>/dev/null | cut -d, -f1); do
+    for device in $(incus profile device list default --project "$project" \
+            --format csv 2>/dev/null | cut -d, -f1); do
         [ -z "$device" ] && continue
         echo "  Removing device '$device' from default profile (project: $project)"
         incus profile device remove default "$device" --project "$project" 2>/dev/null || true
     done
 done < <(_list_projects)
 
-# 5. Delete non-default projects (now empty: no instances, images, or device refs)
+# 5. Delete non-default projects (skip if instances remain after step 1)
 echo "--- Deleting projects ---"
 while IFS= read -r project; do
     [ "$project" = "default" ] && continue
+    # Check if project still has instances (protected ones survived step 1)
+    remaining=$(incus list --project "$project" --format csv -c n 2>/dev/null | wc -l)
+    if [ "$remaining" -gt 0 ]; then
+        echo "  $(_yellow "SKIPPED"): project $project ($remaining instance(s) remain)"
+        skipped=$((skipped + 1))
+        continue
+    fi
     echo "  Deleting project: $project"
     if incus project delete "$project"; then
         deleted=$((deleted + 1))
@@ -146,9 +176,14 @@ for dir in inventory group_vars host_vars; do
     fi
 done
 
+# NOTE: /srv/anklume/data/ and /srv/anklume/shares/ are NEVER deleted (ADR-042)
+
 echo ""
-if [ "$deleted" -eq 0 ]; then
+if [ "$deleted" -eq 0 ] && [ "$skipped" -eq 0 ]; then
     echo "Nothing to flush (no anklume resources found)."
+elif [ "$skipped" -gt 0 ]; then
+    echo "Flush complete: $(_green "$deleted") destroyed, $(_yellow "$skipped") skipped (protected)."
+    echo "Use FORCE=true to bypass protection."
 else
     echo "Flush complete: $deleted resources destroyed."
 fi
