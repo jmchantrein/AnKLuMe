@@ -833,3 +833,27 @@ capabilities:
         action: "Shared volumes + nesting prefix + addressing"
         expected: "Devices use correct paths, names prefixed, IPs zone-aware"
         deterministic: true
+
+  heartbeat_monitoring:
+    description: "OpenClaw heartbeat monitoring templates and skills (Phase 38)"
+    depth_1:
+      - id: HB-001
+        action: "HEARTBEAT.md.j2 template renders with domain variables"
+        expected: "Domain name and project injected, thresholds present"
+        deterministic: true
+      - id: HB-002
+        action: "CRON.md.j2 template renders with schedule variables"
+        expected: "Daily hour/minute and project name present in output"
+        deterministic: true
+      - id: HB-003
+        action: "Skill templates render with correct Incus project"
+        expected: "Both skills contain --project flag with domain project"
+        deterministic: true
+      - id: HB-004
+        action: "Heartbeat defaults present in role defaults"
+        expected: "All heartbeat variables have sensible defaults"
+        deterministic: true
+      - id: HB-005
+        action: "Heartbeat tasks file deploys all templates"
+        expected: "heartbeat.yml deploys HEARTBEAT, CRON, and both skills"
+        deterministic: true

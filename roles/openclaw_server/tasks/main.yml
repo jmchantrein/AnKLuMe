@@ -175,6 +175,10 @@
     mode: "0644"
   # force: false — agent accumulates memory, never overwrite
 
+- name: OpenclawServer | Deploy heartbeat monitoring (Phase 38)
+  ansible.builtin.include_tasks:
+    file: heartbeat.yml
+
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:
     src: openclaw.service.j2
