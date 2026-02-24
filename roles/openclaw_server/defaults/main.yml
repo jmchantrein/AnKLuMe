@@ -50,3 +50,19 @@ openclaw_server_domain: ""
 
 # Incus instance name (set by generator via instance_name)
 openclaw_server_instance_name: ""
+
+# Incus project name (set by generator in host_vars)
+openclaw_server_incus_project: "default"
+
+# --- Heartbeat monitoring (Phase 38) ---
+
+# Health check interval in seconds
+openclaw_server_heartbeat_interval: 300
+
+# Disk space thresholds (percentage)
+openclaw_server_disk_warn_pct: 80
+openclaw_server_disk_crit_pct: 95
+
+# Daily summary cron schedule (hour and minute, 24h format)
+openclaw_server_cron_daily_hour: 8
+openclaw_server_cron_daily_minute: 0

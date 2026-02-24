@@ -1,8 +1,80 @@
-<<<<<<< HEAD
 # DECISIONS.md -- Autonomous Implementation Decisions
 
 Decisions made during autonomous implementation.
 Review and approve/decline each section.
+
+---
+
+## Phase 33: Student Mode and Internationalization
+
+### Architecture: Python helper for bilingual help
+
+Rather than embedding complex shell logic or awk/sed in the Makefile,
+bilingual help is rendered by `scripts/help-i18n.py`. The Makefile
+dispatches to this script when `ANKLUME_MODE` is `student` or `dev`,
+and uses the native printf-based help for `user` mode (no Python
+dependency for the default path).
+
+### Mode file location: `~/.anklume/mode`
+
+Consistent with the existing `~/.anklume/` directory used by telemetry
+(`~/.anklume/telemetry/`) and lab progress (`~/.anklume/labs/`).
+
+### i18n directory: `i18n/fr.yml`
+
+A flat YAML file (target: "description") was chosen over nested
+structures or gettext `.po` files. Rationale:
+- YAML is the project's native format (consistency)
+- Flat structure is trivially auditable (one grep shows coverage)
+- No build step needed (no `.po` -> `.mo` compilation)
+- Easy to add new languages: `i18n/de.yml`, `i18n/es.yml`, etc.
+
+### ANKLUME_LANG override
+
+The `ANKLUME_LANG` env var allows forcing a language independent of
+mode. This is useful for CI (always English) or for users who want
+French help without the student mode restrictions.
+
+### Matrix prefix: SM-* (Student Mode)
+
+Used `SM-*` to avoid collision with existing prefixes.
+
+---
+
+## Phase 38: OpenClaw Heartbeat Monitoring
+
+### D-057: Heartbeat templates as OpenClaw workspace files, not systemd services
+
+**Problem**: Phase 38 requires monitoring for per-domain OpenClaw
+instances. The monitoring could be implemented as systemd timers
+running inside the container, or as OpenClaw workspace instructions
+that the agent executes via its built-in cron/skill system.
+
+**Choice**: Implement as OpenClaw workspace files (HEARTBEAT.md,
+CRON.md, skills/) deployed via Jinja2 templates. The agent uses
+OpenClaw's native cron system to schedule checks, not systemd timers.
+
+**Status**: pending review
+
+---
+
+### D-058: Domain-scoped monitoring only (no cross-domain checks)
+
+**Choice**: Each agent monitors only its own domain's Incus project.
+Cross-domain monitoring requires explicit network policies and is
+left to the admin domain's agent (if any).
+
+**Status**: pending review
+
+---
+
+### D-059: Heartbeat tasks split into separate included file
+
+**Choice**: Create `tasks/heartbeat.yml` and include it from `main.yml`
+via `ansible.builtin.include_tasks`. This keeps each file under 200
+lines and maintains single-responsibility.
+
+**Status**: pending review
 
 ---
 
