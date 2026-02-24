@@ -545,9 +545,9 @@ class TestNestingPrefixDepth3:
         assert gvars_pro["incus_project"] == "001-pro"
         assert gvars_pro["incus_network"]["name"] == "001-net-pro"
         assert "120" in gvars_pro["incus_network"]["subnet"]
-        # sys-firewall auto-created with prefix
-        hvars_fw = _read_host_vars(tmp_path, "sys-firewall")
-        assert hvars_fw["instance_name"] == "001-sys-firewall"
+        # anklume-firewall auto-created with prefix
+        hvars_fw = _read_host_vars(tmp_path, "anklume-firewall")
+        assert hvars_fw["instance_name"] == "001-anklume-firewall"
         assert hvars_fw["instance_type"] == "vm"
 
 
