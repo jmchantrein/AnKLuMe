@@ -1,20 +1,19 @@
-> **Note** : La version anglaise (`scenario-testing.md`) fait foi en
-> cas de divergence.
+# Tests de scenarios end-to-end (BDD)
 
-# Tests de scénarios end-to-end (BDD)
+> Note : la version anglaise ([`scenario-testing.md`](scenario-testing.md)) fait reference en cas de divergence.
 
-anklume inclut des scénarios d'acceptation lisibles par un humain qui
+anklume inclut des scenarios d'acceptation lisibles par un humain qui
 testent des workflows utilisateur complets contre une infrastructure
-Incus réelle. Les scénarios sont écrits au format Gherkin avec
+Incus reelle. Les scenarios sont ecrits au format Gherkin avec
 `pytest-bdd`.
 
-## Démarrage rapide
+## Demarrage rapide
 
 ```bash
-make scenario-test          # Tous les scénarios
+make scenario-test          # Tous les scenarios
 make scenario-test-best     # Bonnes pratiques uniquement
 make scenario-test-bad      # Mauvaises pratiques uniquement
-make scenario-list          # Lister les scénarios disponibles
+make scenario-list          # Lister les scenarios disponibles
 ```
 
 Ou directement avec pytest :
@@ -29,7 +28,7 @@ python3 -m pytest scenarios/bad_practices/ -v -k "duplicate"
 
 ```
 scenarios/
-├── best_practices/              # Workflows recommandés
+├── best_practices/              # Workflows recommandes
 │   ├── pro_workstation_setup.feature
 │   ├── student_lab_deploy.feature
 │   ├── snapshot_restore_cycle.feature
@@ -42,83 +41,118 @@ scenarios/
 │   ├── edit_managed_sections.feature
 │   ├── forget_nftables_deploy.feature
 │   └── wrong_operation_order.feature
-├── conftest.py                  # Définitions des steps + fixtures
-└── pitfalls.yml                 # Base de données des pièges pour guide.sh
+├── conftest.py                  # Definitions des steps + fixtures
+└── pitfalls.yml                 # Base de donnees des pieges pour guide.sh
 ```
 
-## Deux catégories
+## Deux categories
 
 ### Bonnes pratiques
 
-Valident les workflows recommandés. Ces scénarios servent de
+Valident les workflows recommandes. Ces scenarios servent de
 documentation vivante sur la bonne utilisation d'anklume :
 
-- **Pro workstation setup** : Déploiement complet avec isolation réseau
-- **Student lab deploy** : Un enseignant déploie un environnement de TP
-- **Snapshot restore cycle** : Snapshot avant modification, restauration
-- **Sync idempotency** : Exécuter sync deux fois donne le même résultat
-- **Validation before apply** : Toujours linter après sync
+- **Pro workstation setup** : Deploiement complet avec isolation reseau
+- **Student lab deploy** : Un enseignant deploie un environnement de TP
+- **Snapshot restore cycle** : Snapshot avant modification, restauration en cas d'echec
+- **Sync idempotency** : Executer sync deux fois donne le meme resultat
+- **Validation before apply** : Toujours linter apres sync
 
 ### Mauvaises pratiques
 
-Vérifient qu'anklume détecte les erreurs tôt avec des messages clairs :
+Verifient qu'anklume detecte les erreurs tot avec des messages clairs :
 
-- **Apply without sync** : Pas de fichiers d'inventaire, inventaire obsolète
-- **Duplicate IPs** : Le générateur rejette les adresses IP dupliquées
+- **Apply without sync** : Pas de fichiers d'inventaire, inventaire obsolete
+- **Duplicate IPs** : Le generateur rejette les adresses IP dupliquees
 - **Delete protected instance** : Flush sans FORCE en production
-- **Edit managed sections** : Contenu écrasé par sync
-- **Forget nftables-deploy** : Nouveau domaine non isolé
-- **Wrong operation order** : Étapes du workflow manquées
+- **Edit managed sections** : Contenu ecrase par sync
+- **Forget nftables-deploy** : Nouveau domaine non isole
+- **Wrong operation order** : Etapes du workflow manquees
 
-## Écrire des scénarios
+## Ecrire des scenarios
 
-Les scénarios utilisent la syntaxe Gherkin avec des steps
+Les scenarios utilisent la syntaxe Gherkin avec des steps
 `Given/When/Then` :
 
 ```gherkin
 # Matrix: XX-NNN
 Feature: Nom descriptif
-  Explication de ce que ce scénario teste.
+  Explication de ce que ce scenario teste.
 
   Background:
     Given a clean sandbox environment
 
-  Scenario: Cas de test spécifique
+  Scenario: Cas de test specifique
     Given infra.yml from "student-sysadmin"
     When I run "make sync"
     Then exit code is 0
     And inventory files exist for all domains
 ```
 
+### Steps disponibles
+
+**Given** (preconditions) :
+- `a clean sandbox environment` -- verifier le repertoire du projet anklume
+- `images are pre-cached via shared repository` -- ignorer si pas d'Incus
+- `infra.yml from "<example>"` -- copier un exemple d'infra.yml
+- `infra.yml exists but no inventory files` -- simuler un sync manquant
+- `a running infrastructure` -- ignorer si pas d'instances en cours
+- `infra.yml with two machines sharing "<ip>"` -- test d'IP dupliquee
+- `infra.yml with managed section content in "<file>"` -- verifier le fichier
+
+**When** (actions) :
+- `I run "<command>"` -- executer une commande shell
+- `I run "<command>" and it may fail` -- commande attendue en echec
+- `I add a domain "<name>" to infra.yml` -- modifier infra.yml
+- `I edit the managed section in "<file>"` -- injecter du contenu
+
+**Then** (assertions) :
+- `exit code is 0` / `exit code is non-zero`
+- `output contains "<text>"` / `stderr contains "<text>"`
+- `inventory files exist for all domains`
+- `file "<path>" exists` / `file "<path>" does not exist`
+- `all declared instances are running`
+- `intra-domain connectivity works`
+- `inter-domain connectivity is blocked`
+- `no Incus resources were created`
+- `the managed section in "<file>" is unchanged`
+
 ### Annotations Matrix
 
-Liez les scénarios aux IDs de la matrice comportementale :
+Liez les scenarios aux IDs de la matrice comportementale pour le suivi
+de couverture :
 
 ```gherkin
 # Matrix: DL-001, NI-002
 Feature: ...
 ```
 
-## Intégration avec le guide
+L'outil `scripts/matrix-coverage.py` scanne ces annotations.
 
-Les scénarios de mauvaises pratiques alimentent le guide interactif
+## Integration avec le guide
+
+Les scenarios de mauvaises pratiques alimentent le guide interactif
 (`scripts/guide.sh`). Le fichier `scenarios/pitfalls.yml` associe
-chaque piège à une étape du guide et un message d'avertissement.
+chaque piege a une etape du guide et un message d'avertissement.
 
-Le guide affiche des avertissements proactifs aux étapes concernées :
-- Étape 3 (édition infra.yml) : sections gérées, IPs dupliquées
-- Étape 4 (génération) : ordre correct du workflow
-- Étape 6 (application) : vérification inventaire, rappel nftables
+Le guide affiche des avertissements proactifs aux etapes concernees :
+- Etape 3 (edition infra.yml) : sections gerees, IPs dupliquees
+- Etape 4 (generation) : ordre correct du workflow
+- Etape 6 (application) : verification inventaire, rappel nftables
 
-## Dépendances
+## Dependances
 
 ```bash
 pip install pytest-bdd
 ```
 
-## Notes d'exécution
+pytest-bdd est liste dans `pyproject.toml` sous
+`[project.optional-dependencies]`.
 
-- Les scénarios sont **à la demande uniquement** — pas dans la CI
-- Certains scénarios nécessitent un démon Incus (ignorés sinon)
-- Les scénarios de déploiement peuvent prendre plusieurs minutes
-- Le pré-cache d'images (Phase 18e) réduit la latence de démarrage
+## Notes d'execution
+
+- Les scenarios sont **a la demande uniquement** -- pas dans la CI
+- Certains scenarios necessitent un daemon Incus (ignores sinon)
+- Les scenarios de deploiement en bonnes pratiques peuvent prendre
+  plusieurs minutes
+- Le pre-cache d'images via la Phase 18e reduit la latence de demarrage
