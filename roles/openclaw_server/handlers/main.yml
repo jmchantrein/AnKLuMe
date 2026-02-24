@@ -1,6 +1,9 @@
 ---
 - name: OpenclawServer | Restart OpenClaw
   ansible.builtin.systemd:
-    name: openclaw
+    name: >-
+      {{ 'openclaw-' ~ openclaw_server_domain
+         if openclaw_server_domain | default('')
+         else 'openclaw' }}
     state: restarted
     daemon_reload: true

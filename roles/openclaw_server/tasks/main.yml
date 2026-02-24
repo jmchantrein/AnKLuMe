@@ -1,24 +1,14 @@
 ---
 # OpenclawServer | Install and configure OpenClaw AI assistant
-#
-# Applied via the provisioning play (connection: community.general.incus).
-# Runs INSIDE the target container.
-#
-# OpenClaw is a self-hosted AI assistant that connects to messaging
-# platforms and drives local/remote LLMs via its gateway daemon.
-#
-# Agent workspace files are deployed from Jinja2 templates (ADR-036).
-# Operational files are overwritten on every apply (force: true).
-# Only MEMORY.md is seeded once (force: false).
-#
-# Input variables (from defaults, overridable in host_vars):
-#   - openclaw_server_ollama_url (string): Ollama API base URL
-#   - openclaw_server_ollama_api_key (string): Ollama API key (any value)
-#   - openclaw_server_enabled (bool): enable systemd service
-#   - openclaw_server_proxy_ip (string): proxy IP (anklume-instance)
-#   - openclaw_server_proxy_port (int): proxy port
-#   - openclaw_server_agent_name (string): agent display name
-#   - openclaw_server_agent_emoji (string): agent emoji
+# Domain-aware (ADR-036, ADR-043): templates + per-domain service names.
+# Applied via provisioning play (connection: community.general.incus).
+
+- name: OpenclawServer | Compute service name
+  ansible.builtin.set_fact:
+    _openclaw_service_name: >-
+      {{ 'openclaw-' ~ openclaw_server_domain
+         if openclaw_server_domain | default('')
+         else 'openclaw' }}
 
 - name: OpenclawServer | Install curl for nodesource setup
   ansible.builtin.apt:
@@ -178,13 +168,13 @@
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:
     src: openclaw.service.j2
-    dest: /etc/systemd/system/openclaw.service
+    dest: "/etc/systemd/system/{{ _openclaw_service_name }}.service"
     mode: "0644"
   notify: OpenclawServer | Restart OpenClaw
 
 - name: OpenclawServer | Enable and start OpenClaw service
   ansible.builtin.systemd:
-    name: openclaw
+    name: "{{ _openclaw_service_name }}"
     enabled: "{{ openclaw_server_enabled }}"
     state: started
     daemon_reload: true

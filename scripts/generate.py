@@ -374,6 +374,11 @@ def validate(infra, *, check_host_subnets=True):
                 f"{valid_trust_levels}, got '{trust_level}'"
             )
 
+        # Validate openclaw field (boolean, default false)
+        openclaw = domain.get("openclaw")
+        if openclaw is not None and not isinstance(openclaw, bool):
+            errors.append(f"Domain '{dname}': openclaw must be a boolean, got {type(openclaw).__name__}")
+
         domain_profiles = domain.get("profiles") or {}
         domain_profile_names = set(domain_profiles)
         for mname, machine in (domain.get("machines") or {}).items():
@@ -874,6 +879,7 @@ def enrich_infra(infra):
     Called after validate() and before generate(). Mutates infra in place.
     Handles: auto-creation of anklume-firewall VM, AI access policy enrichment.
     """
+    _enrich_openclaw(infra)
     _enrich_addressing(infra)
     _enrich_firewall(infra)
     _enrich_ai_access(infra)
@@ -1080,6 +1086,41 @@ def _enrich_ai_access(infra):
     })
     print(f"INFO: ai_access_policy is 'exclusive' — auto-created network policy "
           f"from '{ai_access_default}' to 'ai-tools'", file=sys.stderr)
+
+
+def _enrich_openclaw(infra):
+    """Auto-create <domain>-openclaw machines for domains with openclaw: true."""
+    domains = infra.get("domains") or {}
+
+    for dname, domain in domains.items():
+        if not domain.get("openclaw", False):
+            continue
+        if domain.get("enabled", True) is False:
+            continue
+
+        openclaw_name = f"{dname}-openclaw"
+
+        # Check if user already declared the openclaw machine
+        machines = domain.get("machines") or {}
+        if openclaw_name in machines:
+            continue
+
+        openclaw_machine = {
+            "description": f"OpenClaw AI assistant for {dname} (auto-created)",
+            "type": "lxc",
+            "roles": ["base_system", "openclaw_server"],
+            "ephemeral": False,
+        }
+
+        if "machines" not in domain or domain["machines"] is None:
+            domain["machines"] = {}
+        domain["machines"][openclaw_name] = openclaw_machine
+
+        print(
+            f"INFO: openclaw: true on domain '{dname}' — "
+            f"auto-created {openclaw_name}",
+            file=sys.stderr,
+        )
 
 
 def _enrich_resources(infra):
@@ -1451,11 +1492,13 @@ def generate(infra, base_dir, dry_run=False):
 
         # group_vars/<domain>.yml
         domain_ephemeral = domain.get("ephemeral", False)
+        domain_openclaw = domain.get("openclaw", False)
         gvars = {k: v for k, v in {
             "domain_name": dname,
             "domain_description": domain.get("description", ""),
             "domain_ephemeral": domain_ephemeral,
             "domain_trust_level": domain.get("trust_level"),
+            "domain_openclaw": domain_openclaw if domain_openclaw else None,
             "incus_project": f"{prefix}{dname}",
             "incus_network": {
                 "name": f"{prefix}net-{dname}",

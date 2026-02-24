@@ -1,5 +1,6 @@
 [Unit]
-Description=OpenClaw AI Assistant Gateway
+Description=OpenClaw AI Assistant Gateway{% if openclaw_server_domain %} ({{ openclaw_server_domain }}){% endif %}
+
 After=network.target
 
 [Service]

@@ -880,6 +880,40 @@ capabilities:
         expected: "All devices correct, names prefixed, paths absolute"
         deterministic: true
 
+  per_domain_openclaw:
+    description: "Per-domain OpenClaw AI assistant instances (ADR-043)"
+    depth_1:
+      - id: OC-001
+        action: "Valid openclaw boolean (true/false/absent)"
+        expected: "Validation passes"
+        deterministic: true
+      - id: OC-002
+        action: "Invalid openclaw value (string, int)"
+        expected: "Validation error about boolean type"
+        deterministic: true
+      - id: OC-003
+        action: "openclaw: true auto-creates <domain>-openclaw machine"
+        expected: "Machine with type lxc, roles [base_system, openclaw_server], auto-assigned IP"
+        deterministic: true
+      - id: OC-004
+        action: "User-declared <domain>-openclaw takes precedence"
+        expected: "User definition preserved, no auto-creation"
+        deterministic: true
+      - id: OC-005
+        action: "openclaw: false or absent, or disabled domain"
+        expected: "No auto-creation of openclaw machine"
+        deterministic: true
+    depth_2:
+      - id: OC-006
+        action: "Multiple domains with openclaw: true"
+        expected: "Each domain gets its own <domain>-openclaw, no IP collision"
+        deterministic: true
+    depth_3:
+      - id: OC-007
+        action: "openclaw: true + addressing + group_vars/host_vars generation"
+        expected: "domain_openclaw in group_vars, host_vars with roles, inventory entry"
+        deterministic: true
+
   flush_protection:
     description: "Flush respects delete protection on instances"
     depth_1:

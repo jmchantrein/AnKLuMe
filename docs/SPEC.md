@@ -175,6 +175,7 @@ domains:
     subnet_id: <0-254>               # Optional: auto-assigned alphabetically within zone
     ephemeral: false                  # Optional (default: false). See below.
     trust_level: semi-trusted         # Determines IP zone (default: semi-trusted)
+    openclaw: false                   # Optional: deploy per-domain OpenClaw AI assistant
     profiles:                         # Optional: extra Incus profiles
       <profile-name>:
         devices: { ... }
@@ -357,6 +358,7 @@ adapt behavior based on domain trust posture.
   VM instances with GPU require IOMMU (Phase 9+)
 - `ephemeral`: must be a boolean if present (at both domain and machine level)
 - `trust_level`: must be one of `admin`, `trusted`, `semi-trusted`, `untrusted`, `disposable` (if present)
+- `openclaw`: must be a boolean if present (default: false)
 - `weight`: must be a positive integer if present (default: 1)
 - `boot_autostart`: must be a boolean if present
 - `boot_priority`: must be an integer 0-100 if present (default: 0)
@@ -431,6 +433,40 @@ special naming significance:
 The `sys-` prefix is retired. Legacy `sys-firewall` declarations
 are still accepted for backward compatibility (see "Auto-creation
 of anklume-firewall" below).
+
+### Per-domain OpenClaw (openclaw directive)
+
+The optional `openclaw` boolean on a domain enables automatic deployment
+of a per-domain OpenClaw AI assistant instance. When `openclaw: true`,
+the generator auto-creates a `<domain>-openclaw` machine in that domain
+if one is not already explicitly declared.
+
+```yaml
+domains:
+  pro:
+    trust_level: trusted
+    openclaw: true          # Auto-creates pro-openclaw machine
+    machines:
+      pw-dev:
+        type: lxc
+```
+
+The auto-created machine uses:
+- type: `lxc`
+- roles: `[base_system, openclaw_server]`
+- ephemeral: `false`
+- IP: auto-assigned within the domain's subnet
+
+If the user declares `<domain>-openclaw` explicitly, their definition
+takes precedence and no auto-creation occurs. The generator propagates
+`domain_openclaw: true` to `group_vars/<domain>.yml` so roles and tools
+can detect whether the domain has an OpenClaw instance.
+
+Each per-domain OpenClaw instance sees only its own domain's network,
+providing network-isolated AI assistance that respects domain boundaries.
+Domain-specific variables (`openclaw_server_domain`,
+`openclaw_server_instance_name`) allow templates to produce
+domain-aware agent configurations.
 
 ### Auto-creation of anklume-firewall (firewall_mode: vm)
 

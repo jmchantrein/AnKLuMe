@@ -1,4 +1,4 @@
-{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Jinja2 template — deployed by openclaw_server role (ADR-036, ADR-043) #}
 {# Do NOT edit the deployed file directly. Edit THIS template instead. #}
 # User
 
@@ -15,3 +15,10 @@
 - GPU: NVIDIA RTX PRO 5000 (24GB VRAM) — runs local LLMs (Ollama, llama-server)
 - Values: FOSS, KISS/DRY, security-first, decentralization
 - Communication style: direct, no fluff, technical depth appreciated
+{% if openclaw_server_domain | default('') %}
+
+## Domain context
+
+This assistant operates within the **{{ openclaw_server_domain }}** domain.
+It can only see and interact with resources within this domain's network.
+{% endif %}
