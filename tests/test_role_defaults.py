@@ -26,6 +26,7 @@ EXPECTED_ROLES = sorted([
     "incus_profiles",
     "incus_projects",
     "incus_snapshots",
+    "llm_sanitizer",
     "lobechat",
     "ollama_server",
     "openclaw_server",

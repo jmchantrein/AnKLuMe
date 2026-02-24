@@ -914,6 +914,44 @@ capabilities:
         expected: "domain_openclaw in group_vars, host_vars with roles, inventory entry"
         deterministic: true
 
+  student_mode:
+    description: "CLI mode profiles and bilingual help (Phase 33)"
+    depth_1:
+      - id: SM-001
+        action: "Set mode via mode-set.sh (student/user/dev)"
+        expected: "Mode persisted in ~/.anklume/mode, invalid modes rejected"
+        deterministic: true
+      - id: SM-002
+        action: "Validate i18n/fr.yml format and coverage"
+        expected: "Valid YAML, all documented targets have FR translations"
+        deterministic: true
+      - id: SM-003
+        action: "Help output differs by mode (student/user/dev)"
+        expected: "Student shows French, dev shows all targets, user shows default"
+        deterministic: true
+      - id: SM-004
+        action: "ANKLUME_LANG env var overrides default language"
+        expected: "Language override works, missing file does not crash"
+        deterministic: true
+      - id: SM-005
+        action: "Makefile mode targets exist and are functional"
+        expected: "mode-student, mode-user, mode-dev in .PHONY with descriptions"
+        deterministic: true
+    depth_2:
+      - id: SM-2-001
+        action: "Mode switch + help output change"
+        expected: "Switching mode changes help output on next invocation"
+        deterministic: true
+      - id: SM-2-002
+        action: "ANKLUME_MODE env override + mode file"
+        expected: "Env var takes precedence over mode file"
+        deterministic: true
+    depth_3:
+      - id: SM-3-001
+        action: "Mode switch + ANKLUME_LANG override + make help"
+        expected: "ANKLUME_LANG overrides mode default, help shows correct language"
+        deterministic: true
+
   flush_protection:
     description: "Flush respects delete protection on instances"
     depth_1:
@@ -1015,41 +1053,41 @@ capabilities:
   llm_sanitizer:
     description: "LLM sanitization proxy — ai_provider/ai_sanitize validation and patterns (Phase 39)"
     depth_1:
-      - id: SAN-001
+      - id: LS-001
         action: "Valid ai_provider values (local, cloud, local-first)"
         expected: "Validation passes for all three values"
         deterministic: true
-      - id: SAN-002
+      - id: LS-002
         action: "Invalid ai_provider value"
         expected: "Validation error mentioning ai_provider"
         deterministic: true
-      - id: SAN-003
+      - id: LS-003
         action: "Valid ai_sanitize values (true, false, 'always')"
         expected: "Validation passes for all three values"
         deterministic: true
-      - id: SAN-004
+      - id: LS-004
         action: "Invalid ai_sanitize value"
         expected: "Validation error mentioning ai_sanitize"
         deterministic: true
-      - id: SAN-005
+      - id: LS-005
         action: "Default propagation (local->false, cloud->true)"
         expected: "group_vars contains correct domain_ai_provider and domain_ai_sanitize"
         deterministic: true
-      - id: SAN-006
+      - id: LS-006
         action: "Explicit ai_sanitize overrides auto-default"
         expected: "group_vars contains user-specified ai_sanitize value"
         deterministic: true
-      - id: SAN-007
+      - id: LS-007
         action: "IaC detection patterns match infrastructure identifiers"
         expected: "Regex patterns match anklume IPs, Incus names, FQDNs, credentials"
         deterministic: true
     depth_2:
-      - id: SAN-2-001
+      - id: LS-2-001
         action: "Sanitization + domain trust level interaction"
         expected: "Trust-aware sanitization defaults applied correctly"
         deterministic: true
     depth_3:
-      - id: SAN-3-001
+      - id: LS-3-001
         action: "Sanitization + ai_provider + network_policies"
         expected: "All features independent, sanitization config correct"
         deterministic: true
