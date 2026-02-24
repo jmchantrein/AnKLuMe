@@ -382,31 +382,16 @@ for e in (json.loads(l) for l in sys.stdin if l.strip())]" 2>/dev/null; \
 		echo ""; echo "Total: $$(wc -l < $(HOME)/.anklume/host-audit/session-$$(date +%Y%m%d).jsonl) entries"; \
 	else echo "No audit entries today."; fi
 
-# ── MCP Dev Server (OpenClaw integration) ─────────────────
+# ── MCP Dev Server (RETIRED — Phase 35) ───────────────────
+# The MCP proxy (mcp-anklume-dev.py) was archived in Phase 35.
+# Development workflow now uses Claude Code directly + mcp-ollama-coder.
+# See: docs/vision-ai-integration.md, scripts/archive/README.md
 ANKLUME_INSTANCE ?= anklume-instance
 
-mcp-dev-start: ## Start the anklume MCP dev server in anklume-instance
-	@echo "Deploying MCP dev server to $(ANKLUME_INSTANCE)..."
-	@incus file push scripts/mcp-anklume-dev.py $(ANKLUME_INSTANCE)/root/anklume/scripts/mcp-anklume-dev.py
-	@incus file push scripts/mcp-anklume-dev.service $(ANKLUME_INSTANCE)/etc/systemd/system/mcp-anklume-dev.service
-	@incus exec $(ANKLUME_INSTANCE) -- bash -c '\
-		pip install --quiet --break-system-packages --ignore-installed "mcp[cli]" 2>/dev/null || true; \
-		systemctl daemon-reload; \
-		systemctl enable --now mcp-anklume-dev.service; \
-		sleep 1; \
-		systemctl is-active mcp-anklume-dev.service'
-	@echo "MCP dev server running on $(ANKLUME_INSTANCE):9090"
-	@echo "Tools: git_status, git_log, make_target, run_tests, incus_list, incus_exec, read_file, claude_code, lint"
-
-mcp-dev-stop: ## Stop the anklume MCP dev server
-	@incus exec $(ANKLUME_INSTANCE) -- systemctl disable --now mcp-anklume-dev.service 2>/dev/null || true
-	@echo "MCP dev server stopped."
-
-mcp-dev-status: ## Show MCP dev server status
-	@incus exec $(ANKLUME_INSTANCE) -- systemctl status mcp-anklume-dev.service --no-pager 2>/dev/null || echo "MCP dev server is not running."
-
-mcp-dev-logs: ## Show MCP dev server logs
-	@incus exec $(ANKLUME_INSTANCE) -- journalctl -u mcp-anklume-dev.service --no-pager -n 50
+mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs: ## [RETIRED] MCP proxy archived (Phase 35)
+	@echo "The MCP dev proxy was retired in Phase 35."
+	@echo "Use Claude Code directly + mcp-ollama-coder for local LLM delegation."
+	@echo "Archived script: scripts/archive/mcp-anklume-dev.py"
 
 # ── Experience Library (Phase 18d) ────────────────────────
 mine-experiences: ## Extract fix patterns from git history
