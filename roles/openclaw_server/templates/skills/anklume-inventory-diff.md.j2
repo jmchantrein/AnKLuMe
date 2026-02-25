@@ -4,11 +4,11 @@
 
 Compare current network inventory against a saved baseline to detect
 new hosts, open ports, and service changes for the
-**{{ openclaw_server_domain | default('unknown') }}** domain.
+**{{ domain_name | default('unknown') }}** domain.
 
 ## Inputs
 
-- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+- **project**: `{{ incus_project | default('default') }}`
   (Incus project, auto-configured)
 - **baseline_dir**: `{{ openclaw_server_nmap_baseline_dir }}`
   (nmap baseline storage directory)
@@ -21,13 +21,13 @@ Execute nmap service detection scan against the domain subnet:
 
 ```bash
 nmap -sV -oX /tmp/nmap-current.xml \
-  --exclude {{ openclaw_server_domain | default('unknown') }}-openclaw \
+  --exclude {{ domain_name | default('unknown') }}-openclaw \
   <domain_subnet>/24
 ```
 
 The domain subnet is determined from the Incus project network
 configuration. Only scan hosts within this domain's project
-`{{ openclaw_server_incus_project | default('default') }}`.
+`{{ incus_project | default('default') }}`.
 
 ### 2. Load baseline
 
@@ -55,8 +55,8 @@ After comparison, save the current scan as the new baseline in
 ### 5. Compose report
 
 ```
-Inventory Diff — {{ openclaw_server_domain | default('unknown') }}
-Project: {{ openclaw_server_incus_project | default('default') }}
+Inventory Diff — {{ domain_name | default('unknown') }}
+Project: {{ incus_project | default('default') }}
 Timestamp: <ISO 8601>
 
 Changes since last scan:

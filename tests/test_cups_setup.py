@@ -1,4 +1,4 @@
-"""Tests for scripts/sys-print.sh -- CUPS print service management."""
+"""Tests for scripts/cups-setup.sh -- CUPS print service management."""
 
 import json
 import os
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from conftest import read_log
 
-PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "sys-print.sh"
+PRINT_SH = Path(__file__).resolve().parent.parent / "scripts" / "cups-setup.sh"
 
 # Fake Incus JSON output: two instances across two projects
 FAKE_INCUS_LIST = json.dumps([
@@ -86,7 +86,7 @@ exit 1
 
 
 def run_print(args, env):
-    """Run sys-print.sh with given args and environment."""
+    """Run cups-setup.sh with given args and environment."""
     return subprocess.run(
         ["bash", str(PRINT_SH)] + args,
         capture_output=True, text=True, env=env,
@@ -99,7 +99,7 @@ def run_print(args, env):
 class TestScriptQuality:
     @pytest.mark.skipif(not shutil.which("shellcheck"), reason="shellcheck not installed")
     def test_script_shellcheck_clean(self):
-        """sys-print.sh passes shellcheck."""
+        """cups-setup.sh passes shellcheck."""
         result = subprocess.run(
             ["shellcheck", str(PRINT_SH)],
             capture_output=True, text=True,
@@ -107,7 +107,7 @@ class TestScriptQuality:
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 
     def test_script_executable(self):
-        """sys-print.sh has the executable bit set."""
+        """cups-setup.sh has the executable bit set."""
         assert os.access(PRINT_SH, os.X_OK)
 
 

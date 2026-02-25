@@ -1,6 +1,6 @@
 # Service d'impression
 
-> Note : la version anglaise ([`sys-print.md`](sys-print.md)) fait reference en cas de divergence.
+> Note : la version anglaise ([`cups-setup.md`](cups-setup.md)) fait reference en cas de divergence.
 
 La configuration recommandee utilise un domaine `shared` avec
 `shared-print` comme nom de conteneur (voir SPEC.md "Naming conventions").
@@ -80,16 +80,16 @@ make apply-print I=shared-print
 
 ```bash
 # Imprimante USB (necessite les IDs vendeur et produit)
-scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
+scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
 
 # Imprimante reseau (NIC macvlan pour acces au reseau local)
-scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
+scripts/cups-setup.sh add-network shared-print --nic-parent enp3s0
 ```
 
 ### 5. Verifier l'etat
 
 ```bash
-scripts/sys-print.sh status shared-print
+scripts/cups-setup.sh status shared-print
 ```
 
 ## Commandes
@@ -99,7 +99,7 @@ scripts/sys-print.sh status shared-print
 Installer et configurer CUPS pour l'acces distant :
 
 ```bash
-scripts/sys-print.sh setup <instance> [--project PROJET]
+scripts/cups-setup.sh setup <instance> [--project PROJET]
 ```
 
 La commande setup :
@@ -113,7 +113,7 @@ La commande setup :
 Ajouter une imprimante USB via le passthrough de peripherique Incus :
 
 ```bash
-scripts/sys-print.sh add-usb <instance> --vendor VID --product PID [--project PROJET]
+scripts/cups-setup.sh add-usb <instance> --vendor VID --product PID [--project PROJET]
 ```
 
 Trouver les IDs vendeur et produit de votre imprimante avec `lsusb`
@@ -134,7 +134,7 @@ peripherique USB directement au conteneur.
 Ajouter une interface macvlan pour la decouverte d'imprimantes reseau :
 
 ```bash
-scripts/sys-print.sh add-network <instance> --nic-parent IFACE [--project PROJET]
+scripts/cups-setup.sh add-network <instance> --nic-parent IFACE [--project PROJET]
 ```
 
 Cela donne au conteneur un acces direct au reseau local physique,
@@ -149,7 +149,7 @@ Apres l'ajout du NIC, redemarrer l'instance pour prise en compte.
 Afficher l'etat du service CUPS et des imprimantes configurees :
 
 ```bash
-scripts/sys-print.sh status <instance> [--project PROJET]
+scripts/cups-setup.sh status <instance> [--project PROJET]
 ```
 
 ## Cibles Makefile

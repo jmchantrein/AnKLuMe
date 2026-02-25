@@ -3,11 +3,11 @@
 # Skill: anklume-health
 
 Check container status, disk usage, and service health for the
-**{{ openclaw_server_domain | default('unknown') }}** domain.
+**{{ domain_name | default('unknown') }}** domain.
 
 ## Inputs
 
-- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+- **project**: `{{ incus_project | default('default') }}`
   (Incus project, auto-configured)
 - **disk_warn_pct**: `{{ openclaw_server_disk_warn_pct }}`
   (disk warning threshold percentage)
@@ -19,7 +19,7 @@ Check container status, disk usage, and service health for the
 ### 1. List containers
 
 ```bash
-incus list --project {{ openclaw_server_incus_project | default('default') }} \
+incus list --project {{ incus_project | default('default') }} \
   --format csv -c n,s
 ```
 
@@ -32,7 +32,7 @@ For each instance with status `RUNNING`:
 
 ```bash
 incus exec <instance> \
-  --project {{ openclaw_server_incus_project | default('default') }} -- \
+  --project {{ incus_project | default('default') }} -- \
   df --output=pcent / | tail -1
 ```
 
@@ -47,7 +47,7 @@ For each running instance, check expected services:
 
 ```bash
 incus exec <instance> \
-  --project {{ openclaw_server_incus_project | default('default') }} -- \
+  --project {{ incus_project | default('default') }} -- \
   systemctl is-active <service>
 ```
 
@@ -61,8 +61,8 @@ Services to check (if installed):
 Output format:
 
 ```
-Domain: {{ openclaw_server_domain | default('unknown') }}
-Project: {{ openclaw_server_incus_project | default('default') }}
+Domain: {{ domain_name | default('unknown') }}
+Project: {{ incus_project | default('default') }}
 Timestamp: <ISO 8601>
 Overall: OK | WARNING | CRITICAL
 

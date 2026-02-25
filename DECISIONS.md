@@ -1,7 +1,7 @@
 # DECISIONS.md -- Autonomous Implementation Decisions
 
 Decisions made during autonomous implementation.
-Review and approve/decline each section.
+Reviewed 2026-02-25. Status per section below.
 
 ---
 
@@ -54,7 +54,7 @@ that the agent executes via its built-in cron/skill system.
 CRON.md, skills/) deployed via Jinja2 templates. The agent uses
 OpenClaw's native cron system to schedule checks, not systemd timers.
 
-**Status**: pending review
+**Status**: approved
 
 ---
 
@@ -64,7 +64,7 @@ OpenClaw's native cron system to schedule checks, not systemd timers.
 Cross-domain monitoring requires explicit network policies and is
 left to the admin domain's agent (if any).
 
-**Status**: pending review
+**Status**: approved
 
 ---
 
@@ -74,58 +74,40 @@ left to the admin domain's agent (if any).
 via `ansible.builtin.include_tasks`. This keeps each file under 200
 lines and maintains single-responsibility.
 
-**Status**: pending review
+**Status**: approved
 
 ---
 
-## Phase 37: Per-Domain OpenClaw Instances
+## Phase 37: OpenClaw Instances — KISS Simplification
 
-### ADR-043 numbering
+**Review outcome**: The original per-domain approach (openclaw: true
+directive, auto-creation, domain-scoped templates) was rejected in
+favor of the KISS principle. OpenClaw machines are declared like any
+other machine.
 
-ADR-043 was the next available number after ADR-042 (flush protection).
+### Changes implemented after review
 
-### Auto-creation pattern
+- Removed `openclaw: true` domain-level field from SPEC and generator
+- Removed `_enrich_openclaw()` auto-creation function
+- Removed `domain_openclaw` from group_vars propagation
+- Removed `openclaw_server_domain` and `openclaw_server_instance_name`
+  variables from role defaults
+- Simplified all templates (removed domain conditionals)
+- Service name: always `openclaw.service` (each container is isolated)
+- Templates now use standard `domain_name` and `incus_project` from
+  group_vars instead of role-specific variables
+- Agent identity (name, emoji) defaults to empty — users configure
+  per instance. SOUL persisted via persistent_data volumes.
+- Generator warns if openclaw_server role present without network_policy
 
-Followed the exact same pattern as `_enrich_firewall()` (anklume-firewall
-auto-creation): check if user declared the machine, if not, auto-create
-with sensible defaults. The enrichment runs after validation but before
-generation, and auto-created machines get IPs via `_enrich_addressing()`.
+### ADR-043 (superseded)
 
-### Service name: `openclaw-<domain>.service`
+ADR-043 was rewritten to document the KISS approach. See ARCHITECTURE.md.
 
-Per-domain instances use `openclaw-<domain>` as the systemd service name
-(e.g., `openclaw-pro.service`). The centralized instance (no domain set)
-keeps the legacy `openclaw.service` name for backward compatibility.
+### Future directions (noted from review)
 
-### Template changes are additive
-
-All template changes use `{% if openclaw_server_domain | default('') %}`
-conditionals. When `openclaw_server_domain` is empty (centralized mode),
-templates render identically to before. No breaking change.
-
-### group_vars propagation
-
-`domain_openclaw: true` is propagated to group_vars only when `true`.
-When `false` or absent, the key is omitted (not set to `false`). This
-matches the pattern used by `domain_trust_level` and other optional
-fields.
-
-### No network_policies auto-creation for openclaw
-
-Unlike `ai_access_policy: exclusive` which auto-creates network policies,
-per-domain OpenClaw instances do not auto-create network policies to the
-LLM backend. The user must explicitly declare `network_policies` if
-cross-domain AI access is needed. This is intentional: the default
-posture is full isolation.
-
-### Questions for review
-
-1. Should `openclaw_server_agent_name` be auto-scoped per domain
-   (e.g., `Ada-pro`, `Ada-perso`)? Currently defaults to `Ada` for all.
-2. Should the generator warn if `openclaw: true` but no LLM backend
-   (gpu-server / ollama_server) is reachable from the domain?
-3. Should the SPEC examples show the per-domain pattern as the primary
-   example, or keep the centralized pattern as primary?
+- Docker Compose-like CLI refonte (`anklume volume ls`, `anklume domain ls`)
+- Device naming convention to be decided with CLI refonte
 
 ---
 
@@ -142,9 +124,10 @@ posture is full isolation.
 
 ### Script naming
 
-The script `scripts/sys-print.sh` retains its filename. It is a tool
-(like `snap.sh`), not a container. Its examples and usage messages now
-reference `shared-print` as the default instance name.
+The script `scripts/cups-setup.sh` (renamed from `sys-print.sh` per
+user review) uses a descriptive name reflecting its function. Its
+examples and usage messages reference `shared-print` as the default
+instance name.
 
 ### Decision: `shared` domain in canonical infra.yml
 
@@ -161,8 +144,8 @@ demonstrated in `examples/shared-services/`. Users add it when needed.
 | `tests/test_generate.py:541` | `sys-firewall` | Tests backward compatibility |
 | `tests/test_generate_internals.py:1903` | `sys-firewall` | Tests backward compatibility |
 | `docs/SPEC.md:402` | `sys-firewall` | Documents backward compatibility |
-| `scripts/sys-print.sh` (filename) | `sys-print.sh` | Tool name, not container name |
-| `tests/test_sys_print.py` (filename) | `test_sys_print.py` | Tests the tool |
+| `scripts/cups-setup.sh` (filename) | `cups-setup.sh` | Renamed per user review |
+| `tests/test_cups_setup.py` (filename) | `test_cups_setup.py` | Tests the tool |
 
 ---
 
@@ -172,13 +155,16 @@ demonstrated in `examples/shared-services/`. Users add it when needed.
 - ADR-040 was already taken (credits/attribution). Used ADR-041 for
   persistent_data and ADR-042 for flush protection.
 
-### persistent_data device prefix: `pd-`
+### persistent_data device prefix: `pd-` (temporary)
 - Chose `pd-` prefix to avoid collisions with `sv-` (shared volumes)
   and user-declared devices.
+- **Review note**: prefix naming deferred to future Docker Compose-like
+  CLI refonte. Current `pd-`/`sv-` are temporary.
 
 ### persistent_data source path convention
-- Source: `<persistent_data_base>/<machine_name>/<volume_name>`
+- Source: `<persistent_data_base>/<domain_name>/<machine_name>/<volume_name>`
 - Default base: `/srv/anklume/data`.
+- **Review note**: domain added to path hierarchy for better organization.
 
 ### shift: true by default on persistent_data
 - Mirrored the shared_volumes default.

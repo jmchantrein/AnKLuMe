@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CUPS print service management for anklume instances.
 # Install CUPS, add USB printers, and configure network printer access.
-# See docs/sys-print.md and ROADMAP.md Phase 20e.
+# See docs/cups-setup.md and ROADMAP.md Phase 20e.
 set -euo pipefail
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -34,7 +34,7 @@ sys.exit(1)
 # ── Commands ─────────────────────────────────────────────────
 
 cmd_setup() {
-    [[ $# -ge 1 ]] || die "Usage: sys-print.sh setup <instance> [--project PROJECT]"
+    [[ $# -ge 1 ]] || die "Usage: cups-setup.sh setup <instance> [--project PROJECT]"
     local instance="$1"
     shift
     local project=""
@@ -140,7 +140,7 @@ CUPSCONF
 
     echo "Done: CUPS print service configured in ${instance}."
     echo "Web interface: http://<instance-ip>:631"
-    echo "Add printers with: sys-print.sh add-usb or sys-print.sh add-network"
+    echo "Add printers with: cups-setup.sh add-usb or cups-setup.sh add-network"
 }
 
 cmd_add_usb() {
@@ -162,7 +162,7 @@ cmd_add_usb() {
         esac
     done
 
-    [[ -n "$instance" ]] || die "Usage: sys-print.sh add-usb <instance> --vendor VID --product PID [--project PROJECT]"
+    [[ -n "$instance" ]] || die "Usage: cups-setup.sh add-usb <instance> --vendor VID --product PID [--project PROJECT]"
     [[ -n "$vendor" ]]   || die "Missing --vendor VID"
     [[ -n "$product" ]]  || die "Missing --product PID"
 
@@ -201,7 +201,7 @@ cmd_add_network() {
         esac
     done
 
-    [[ -n "$instance" ]]   || die "Usage: sys-print.sh add-network <instance> --nic-parent IFACE [--project PROJECT]"
+    [[ -n "$instance" ]]   || die "Usage: cups-setup.sh add-network <instance> --nic-parent IFACE [--project PROJECT]"
     [[ -n "$nic_parent" ]] || die "Missing --nic-parent IFACE (host network interface, e.g. eth0, enp3s0)"
 
     check_incus
@@ -221,7 +221,7 @@ cmd_add_network() {
 }
 
 cmd_status() {
-    [[ $# -ge 1 ]] || die "Usage: sys-print.sh status <instance> [--project PROJECT]"
+    [[ $# -ge 1 ]] || die "Usage: cups-setup.sh status <instance> [--project PROJECT]"
     local instance="$1"
     shift
     local project=""
@@ -278,7 +278,7 @@ PYEOF
 
 usage() {
     cat <<'USAGE'
-Usage: sys-print.sh <command> [args]
+Usage: cups-setup.sh <command> [args]
 
 Commands:
   setup       <instance> [--project P]                           Install and configure CUPS
@@ -303,10 +303,10 @@ access to the physical LAN for discovering network printers (WiFi/Ethernet).
 Other domains access the CUPS service via IPP (port 631) through network_policies.
 
 Examples:
-  sys-print.sh setup shared-print                                # Install CUPS
-  sys-print.sh add-usb shared-print --vendor 04b8 --product 0005 # Add Epson USB
-  sys-print.sh add-network shared-print --nic-parent enp3s0      # LAN access
-  sys-print.sh status shared-print                               # Check status
+  cups-setup.sh setup shared-print                                # Install CUPS
+  cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005 # Add Epson USB
+  cups-setup.sh add-network shared-print --nic-parent enp3s0      # LAN access
+  cups-setup.sh status shared-print                               # Check status
 USAGE
 }
 
@@ -318,5 +318,5 @@ case "$1" in
     add-network) shift; cmd_add_network "$@" ;;
     status)      shift; cmd_status "$@" ;;
     -h|--help|help) usage ;;
-    *) die "Unknown command: $1. Run 'sys-print.sh help' for usage." ;;
+    *) die "Unknown command: $1. Run 'cups-setup.sh help' for usage." ;;
 esac

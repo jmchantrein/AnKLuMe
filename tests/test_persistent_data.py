@@ -135,7 +135,7 @@ class TestPersistentDataGeneration:
         dev = hvars["instance_devices"]["pd-projects"]
         assert dev["type"] == "disk"
         assert dev["path"] == "/home/user/projects"
-        assert dev["source"] == "/srv/anklume/data/pro-dev/projects"
+        assert dev["source"] == "/srv/anklume/data/pro/pro-dev/projects"
         assert "shift" in dev and dev["shift"] == "true"
 
     def test_readonly_true(self, tmp_path):  # Matrix: PD-001
@@ -158,7 +158,7 @@ class TestPersistentDataGeneration:
         generate(infra, str(tmp_path))
         hvars = _read_host_vars(tmp_path, "pro-dev")
         dev = hvars["instance_devices"]["pd-db"]
-        assert dev["source"] == "/mnt/storage/data/pro-dev/db"
+        assert dev["source"] == "/mnt/storage/data/pro/pro-dev/db"
 
     def test_no_pd_device_without_persistent_data(self, tmp_path):  # Matrix: PD-006
         infra = _base_infra()

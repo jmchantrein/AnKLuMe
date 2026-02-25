@@ -58,8 +58,8 @@ machines:
 Mechanism (identical to shared_volumes):
 - Enrichment: `_enrich_persistent_data()` builds
   `infra["_persistent_data_devices"]`
-- Default source: `<base>/<machine>/<volume>`
-  (e.g., `/srv/anklume/data/pro-dev/db`)
+- Default source: `<base>/<domain>/<machine>/<volume>`
+  (e.g., `/srv/anklume/data/pro/pro-dev/db`)
 - Injected device: `pd-<name>` in `instance_devices`
   (prefix `pd-` like `sv-` for shared)
 - Generation: merge pd-* + sv-* + user devices in host_vars

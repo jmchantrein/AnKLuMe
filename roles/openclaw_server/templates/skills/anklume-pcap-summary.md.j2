@@ -3,11 +3,11 @@
 # Skill: anklume-pcap-summary
 
 Condense packet capture (pcap) files into readable summaries
-for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+for the **{{ domain_name | default('unknown') }}** domain.
 
 ## Inputs
 
-- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+- **project**: `{{ incus_project | default('default') }}`
   (Incus project, auto-configured)
 - **pcap_file**: Path to the pcap file to analyze
 
@@ -58,13 +58,13 @@ Flag suspicious patterns:
 - Traffic leaving the domain subnet (cross-domain leakage)
 
 Domain context: only flag traffic that crosses the boundary of
-project `{{ openclaw_server_incus_project | default('default') }}`.
+project `{{ incus_project | default('default') }}`.
 
 ### 6. Compose summary
 
 ```
-PCAP Summary — {{ openclaw_server_domain | default('unknown') }}
-Project: {{ openclaw_server_incus_project | default('default') }}
+PCAP Summary — {{ domain_name | default('unknown') }}
+Project: {{ incus_project | default('default') }}
 Timestamp: <ISO 8601>
 Capture file: <pcap_file>
 Duration: <start_time> to <end_time>

@@ -76,16 +76,16 @@ make apply-print I=shared-print
 
 ```bash
 # USB printer (requires vendor and product IDs)
-scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
+scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
 
 # Network printer (macvlan NIC for physical LAN access)
-scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
+scripts/cups-setup.sh add-network shared-print --nic-parent enp3s0
 ```
 
 ### 5. Check status
 
 ```bash
-scripts/sys-print.sh status shared-print
+scripts/cups-setup.sh status shared-print
 ```
 
 ## Commands
@@ -95,7 +95,7 @@ scripts/sys-print.sh status shared-print
 Install and configure CUPS for remote access:
 
 ```bash
-scripts/sys-print.sh setup <instance> [--project PROJECT]
+scripts/cups-setup.sh setup <instance> [--project PROJECT]
 ```
 
 The setup command:
@@ -109,7 +109,7 @@ The setup command:
 Add a USB printer via Incus device passthrough:
 
 ```bash
-scripts/sys-print.sh add-usb <instance> --vendor VID --product PID [--project PROJECT]
+scripts/cups-setup.sh add-usb <instance> --vendor VID --product PID [--project PROJECT]
 ```
 
 Find your printer's vendor and product IDs with `lsusb` on the host:
@@ -129,7 +129,7 @@ directly to the container.
 Add a macvlan NIC for network printer discovery:
 
 ```bash
-scripts/sys-print.sh add-network <instance> --nic-parent IFACE [--project PROJECT]
+scripts/cups-setup.sh add-network <instance> --nic-parent IFACE [--project PROJECT]
 ```
 
 This gives the container direct access to the physical LAN, allowing
@@ -144,7 +144,7 @@ After adding the NIC, restart the instance for it to take effect.
 Show CUPS service status and configured printers:
 
 ```bash
-scripts/sys-print.sh status <instance> [--project PROJECT]
+scripts/cups-setup.sh status <instance> [--project PROJECT]
 ```
 
 ## Makefile targets

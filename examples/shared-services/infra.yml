@@ -66,8 +66,8 @@ domains:
 # After `make apply`, run:
 #   make apply-print I=shared-print
 # to install CUPS, then add printers:
-#   scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
-#   scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
+#   scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
+#   scripts/cups-setup.sh add-network shared-print --nic-parent enp3s0
 network_policies:
   - description: "Pro domain prints via CUPS"
     from: pro

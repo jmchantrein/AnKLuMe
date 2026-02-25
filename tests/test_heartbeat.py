@@ -58,12 +58,12 @@ class TestHeartbeatTemplate:
         assert "deployed by openclaw_server role (ADR-036)" in self.content
 
     def test_uses_domain_variable(self):
-        """Template references openclaw_server_domain."""
-        assert "openclaw_server_domain" in self.content
+        """Template references domain_name."""
+        assert "domain_name" in self.content
 
     def test_uses_incus_project_variable(self):
-        """Template references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Template references incus_project."""
+        assert "incus_project" in self.content
 
     def test_uses_disk_warn_threshold(self):
         """Template references disk warning threshold."""
@@ -128,12 +128,12 @@ class TestCronTemplate:
         assert "openclaw_server_cron_daily_minute" in self.content
 
     def test_uses_domain_variable(self):
-        """Template references openclaw_server_domain."""
-        assert "openclaw_server_domain" in self.content
+        """Template references domain_name."""
+        assert "domain_name" in self.content
 
     def test_uses_incus_project(self):
-        """Template references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Template references incus_project."""
+        assert "incus_project" in self.content
 
     def test_has_daily_summary_section(self):
         """Template has a daily health summary section."""
@@ -176,8 +176,8 @@ class TestHealthSkillTemplate:
         assert "--project" in self.content
 
     def test_uses_incus_project(self):
-        """Skill references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Skill references incus_project."""
+        assert "incus_project" in self.content
 
     def test_uses_disk_thresholds(self):
         """Skill references disk threshold variables."""
@@ -226,8 +226,8 @@ class TestNetworkDiffSkillTemplate:
         assert "--project" in self.content
 
     def test_uses_incus_project(self):
-        """Skill references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Skill references incus_project."""
+        assert "incus_project" in self.content
 
     def test_has_baseline_concept(self):
         """Skill describes baseline comparison."""
@@ -286,14 +286,6 @@ class TestHeartbeatDefaults:
     def test_cron_daily_minute_default(self):
         """Default cron daily minute is 0."""
         assert "openclaw_server_cron_daily_minute: 0" in self.content
-
-    def test_domain_default(self):
-        """Domain variable exists with empty default."""
-        assert 'openclaw_server_domain: ""' in self.content
-
-    def test_incus_project_default(self):
-        """Incus project variable exists with default."""
-        assert 'openclaw_server_incus_project: "default"' in self.content
 
     def test_all_heartbeat_vars_prefixed(self):
         """All heartbeat variables use the role prefix."""

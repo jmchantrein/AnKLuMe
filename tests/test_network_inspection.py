@@ -68,12 +68,12 @@ class TestNetworkTriageSkill:
         assert "deployed by openclaw_server role (ADR-036)" in self.content
 
     def test_uses_domain_variable(self):
-        """Skill references openclaw_server_domain."""
-        assert "openclaw_server_domain" in self.content
+        """Skill references domain_name."""
+        assert "domain_name" in self.content
 
     def test_uses_incus_project_variable(self):
-        """Skill references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Skill references incus_project."""
+        assert "incus_project" in self.content
 
     def test_uses_ollama_url(self):
         """Skill references openclaw_server_ollama_url for LLM analysis."""
@@ -124,12 +124,12 @@ class TestInventoryDiffSkill:
         assert "deployed by openclaw_server role (ADR-036)" in self.content
 
     def test_uses_domain_variable(self):
-        """Skill references openclaw_server_domain."""
-        assert "openclaw_server_domain" in self.content
+        """Skill references domain_name."""
+        assert "domain_name" in self.content
 
     def test_uses_incus_project_variable(self):
-        """Skill references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Skill references incus_project."""
+        assert "incus_project" in self.content
 
     def test_uses_baseline_dir(self):
         """Skill references openclaw_server_nmap_baseline_dir."""
@@ -186,12 +186,12 @@ class TestPcapSummarySkill:
         assert "deployed by openclaw_server role (ADR-036)" in self.content
 
     def test_uses_domain_variable(self):
-        """Skill references openclaw_server_domain."""
-        assert "openclaw_server_domain" in self.content
+        """Skill references domain_name."""
+        assert "domain_name" in self.content
 
     def test_uses_incus_project_variable(self):
-        """Skill references openclaw_server_incus_project."""
-        assert "openclaw_server_incus_project" in self.content
+        """Skill references incus_project."""
+        assert "incus_project" in self.content
 
     def test_has_procedure_section(self):
         """Skill has a procedure section."""

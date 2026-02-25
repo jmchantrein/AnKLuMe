@@ -2,7 +2,7 @@
 {# Do NOT edit the deployed file directly. Edit THIS template instead. #}
 # Cron Configuration — {{ openclaw_server_agent_name }}
 
-Scheduled tasks for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+Scheduled tasks for the **{{ domain_name | default('unknown') }}** domain.
 These tasks use OpenClaw's built-in cron system (`openclaw cron`).
 
 ## Daily health summary
@@ -25,14 +25,14 @@ Steps:
 **Action**: Create a snapshot of all domain instances.
 
 Steps:
-1. List running instances in project `{{ openclaw_server_incus_project | default('default') }}`
+1. List running instances in project `{{ incus_project | default('default') }}`
 2. For each instance, create snapshot `pre-maint-<timestamp>`
 3. Log snapshot names to `~/.openclaw/workspace/memory/snapshots-log.md`
 4. Report success or failure
 
 ```bash
 incus snapshot create <instance> pre-maint-$(date +%Y%m%d-%H%M%S) \
-  --project {{ openclaw_server_incus_project | default('default') }}
+  --project {{ incus_project | default('default') }}
 ```
 
 ## Log rotation alerts
@@ -46,7 +46,7 @@ Steps:
 3. Suggest rotation commands if needed
 
 ```bash
-incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+incus exec <instance> --project {{ incus_project | default('default') }} -- \
   du -sh /var/log/ 2>/dev/null
 ```
 
@@ -65,7 +65,7 @@ Steps:
 
 ```bash
 # Scan domain subnet and compare to baseline
-nmap-diff.sh {{ openclaw_server_domain | default('unknown') }} \
+nmap-diff.sh {{ domain_name | default('unknown') }} \
   --baseline-dir {{ openclaw_server_nmap_baseline_dir }}
 ```
 
@@ -78,17 +78,17 @@ Register these tasks with OpenClaw:
 # Daily health summary
 openclaw cron add "health-daily" \
   --schedule "{{ openclaw_server_cron_daily_minute }} {{ openclaw_server_cron_daily_hour }} * * *" \
-  --message "Run daily health check for {{ openclaw_server_domain | default('unknown') }} domain"
+  --message "Run daily health check for {{ domain_name | default('unknown') }} domain"
 
 # Weekly log rotation check
 openclaw cron add "log-rotation" \
   --schedule "0 {{ openclaw_server_cron_daily_hour }} * * 1" \
-  --message "Check log sizes for {{ openclaw_server_domain | default('unknown') }} domain"
+  --message "Check log sizes for {{ domain_name | default('unknown') }} domain"
 {% if openclaw_server_network_scan_enabled | default(false) %}
 
 # Network inventory scan
 openclaw cron add "network-scan" \
   --schedule "0 */{{ (openclaw_server_network_scan_interval / 3600) | int | default(1) }} * * *" \
-  --message "Run network inventory diff for {{ openclaw_server_domain | default('unknown') }} domain"
+  --message "Run network inventory diff for {{ domain_name | default('unknown') }} domain"
 {% endif %}
 ```
