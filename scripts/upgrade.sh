@@ -8,6 +8,13 @@
 
 set -euo pipefail
 
+# Ensure Python can find the psot package alongside this script.
+# Needed when generate.py is invoked from a project workspace where
+# scripts/ may not contain the full psot/ package yet (e.g., during
+# the upgrade process itself).
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPTS_DIR}:${PYTHONPATH:-}"
+
 FRAMEWORK_FILES=(
     "Makefile"
     "site.yml"

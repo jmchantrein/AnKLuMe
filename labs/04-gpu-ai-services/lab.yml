@@ -1,0 +1,50 @@
+---
+# Lab 04: GPU Passthrough and AI Services
+# Deploy an AI domain with GPU passthrough and verify Ollama inference.
+
+title: "GPU Passthrough and AI Services"
+description: >-
+  Learn how to configure GPU passthrough in anklume and deploy an
+  AI service (Ollama) in a dedicated domain. You will verify GPU
+  availability on the host, create an infrastructure with a GPU
+  profile, deploy the ai-tools domain, and confirm that Ollama
+  runs with GPU acceleration.
+
+difficulty: intermediate
+duration: "45m"
+
+prerequisites:
+  - "01-first-deploy"
+
+objectives:
+  - "Verify GPU availability and driver readiness on the host"
+  - "Understand Incus GPU profiles and passthrough configuration"
+  - "Deploy an ai-tools domain with GPU-enabled container"
+  - "Confirm Ollama runs with GPU acceleration"
+  - "Run a model and verify inference works end-to-end"
+
+steps:
+  - id: "01"
+    title: "Check GPU availability"
+    instruction_file: "steps/01-check-gpu.md"
+    hint: "Run nvidia-smi on the host to verify the GPU is detected"
+    validation: "nvidia-smi > /dev/null 2>&1"
+  - id: "02"
+    title: "Create the infrastructure"
+    instruction_file: "steps/02-create-infra.md"
+    hint: "Copy the lab infra.yml and run make sync"
+    validation: "test -f inventory/ai-tools.yml && test -f group_vars/ai-tools.yml"
+  - id: "03"
+    title: "Deploy the infrastructure"
+    instruction_file: "steps/03-deploy.md"
+    hint: "Run make apply and check incus list for the ai-tools project"
+    validation: "incus list --project ai-tools --format csv -c s 2>/dev/null | grep -qc RUNNING"
+  - id: "04"
+    title: "Verify Ollama and GPU acceleration"
+    instruction_file: "steps/04-verify-ollama.md"
+    hint: "Use incus exec to check nvidia-smi and ollama status inside the container"
+    validation: "incus exec gpu-server --project ai-tools -- nvidia-smi > /dev/null 2>&1"
+  - id: "05"
+    title: "Test inference"
+    instruction_file: "steps/05-test-inference.md"
+    hint: "Pull a small model and send a prompt via the Ollama API"
