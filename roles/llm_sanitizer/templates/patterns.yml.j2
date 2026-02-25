@@ -99,6 +99,29 @@ categories:
       pattern: 'inventory/[a-z][a-z0-9-]+\.yml'
       replacement: "inventory/DOMAIN.yml"
 
+  # Network identifiers (MAC addresses, interfaces, ARP entries)
+  network_identifiers:
+    - name: mac_address
+      description: "IEEE 802 MAC addresses (colon-separated)"
+      pattern: '\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b'
+      replacement: "XX:XX:XX:XX:XX:XX"
+    - name: mac_address_dash
+      description: "IEEE 802 MAC addresses (dash-separated)"
+      pattern: '\b([0-9a-fA-F]{2}-){5}[0-9a-fA-F]{2}\b'
+      replacement: "XX-XX-XX-XX-XX-XX"
+    - name: linux_interface
+      description: "Linux network interface names (eth, ens, enp, veth, br)"
+      pattern: '\b(eth|ens|enp|veth|br-?)[a-z0-9@.]+\b'
+      replacement: "IFACE_REDACTED"
+    - name: arp_entry
+      description: "ARP table entries (IP at MAC on interface)"
+      pattern: '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\s+\S+\s+([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'
+      replacement: "REDACTED_IP REDACTED_TYPE XX:XX:XX:XX:XX:XX"
+    - name: nmap_host_report
+      description: "Nmap scan report host lines"
+      pattern: 'Nmap scan report for\s+\S+'
+      replacement: "Nmap scan report for REDACTED_HOST"
+
   # Credential patterns (API keys, tokens, secrets)
   credentials:
     - name: bearer_token

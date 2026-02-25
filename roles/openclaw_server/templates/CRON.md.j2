@@ -50,6 +50,26 @@ incus exec <instance> --project {{ openclaw_server_incus_project | default('defa
   du -sh /var/log/ 2>/dev/null
 ```
 
+{% if openclaw_server_network_scan_enabled | default(false) %}
+## Network inventory scan
+
+**Schedule**: Every {{ (openclaw_server_network_scan_interval / 3600) | int }} hour(s)
+**Action**: Run nmap inventory diff against the domain subnet baseline.
+
+Steps:
+1. Execute the `anklume-inventory-diff` skill
+2. Compare results against baseline in `{{ openclaw_server_nmap_baseline_dir }}`
+3. If new hosts or unexpected ports found: run `anklume-network-triage`
+4. Store results in `~/.openclaw/workspace/memory/inventory-diff-latest.md`
+5. If any CRITICAL findings: notify user immediately
+
+```bash
+# Scan domain subnet and compare to baseline
+nmap-diff.sh {{ openclaw_server_domain | default('unknown') }} \
+  --baseline-dir {{ openclaw_server_nmap_baseline_dir }}
+```
+
+{% endif %}
 ## Cron registration
 
 Register these tasks with OpenClaw:
@@ -64,4 +84,11 @@ openclaw cron add "health-daily" \
 openclaw cron add "log-rotation" \
   --schedule "0 {{ openclaw_server_cron_daily_hour }} * * 1" \
   --message "Check log sizes for {{ openclaw_server_domain | default('unknown') }} domain"
+{% if openclaw_server_network_scan_enabled | default(false) %}
+
+# Network inventory scan
+openclaw cron add "network-scan" \
+  --schedule "0 */{{ (openclaw_server_network_scan_interval / 3600) | int | default(1) }} * * *" \
+  --message "Run network inventory diff for {{ openclaw_server_domain | default('unknown') }} domain"
+{% endif %}
 ```

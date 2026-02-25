@@ -1,0 +1,91 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Skill: anklume-pcap-summary
+
+Condense packet capture (pcap) files into readable summaries
+for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+
+## Inputs
+
+- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+  (Incus project, auto-configured)
+- **pcap_file**: Path to the pcap file to analyze
+
+## Procedure
+
+### 1. Validate input
+
+Check that the pcap file exists and is readable. Verify tshark
+is available:
+
+```bash
+which tshark || echo "tshark not installed — install wireshark-common"
+```
+
+### 2. Extract protocol statistics
+
+```bash
+tshark -r <pcap_file> -q -z io,phs
+```
+
+This produces a protocol hierarchy statistics summary showing
+the distribution of protocols in the capture.
+
+### 3. Extract conversation summaries
+
+```bash
+tshark -r <pcap_file> -q -z conv,ip
+```
+
+List all IP conversations with packet counts and byte totals.
+
+### 4. Extract DNS queries
+
+```bash
+tshark -r <pcap_file> -Y "dns.qr == 0" -T fields \
+  -e dns.qry.name -e ip.src | sort | uniq -c | sort -rn | head -20
+```
+
+Top 20 DNS queries by frequency — identifies what hosts are
+being resolved.
+
+### 5. Detect anomalies
+
+Flag suspicious patterns:
+- Connections to non-standard ports (not 80, 443, 22, 53, etc.)
+- High-volume single-source traffic (potential scan or DoS)
+- DNS queries for unusual TLDs or high entropy domains
+- Traffic leaving the domain subnet (cross-domain leakage)
+
+Domain context: only flag traffic that crosses the boundary of
+project `{{ openclaw_server_incus_project | default('default') }}`.
+
+### 6. Compose summary
+
+```
+PCAP Summary — {{ openclaw_server_domain | default('unknown') }}
+Project: {{ openclaw_server_incus_project | default('default') }}
+Timestamp: <ISO 8601>
+Capture file: <pcap_file>
+Duration: <start_time> to <end_time>
+Total packets: <count>
+
+Protocol Distribution:
+  TCP: N% | UDP: N% | Other: N%
+
+Top Conversations:
+  <src_ip> <-> <dst_ip>: <packets> packets, <bytes> bytes
+
+Top DNS Queries:
+  <count> <domain_name>
+
+Anomalies:
+  [level] <description>
+
+No anomalies detected. (if applicable)
+```
+
+## Output
+
+Return the summary as text. Save to
+`~/.openclaw/workspace/memory/pcap-summary-latest.md`.

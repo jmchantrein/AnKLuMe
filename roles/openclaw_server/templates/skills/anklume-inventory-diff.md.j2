@@ -1,0 +1,75 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Skill: anklume-inventory-diff
+
+Compare current network inventory against a saved baseline to detect
+new hosts, open ports, and service changes for the
+**{{ openclaw_server_domain | default('unknown') }}** domain.
+
+## Inputs
+
+- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+  (Incus project, auto-configured)
+- **baseline_dir**: `{{ openclaw_server_nmap_baseline_dir }}`
+  (nmap baseline storage directory)
+
+## Procedure
+
+### 1. Run current inventory scan
+
+Execute nmap service detection scan against the domain subnet:
+
+```bash
+nmap -sV -oX /tmp/nmap-current.xml \
+  --exclude {{ openclaw_server_domain | default('unknown') }}-openclaw \
+  <domain_subnet>/24
+```
+
+The domain subnet is determined from the Incus project network
+configuration. Only scan hosts within this domain's project
+`{{ openclaw_server_incus_project | default('default') }}`.
+
+### 2. Load baseline
+
+Read the most recent baseline from `{{ openclaw_server_nmap_baseline_dir }}`.
+If no baseline exists, save the current scan as the initial baseline
+and report "Baseline created, no comparison available."
+
+### 3. Compare inventories
+
+Parse both nmap XML files and build host-service maps:
+`{host_ip: [(port, protocol, service, version), ...]}`.
+
+Detect:
+- **New hosts**: IP present now, absent from baseline
+- **Missing hosts**: IP in baseline, absent now
+- **New ports**: host exists in both, port open now but not before
+- **Closed ports**: host exists in both, port was open but is now closed
+- **Service changes**: same host and port, different service or version
+
+### 4. Update baseline
+
+After comparison, save the current scan as the new baseline in
+`{{ openclaw_server_nmap_baseline_dir }}/`.
+
+### 5. Compose report
+
+```
+Inventory Diff — {{ openclaw_server_domain | default('unknown') }}
+Project: {{ openclaw_server_incus_project | default('default') }}
+Timestamp: <ISO 8601>
+
+Changes since last scan:
+  + <ip> — new host (ports: ...)
+  - <ip> — missing host
+  ~ <ip>:<port> — new port (<service>)
+  ~ <ip>:<port> — closed port
+  ~ <ip>:<port> — service changed (<old> -> <new>)
+
+No changes detected. (if applicable)
+```
+
+## Output
+
+Return the diff report as text. Save to
+`~/.openclaw/workspace/memory/inventory-diff-latest.md`.
