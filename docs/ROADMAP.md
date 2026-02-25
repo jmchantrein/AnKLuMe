@@ -2702,12 +2702,11 @@ a) **Extend `openclaw_server` role for multi-instance**:
      per domain context
    - Systemd service per instance
 
-b) **infra.yml integration**:
+b) **infra.yml integration** (ADR-043: no `openclaw: true` directive):
    ```yaml
    domains:
      pro:
        trust_level: trusted
-       openclaw: true               # Deploy an OpenClaw instance
        machines:
          pro-dev: { type: lxc, roles: [base_system] }
          pro-openclaw: { type: lxc, roles: [base_system, openclaw_server] }
@@ -2727,13 +2726,13 @@ e) **Security model**:
    - ClawHub third-party skills only in sandbox domains
    - Custom anklume skills deployed via Ansible templates (ADR-036)
 
-**Validation criteria**:
-- [ ] Two OpenClaw instances in different domains coexist
-- [ ] Each instance sees only its domain's containers
-- [ ] Local mode (Ollama) works without proxy
-- [ ] Heartbeat functional (basic health check)
-- [ ] `make lint` passes
-- [ ] Tests for multi-instance configuration
+**Validation criteria** (design-level; live infra validation deferred):
+- [x] ADR-043 adopted: no `openclaw: true`, standard machine declaration
+- [x] Generator warns on `openclaw_server` role without `network_policy`
+- [x] `make lint` passes
+- [x] Tests for multi-instance configuration (generator-level)
+- [ ] Two OpenClaw instances in different domains coexist (live infra)
+- [ ] Heartbeat functional (live infra)
 
 ---
 

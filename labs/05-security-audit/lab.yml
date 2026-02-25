@@ -1,0 +1,50 @@
+---
+# Lab 05: Security Audit
+# Multi-domain infrastructure with trust levels, nftables isolation,
+# and network policy exceptions.
+
+title: "Security Audit"
+description: >-
+  Learn how to audit the security posture of an anklume
+  infrastructure. You will examine a multi-domain setup with
+  different trust levels, verify that nftables rules enforce
+  network isolation between domains, add a network policy for
+  selective cross-domain access, and run a systematic audit
+  using IP addressing conventions and the doctor script.
+
+difficulty: advanced
+duration: "1h"
+
+prerequisites:
+  - "01-first-deploy"
+
+objectives:
+  - "Understand trust levels and their IP addressing zones"
+  - "Inspect network bridges and verify domain isolation topology"
+  - "Verify that inter-domain traffic is blocked by nftables"
+  - "Add a network policy and confirm selective cross-domain access"
+  - "Run a systematic security audit of the infrastructure"
+
+steps:
+  - id: "01"
+    title: "Inspect the topology"
+    instruction_file: "steps/01-inspect-topology.md"
+    hint: "Use incus network list and incus project list to see all resources"
+    validation: "incus list --project corp-office --format csv -c s 2>/dev/null | grep -qc RUNNING"
+  - id: "02"
+    title: "Test isolation"
+    instruction_file: "steps/02-test-isolation.md"
+    hint: "Try pinging from a container in one domain to a container in another"
+  - id: "03"
+    title: "Examine nftables rules"
+    instruction_file: "steps/03-nftables-rules.md"
+    hint: "Run make nftables to generate rules, then inspect the output"
+    validation: "test -f /tmp/anklume-nftables.conf || make nftables > /dev/null 2>&1"
+  - id: "04"
+    title: "Add a network policy"
+    instruction_file: "steps/04-network-policies.md"
+    hint: "Add a network_policies section to infra.yml and regenerate nftables"
+  - id: "05"
+    title: "Audit checklist"
+    instruction_file: "steps/05-audit-checklist.md"
+    hint: "Systematically verify IP zones, isolation, and protection flags"

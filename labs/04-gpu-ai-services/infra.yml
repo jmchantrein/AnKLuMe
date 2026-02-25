@@ -1,0 +1,35 @@
+---
+# Lab 04 — GPU Passthrough and AI Services
+# A single ai-tools domain with GPU passthrough for Ollama inference.
+
+project_name: lab-04
+
+global:
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  ai-tools:
+    description: "AI services domain with GPU passthrough"
+    trust_level: trusted
+    profiles:
+      gpu-passthrough:
+        devices:
+          gpu:
+            type: gpu
+            gid: "44"
+        config: {}
+    machines:
+      gpu-server:
+        description: "Ollama inference server with GPU"
+        type: lxc
+        gpu: true
+        profiles: [default, gpu-passthrough]
+        config:
+          security.nesting: "true"
+        roles: [base_system]

@@ -1,0 +1,59 @@
+---
+# Lab 05 — Security Audit
+# Multi-domain infrastructure with different trust levels for
+# practicing security audit methodology.
+
+project_name: lab-05
+
+global:
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
+  default_os_image: "images:debian/13"
+  default_connection: community.general.incus
+  default_user: root
+
+domains:
+  corp-office:
+    description: "Trusted corporate office network"
+    trust_level: trusted
+    machines:
+      office-workstation:
+        description: "Employee workstation"
+        type: lxc
+        roles: [base_system]
+      office-fileserver:
+        description: "Internal file server"
+        type: lxc
+        ephemeral: false
+        roles: [base_system]
+
+  corp-dev:
+    description: "Development environment"
+    trust_level: semi-trusted
+    machines:
+      dev-server:
+        description: "Development server"
+        type: lxc
+        roles: [base_system]
+
+  corp-dmz:
+    description: "Untrusted DMZ for public-facing services"
+    trust_level: untrusted
+    machines:
+      dmz-web:
+        description: "Public web server"
+        type: lxc
+        ephemeral: true
+        roles: [base_system]
+
+  corp-sandbox:
+    description: "Disposable sandbox for testing"
+    trust_level: disposable
+    ephemeral: true
+    machines:
+      sandbox-test:
+        description: "Throwaway test container"
+        type: lxc
+        roles: [base_system]
