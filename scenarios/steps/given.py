@@ -162,6 +162,153 @@ def infra_with_managed_content(sandbox, filename):
     assert path.exists(), f"File not found: {path}"
 
 
+@given(parsers.parse('infra.yml with invalid snapshots_schedule "{schedule}"'))
+def infra_with_invalid_schedule(sandbox, schedule):
+    """Create infra.yml with an invalid snapshots_schedule."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    "test-vm": {
+                        "type": "lxc",
+                        "snapshots_schedule": schedule,
+                    },
+                },
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given(parsers.parse('infra.yml with invalid snapshots_expiry "{expiry}"'))
+def infra_with_invalid_expiry(sandbox, expiry):
+    """Create infra.yml with an invalid snapshots_expiry."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    "test-vm": {
+                        "type": "lxc",
+                        "snapshots_expiry": expiry,
+                    },
+                },
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given(parsers.parse("infra.yml with boot_priority {priority:d}"))
+def infra_with_invalid_boot_priority(sandbox, priority):
+    """Create infra.yml with an out-of-range boot_priority."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    "test-vm": {
+                        "type": "lxc",
+                        "boot_priority": priority,
+                    },
+                },
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given(parsers.parse('infra.yml with shared_volume consumer "{consumer}"'))
+def infra_with_invalid_sv_consumer(sandbox, consumer):
+    """Create infra.yml with an unknown shared_volume consumer."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    "test-vm": {"type": "lxc"},
+                },
+            },
+        },
+        "shared_volumes": {
+            "docs": {
+                "path": "/shared/docs",
+                "consumers": {consumer: "ro"},
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given(parsers.parse('infra.yml with shared_volume relative path "{path}"'))
+def infra_with_relative_sv_path(sandbox, path):
+    """Create infra.yml with a relative shared_volume path."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    "test-vm": {"type": "lxc"},
+                },
+            },
+        },
+        "shared_volumes": {
+            "docs": {
+                "path": path,
+                "consumers": {"test": "ro"},
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given(parsers.parse('infra.yml with invalid trust_level "{level}"'))
+def infra_with_invalid_trust_level(sandbox, level):
+    """Create infra.yml with an invalid trust_level."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "test": {
+                "trust_level": level,
+                "machines": {
+                    "test-vm": {"type": "lxc"},
+                },
+            },
+        },
+    }
+    dst = sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
 @given("no generated files exist")
 def no_generated_files(sandbox, clean_generated_files):
     """Remove all generated Ansible files."""

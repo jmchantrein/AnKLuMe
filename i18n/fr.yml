@@ -58,6 +58,9 @@ claude-host-audit: "Afficher le journal d'audit du jour en mode hote"
 console: "Lancer la console tmux avec panneaux colores par domaine"
 dashboard: "Tableau de bord web (PORT=8888)"
 desktop-config: "Generer la config d'environnement de bureau depuis infra.yml"
+desktop-apply: "Appliquer la config bureau via plugin (ENGINE=sway)"
+desktop-reset: "Reinitialiser la config bureau par defaut"
+desktop-plugins: "Lister les plugins de bureau disponibles"
 
 # ── Instance management ──────────────────────────────────
 disp: "Lancer une instance ephemere jetable"

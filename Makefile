@@ -112,6 +112,15 @@ domain-exec: ## Open terminal to instance with domain colors (I=<instance>)
 desktop-config: ## Generate desktop environment config from infra.yml
 	python3 scripts/desktop_config.py $(if $(SWAY),--sway) $(if $(FOOT),--foot) $(if $(DESKTOP),--desktop)
 
+desktop-apply: ## Apply desktop plugin config from infra.yml (ENGINE=sway)
+	scripts/desktop-plugin.sh apply $(if $(ENGINE),--engine $(ENGINE))
+
+desktop-reset: ## Reset desktop plugin config to defaults (ENGINE=sway)
+	scripts/desktop-plugin.sh reset $(if $(ENGINE),--engine $(ENGINE))
+
+desktop-plugins: ## List available desktop plugins
+	@scripts/desktop-plugin.sh list
+
 dashboard: ## Launch web dashboard (PORT=8888)
 	python3 scripts/dashboard.py --port $(or $(PORT),8888) $(if $(HOST),--host $(HOST))
 
@@ -603,6 +612,10 @@ lab-solution: ## Show solution (L=01)
 init: install-hooks ## Initial setup: install all dependencies
 	$(call require_container,init)
 	ansible-galaxy collection install -r requirements.yml
+	@mkdir -p roles_vendor
+	@if python3 -c "import yaml; r=yaml.safe_load(open('requirements.yml'))['roles']; exit(0 if r else 1)" 2>/dev/null; then \
+		ansible-galaxy role install -r requirements.yml -p roles_vendor/; \
+	fi
 	pip install --user --break-system-packages pyyaml pytest molecule ruff
 	@echo "---"
 	@echo "Also install system packages: ansible-lint yamllint shellcheck"
@@ -729,7 +742,7 @@ help-all: ## Show all available targets
         dead-code call-graph dep-graph code-graph \
         audit audit-json smoke doctor \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
-        clipboard-to clipboard-from domain-exec desktop-config dashboard \
+        clipboard-to clipboard-from domain-exec desktop-config desktop-apply desktop-reset desktop-plugins dashboard \
         export-app export-list export-remove \
         llm-switch llm-status llm-bench llm-dev ollama-dev \
         claude-host claude-host-resume claude-host-audit \

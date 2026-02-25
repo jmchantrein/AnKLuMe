@@ -8,11 +8,11 @@ Feature: Shared volumes setup
 
   Scenario: Sync generates shared volume devices
     Given infra.yml from "pro-workstation"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
 
   Scenario: Sync dry-run shows device changes
     Given infra.yml from "pro-workstation"
-    When I run "make sync-dry"
+    When I run "python3 scripts/generate.py infra.yml --dry-run"
     Then exit code is 0

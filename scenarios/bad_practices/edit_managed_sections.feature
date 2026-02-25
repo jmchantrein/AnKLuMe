@@ -8,9 +8,9 @@ Feature: Edit managed sections
 
   Scenario: Managed section content is overwritten by sync
     Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     When I edit the managed section in "group_vars/anklume.yml"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And the managed section in "group_vars/anklume.yml" is unchanged

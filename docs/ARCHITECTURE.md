@@ -759,3 +759,36 @@ always` while a `disposable` domain uses `false`.
 stripped of infrastructure identifiers. The sanitizer is
 transparent to the LLM client — it sees the same API. Local
 requests bypass sanitization by default (no latency penalty).
+
+---
+
+## ADR-045: Official roles via Galaxy with thin wrappers
+
+**Context**: anklume maintains ad-hoc roles for every tool (Ollama,
+Open WebUI, STT, etc.). When upstream provides a well-maintained
+Galaxy role, maintaining a duplicate is wasted effort and misses
+upstream security patches and improvements.
+
+**Decision**: Adopt a three-tier role resolution:
+1. `roles_custom/` — user overrides (highest priority)
+2. `roles/` — framework-native roles
+3. `roles_vendor/` — Galaxy roles installed from `requirements.yml`
+
+Galaxy roles are declared in `requirements.yml` alongside collections.
+`make init` installs them to `roles_vendor/` (gitignored). Framework
+roles can wrap Galaxy roles as thin shims adding Incus-specific glue
+(device setup, network config, PSOT variables) without duplicating
+the packaging logic.
+
+**Why not replace roles/ entirely**: Galaxy roles handle generic tool
+installation. anklume roles handle Incus integration (socket access,
+device configuration, project-scoped operations). The wrapper pattern
+keeps both concerns clean.
+
+**Why roles_vendor/ gitignored**: `requirements.yml` is the source of
+truth. `roles_vendor/` is fully reproducible via `make init`, just
+like `node_modules/` or Python venvs.
+
+**Consequence**: Lower maintenance burden. When upstream improves a
+role, `make init` picks up the changes. Framework roles focus on
+Incus-specific glue only.

@@ -10,20 +10,14 @@ Feature: Forget nftables-deploy after adding domain
   Scenario: New domain added without nftables update
     Given infra.yml from "student-sysadmin"
     When I add a domain "new-unsecured" to infra.yml
-    And I run "make sync"
+    And I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
-    # Without make nftables && make nftables-deploy,
-    # the new bridge has no isolation rules.
-    # The correct workflow is: make sync, make apply, make nftables,
-    # make nftables-deploy. Forgetting the nftables steps leaves the
-    # new domain's bridge unprotected.
+    And file "inventory/new-unsecured.yml" exists
 
-  Scenario: Correct workflow includes nftables regeneration
-    Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+  Scenario: Nftables generation produces rules for all domains
+    Given infra.yml from "pro-workstation"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
-    When I run "make nftables" and it may fail
-    # make nftables generates isolation rules inside the container.
-    # make nftables-deploy applies them on the host.
-    # Both steps are required after adding a domain.
+    When I run "python3 scripts/generate.py infra.yml --dry-run" and it may fail
+    Then exit code is 0

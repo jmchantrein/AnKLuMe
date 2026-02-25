@@ -8,7 +8,7 @@ Feature: Duplicate IPs in infra.yml
 
   Scenario: Two machines share the same IP
     Given infra.yml with two machines sharing "10.100.200.10"
-    When I run "make sync" and it may fail
+    When I run "python3 scripts/generate.py infra.yml" and it may fail
     Then exit code is non-zero
     And output contains "already used"
     And file "inventory/test-a.yml" does not exist

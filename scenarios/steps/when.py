@@ -18,18 +18,17 @@ def run_command_may_fail(sandbox, command):
 
 @when(parsers.parse('I add a domain "{domain}" to infra.yml'))
 def add_domain_to_infra(sandbox, domain):
-    """Add a new domain to the current infra.yml."""
+    """Add a new domain to the current infra.yml.
+
+    Uses auto-assigned IPs (no explicit IP) to work with ADR-038
+    addressing convention. Trust level defaults to semi-trusted.
+    """
     infra = sandbox.load_infra()
-    base = infra.get("global", {}).get("base_subnet", "10.200")
-    max_subnet = max(
-        d.get("subnet_id", 0) for d in infra.get("domains", {}).values()
-    )
     infra.setdefault("domains", {})[domain] = {
-        "subnet_id": max_subnet + 1,
+        "trust_level": "semi-trusted",
         "machines": {
             f"{domain}-test": {
                 "type": "lxc",
-                "ip": f"{base}.{max_subnet + 1}.10",
             }
         },
     }
