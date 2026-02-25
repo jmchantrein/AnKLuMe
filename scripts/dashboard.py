@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """anklume web dashboard — live infrastructure status.
 
-Single-file web dashboard using Python's stdlib http.server and htmx
-(loaded from CDN) for reactive updates. No external Python dependencies.
+Single-file web dashboard using FastAPI and htmx (loaded from CDN) for
+reactive updates.
 
 Endpoints:
     GET /           — Main dashboard page
     GET /api/status — JSON: instances, networks, projects
+    GET /api/html   — HTML fragment for htmx polling
     GET /api/infra  — JSON: parsed infra.yml
 
 Usage:
@@ -17,11 +18,14 @@ Phase 21: Desktop Integration
 """
 
 import argparse
-import http.server
 import json
 import subprocess
 import sys
 from pathlib import Path
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -280,41 +284,33 @@ def render_status_html(status):
     return "\n".join(parts)
 
 
-# ── HTTP handler ─────────────────────────────────────────────────
+# ── FastAPI application ──────────────────────────────────────────
+
+app = FastAPI(title="anklume Dashboard")
 
 
-class DashboardHandler(http.server.BaseHTTPRequestHandler):
-    """Handle dashboard HTTP requests."""
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """Serve main dashboard page."""
+    return HTML_TEMPLATE
 
-    def do_GET(self):  # noqa: N802
-        if self.path == "/":
-            self._serve_html(HTML_TEMPLATE)
-        elif self.path == "/api/status":
-            self._serve_json(build_status())
-        elif self.path == "/api/html":
-            status = build_status()
-            html = render_status_html(status)
-            self._serve_html(html)
-        elif self.path == "/api/infra":
-            self._serve_json(load_infra_yml())
-        else:
-            self.send_error(404)
 
-    def _serve_html(self, content):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(content.encode())
+@app.get("/api/status")
+async def api_status():
+    """Return full status as JSON."""
+    return build_status()
 
-    def _serve_json(self, data):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, indent=2).encode())
 
-    def log_message(self, format, *args):  # noqa: A002
-        """Suppress default logging for htmx polling."""
-        pass
+@app.get("/api/html", response_class=HTMLResponse)
+async def api_html():
+    """Return status as HTML fragment for htmx polling."""
+    return render_status_html(build_status())
+
+
+@app.get("/api/infra")
+async def api_infra():
+    """Return parsed infra.yml as JSON."""
+    return load_infra_yml()
 
 
 # ── Entry point ──────────────────────────────────────────────────
@@ -326,14 +322,8 @@ def main():
     parser.add_argument("--port", type=int, default=8888, help="Port (default: 8888)")
     args = parser.parse_args()
 
-    server = http.server.HTTPServer((args.host, args.port), DashboardHandler)
     print(f"anklume Dashboard: http://{args.host}:{args.port}")
-    print("Press Ctrl+C to stop")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopped")
-        server.server_close()
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

@@ -405,14 +405,21 @@ pytest-bdd has ~1.5k GitHub stars and active maintenance. Adding
 "scenarios" to `testpaths` in pyproject.toml is sufficient — no
 separate runner configuration needed.
 
-**Status**: rejected — migrate to behave
+**Status**: rejected — migrated to behave
 
 **Review outcome (2026-02-25)**: behave est préféré pour les scénarios
 Gherkin. behave est le framework BDD de référence en Python, avec un
 meilleur support Gherkin natif (tables, outlines, tags). pytest reste
 pour les tests unitaires et de propriétés. Les deux outils coexistent
 sans duplication : pytest pour les tests techniques, behave pour les
-scénarios BDD. La migration est ajoutée au ROADMAP (Deferred Enhancements).
+scénarios BDD.
+
+**Implementation (2026-02-25)**: Migration completed. pytest-bdd removed,
+behave installed. `scenarios/conftest.py` replaced by `environment.py`
+(behave hooks) + `support.py` (Sandbox class). Step files converted.
+`test_bad_practices.py` and `test_best_practices.py` deleted (behave
+auto-discovers). Makefile targets updated. All 21 features / 44 scenarios /
+252 steps resolve correctly.
 
 ---
 
@@ -439,13 +446,17 @@ provides reactive auto-refresh without writing JavaScript. No pip
 install needed to run the dashboard. This follows the project's
 principle of minimizing external dependencies.
 
-**Status**: validated with modification — migrate to FastAPI
+**Status**: validated with modification — migrated to FastAPI
 
 **Review outcome (2026-02-25)**: http.server fonctionne pour la v1
 lecture seule, mais ne permet pas d'évoluer facilement vers l'interactivité
 (formulaires, WebSocket, authentification). Décision : migrer vers FastAPI
-dès maintenant pour préparer les évolutions futures. FastAPI est ajouté au
-ROADMAP (Deferred Enhancements).
+dès maintenant pour préparer les évolutions futures.
+
+**Implementation (2026-02-25)**: Migration completed. `http.server`
+replaced by FastAPI + uvicorn. All 4 routes preserved. htmx frontend
+unchanged. `fastapi` and `uvicorn` added to `pyproject.toml` runtime deps
+and `make init`.
 
 ---
 
@@ -472,7 +483,7 @@ container, requires no setup, no running daemon, and no network access.
 It's the simplest mechanism that preserves the explicit-action security
 model. Compatible with MCP clipboard tools (same file path).
 
-**Status**: validated with enhancement — QubesOS-style clipboard security
+**Status**: validated with enhancement — QubesOS-style clipboard security implemented
 
 **Review outcome (2026-02-25)**: Le mécanisme `incus file push/pull`
 est validé comme transport. Ajout d'un modèle de sécurité inspiré de
@@ -491,7 +502,12 @@ QubesOS :
   (le répertoire `~/.anklume/` est déjà sur le host, protégé par les
   permissions UNIX)
 
-Ce modèle est ajouté au ROADMAP (Deferred Enhancements).
+**Implementation (2026-02-25)**: All features implemented in
+`scripts/clipboard.sh` except tmux domain-switch purge (requires tmux
+hook integration, deferred). New commands: `history`, `recall`, `purge`.
+`ANKLUME_CLIPBOARD_TIMEOUT` env var (default 30s). Trust-level warning
+on copy-from untrusted/disposable domains. History stored in
+`~/.anklume/clipboard/`.
 
 ---
 

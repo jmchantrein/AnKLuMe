@@ -1,5 +1,7 @@
 """Tests for Phase 21 desktop integration scripts."""
 
+import importlib.util
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -113,6 +115,10 @@ class TestDesktopConfig:
 # ── dashboard.py tests ───────────────────────────────────────────
 
 
+@pytest.mark.skipif(
+    not shutil.which("uvicorn") and not importlib.util.find_spec("uvicorn"),
+    reason="uvicorn not installed (dashboard requires fastapi/uvicorn)",
+)
 class TestDashboard:
     """Tests for the web dashboard (pure logic, no server)."""
 
