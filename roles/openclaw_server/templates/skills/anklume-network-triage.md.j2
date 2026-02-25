@@ -3,11 +3,11 @@
 # Skill: anklume-network-triage
 
 Parse nmap and tshark output, classify anomalies using LLM analysis
-for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+for the **{{ domain_name | default('unknown') }}** domain.
 
 ## Inputs
 
-- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+- **project**: `{{ incus_project | default('default') }}`
   (Incus project, auto-configured)
 - **scan_output**: Raw nmap or tshark text (passed as argument or file path)
 - **baseline_dir**: `{{ openclaw_server_nmap_baseline_dir }}`
@@ -47,15 +47,15 @@ to classify each finding:
 | **critical** | Requires immediate attention | Unauthorized host, known vulnerable service |
 
 Domain context for classification:
-- Domain: `{{ openclaw_server_domain | default('unknown') }}`
+- Domain: `{{ domain_name | default('unknown') }}`
 - Trust level: use domain trust level for severity thresholds
 - Only consider hosts within this domain's project
 
 ### 4. Compose report
 
 ```
-Network Triage — {{ openclaw_server_domain | default('unknown') }}
-Project: {{ openclaw_server_incus_project | default('default') }}
+Network Triage — {{ domain_name | default('unknown') }}
+Project: {{ incus_project | default('default') }}
 Timestamp: <ISO 8601>
 Scan type: nmap | tshark
 

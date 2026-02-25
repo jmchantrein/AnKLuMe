@@ -32,27 +32,18 @@ openclaw_server_ollama_port: 11434
 # Embeddings model for memory search (served by Ollama on port 11434)
 openclaw_server_embeddings_model: "nomic-embed-text"
 
-# --- Agent identity (ADR-036: reproduced from templates) ---
+# --- Agent identity (set in host_vars per instance) ---
 
-openclaw_server_agent_name: "Ada"
-openclaw_server_agent_emoji: "\U0001F99E"
+# Empty defaults — users configure per instance via host_vars.
+# SOUL personality is persisted via persistent_data volumes.
+openclaw_server_agent_name: ""
+openclaw_server_agent_emoji: ""
 
 # --- User profile ---
 
 openclaw_server_user_name: "anklume"
 openclaw_server_user_timezone: "Europe/Paris"
 openclaw_server_user_languages: "French (primary), English (technical)"
-
-# --- Domain awareness (ADR-043: per-domain instances) ---
-
-# Domain this OpenClaw instance belongs to (set by generator)
-openclaw_server_domain: ""
-
-# Incus instance name (set by generator via instance_name)
-openclaw_server_instance_name: ""
-
-# Incus project name (set by generator in host_vars)
-openclaw_server_incus_project: "default"
 
 # --- Heartbeat monitoring (Phase 38) ---
 

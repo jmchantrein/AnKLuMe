@@ -545,7 +545,7 @@ apply-tor: ## Setup Tor transparent proxy in container (I=<instance> [PROJECT=<p
 # ── Print Service (Phase 20e) ─────────────────────────────
 apply-print: ## Setup CUPS print service in container (I=<instance> [PROJECT=<project>])
 	@test -n "$(I)" || { echo "ERROR: I required. Usage: make apply-print I=<instance>"; exit 1; }
-	scripts/sys-print.sh setup $(I) $(if $(PROJECT),--project $(PROJECT))
+	scripts/cups-setup.sh setup $(I) $(if $(PROJECT),--project $(PROJECT))
 
 # ── Lifecycle ─────────────────────────────────────────────
 flush: ## Destroy all anklume infrastructure (FORCE=true required in prod)

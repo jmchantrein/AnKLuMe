@@ -1251,7 +1251,7 @@ b) **Instance removal** (`make instance-remove`):
 
 c) **Persistent data** (ADR-040):
    - `persistent_data:` per-machine section in infra.yml
-   - Host bind mounts at `<persistent_data_base>/<machine>/<volume>`
+   - Host bind mounts at `<persistent_data_base>/<domain>/<machine>/<volume>`
    - Devices injected as `pd-<name>` (like `sv-*` for shared volumes)
    - `scripts/create-data-dirs.py` + `make data-dirs`
 

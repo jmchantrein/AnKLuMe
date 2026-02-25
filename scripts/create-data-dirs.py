@@ -29,13 +29,13 @@ def main():
     domains = infra.get("domains") or {}
 
     created = []
-    for domain in domains.values():
+    for dname, domain in domains.items():
         for mname, machine in (domain.get("machines") or {}).items():
             pd = machine.get("persistent_data")
             if not pd or not isinstance(pd, dict):
                 continue
             for vname in pd:
-                source = f"{pd_base}/{mname}/{vname}"
+                source = f"{pd_base}/{dname}/{mname}/{vname}"
                 p = Path(source)
                 if not p.exists():
                     p.mkdir(parents=True, exist_ok=True)

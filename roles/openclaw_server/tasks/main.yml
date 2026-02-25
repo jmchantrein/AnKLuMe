@@ -1,14 +1,7 @@
 ---
 # OpenclawServer | Install and configure OpenClaw AI assistant
-# Domain-aware (ADR-036, ADR-043): templates + per-domain service names.
+# ADR-036: templates are framework-reproducible.
 # Applied via provisioning play (connection: community.general.incus).
-
-- name: OpenclawServer | Compute service name
-  ansible.builtin.set_fact:
-    _openclaw_service_name: >-
-      {{ 'openclaw-' ~ openclaw_server_domain
-         if openclaw_server_domain | default('')
-         else 'openclaw' }}
 
 - name: OpenclawServer | Install curl for nodesource setup
   ansible.builtin.apt:
@@ -172,13 +165,13 @@
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:
     src: openclaw.service.j2
-    dest: "/etc/systemd/system/{{ _openclaw_service_name }}.service"
+    dest: "/etc/systemd/system/openclaw.service"
     mode: "0644"
   notify: OpenclawServer | Restart OpenClaw
 
 - name: OpenclawServer | Enable and start OpenClaw service
   ansible.builtin.systemd:
-    name: "{{ _openclaw_service_name }}"
+    name: openclaw
     enabled: "{{ openclaw_server_enabled }}"
     state: started
     daemon_reload: true

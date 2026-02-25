@@ -2,8 +2,8 @@
 {# Do NOT edit the deployed file directly. Edit THIS template instead. #}
 # Heartbeat Monitoring — {{ openclaw_server_agent_name }}
 
-Domain-scoped health monitoring for the **{{ openclaw_server_domain | default('unknown') }}** domain.
-All checks target the Incus project `{{ openclaw_server_incus_project | default('default') }}` only.
+Domain-scoped health monitoring for the **{{ domain_name | default('unknown') }}** domain.
+All checks target the Incus project `{{ incus_project | default('default') }}` only.
 
 ## Configuration
 
@@ -12,15 +12,15 @@ All checks target the Incus project `{{ openclaw_server_incus_project | default(
 | Check interval | {{ openclaw_server_heartbeat_interval }}s | Seconds between health checks |
 | Disk warning | {{ openclaw_server_disk_warn_pct }}% | Warning threshold |
 | Disk critical | {{ openclaw_server_disk_crit_pct }}% | Critical threshold |
-| Domain | {{ openclaw_server_domain | default('unknown') }} | Monitored domain |
-| Project | {{ openclaw_server_incus_project | default('default') }} | Incus project |
+| Domain | {{ domain_name | default('unknown') }} | Monitored domain |
+| Project | {{ incus_project | default('default') }} | Incus project |
 
 ## Container status check
 
 Query all instances in the domain project and report status changes.
 
 ```bash
-incus list --project {{ openclaw_server_incus_project | default('default') }} --format json
+incus list --project {{ incus_project | default('default') }} --format json
 ```
 
 **Expected states**: RUNNING, STOPPED, FROZEN.
@@ -32,7 +32,7 @@ that were RUNNING in the previous check but are now STOPPED as critical.
 Check disk usage for each running instance in the domain.
 
 ```bash
-incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+incus exec <instance> --project {{ incus_project | default('default') }} -- \
   df -h --output=pcent,target / | tail -1
 ```
 
@@ -47,7 +47,7 @@ incus exec <instance> --project {{ openclaw_server_incus_project | default('defa
 For each running instance, verify key systemd services are active.
 
 ```bash
-incus exec <instance> --project {{ openclaw_server_incus_project | default('default') }} -- \
+incus exec <instance> --project {{ incus_project | default('default') }} -- \
   systemctl is-active <service> 2>/dev/null
 ```
 
@@ -65,7 +65,7 @@ Compare current network state against a saved baseline.
 ### Capture baseline
 
 ```bash
-incus list --project {{ openclaw_server_incus_project | default('default') }} \
+incus list --project {{ incus_project | default('default') }} \
   --format csv -c n,s,4 > ~/.openclaw/workspace/memory/network-baseline.csv
 ```
 
@@ -83,7 +83,7 @@ Save the diff result to `~/.openclaw/workspace/memory/network-diff-latest.md`.
 Format health check results as a structured summary:
 
 ```markdown
-## Health Report — {{ openclaw_server_domain | default('unknown') }}
+## Health Report — {{ domain_name | default('unknown') }}
 **Date**: <timestamp>
 **Status**: OK | WARNING | CRITICAL
 

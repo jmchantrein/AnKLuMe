@@ -52,13 +52,13 @@ make apply
 make apply-print I=shared-print
 
 # Add a USB printer
-scripts/sys-print.sh add-usb shared-print --vendor 04b8 --product 0005
+scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
 
 # Add network printer access
-scripts/sys-print.sh add-network shared-print --nic-parent enp3s0
+scripts/cups-setup.sh add-network shared-print --nic-parent enp3s0
 
 # Check status
-scripts/sys-print.sh status shared-print
+scripts/cups-setup.sh status shared-print
 ```
 
 ## Printing from other domains

@@ -3,11 +3,11 @@
 # Skill: anklume-network-diff
 
 Compare current network state against a saved baseline for the
-**{{ openclaw_server_domain | default('unknown') }}** domain.
+**{{ domain_name | default('unknown') }}** domain.
 
 ## Inputs
 
-- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+- **project**: `{{ incus_project | default('default') }}`
   (Incus project, auto-configured)
 - **baseline_path**: `~/.openclaw/workspace/memory/network-baseline.csv`
   (auto-generated on first run)
@@ -17,7 +17,7 @@ Compare current network state against a saved baseline for the
 ### 1. Capture current state
 
 ```bash
-incus list --project {{ openclaw_server_incus_project | default('default') }} \
+incus list --project {{ incus_project | default('default') }} \
   --format csv -c n,s,4
 ```
 
@@ -47,8 +47,8 @@ the next diff will compare against the state from this run.
 ### 5. Compose report
 
 ```
-Network Diff — {{ openclaw_server_domain | default('unknown') }}
-Project: {{ openclaw_server_incus_project | default('default') }}
+Network Diff — {{ domain_name | default('unknown') }}
+Project: {{ incus_project | default('default') }}
 Timestamp: <ISO 8601>
 
 Changes since last check:

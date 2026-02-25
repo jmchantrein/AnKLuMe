@@ -369,7 +369,7 @@ proxy devices.
 Need to decide between Ansible roles and shell scripts.
 
 **Choice**: Implement as standalone shell scripts (`scripts/tor-gateway.sh`,
-`scripts/sys-print.sh`) wrapping `incus exec` commands. Same approach as
+`scripts/cups-setup.sh`) wrapping `incus exec` commands. Same approach as
 Phase 20a-d scripts (disp.sh, golden.sh, transfer.sh).
 
 **Alternatives considered**:

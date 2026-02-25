@@ -7,55 +7,31 @@ open-source, self-hosted AI assistant that connects to messaging platforms
 Running OpenClaw inside anklume provides network isolation, controlled
 messaging access, and local LLM delegation for privacy-sensitive queries.
 
-## Per-domain architecture (ADR-043)
+## Deployment
 
-OpenClaw can be deployed as per-domain instances. Each domain that sets
-`openclaw: true` in `infra.yml` gets its own `<domain>-openclaw` LXC
-container, automatically created by the generator. Each instance:
-
-- Sees only its own domain's network (inherits domain isolation)
-- Has its own agent identity, memory, and persona
-- Uses a domain-scoped systemd service name (`openclaw-<domain>`)
-- Receives domain-specific template variables for agent configuration
+OpenClaw instances are declared like any other machine in `infra.yml`.
+Each instance inherits its domain's network isolation. SOUL personality
+is persisted via `persistent_data` volumes — instances are deployed
+blank and the user configures the agent identity as needed.
 
 ```yaml
-# infra.yml
+# infra.yml — declare OpenClaw machines explicitly
 domains:
   pro:
     trust_level: trusted
-    openclaw: true         # Auto-creates pro-openclaw
     machines:
+      pro-openclaw:
+        description: "AI assistant for pro domain"
+        type: lxc
+        roles: [base_system, openclaw_server]
       pw-dev:
         type: lxc
-  perso:
-    trust_level: trusted
-    openclaw: true         # Auto-creates perso-openclaw
-    machines:
-      perso-ws:
-        type: lxc
 ```
 
-This results in:
+Cross-domain AI access (e.g., reaching the shared Ollama backend)
+requires explicit `network_policies` in `infra.yml`.
 
-```
-Host
-+-- pro-openclaw     (pro project, sees only 10.110.x.x)
-+-- perso-openclaw   (perso project, sees only 10.110.y.x)
-+-- gpu-server       (ai-tools project, shared LLM backend)
-```
-
-Each per-domain instance connects to the shared Ollama backend for LLM
-inference. Cross-domain AI access requires explicit `network_policies`
-in `infra.yml`.
-
-If a user explicitly declares `<domain>-openclaw` in `machines:`,
-their definition takes precedence over auto-creation. Setting
-`openclaw: false` (or omitting it) on a domain skips auto-creation.
-
-The centralized `ai-tools` OpenClaw deployment pattern (documented
-below) remains valid for single-assistant setups.
-
-## Centralized architecture (legacy)
+## Architecture
 
 ```
 Host

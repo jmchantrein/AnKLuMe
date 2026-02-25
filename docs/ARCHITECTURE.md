@@ -645,7 +645,7 @@ consumers.
 
 **Decision**: Add `persistent_data` per-machine in infra.yml. Each
 volume is an Incus disk device (`pd-<name>`) with source on the host
-at `<persistent_data_base>/<machine>/<volume>`. The generator injects
+at `<persistent_data_base>/<domain>/<machine>/<volume>`. The generator injects
 devices into `instance_devices` alongside `sv-*` shared volume devices.
 The existing `incus_instances` role handles the devices transparently.
 
@@ -685,45 +685,38 @@ instances.
 
 ---
 
-## ADR-043: Per-domain OpenClaw instances
+## ADR-043: OpenClaw instances — standard machine declaration (KISS)
 
-**Context**: Phase 28b deployed OpenClaw as a single centralized
-instance in the `ai-tools` domain. This works for a single-user
-setup but violates domain isolation principles: the centralized
-assistant can see all domains via network policies, and all domains
-share one assistant configuration.
+**Context**: Phase 28b deployed OpenClaw as a centralized instance.
+An earlier iteration (Phase 37) introduced `openclaw: true` as a
+domain-level directive with auto-creation of `<domain>-openclaw`
+machines. This added special-case logic (enrichment function,
+domain-level field, template conditionals) for what is fundamentally
+a standard machine with a specific role.
 
-**Decision**: Reposition OpenClaw from a centralized service to
-per-domain optional instances. Each domain can opt in via
-`openclaw: true` in infra.yml. The generator auto-creates a
-`<domain>-openclaw` LXC container with `roles: [base_system,
-openclaw_server]`, following the same pattern as `anklume-firewall`
-auto-creation (ADR-024).
+**Decision (supersedes Phase 37 approach)**: OpenClaw instances are
+declared like any other machine in `machines:`. No `openclaw: true`
+directive, no auto-creation, no `domain_openclaw` in group_vars.
+The `openclaw_server` role is assigned via `roles:` like any role.
 
-The `openclaw_server` role is made domain-aware:
-- Templates receive `openclaw_server_domain` (the domain name)
-  and `openclaw_server_instance_name` (the Incus instance name)
-- Systemd service name is per-instance (`openclaw-<domain>.service`)
-- Agent identity defaults to domain-scoped values
-- Each instance sees only its own domain's network
+```yaml
+machines:
+  pro-openclaw:
+    description: "AI assistant for pro domain"
+    type: lxc
+    roles: [base_system, openclaw_server]
+```
 
-If the user explicitly declares `<domain>-openclaw`, that definition
-takes precedence (no auto-creation). The generator propagates
-`domain_openclaw: true/false` to group_vars.
+**Why no auto-creation**: KISS principle. OpenClaw is not special
+enough to warrant its own enrichment step. The user declares machines
+explicitly — same workflow as every other machine.
 
-**Why per-domain, not centralized**: Domain isolation is a core
-anklume principle. A centralized assistant with cross-domain network
-access is an information leakage vector. Per-domain instances inherit
-the domain's trust level and network boundaries automatically.
+**Warning**: The generator emits a warning if a machine has the
+`openclaw_server` role but no `network_policy` provides access to
+a known LLM backend.
 
-**Why auto-creation**: Minimizes UX friction (design principle).
-Adding `openclaw: true` to a domain is a single-line change. No need
-to manually declare the machine, assign an IP, or configure roles.
-
-**Consequence**: Each domain can have its own isolated AI assistant.
-The centralized `ai-tools` OpenClaw remains as one possible
-deployment pattern (user declares it explicitly). Per-domain
-instances are fully independent and cannot see other domains.
+**Consequence**: Simpler generator, fewer special cases. Users
+declare OpenClaw machines like any other machine.
 
 ---
 
