@@ -66,3 +66,14 @@ openclaw_server_disk_crit_pct: 95
 # Daily summary cron schedule (hour and minute, 24h format)
 openclaw_server_cron_daily_hour: 8
 openclaw_server_cron_daily_minute: 0
+
+# --- Network inspection (Phase 40) ---
+
+# Enable periodic network scanning via cron
+openclaw_server_network_scan_enabled: false
+
+# Network scan interval in seconds (default: 1 hour)
+openclaw_server_network_scan_interval: 3600
+
+# Directory for nmap baseline storage
+openclaw_server_nmap_baseline_dir: "/var/lib/openclaw/baselines"

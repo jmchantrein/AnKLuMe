@@ -123,6 +123,9 @@ templates deployed with `force: true` on every `make apply`:
 - `CRON.md.j2` → `~/.openclaw/workspace/CRON.md`
 - `skills/anklume-health.md.j2` → `~/.openclaw/workspace/skills/anklume-health.md`
 - `skills/anklume-network-diff.md.j2` → `~/.openclaw/workspace/skills/anklume-network-diff.md`
+- `skills/anklume-network-triage.md.j2` → `~/.openclaw/workspace/skills/anklume-network-triage.md`
+- `skills/anklume-inventory-diff.md.j2` → `~/.openclaw/workspace/skills/anklume-inventory-diff.md`
+- `skills/anklume-pcap-summary.md.j2` → `~/.openclaw/workspace/skills/anklume-pcap-summary.md`
 
 Exceptions:
 - `SOUL.md`: personality file, agent-owned, `.gitignored` globally.
@@ -160,6 +163,29 @@ Configuration defaults in `roles/openclaw_server/defaults/main.yml`:
 - `openclaw_server_disk_crit_pct`: disk critical threshold (default: `95`)
 - `openclaw_server_cron_daily_hour`: daily summary hour (default: `8`)
 - `openclaw_server_cron_daily_minute`: daily summary minute (default: `0`)
+
+#### Network inspection (Phase 40)
+
+The `openclaw_server` role deploys three additional network inspection
+skills that enable LLM-assisted security monitoring per domain:
+
+- **`anklume-network-triage`**: Parse nmap/tshark output and classify
+  anomalies (normal/suspect/critical) using Ollama.
+- **`anklume-inventory-diff`**: Compare nmap service scans against a
+  stored baseline to detect new hosts, open ports, service changes.
+- **`anklume-pcap-summary`**: Condense pcap captures into readable
+  summaries with protocol distribution and anomaly detection.
+
+A standalone `scripts/nmap-diff.sh` provides domain-scoped nmap
+scanning with automatic baseline management.
+
+Configuration defaults:
+- `openclaw_server_network_scan_enabled`: enable cron scan (default: `false`)
+- `openclaw_server_network_scan_interval`: scan interval in seconds (default: `3600`)
+- `openclaw_server_nmap_baseline_dir`: baseline storage (default: `/var/lib/openclaw/baselines`)
+
+See [network-inspection.md](network-inspection.md) for the full
+architecture (3-level pipeline), skill descriptions, and usage.
 
 ### Reconciliation pattern (all infra roles)
 

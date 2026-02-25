@@ -1,0 +1,75 @@
+{# Jinja2 template — deployed by openclaw_server role (ADR-036) #}
+{# Do NOT edit the deployed file directly. Edit THIS template instead. #}
+# Skill: anklume-network-triage
+
+Parse nmap and tshark output, classify anomalies using LLM analysis
+for the **{{ openclaw_server_domain | default('unknown') }}** domain.
+
+## Inputs
+
+- **project**: `{{ openclaw_server_incus_project | default('default') }}`
+  (Incus project, auto-configured)
+- **scan_output**: Raw nmap or tshark text (passed as argument or file path)
+- **baseline_dir**: `{{ openclaw_server_nmap_baseline_dir }}`
+  (nmap baseline storage directory)
+
+## Procedure
+
+### 1. Identify scan type
+
+Detect whether input is nmap XML/text or tshark/pcap output.
+Look for signatures:
+- nmap: `Nmap scan report`, `PORT`, `STATE`, `SERVICE`
+- tshark: `Frame`, `Ethernet`, `Internet Protocol`, timestamps
+
+### 2. Extract findings
+
+For nmap output, extract per-host:
+- Open ports and services
+- OS detection results
+- Script output (if present)
+
+For tshark output, extract:
+- Source/destination pairs
+- Protocols and port usage
+- DNS queries and responses
+- Unusual traffic patterns (non-standard ports, high volume)
+
+### 3. Classify anomalies
+
+Use LLM analysis (via Ollama at `{{ openclaw_server_ollama_url }}`)
+to classify each finding:
+
+| Level | Criteria | Examples |
+|-------|----------|---------|
+| **normal** | Expected services on known hosts | SSH on admin host, HTTP on web server |
+| **suspect** | Unexpected but not necessarily malicious | New open port, unknown service version |
+| **critical** | Requires immediate attention | Unauthorized host, known vulnerable service |
+
+Domain context for classification:
+- Domain: `{{ openclaw_server_domain | default('unknown') }}`
+- Trust level: use domain trust level for severity thresholds
+- Only consider hosts within this domain's project
+
+### 4. Compose report
+
+```
+Network Triage — {{ openclaw_server_domain | default('unknown') }}
+Project: {{ openclaw_server_incus_project | default('default') }}
+Timestamp: <ISO 8601>
+Scan type: nmap | tshark
+
+Findings:
+  [normal]   <host>:<port> — <service> (expected)
+  [suspect]  <host>:<port> — <service> (reason)
+  [critical] <host>:<port> — <service> (reason)
+
+Summary:
+  Normal: N | Suspect: N | Critical: N
+  Action required: yes/no
+```
+
+## Output
+
+Return the triage report as text. Save to
+`~/.openclaw/workspace/memory/network-triage-latest.md`.

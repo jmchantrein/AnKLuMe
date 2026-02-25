@@ -181,3 +181,4 @@ Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/disposable.md` — Disposable containers
 - `docs/tor-gateway.md` — Tor gateway routing
 - `docs/llm-sanitizer.md` — LLM sanitization proxy (Phase 39)
+- `docs/network-inspection.md` — Network inspection and security monitoring (Phase 40)

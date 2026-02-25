@@ -1091,3 +1091,37 @@ capabilities:
         action: "Sanitization + ai_provider + network_policies"
         expected: "All features independent, sanitization config correct"
         deterministic: true
+
+  network_inspection:
+    description: "LLM-assisted network inspection per domain (Phase 40)"
+    depth_1:
+      - id: NI-001
+        action: "Network triage skill template renders with domain variables"
+        expected: "Domain name, project, and LLM URL injected correctly"
+        deterministic: true
+      - id: NI-002
+        action: "Inventory diff skill template renders with baseline dir"
+        expected: "Baseline dir and project name present in output"
+        deterministic: true
+      - id: NI-003
+        action: "PCAP summary skill template renders with domain context"
+        expected: "Domain name and project injected, tshark commands present"
+        deterministic: true
+      - id: NI-004
+        action: "nmap-diff.sh passes shellcheck validation"
+        expected: "Zero shellcheck warnings at severity=warning level"
+        deterministic: true
+      - id: NI-005
+        action: "Network anonymization patterns match expected identifiers"
+        expected: "MAC addresses, interface names, ARP entries matched"
+        deterministic: true
+    depth_2:
+      - id: NI-2-001
+        action: "Heartbeat tasks deploy all 5 skills (2 existing + 3 new)"
+        expected: "heartbeat.yml references all 5 skill template files"
+        deterministic: true
+    depth_3:
+      - id: NI-3-001
+        action: "Network inspection + heartbeat + network scan cron"
+        expected: "CRON.md includes network scan when enabled, skills deployed"
+        deterministic: true

@@ -38,3 +38,31 @@
     dest: /root/.openclaw/workspace/skills/anklume-network-diff.md
     mode: "0644"
   # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy network triage skill
+  ansible.builtin.template:
+    src: skills/anklume-network-triage.md.j2
+    dest: /root/.openclaw/workspace/skills/anklume-network-triage.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy inventory diff skill
+  ansible.builtin.template:
+    src: skills/anklume-inventory-diff.md.j2
+    dest: /root/.openclaw/workspace/skills/anklume-inventory-diff.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Deploy pcap summary skill
+  ansible.builtin.template:
+    src: skills/anklume-pcap-summary.md.j2
+    dest: /root/.openclaw/workspace/skills/anklume-pcap-summary.md
+    mode: "0644"
+  # force: true (default) — overwritten on every apply (ADR-036)
+
+- name: OpenclawServer | Create nmap baseline directory
+  ansible.builtin.file:
+    path: "{{ openclaw_server_nmap_baseline_dir }}"
+    state: directory
+    mode: "0755"
+  when: openclaw_server_network_scan_enabled | default(false)

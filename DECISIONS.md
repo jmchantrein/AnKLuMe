@@ -271,3 +271,36 @@ Accept `"always"` as a third value (string, not boolean) for users who
 need sanitization even for local requests (compliance, shared infra).
 
 ---
+
+## Phase 40: Network Inspection and Security Monitoring
+
+### 3-level pipeline architecture (Collection, Diffing, Triage)
+
+Structured network inspection as a three-level pipeline rather than a
+single monolithic scan-and-report tool. Level 1 collects raw data
+(nmap/tshark), Level 2 diffs against baselines, Level 3 uses LLM for
+classification. This separation allows each level to be used
+independently: an operator can run nmap-diff.sh without OpenClaw, or
+an agent can classify pre-existing scan output without running a scan.
+
+### nmap-diff.sh as standalone script, not Ansible role
+
+Following ADR-013 (snapshot) and D-050 (disposable) precedent: network
+scans are imperative one-shot operations, not declarative reconciliation.
+A shell script wrapping nmap + diff is simpler and more composable than
+an Ansible role.
+
+### Network scan disabled by default
+
+`openclaw_server_network_scan_enabled: false` by default because nmap
+scanning requires explicit installation of nmap in the container and may
+trigger security alerts on some networks. The operator must consciously
+enable it.
+
+### Anonymization patterns for network data
+
+Added MAC address, interface name, ARP entry, and nmap report patterns
+to the llm_sanitizer. Network scan output is rich in infrastructure
+identifiers that should not leak to cloud LLMs.
+
+---
