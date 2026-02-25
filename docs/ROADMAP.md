@@ -3103,6 +3103,199 @@ d) **Generator support**:
 
 ---
 
+## Phase 43: Docker-Style CLI (Typer)
+
+**Goal**: Replace the flat Makefile target surface with a hierarchical
+CLI following Docker/kubectl/Incus conventions (`anklume <noun> <verb>`),
+using Python Typer for auto-completion, rich help, and mode-aware
+command filtering. The CLI **is** the framework entry point — no
+Makefile backend.
+
+**Prerequisites**: Phase 32 (Makefile UX), Phase 33 (Student Mode).
+
+**Rationale**: The current CLI uses 110+ Makefile targets with
+inconsistent parameter conventions (`G=`, `D=`, `I=`, `DOMAIN=`).
+Docker, kubectl, Terraform, and Incus all use Go+cobra for
+`<tool> <noun> <verb>` patterns. Since anklume is Python-native
+(Ansible, generate.py), Python Typer provides the same UX pattern
+without introducing a second compiled language. Python is already a
+hard dependency (Ansible) — no distribution overhead.
+
+**Why Typer, not Go/Rust**: Feature parity with cobra (Go) and clap
+(Rust) for nested subcommands, auto-completion (bash/zsh/fish), and
+rich help output. Decisive advantage: the CLI can directly import
+`generate.py` functions (no subprocess), read `infra.yml` natively
+(PyYAML), and provide dynamic completions from live infrastructure
+data. Startup overhead (~150ms) is irrelevant when commands call
+`incus`/`ansible-playbook` (seconds). POC mode — no backward
+compatibility with Makefile required.
+
+**Design**: Single entry point `bin/anklume` (Python Typer app) that
+directly calls Python functions and shell scripts. No Makefile
+intermediary — the CLI orchestrates everything.
+
+```
+# Command hierarchy (noun verb pattern)
+anklume domain list                    # List domains from infra.yml
+anklume domain apply pro               # Apply single domain
+anklume domain apply --all             # Apply full infrastructure
+anklume instance list [--domain pro]   # List instances (incus list)
+anklume instance remove pro-dev        # Remove instance
+anklume instance exec pro-dev -- bash  # Shell into instance
+anklume snapshot create [pro-dev]      # Create snapshot
+anklume snapshot restore pro-dev       # Restore snapshot
+anklume snapshot list                  # List all snapshots
+anklume network status                 # Show network topology
+anklume network rules                  # Show nftables rules
+anklume portal open pro-dev /path      # Open file from container
+anklume app export pro-dev code        # Export app to host desktop
+anklume llm status                     # Show LLM backend status
+anklume llm switch --model qwen3       # Switch LLM model
+anklume desktop apply --engine sway    # Apply desktop config
+anklume lab start 01                   # Start lab exercise
+anklume sync                           # Generate Ansible files
+anklume sync --dry-run                 # Preview changes
+anklume lint                           # Run all validators
+anklume test                           # Run all tests
+anklume flush --force                  # Destroy all infrastructure
+anklume doctor                         # Diagnose infrastructure health
+anklume upgrade                        # Safe framework update
+anklume guide                          # Interactive onboarding
+
+# Dynamic completion from infra.yml
+anklume domain apply [TAB]  → pro  perso  ai-tools  anklume
+anklume instance exec [TAB] → pro-dev  perso-desktop  ai-gpu ...
+```
+
+**Architecture**:
+
+```
+bin/anklume                      ← Entry point (shebang: #!/usr/bin/env python3)
+scripts/cli/
+├── __init__.py                  ← Typer app factory
+├── domain.py                    ← anklume domain {list,apply,status}
+├── instance.py                  ← anklume instance {list,remove,exec}
+├── snapshot.py                  ← anklume snapshot {create,restore,list,delete}
+├── network.py                   ← anklume network {status,rules,deploy}
+├── portal.py                    ← anklume portal {open,push,pull,list}
+├── app.py                       ← anklume app {export,list,remove}
+├── llm.py                       ← anklume llm {status,switch,bench}
+├── desktop.py                   ← anklume desktop {apply,reset,plugins}
+├── lab.py                       ← anklume lab {start,check,hint,reset}
+├── dev.py                       ← anklume dev {test,lint,matrix,audit}
+├── completions.py               ← Dynamic completers (domains, instances)
+└── helpers.py                   ← Shared: run_cmd(), require_container(), rich output
+```
+
+**Key implementation details**:
+- `generate.py` imported directly (`from scripts.generate import ...`)
+- Dynamic completions read `infra.yml` for domain/machine names
+- `require_container()` check on commands that need Incus socket
+- `ANKLUME_MODE` / `ANKLUME_LANG` respected for help filtering
+- Rich tables for `list` commands, Rich progress for `apply`
+- Commands that wrap shell scripts use `subprocess.run()`
+- Commands that wrap Ansible use `subprocess.run(["ansible-playbook", ...])`
+- `anklume dev` group hidden in user/student mode
+
+**Deliverables**:
+
+a) **CLI package** (`bin/anklume` + `scripts/cli/`):
+   - Python Typer app with command groups: `domain`, `instance`,
+     `snapshot`, `network`, `portal`, `app`, `llm`, `desktop`,
+     `lab`, `dev`
+   - Top-level commands: `sync`, `lint`, `test`, `flush`, `upgrade`,
+     `guide`, `doctor`
+   - Shell completion: `anklume --install-completion`
+   - Rich-formatted help with mode filtering (student/user/dev)
+
+b) **Dynamic completions** (unique advantage over Makefile):
+   - Domain names from `infra.yml`
+   - Machine names from `infra.yml`
+   - Snapshot names from `incus` query
+   - Lab numbers from `labs/` directory
+
+c) **Mode-aware filtering** (absorbs Phase 33 mode logic):
+   - `ANKLUME_MODE=user`: ~30 commands visible
+   - `ANKLUME_MODE=student`: same + bilingual descriptions + transparent
+   - `ANKLUME_MODE=dev`: all commands including `anklume dev` group
+
+d) **ADR-046**: Document CLI design decision (Typer over Go/Rust,
+   no Makefile backend, command hierarchy, dynamic completions)
+
+**Validation criteria**:
+- [ ] `anklume domain list` shows all domains from infra.yml
+- [ ] `anklume domain apply pro` applies a single domain
+- [ ] `anklume --help` shows grouped commands with descriptions
+- [ ] Shell completion works (bash, zsh, fish)
+- [ ] Dynamic completion suggests domain/machine names from infra.yml
+- [ ] Mode filtering hides dev commands in user mode
+- [ ] Student mode shows bilingual descriptions
+- [ ] `anklume` without args shows usage summary
+- [ ] `ruff check scripts/cli/` passes
+- [ ] No Makefile dependency — CLI calls scripts/functions directly
+
+---
+
+## Deferred Enhancements (from prior sessions)
+
+Items discussed and deferred during development sessions. Each is
+tracked here until promoted to a phase or integrated into an
+existing phase.
+
+### NER-based sanitization (Phase 39 enhancement)
+
+Current Phase 39 sanitization uses regex-based tokenization for IPs,
+hostnames, and FQDNs. A future enhancement would use Named Entity
+Recognition (NER) to detect and anonymize infrastructure-specific
+entities (domain names, project names, service identifiers) that
+regex cannot reliably catch. Requires evaluation of local NER models
+(spaCy, GLiNER) running on GPU alongside Ollama.
+
+### Level 4 network analysis pipeline (Phase 40 enhancement)
+
+Current Phase 40 provides network inspection (nmap scan diff, PCAP
+summary). A Level 4 pipeline would add continuous monitoring with
+anomaly baseline learning: establish normal traffic patterns per
+domain, detect deviations, and escalate through the three-level
+triage pipeline (local fast → local LLM → cloud via sanitizer).
+
+### `~/.anklume/` single mount point (Phase 31 enhancement)
+
+For Live OS deployments, consolidate all user-mutable data under
+`~/.anklume/` as a single bind mount point. This simplifies the
+persistent data partition layout: one mount = all user state
+(mode, telemetry, agent config, session data). Currently scattered
+across `~/.anklume/mode`, `~/.anklume/telemetry/`, etc.
+
+### tmux/libtmux in bootstrap (Phase 23 enhancement)
+
+`tmux` and `libtmux` (Python) are currently installed manually in
+`anklume-instance`. They should be added to `scripts/bootstrap.sh`
+as part of the container provisioning step, since `make console`
+(Phase 19a) depends on them.
+
+### GUI app forwarding priority (Phase 26 enhancement)
+
+VS Code running inside containers with display forwarding to the
+host is a high-priority user need. Current Phase 26 exports
+`.desktop` files that launch apps via `incus exec`, but GUI
+forwarding (Wayland socket sharing or X11 forwarding) needs
+real-world validation with complex apps like VS Code, Firefox.
+PipeWire audio socket sharing is also pending.
+
+### Orphan veth pair cleanup (Incus upstream investigation)
+
+When Incus containers restart, stale veth pairs can remain in the
+host network namespace with the same MAC address as the new pair.
+The bridge FDB sends unicast frames to the wrong port, causing
+ARP to work (broadcast) but ping/DNS to fail (unicast). Current
+workaround: manually delete orphan paired veths. Root cause
+investigation needed: determine if this is an Incus bug or
+expected behavior, and whether `incus restart` should clean up
+old veths automatically.
+
+---
+
 ## Current State
 
 **Completed** (Phases 1-29):
@@ -3150,12 +3343,21 @@ d) **Generator support**:
 - Phase 39: LLM Sanitization Proxy
 - Phase 40: Network Inspection and Security Monitoring
 - Phase 30: Educational Platform and Guided Labs
+- Phase 41: Official Roles and External Role Integration
+- Phase 42: Desktop Environment Plugin System
 
 **In progress**:
 - Phase 31: Live OS with Encrypted Persistent Storage (VM testing via Incus/KVM)
 
+**Short-term**:
+- Phase 43: Docker-Style CLI (Typer) — hierarchical CLI replacing flat Makefile targets
+
 **Vision document**: `docs/vision-ai-integration.md` — consolidation of
 design discussions for Phases 35-40 (AI integration architecture).
+
+**Deferred enhancements**: See "Deferred Enhancements" section above for
+items tracked from development sessions (NER sanitization, Level 4
+network pipeline, veth cleanup, GUI app forwarding, tmux bootstrap).
 
 **Deployed infrastructure** (Phase 34 addressing convention):
 
@@ -3169,7 +3371,9 @@ design discussions for Phases 35-40 (AI integration architecture).
 | ai-tools | ai-chat | 10.120.0.30 | semi-trusted | net-ai-tools |
 | ai-tools | ai-code | 10.120.0.40 | semi-trusted | net-ai-tools |
 
-**Active ADRs**: 32 ADRs (ADR-001 to ADR-038, gaps at 007, 027, 028,
+**Active ADRs**: 37 ADRs (ADR-001 to ADR-045, gaps at 007, 027, 028,
 033, 034, 037 — deleted during documentation review)
 
-**Known issues**: None
+**Known issues**:
+- Orphan veth pairs on container restart (see Deferred Enhancements)
+- Debian 13 (Trixie) bootstrap not yet validated (Phase 23)
