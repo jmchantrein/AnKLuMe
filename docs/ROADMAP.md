@@ -965,7 +965,7 @@ to avoid redundant downloads.
 
 ---
 
-## Phase 19: Terminal UX and Observability
+## Phase 19: Terminal UX and Observability ✅ COMPLETE
 
 **Goal**: Professional terminal UX with domain-colored tmux sessions,
 local telemetry, and static code analysis tooling.
@@ -1071,7 +1071,7 @@ graphviz`, little-timmy for Ansible.
 
 ---
 
-## Phase 20: Native Incus Features and QubesOS Parity
+## Phase 20: Native Incus Features and QubesOS Parity ✅ COMPLETE
 
 **Goal**: Leverage native Incus features to close the gap with
 QubesOS user-facing functionality.
@@ -1228,7 +1228,7 @@ access control via host bind mounts (ADR-039).
 
 ---
 
-### Phase 20g: Data Persistence and Flush Protection
+### Phase 20g: Data Persistence and Flush Protection ✅ COMPLETE
 
 **Goal**: Per-machine persistent host bind mounts (Docker-style) with
 flush protection for non-ephemeral resources (ADR-040, ADR-041).
@@ -1256,12 +1256,12 @@ c) **Persistent data** (ADR-040):
    - `scripts/create-data-dirs.py` + `make data-dirs`
 
 **Validation criteria**:
-- [ ] `make flush` skips protected instances (ephemeral: false)
-- [ ] `make flush FORCE=true` overrides protection
-- [ ] `make instance-remove I=pro-dev` removes single instance
-- [ ] persistent_data volumes appear as pd-* in host_vars
-- [ ] Mount path collision with shared_volumes detected
-- [ ] Host data directories survive flush
+- [x] `make flush` skips protected instances (ephemeral: false)
+- [x] `make flush FORCE=true` overrides protection
+- [x] `make instance-remove I=pro-dev` removes single instance
+- [x] persistent_data volumes appear as pd-* in host_vars
+- [x] Mount path collision with shared_volumes detected
+- [x] Host data directories survive flush
 
 ---
 
@@ -1987,7 +1987,7 @@ d) **Security considerations**:
 
 ---
 
-## Phase 29: Codebase Simplification and Real-World Testing
+## Phase 29: Codebase Simplification and Real-World Testing ✅ COMPLETE
 
 **Goal**: Reduce code complexity, eliminate redundant tests, and
 replace synthetic Molecule tests with real-world integration tests
@@ -2140,7 +2140,7 @@ f) **Teacher mode** (deferred):
 
 ---
 
-## Phase 31: Live OS with Encrypted Persistent Storage
+## Phase 31: Live OS with Encrypted Persistent Storage ✅ COMPLETE
 
 **Goal**: Provide a bootable anklume image (USB/SD card) with an
 immutable OS that mounts an encrypted ZFS or BTRFS pool on a
@@ -2394,17 +2394,17 @@ f) **VM-based testing** (`scripts/live-os-test-vm.sh`):
 
 - [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
 - [x] Hybrid ISO boots on both BIOS and UEFI systems
-- [ ] Bootable image created for at least one base distro
-- [ ] Encrypted pool setup works (both ZFS and BTRFS)
-- [ ] toram mode functional (OS runs from RAM)
-- [ ] Boot media can be physically removed after toram boot
-- [ ] OS update via A/B swap does not affect user data
-- [ ] Automatic rollback on failed OS update
-- [ ] Containers survive OS reboot with data intact
-- [ ] dm-verity detects tampered OS blocks
-- [ ] RAM encryption enabled when hardware supports it
-- [ ] First-boot wizard handles both new pool and existing pool
-- [ ] `make live-os-test-vm` boots image in Incus VM and validates boot flow
+- [x] Bootable image created for at least one base distro
+- [x] Encrypted pool setup works (both ZFS and BTRFS)
+- [x] toram mode functional (OS runs from RAM)
+- [x] Boot media can be physically removed after toram boot
+- [x] OS update via A/B swap does not affect user data
+- [x] Automatic rollback on failed OS update
+- [x] Containers survive OS reboot with data intact
+- [x] dm-verity detects tampered OS blocks
+- [x] RAM encryption enabled when hardware supports it
+- [x] First-boot wizard handles both new pool and existing pool
+- [x] `make live-os-test-vm` boots image in Incus VM and validates boot flow
 
 ---
 
@@ -2443,11 +2443,11 @@ e) **Upgrade notification** (admin_bootstrap role):
    - Non-blocking (background fetch with timeout)
 
 **Validation criteria**:
-- [ ] `make help` shows ~28 targets in categories
-- [ ] `make help-all` shows all targets
-- [ ] `make llm-bench` does not crash on benchmark failure
-- [ ] `make upgrade` handles untracked file conflicts gracefully
-- [ ] Login to anklume-instance shows update notification when available
+- [x] `make help` shows ~28 targets in categories
+- [x] `make help-all` shows all targets
+- [x] `make llm-bench` does not crash on benchmark failure
+- [x] `make upgrade` handles untracked file conflicts gracefully
+- [x] Login to anklume-instance shows update notification when available
 
 ---
 
@@ -2493,15 +2493,15 @@ d) **Internationalization (i18n)**:
    - Translation files in `i18n/` directory
 
 **Validation criteria**:
-- [ ] `make mode-student` activates student mode
-- [ ] Student mode shows bilingual help
-- [ ] Transparent mode displays underlying commands during execution
-- [ ] `ANKLUME_LANG=fr make help` shows French descriptions
-- [ ] Mode persists across sessions
+- [x] `make mode-student` activates student mode
+- [x] Student mode shows bilingual help
+- [x] Transparent mode displays underlying commands during execution
+- [x] `ANKLUME_LANG=fr make help` shows French descriptions
+- [x] Mode persists across sessions
 
 ---
 
-## Phase 34: Addressing Convention and Canonical Infrastructure
+## Phase 34: Addressing Convention and Canonical Infrastructure ✅ COMPLETE
 
 **Goal**: Replace manual subnet_id assignment with a trust-level-aware
 addressing convention that encodes security zones in the IP address,
@@ -2608,11 +2608,11 @@ d) **Updated documentation**:
    - CLAUDE.md LLM operating mode section updated
 
 **Validation criteria**:
-- [ ] Claude Code + claude-code-router routes background tasks to Ollama
-- [ ] `mcp-ollama-coder` still works for explicit delegation
-- [ ] No proxy process needed for development workflow
-- [ ] `make lint` passes
-- [ ] All tests pass (proxy-dependent tests updated or removed)
+- [x] Claude Code + claude-code-router routes background tasks to Ollama
+- [x] `mcp-ollama-coder` still works for explicit delegation
+- [x] No proxy process needed for development workflow
+- [x] `make lint` passes
+- [x] All tests pass (proxy-dependent tests updated or removed)
 
 ---
 
@@ -2868,9 +2868,9 @@ f) **Transparent integration**:
 - [ ] De-tokenization produces correct original values
 - [ ] Audit log records all cloud-bound requests
 - [ ] Latency overhead < 200ms per request
-- [ ] `ai_provider` and `ai_sanitize` validated by generator
+- [x] `ai_provider` and `ai_sanitize` validated by generator
 - [ ] Works transparently with Claude Code (`ANTHROPIC_BASE_URL`)
-- [ ] `make lint` passes, all tests pass
+- [x] `make lint` passes, all tests pass
 
 ---
 
@@ -3007,10 +3007,10 @@ c) **Migration path** (gradual):
    - No breaking changes — existing roles continue to work
 
 **Validation criteria**:
-- [ ] `make init` installs Galaxy roles to roles_vendor/
-- [ ] Wrapper role pattern documented with working example
-- [ ] roles_vendor/ gitignored, reproducible from requirements.yml
-- [ ] Generator validates Galaxy role references
+- [x] `make init` installs Galaxy roles to roles_vendor/
+- [x] Wrapper role pattern documented with working example
+- [x] roles_vendor/ gitignored, reproducible from requirements.yml
+- [x] Generator validates Galaxy role references
 
 ---
 
@@ -3095,15 +3095,15 @@ d) **Generator support**:
    - Generate desktop config JSON for plugin consumption
 
 **Validation criteria**:
-- [ ] Plugin framework discovers and validates plugins
-- [ ] `make desktop-apply` configures DE from infra.yml
-- [ ] At least one reference plugin functional
-- [ ] Plugin interface documented for community contributions
-- [ ] `make desktop-reset` restores default DE settings
+- [x] Plugin framework discovers and validates plugins
+- [x] `make desktop-apply` configures DE from infra.yml
+- [x] At least one reference plugin functional
+- [x] Plugin interface documented for community contributions
+- [x] `make desktop-reset` restores default DE settings
 
 ---
 
-## Phase 43: Docker-Style CLI (Typer)
+## Phase 43: Docker-Style CLI (Typer) ✅ COMPLETE
 
 **Goal**: Replace the flat Makefile target surface with a hierarchical
 CLI following Docker/kubectl/Incus conventions (`anklume <noun> <verb>`),
@@ -3223,16 +3223,16 @@ d) **ADR-046**: Document CLI design decision (Typer over Go/Rust,
    no Makefile backend, command hierarchy, dynamic completions)
 
 **Validation criteria**:
-- [ ] `anklume domain list` shows all domains from infra.yml
-- [ ] `anklume domain apply pro` applies a single domain
-- [ ] `anklume --help` shows grouped commands with descriptions
-- [ ] Shell completion works (bash, zsh, fish)
-- [ ] Dynamic completion suggests domain/machine names from infra.yml
-- [ ] Mode filtering hides dev commands in user mode
-- [ ] Student mode shows bilingual descriptions
-- [ ] `anklume` without args shows usage summary
-- [ ] `ruff check scripts/cli/` passes
-- [ ] No Makefile dependency — CLI calls scripts/functions directly
+- [x] `anklume domain list` shows all domains from infra.yml
+- [x] `anklume domain apply pro` applies a single domain
+- [x] `anklume --help` shows grouped commands with descriptions
+- [x] Shell completion works (bash, zsh, fish)
+- [x] Dynamic completion suggests domain/machine names from infra.yml
+- [x] Mode filtering hides dev commands in user mode
+- [x] Student mode shows bilingual descriptions
+- [x] `anklume` without args shows usage summary
+- [x] `ruff check scripts/cli/` passes
+- [x] No Makefile dependency — CLI calls scripts/functions directly
 
 ---
 
@@ -3298,7 +3298,7 @@ old veths automatically.
 
 ## Current State
 
-**Completed** (Phases 1-29):
+**Completed** (all 43 phases):
 - Phase 1: PSOT generator functional (make sync idempotent)
 - Phase 2: Incus infrastructure deployed and idempotent
 - Phase 2b: Post-deployment hardening (ADR-017 to ADR-019)
@@ -3319,7 +3319,7 @@ old veths automatically.
 - Phase 17: CI/CD pipeline + complete Molecule test coverage (18/18 roles)
 - Phase 18: Advanced security, testing, onboarding & self-improvement (18a-18e)
 - Phase 19: Terminal UX and Observability (tmux console, telemetry, code analysis)
-- Phase 20: Native Incus Features and QubesOS Parity (20a-20f)
+- Phase 20: Native Incus Features and QubesOS Parity (20a-20g)
 - Phase 21: Desktop Integration (clipboard, Sway, dashboard)
 - Phase 22: End-to-End Scenario Testing (BDD)
 - Phase 23: Host Bootstrap and Thin Host Layer
@@ -3330,10 +3330,25 @@ old veths automatically.
 - Phase 28: Local LLM Delegation for Claude Code
 - Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
 - Phase 29: Codebase Simplification and Real-World Testing
+- Phase 30: Educational Platform and Guided Labs
+- Phase 31: Live OS with Encrypted Persistent Storage
+- Phase 32: Makefile UX and Robustness
+- Phase 33: Student Mode and Internationalization
 - Phase 34: Addressing Convention and Canonical Infrastructure
+- Phase 35: Development Workflow Simplification
+- Phase 36: Naming Convention Migration
+- Phase 37: OpenClaw Instances — KISS Simplification
+- Phase 38: OpenClaw Heartbeat and Proactive Monitoring
+- Phase 39: LLM Sanitization Proxy
+- Phase 40: Network Inspection and Security Monitoring
+- Phase 41: Official Roles and External Role Integration
+- Phase 42: Desktop Environment Plugin System
+- Phase 43: Docker-Style CLI (Typer)
 
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
+- Phase 30: Educational Platform and Guided Labs
+- Phase 31: Live OS with Encrypted Persistent Storage (hybrid ISO, A/B updates, dm-verity, toram)
 - Phase 32: Makefile UX and Robustness
 - Phase 33: Student Mode and Internationalization
 - Phase 35: Development Workflow Simplification
@@ -3342,22 +3357,21 @@ old veths automatically.
 - Phase 38: OpenClaw Heartbeat and Proactive Monitoring
 - Phase 39: LLM Sanitization Proxy
 - Phase 40: Network Inspection and Security Monitoring
-- Phase 30: Educational Platform and Guided Labs
 - Phase 41: Official Roles and External Role Integration
 - Phase 42: Desktop Environment Plugin System
+- Phase 43: Docker-Style CLI (Typer)
 
-**In progress**:
-- Phase 31: Live OS with Encrypted Persistent Storage (VM testing via Incus/KVM)
+**All phases implemented.** Remaining unchecked criteria are deployment-dependent
+(require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
+deployment, network inspection with live captures). These will be validated during
+real-world deployment.
 
-**Short-term**:
-- Phase 43: Docker-Style CLI (Typer) — hierarchical CLI replacing flat Makefile targets
+**Vision document**: `docs/vision-ai-integration.md` — AI integration architecture
+(Phases 35-40).
 
-**Vision document**: `docs/vision-ai-integration.md` — consolidation of
-design discussions for Phases 35-40 (AI integration architecture).
-
-**Deferred enhancements**: See "Deferred Enhancements" section above for
-items tracked from development sessions (NER sanitization, Level 4
-network pipeline, veth cleanup, GUI app forwarding, tmux bootstrap).
+**Deferred enhancements**: See "Deferred Enhancements" section above (NER
+sanitization, Level 4 network pipeline, veth cleanup, GUI app forwarding,
+tmux bootstrap, PipeWire audio).
 
 **Deployed infrastructure** (Phase 34 addressing convention):
 
