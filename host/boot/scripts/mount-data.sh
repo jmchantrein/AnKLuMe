@@ -141,7 +141,7 @@ main() {
                 local pool_status
                 pool_status=$(zpool status "$pool_name" 2>/dev/null | head -3)
                 ok "ZFS pool verified as imported"
-                info "Pool status:\n$pool_status"
+                printf "\033[0;34m[INFO]\033[0m Pool status:\n%s\n" "$pool_status"
             else
                 err "ZFS pool import verification failed"
                 exit 1

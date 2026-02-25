@@ -6,13 +6,19 @@ Feature: Invalid shared volumes configuration
   Background:
     Given a clean sandbox environment
 
-  Scenario: Unknown consumer domain
-    Given infra.yml from "student-sysadmin"
-    When I run "python3 scripts/generate.py --validate infra.yml" and it may fail
-    # If infra.yml has an unknown consumer, generator should error
+  Scenario: Unknown consumer domain rejected
+    Given infra.yml with shared_volume consumer "nonexistent-domain"
+    When I run "python3 scripts/generate.py infra.yml" and it may fail
+    Then exit code is non-zero
+    And output contains "consumer"
 
-  Scenario: Empty consumers mapping
-    Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+  Scenario: Relative mount path rejected
+    Given infra.yml with shared_volume relative path "relative/path"
+    When I run "python3 scripts/generate.py infra.yml" and it may fail
+    Then exit code is non-zero
+    And output contains "path"
+
+  Scenario: Valid example passes generator
+    Given infra.yml from "pro-workstation"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
-    # Valid infra without shared_volumes passes

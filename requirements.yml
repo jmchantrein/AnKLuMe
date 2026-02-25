@@ -4,3 +4,11 @@ collections:
     version: ">=9.0.0"
   - name: ansible.posix
     version: ">=1.5.0"
+
+# Galaxy roles (installed to roles_vendor/ by make init)
+# Add entries here when using official upstream roles.
+# Example:
+#   roles:
+#     - name: geerlingguy.docker
+#       version: ">=7.0.0"
+roles: []

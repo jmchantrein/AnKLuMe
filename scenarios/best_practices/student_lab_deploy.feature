@@ -5,7 +5,7 @@ Feature: Student lab deployment
   Scenario: Generate lab infrastructure
     Given a clean sandbox environment
     And infra.yml from "student-sysadmin"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
 

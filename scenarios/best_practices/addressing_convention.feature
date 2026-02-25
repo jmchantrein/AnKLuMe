@@ -8,7 +8,7 @@ Feature: Trust-level-aware addressing convention
 
   Scenario: Pro workstation uses zone-aware IPs
     Given infra.yml from "pro-workstation"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
     And file "group_vars/pro.yml" exists
@@ -16,7 +16,21 @@ Feature: Trust-level-aware addressing convention
 
   Scenario: Sync is idempotent with addressing
     Given infra.yml from "pro-workstation"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
+
+  Scenario: Student sysadmin uses addressing convention
+    Given infra.yml from "student-sysadmin"
+    When I run "python3 scripts/generate.py infra.yml"
+    Then exit code is 0
+    And inventory files exist for all domains
+    And generated host_vars contain valid IPs
+
+  Scenario: AI-tools example uses addressing convention
+    Given infra.yml from "ai-tools"
+    When I run "python3 scripts/generate.py infra.yml"
+    Then exit code is 0
+    And inventory files exist for all domains
+    And generated host_vars contain valid IPs

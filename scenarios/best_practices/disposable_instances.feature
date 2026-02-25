@@ -8,12 +8,12 @@ Feature: Disposable instances
 
   Scenario: Ephemeral flag propagated to host_vars
     Given infra.yml from "sandbox-isolation"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
 
   Scenario: Tor gateway uses ephemeral domains
     Given infra.yml from "tor-gateway"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains

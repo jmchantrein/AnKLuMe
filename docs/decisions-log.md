@@ -486,3 +486,105 @@ Output to `desktop/` (gitignored) lets users copy what they need. Same
 pattern as `scripts/console.py` (reads infra.yml, generates output).
 
 **Status**: pending review
+
+---
+
+## D-054: Phase 41 — Three-tier role resolution with Galaxy integration
+
+**Problem**: anklume lacked a mechanism for leveraging official Ansible
+Galaxy roles (e.g., `geerlingguy.docker`), forcing custom implementations
+for common software installations.
+
+**Choice**: Implement a three-tier `roles_path` priority:
+`roles_custom/ > roles/ > roles_vendor/`. Galaxy roles are declared in
+`requirements.yml` (roles section) and installed to `roles_vendor/` via
+`make init`. User overrides go in `roles_custom/` (gitignored).
+
+**Alternatives considered**:
+(a) Single roles directory with Galaxy roles mixed in — pollutes the
+framework's own roles.
+(b) Collections only — Galaxy roles are different from collections and
+need a separate install path.
+(c) Git submodules — poor UX, version pinning harder.
+
+**Rationale**: The three-tier pattern mirrors how anklume already handles
+overrides (user > framework > vendor). `roles_vendor/` is gitignored to
+keep the repo clean. ADR-045 formalized this decision.
+
+**Status**: pending review
+
+---
+
+## D-055: Phase 42 — Desktop plugin system with schema-driven interface
+
+**Problem**: The desktop configuration generator (Phase 21) was tightly
+coupled to Sway. Users with GNOME, KDE, or Hyprland couldn't benefit.
+
+**Choice**: Create a plugin system under `plugins/desktop/<engine>/`
+with a standardized interface: `detect.sh` (is this DE active?) and
+`apply.sh` (apply domain config). A YAML schema
+(`plugins/desktop/plugin.schema.yml`) defines the contract. The
+orchestrator script (`scripts/desktop-plugin.sh`) discovers, validates,
+and invokes plugins.
+
+**Alternatives considered**:
+(a) Single monolithic script with if/elif for each DE — poor extensibility.
+(b) Ansible role per DE — overkill for client-side config that runs on
+the host, not in containers.
+(c) Python plugin system — shell scripts are more appropriate for DE
+detection and config file generation.
+
+**Rationale**: The plugin pattern is extensible (add a directory, get a
+new DE), testable (each plugin validated independently), and follows the
+framework's "detect then apply" pattern. Trust-level colors in the schema
+mirror the console QubesOS-style visual identification.
+
+**Status**: pending review
+
+---
+
+## D-056: Phase 31 — Toram copy integrity verification
+
+**Problem**: The `anklume-toram` initramfs hook copied the squashfs root
+image to RAM without verifying the copy was complete. A partial copy
+(e.g., disk error, tmpfs full) would leave an unusable root filesystem.
+
+**Choice**: Added post-copy size verification comparing `stat -c %s` of
+source and destination. If sizes differ, the copy is removed and the
+hook returns an error, falling back to disk-based boot.
+
+**Rationale**: Defense in depth for a critical boot path. The check adds
+negligible overhead (two stat calls) but prevents silent boot failures
+from corrupted RAM copies.
+
+**Status**: pending review
+
+---
+
+## D-057: Phase 22 — BDD scenarios use generator directly, not `make sync`
+
+**Problem**: All 17 BDD scenario features used `make sync` which requires
+running inside `anklume-instance` (the admin container). This meant
+15/30+ scenarios failed on the host, making them untestable during
+development.
+
+**Choice**: Updated all generator-only scenarios to call
+`python3 scripts/generate.py infra.yml` directly instead of `make sync`.
+Scenarios that require Incus (deployment, snapshots) still use `make`
+targets and are gated behind `we are in a sandbox environment`.
+
+**Alternatives considered**:
+(a) Skip all scenarios on host — defeats the purpose of testing.
+(b) Remove `require_container` check — would break production safety.
+(c) Add a `SKIP_CONTAINER_CHECK=1` env var — adds complexity and could
+be misused.
+
+**Rationale**: Generator scenarios only test `scripts/generate.py` which
+runs anywhere. Separating "generator validation" from "deployment testing"
+makes the BDD suite useful in both development and sandbox contexts.
+Result: 40 passed (from 0 on host), 4 legitimately skipped.
+
+Also fixed the `add_domain_to_infra` step which used legacy `base_subnet`
+syntax incompatible with ADR-038 addressing convention.
+
+**Status**: pending review

@@ -1,7 +1,9 @@
 """Then step definitions for anklume E2E scenario tests."""
 
 import json
+import re
 
+import yaml
 from pytest_bdd import parsers, then
 
 
@@ -132,3 +134,23 @@ def check_managed_unchanged(sandbox, filename):
     assert "SCENARIO-INJECTED" not in content, (
         "Managed section still contains injected content after sync"
     )
+
+
+@then("generated host_vars contain valid IPs")
+def check_host_vars_ips(sandbox):
+    """Verify all generated host_vars files contain valid IP addresses."""
+    ip_pattern = re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+    host_vars_dir = sandbox.project_dir / "host_vars"
+    assert host_vars_dir.exists(), "host_vars directory not found"
+    found_any = False
+    for f in host_vars_dir.glob("*.yml"):
+        content = yaml.safe_load(f.read_text())
+        if not content:
+            continue
+        ip = content.get("ansible_host") or content.get("instance_ip")
+        if ip:
+            found_any = True
+            assert ip_pattern.match(ip), (
+                f"Invalid IP in {f.name}: {ip}"
+            )
+    assert found_any, "No host_vars files contain IP addresses"

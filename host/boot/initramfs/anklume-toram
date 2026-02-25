@@ -68,7 +68,17 @@ go() {
         return 1
     fi
 
-    ok "anklume: Root image copied to /run/anklume-toram/root.squashfs"
+    # Verify copy integrity (size match)
+    expected_size=$(stat -c %s "$ROOT_IMAGE" 2>/dev/null || echo 0)
+    actual_size=$(stat -c %s /run/anklume-toram/root.squashfs 2>/dev/null || echo 0)
+    if [ "$expected_size" -eq 0 ] || [ "$expected_size" -ne "$actual_size" ]; then
+        warn "anklume: Copy incomplete: expected $expected_size bytes, got $actual_size"
+        rm -f /run/anklume-toram/root.squashfs
+        umount /run/anklume-toram
+        return 1
+    fi
+
+    ok "anklume: Root image copied to /run/anklume-toram/root.squashfs ($actual_size bytes)"
 
     # Update ROOT environment variable to point to the RAM-based copy
     export ROOT="/run/anklume-toram/root.squashfs"

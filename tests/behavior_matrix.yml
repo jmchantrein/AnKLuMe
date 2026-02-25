@@ -1091,3 +1091,71 @@ capabilities:
         action: "Network inspection + heartbeat + network scan cron"
         expected: "CRON.md includes network scan when enabled, skills deployed"
         deterministic: true
+
+  galaxy_roles:
+    description: "Official Galaxy role integration and vendor roles (Phase 41)"
+    depth_1:
+      - id: GR-001
+        action: "requirements.yml contains roles section"
+        expected: "File has both collections and roles keys"
+        deterministic: true
+      - id: GR-002
+        action: "ansible.cfg has three-tier roles_path"
+        expected: "roles_path includes roles_custom, roles, roles_vendor in order"
+        deterministic: true
+      - id: GR-003
+        action: "roles_vendor/ is gitignored"
+        expected: ".gitignore contains /roles_vendor/ entry"
+        deterministic: true
+      - id: GR-004
+        action: "ADR-045 exists in ARCHITECTURE.md"
+        expected: "ADR-045 documents Galaxy role integration decision"
+        deterministic: true
+      - id: GR-005
+        action: "SPEC.md documents role resolution order"
+        expected: "Three directories listed with priority order"
+        deterministic: true
+    depth_2:
+      - id: GR-2-001
+        action: "roles_path priority resolves custom > native > vendor"
+        expected: "ansible.cfg roles_path is roles_custom/:roles/:roles_vendor/"
+        deterministic: true
+    depth_3:
+      - id: GR-3-001
+        action: "make init installs Galaxy roles to roles_vendor/"
+        expected: "Makefile init target creates roles_vendor/ and conditionally installs roles"
+        deterministic: true
+
+  desktop_plugin:
+    description: "Desktop environment plugin system (Phase 42)"
+    depth_1:
+      - id: DP-001
+        action: "Plugin directory structure exists"
+        expected: "plugins/desktop/ with plugin.schema.yml"
+        deterministic: true
+      - id: DP-002
+        action: "Plugin schema defines required interface"
+        expected: "Schema specifies detect.sh, apply.sh, reset capabilities"
+        deterministic: true
+      - id: DP-003
+        action: "Desktop plugin script validates plugin structure"
+        expected: "scripts/desktop-plugin.sh discovers and validates plugins"
+        deterministic: true
+      - id: DP-004
+        action: "Reference plugin implements detect.sh"
+        expected: "At least one plugin has a working detect.sh"
+        deterministic: true
+      - id: DP-005
+        action: "Reference plugin implements apply.sh"
+        expected: "At least one plugin has apply.sh that reads JSON config"
+        deterministic: true
+    depth_2:
+      - id: DP-2-001
+        action: "Plugin framework discovers all installed plugins"
+        expected: "desktop-plugin.sh list shows all plugins in plugins/desktop/"
+        deterministic: true
+    depth_3:
+      - id: DP-3-001
+        action: "Sway plugin apply.sh generates working config from JSON"
+        expected: "apply.sh --dry-run with domain config produces valid Sway snippets"
+        deterministic: true

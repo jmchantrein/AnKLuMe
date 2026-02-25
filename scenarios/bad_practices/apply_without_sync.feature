@@ -13,10 +13,10 @@ Feature: Apply without sync
 
   Scenario: Stale inventory missing new domain
     Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     When I add a domain "new-domain" to infra.yml
     Then file "inventory/new-domain.yml" does not exist
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And file "inventory/new-domain.yml" exists

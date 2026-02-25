@@ -373,6 +373,42 @@ The generator propagates these to `domain_ai_provider` and
 `llm_sanitizer` role reads these variables to decide whether
 to activate.
 
+### Roles and provisioning
+
+Each machine specifies a list of Ansible roles for provisioning:
+
+```yaml
+machines:
+  pro-dev:
+    roles: [base_system, dev_tools]    # anklume-native roles
+```
+
+Roles are resolved from three directories in priority order
+(configured in `ansible.cfg`):
+
+| Directory | Purpose | Tracked in git |
+|-----------|---------|----------------|
+| `roles_custom/` | User overrides | No (gitignored) |
+| `roles/` | Framework-native roles | Yes |
+| `roles_vendor/` | Galaxy roles (upstream) | No (gitignored) |
+
+**Galaxy role integration** (ADR-045): Official upstream Ansible Galaxy
+roles can be declared in `requirements.yml` and installed to
+`roles_vendor/` via `make init`. Framework roles can wrap Galaxy roles
+with thin wrappers that add Incus-specific glue.
+
+`requirements.yml` format:
+```yaml
+collections:
+  - name: community.general
+roles:
+  - name: geerlingguy.docker
+    version: ">=7.0.0"
+```
+
+`make init` installs both collections and roles. `roles_vendor/` is
+gitignored and fully reproducible from `requirements.yml`.
+
 ### Validation constraints
 
 - Domain names: unique, alphanumeric + hyphen

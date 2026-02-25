@@ -1,0 +1,86 @@
+---
+# Plugin Interface Schema for Desktop Environment Plugins
+#
+# Each plugin lives in plugins/desktop/<engine>/ and must implement:
+#   detect.sh  — returns 0 if this DE is active, 1 otherwise
+#   apply.sh   — reads JSON config from stdin, applies DE settings
+#   apply.sh --reset  — restores default DE settings
+#
+# Plugins are discovered by scripts/desktop-plugin.sh and invoked
+# based on the desktop.engine setting in infra.yml.
+
+interface:
+  version: 1
+  required_scripts:
+    - name: detect.sh
+      description: "Detect if this desktop environment is running"
+      exit_codes:
+        0: "DE is active and version supported"
+        1: "DE is not active or not installed"
+      stdout: "DE version string (optional)"
+
+    - name: apply.sh
+      description: "Apply domain-based desktop configuration"
+      stdin: "JSON config object (see config_schema below)"
+      flags:
+        --reset: "Restore default DE settings (undo apply)"
+        --dry-run: "Print what would be changed without applying"
+      exit_codes:
+        0: "Configuration applied successfully"
+        1: "Error applying configuration"
+
+  optional_scripts:
+    - name: validate.sh
+      description: "Validate that prerequisites are met"
+      exit_codes:
+        0: "All prerequisites met"
+        1: "Missing prerequisites (printed to stderr)"
+
+config_schema:
+  description: "JSON config passed to apply.sh via stdin"
+  properties:
+    project_name:
+      type: string
+      description: "anklume project name"
+    virtual_desktops:
+      type: string
+      enum: [auto, "false"]
+      description: "'auto' creates one desktop per enabled domain"
+    window_borders:
+      type: string
+      enum: [trust_level, none]
+      description: "Window border coloring strategy"
+    domains:
+      type: array
+      items:
+        properties:
+          name:
+            type: string
+          trust_level:
+            type: string
+            enum: [admin, trusted, semi-trusted, untrusted, disposable]
+          color:
+            type: string
+            description: "Hex color code for this domain"
+          wallpaper:
+            type: string
+            description: "Path to wallpaper image (optional)"
+          panel_color:
+            type: string
+            description: "Override color for panel/taskbar (optional)"
+          pinned_apps:
+            type: array
+            items:
+              type: string
+            description: "Apps pinned to taskbar on this desktop"
+          machines:
+            type: array
+            items:
+              type: string
+
+trust_level_colors:
+  admin: "#1565C0"
+  trusted: "#2E7D32"
+  semi-trusted: "#F9A825"
+  untrusted: "#C62828"
+  disposable: "#7B1FA2"

@@ -6,7 +6,7 @@ Feature: Pro workstation setup
   Scenario: Generate Ansible files from example
     Given a clean sandbox environment
     And infra.yml from "pro-workstation"
-    When I run "make sync"
+    When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     And inventory files exist for all domains
     And file "group_vars/anklume.yml" exists
