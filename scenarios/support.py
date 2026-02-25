@@ -1,43 +1,23 @@
-"""Shared fixtures and step definitions for anklume E2E scenario tests.
+"""Shared support classes and helpers for anklume E2E scenario tests.
 
-Uses pytest-bdd with Gherkin .feature files. Designed to run inside
-the Phase 12 sandbox (Incus-in-Incus) or any environment with a live
-Incus daemon.
-
-Step definitions are split into:
-- scenarios/steps/given.py
-- scenarios/steps/when.py
-- scenarios/steps/then.py
-
-Usage:
-    pytest scenarios/ -v --tb=long
-    pytest scenarios/best_practices/ -v
-    pytest scenarios/bad_practices/ -v
+Contains data classes (CommandResult, Sandbox), backup/restore helpers,
+and Incus cleanup functions used by behave environment hooks and step
+definitions.
 """
 
 import json
 import logging
-import os
 import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import pytest
 import yaml
 
 logger = logging.getLogger("anklume.scenarios")
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-
-# Skip host subnet conflict detection — examples use 10.100 which may
-# conflict with host interfaces.  The env var is checked by generate.py.
-os.environ["ANKLUME_SKIP_HOST_SUBNET_CHECK"] = "1"
-
-# Skip network safety checks — scenario tests may run in sandboxes without
-# internet connectivity.  The env var is checked by the Makefile.
-os.environ["ANKLUME_SKIP_NETWORK_CHECK"] = "1"
 
 # Persistent backup directory — survives crashes so next run can restore.
 SESSION_BACKUP_DIR = PROJECT_DIR / ".scenario-session-backup"
@@ -87,7 +67,7 @@ def _clean_incus_state(sandbox) -> None:
     """Remove all anklume Incus resources (instances, profiles, projects, networks).
 
     Used by deploy scenarios to ensure a clean starting state.
-    Follows the correct deletion order: instances → images → profiles → projects → networks.
+    Follows the correct deletion order: instances -> images -> profiles -> projects -> networks.
     """
     result = sandbox.run("incus project list --format csv -c n 2>/dev/null")
     if result.returncode != 0:
@@ -133,7 +113,7 @@ def _clean_incus_state(sandbox) -> None:
             shutil.rmtree(d)
 
 
-# ── Data classes ─────────────────────────────────────────────────
+# -- Data classes ------------------------------------------------------
 
 
 @dataclass
@@ -303,64 +283,3 @@ class Sandbox:
         """Check if Incus daemon is available."""
         result = self.run("incus info 2>/dev/null")
         return result.returncode == 0
-
-
-# ── Fixtures ─────────────────────────────────────────────────────
-
-
-@pytest.fixture(scope="session")
-def _session_backup():
-    """Session-level crash-safe backup of project state."""
-    if SESSION_BACKUP_DIR.exists():
-        logger.warning("Restoring from previous scenario session crash backup")
-        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
-        shutil.rmtree(SESSION_BACKUP_DIR)
-
-    _backup_state(PROJECT_DIR, SESSION_BACKUP_DIR)
-
-    yield
-
-    if SESSION_BACKUP_DIR.exists():
-        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
-        shutil.rmtree(SESSION_BACKUP_DIR)
-
-
-@pytest.fixture()
-def sandbox(_session_backup):
-    """Provide a sandbox instance for scenario steps."""
-    return Sandbox(project_dir=PROJECT_DIR)
-
-
-@pytest.fixture(autouse=True)
-def scenario_state_restore(_session_backup):
-    """Per-test state restoration from session backup."""
-    yield
-    stash = PROJECT_DIR / ".scenario-stash-inventory"
-    if stash.exists():
-        shutil.rmtree(stash)
-    if SESSION_BACKUP_DIR.exists():
-        _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
-
-
-@pytest.fixture()
-def infra_backup():
-    """Legacy fixture — now handled by scenario_state_restore (autouse)."""
-    yield
-
-
-@pytest.fixture()
-def clean_generated_files(sandbox):
-    """Remove all generated files (inventory, group_vars, host_vars)."""
-    for dirname in PROTECTED_DIRS:
-        d = sandbox.project_dir / dirname
-        if d.exists():
-            shutil.rmtree(d)
-    yield
-
-
-# ── Import step definitions so pytest-bdd discovers them ─────────
-# These imports MUST be at module level for pytest-bdd collection.
-
-from scenarios.steps.given import *  # noqa: F401, F403, E402
-from scenarios.steps.then import *  # noqa: F401, F403, E402
-from scenarios.steps.when import *  # noqa: F401, F403, E402

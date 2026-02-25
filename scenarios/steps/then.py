@@ -4,73 +4,73 @@ import json
 import re
 
 import yaml
-from pytest_bdd import parsers, then
+from behave import then
 
 
 @then("exit code is 0")
-def check_exit_zero(sandbox):
-    assert sandbox.last_result.returncode == 0, (
-        f"Expected exit 0, got {sandbox.last_result.returncode}\n"
-        f"stdout: {sandbox.last_result.stdout[:500]}\n"
-        f"stderr: {sandbox.last_result.stderr[:500]}"
+def check_exit_zero(context):
+    assert context.sandbox.last_result.returncode == 0, (
+        f"Expected exit 0, got {context.sandbox.last_result.returncode}\n"
+        f"stdout: {context.sandbox.last_result.stdout[:500]}\n"
+        f"stderr: {context.sandbox.last_result.stderr[:500]}"
     )
 
 
 @then("exit code is non-zero")
-def check_exit_nonzero(sandbox):
-    assert sandbox.last_result.returncode != 0, (
+def check_exit_nonzero(context):
+    assert context.sandbox.last_result.returncode != 0, (
         f"Expected non-zero exit, got 0\n"
-        f"stdout: {sandbox.last_result.stdout[:500]}"
+        f"stdout: {context.sandbox.last_result.stdout[:500]}"
     )
 
 
-@then(parsers.parse('output contains "{text}"'))
-def check_output_contains(sandbox, text):
-    combined = sandbox.last_result.stdout + sandbox.last_result.stderr
+@then('output contains "{text}"')
+def check_output_contains(context, text):
+    combined = context.sandbox.last_result.stdout + context.sandbox.last_result.stderr
     assert text in combined, (
         f"Expected '{text}' in output, not found.\n"
-        f"stdout: {sandbox.last_result.stdout[:500]}\n"
-        f"stderr: {sandbox.last_result.stderr[:500]}"
+        f"stdout: {context.sandbox.last_result.stdout[:500]}\n"
+        f"stderr: {context.sandbox.last_result.stderr[:500]}"
     )
 
 
-@then(parsers.parse('stderr contains "{text}"'))
-def check_stderr_contains(sandbox, text):
-    assert text in sandbox.last_result.stderr, (
+@then('stderr contains "{text}"')
+def check_stderr_contains(context, text):
+    assert text in context.sandbox.last_result.stderr, (
         f"Expected '{text}' in stderr, not found.\n"
-        f"stderr: {sandbox.last_result.stderr[:500]}"
+        f"stderr: {context.sandbox.last_result.stderr[:500]}"
     )
 
 
 @then("inventory files exist for all domains")
-def check_inventory_files(sandbox):
-    infra = sandbox.load_infra()
+def check_inventory_files(context):
+    infra = context.sandbox.load_infra()
     for domain in infra.get("domains", {}):
-        inv = sandbox.project_dir / "inventory" / f"{domain}.yml"
+        inv = context.sandbox.project_dir / "inventory" / f"{domain}.yml"
         assert inv.exists(), f"Missing inventory file: {inv}"
 
 
-@then(parsers.parse('file "{path}" exists'))
-def check_file_exists(sandbox, path):
-    full = sandbox.project_dir / path
+@then('file "{path}" exists')
+def check_file_exists(context, path):
+    full = context.sandbox.project_dir / path
     assert full.exists(), f"File not found: {full}"
 
 
-@then(parsers.parse('file "{path}" does not exist'))
-def check_file_not_exists(sandbox, path):
-    full = sandbox.project_dir / path
+@then('file "{path}" does not exist')
+def check_file_not_exists(context, path):
+    full = context.sandbox.project_dir / path
     assert not full.exists(), f"File should not exist: {full}"
 
 
 @then("all declared instances are running")
-def check_all_running(sandbox):
-    for name, _domain in sandbox.all_declared_instances():
-        assert sandbox.instance_running(name), f"Instance {name} is not running"
+def check_all_running(context):
+    for name, _domain in context.sandbox.all_declared_instances():
+        assert context.sandbox.instance_running(name), f"Instance {name} is not running"
 
 
-@then(parsers.parse('instance "{name}" is running in project "{project}"'))
-def check_instance_running(sandbox, name, project):
-    result = sandbox.run(
+@then('instance "{name}" is running in project "{project}"')
+def check_instance_running(context, name, project):
+    result = context.sandbox.run(
         f"incus list --project {project} --format json 2>/dev/null"
     )
     assert result.returncode == 0
@@ -80,8 +80,8 @@ def check_instance_running(sandbox, name, project):
 
 
 @then("intra-domain connectivity works")
-def check_intra_domain(sandbox):
-    infra = sandbox.load_infra()
+def check_intra_domain(context):
+    infra = context.sandbox.load_infra()
     for domain_name, domain in infra.get("domains", {}).items():
         machines = list(domain.get("machines", {}).items())
         if len(machines) < 2:
@@ -89,7 +89,7 @@ def check_intra_domain(sandbox):
         src_name = machines[0][0]
         dst_ip = machines[1][1].get("ip", "")
         if dst_ip:
-            result = sandbox.run(
+            result = context.sandbox.run(
                 f"incus exec {src_name} --project {domain_name} -- "
                 f"ping -c1 -W2 {dst_ip} 2>/dev/null"
             )
@@ -99,9 +99,9 @@ def check_intra_domain(sandbox):
 
 
 @then("inter-domain connectivity is blocked")
-def check_inter_domain_blocked(sandbox):
-    for src, dst, dst_ip in sandbox.cross_domain_pairs():
-        result = sandbox.run(
+def check_inter_domain_blocked(context):
+    for src, dst, dst_ip in context.sandbox.cross_domain_pairs():
+        result = context.sandbox.run(
             f"incus exec {src} -- ping -c1 -W2 {dst_ip} 2>/dev/null"
         )
         assert result.returncode != 0, (
@@ -110,9 +110,9 @@ def check_inter_domain_blocked(sandbox):
 
 
 @then("no Incus resources were created")
-def check_no_resources(sandbox):
+def check_no_resources(context):
     """Verify no new Incus projects/instances were created by the failed command."""
-    result = sandbox.run("incus project list --format json 2>/dev/null")
+    result = context.sandbox.run("incus project list --format json 2>/dev/null")
     if result.returncode == 0:
         try:
             projects = json.loads(result.stdout)
@@ -126,10 +126,10 @@ def check_no_resources(sandbox):
             pass
 
 
-@then(parsers.parse('the managed section in "{filename}" is unchanged'))
-def check_managed_unchanged(sandbox, filename):
+@then('the managed section in "{filename}" is unchanged')
+def check_managed_unchanged(context, filename):
     """Verify managed section does not contain injected content."""
-    path = sandbox.project_dir / filename
+    path = context.sandbox.project_dir / filename
     content = path.read_text()
     assert "SCENARIO-INJECTED" not in content, (
         "Managed section still contains injected content after sync"
@@ -137,10 +137,10 @@ def check_managed_unchanged(sandbox, filename):
 
 
 @then("generated host_vars contain valid IPs")
-def check_host_vars_ips(sandbox):
+def check_host_vars_ips(context):
     """Verify all generated host_vars files contain valid IP addresses."""
     ip_pattern = re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-    host_vars_dir = sandbox.project_dir / "host_vars"
+    host_vars_dir = context.sandbox.project_dir / "host_vars"
     assert host_vars_dir.exists(), "host_vars directory not found"
     found_any = False
     for f in host_vars_dir.glob("*.yml"):

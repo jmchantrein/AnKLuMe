@@ -1,1 +1,1 @@
-# Step definition modules for pytest-bdd scenarios.
+# Step definition modules for behave scenarios.

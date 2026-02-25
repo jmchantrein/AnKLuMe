@@ -3,13 +3,13 @@ name = "anklume"
 version = "0.1.0"
 description = "QubesOS-like isolation using native Linux kernel features, orchestrated by Ansible and Incus"
 requires-python = ">=3.11"
-dependencies = ["typer[all]>=0.12", "pyyaml>=6.0"]
+dependencies = ["typer[all]>=0.12", "pyyaml>=6.0", "fastapi>=0.115", "uvicorn>=0.32"]
 
 [project.scripts]
 anklume = "scripts.cli:app"
 
 [project.optional-dependencies]
-test = ["pytest", "pyyaml", "hypothesis", "pytest-bdd"]
+test = ["pytest", "pyyaml", "hypothesis", "behave"]
 
 [tool.ruff]
 line-length = 120
@@ -19,4 +19,4 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "scenarios"]
+testpaths = ["tests"]

@@ -1,56 +1,60 @@
 """Given step definitions for anklume E2E scenario tests."""
 
 import json
+import logging
 import shutil
+from pathlib import Path
 
-import pytest
 import yaml
-from pytest_bdd import given, parsers
+from behave import given
 
-from scenarios.conftest import _clean_incus_state
+from scenarios.support import PROTECTED_DIRS, _clean_incus_state
+
+logger = logging.getLogger("anklume.scenarios")
 
 
 @given("a clean sandbox environment")
-def clean_sandbox(sandbox):
+def clean_sandbox(context):
     """Verify we're in a working anklume directory."""
-    assert (sandbox.project_dir / "scripts" / "generate.py").exists(), (
+    assert (context.sandbox.project_dir / "scripts" / "generate.py").exists(), (
         "Not in an anklume project directory"
     )
 
 
 @given("images are pre-cached via shared repository")
-def precache_images(sandbox):
+def precache_images(context):
     """Ensure images are available locally (skip if no Incus)."""
-    if not sandbox.has_incus():
-        pytest.skip("No Incus daemon available")
+    if not context.sandbox.has_incus():
+        context.scenario.skip("No Incus daemon available")
 
 
 @given("Incus daemon is available")
-def incus_available(sandbox):
+def incus_available(context):
     """Skip if no Incus daemon is accessible."""
-    if not sandbox.has_incus():
-        pytest.skip("No Incus daemon available")
+    if not context.sandbox.has_incus():
+        context.scenario.skip("No Incus daemon available")
 
 
 @given("storage backend supports snapshots")
-def storage_supports_snapshots(sandbox):
+def storage_supports_snapshots(context):
     """Skip if the default storage pool uses 'dir' backend (snapshots hang)."""
-    result = sandbox.run("incus storage show default --format json")
+    result = context.sandbox.run("incus storage show default --format json")
     if result.returncode != 0:
-        pytest.skip("Cannot query storage pool")
+        context.scenario.skip("Cannot query storage pool")
+        return
     try:
         pool = json.loads(result.stdout)
         driver = pool.get("driver", "dir")
         if driver == "dir":
-            pytest.skip(
+            context.scenario.skip(
                 f"Storage backend '{driver}' does not support reliable snapshots"
             )
     except (json.JSONDecodeError, TypeError):
-        pytest.skip("Cannot parse storage pool info")
+        context.scenario.skip("Cannot parse storage pool info")
 
 
 @given("we are in a sandbox environment")
-def in_sandbox(sandbox):
+def in_sandbox(context):
     """Skip if not inside an Incus-in-Incus sandbox.
 
     Deploy scenarios that run 'make apply' with example infra.yml files
@@ -59,36 +63,42 @@ def in_sandbox(sandbox):
 
     Also cleans Incus state so each deploy scenario starts fresh.
     """
-    from pathlib import Path
-
     marker = Path("/etc/anklume/absolute_level")
     if not marker.exists():
-        pytest.skip("Not in a sandbox — deploy scenarios skipped to avoid network conflicts")
+        context.scenario.skip(
+            "Not in a sandbox -- deploy scenarios skipped to avoid network conflicts"
+        )
+        return
     try:
         level = int(marker.read_text().strip())
         if level < 1:
-            pytest.skip("Not nested — deploy scenarios skipped to avoid network conflicts")
+            context.scenario.skip(
+                "Not nested -- deploy scenarios skipped to avoid network conflicts"
+            )
+            return
     except (ValueError, OSError):
-        pytest.skip("Cannot read nesting level")
+        context.scenario.skip("Cannot read nesting level")
+        return
 
-    # Clean Incus state so deploy starts from scratch
-    _clean_incus_state(sandbox)
+    # Clean Incus state so deploy starts from scratch.
+    _clean_incus_state(context.sandbox)
 
 
-@given(parsers.parse('infra.yml from "{example}"'))
-def load_infra_from_example(sandbox, example):
+@given('infra.yml from "{example}"')
+def load_infra_from_example(context, example):
     """Copy an example infra.yml into place."""
-    src = sandbox.project_dir / "examples" / example / "infra.yml"
+    src = context.sandbox.project_dir / "examples" / example / "infra.yml"
     if not src.exists():
-        src = sandbox.project_dir / "examples" / f"{example}.infra.yml"
+        src = context.sandbox.project_dir / "examples" / f"{example}.infra.yml"
     assert src.exists(), f"Example not found: {src}"
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(src.read_text())
 
 
 @given("infra.yml exists but no inventory files")
-def infra_without_inventory(sandbox, infra_backup):
+def infra_without_inventory(context):
     """Ensure infra.yml exists but inventory/ is empty."""
+    sandbox = context.sandbox
     infra_path = sandbox.project_dir / "infra.yml"
     if not infra_path.exists():
         example = sandbox.project_dir / "examples" / "student-sysadmin" / "infra.yml"
@@ -103,16 +113,16 @@ def infra_without_inventory(sandbox, infra_backup):
 
 
 @given("a running infrastructure")
-def running_infra(sandbox):
+def running_infra(context):
     """Verify that instances are running; rebuild if destroyed."""
-    import logging
-
-    logger = logging.getLogger("anklume.scenarios")
+    sandbox = context.sandbox
     if not sandbox.has_incus():
-        pytest.skip("No Incus daemon available")
+        context.scenario.skip("No Incus daemon available")
+        return
     result = sandbox.run("incus list --all-projects --format json")
     if result.returncode != 0:
-        pytest.skip("No Incus daemon available")
+        context.scenario.skip("No Incus daemon available")
+        return
     try:
         instances = json.loads(result.stdout)
         running = [i for i in instances if i.get("status") == "Running"]
@@ -121,49 +131,52 @@ def running_infra(sandbox):
             return
     except (json.JSONDecodeError, TypeError):
         pass
-    logger.info("No running instances — rebuilding infrastructure via make sync && make apply")
+    logger.info("No running instances -- rebuilding infrastructure via make sync && make apply")
     r = sandbox.run("make sync", timeout=120)
     if r.returncode != 0:
-        pytest.skip(f"Cannot rebuild: make sync failed (rc={r.returncode})")
+        context.scenario.skip(f"Cannot rebuild: make sync failed (rc={r.returncode})")
+        return
     r = sandbox.run("make apply", timeout=600)
     if r.returncode != 0:
-        pytest.skip(f"Cannot rebuild: make apply failed (rc={r.returncode})")
+        context.scenario.skip(f"Cannot rebuild: make apply failed (rc={r.returncode})")
 
 
-@given(parsers.parse('infra.yml with two machines sharing "{ip}"'))
-def infra_with_duplicate_ip(sandbox, ip):
+@given('infra.yml with two machines sharing "{ip}"')
+def infra_with_duplicate_ip(context, ip):
     """Create an infra.yml with duplicate IPs."""
     infra = {
         "project_name": "scenario-test",
-        "global": {"base_subnet": "10.100"},
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
         "domains": {
             "test-a": {
-                "subnet_id": 200,
+                "trust_level": "semi-trusted",
                 "machines": {
                     "test-a-one": {"type": "lxc", "ip": ip},
                 },
             },
             "test-b": {
-                "subnet_id": 201,
+                "trust_level": "semi-trusted",
                 "machines": {
                     "test-b-one": {"type": "lxc", "ip": ip},
                 },
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse('infra.yml with managed section content in "{filename}"'))
-def infra_with_managed_content(sandbox, filename):
+@given('infra.yml with managed section content in "{filename}"')
+def infra_with_managed_content(context, filename):
     """Verify a generated file with managed sections exists."""
-    path = sandbox.project_dir / filename
+    path = context.sandbox.project_dir / filename
     assert path.exists(), f"File not found: {path}"
 
 
-@given(parsers.parse('infra.yml with invalid snapshots_schedule "{schedule}"'))
-def infra_with_invalid_schedule(sandbox, schedule):
+@given('infra.yml with invalid snapshots_schedule "{schedule}"')
+def infra_with_invalid_schedule(context, schedule):
     """Create infra.yml with an invalid snapshots_schedule."""
     infra = {
         "project_name": "scenario-test",
@@ -182,12 +195,12 @@ def infra_with_invalid_schedule(sandbox, schedule):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse('infra.yml with invalid snapshots_expiry "{expiry}"'))
-def infra_with_invalid_expiry(sandbox, expiry):
+@given('infra.yml with invalid snapshots_expiry "{expiry}"')
+def infra_with_invalid_expiry(context, expiry):
     """Create infra.yml with an invalid snapshots_expiry."""
     infra = {
         "project_name": "scenario-test",
@@ -206,12 +219,12 @@ def infra_with_invalid_expiry(sandbox, expiry):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse("infra.yml with boot_priority {priority:d}"))
-def infra_with_invalid_boot_priority(sandbox, priority):
+@given("infra.yml with boot_priority {priority:d}")
+def infra_with_invalid_boot_priority(context, priority):
     """Create infra.yml with an out-of-range boot_priority."""
     infra = {
         "project_name": "scenario-test",
@@ -230,12 +243,12 @@ def infra_with_invalid_boot_priority(sandbox, priority):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse('infra.yml with shared_volume consumer "{consumer}"'))
-def infra_with_invalid_sv_consumer(sandbox, consumer):
+@given('infra.yml with shared_volume consumer "{consumer}"')
+def infra_with_invalid_sv_consumer(context, consumer):
     """Create infra.yml with an unknown shared_volume consumer."""
     infra = {
         "project_name": "scenario-test",
@@ -257,12 +270,12 @@ def infra_with_invalid_sv_consumer(sandbox, consumer):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse('infra.yml with shared_volume relative path "{path}"'))
-def infra_with_relative_sv_path(sandbox, path):
+@given('infra.yml with shared_volume relative path "{path}"')
+def infra_with_relative_sv_path(context, path):
     """Create infra.yml with a relative shared_volume path."""
     infra = {
         "project_name": "scenario-test",
@@ -284,12 +297,12 @@ def infra_with_relative_sv_path(sandbox, path):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
-@given(parsers.parse('infra.yml with invalid trust_level "{level}"'))
-def infra_with_invalid_trust_level(sandbox, level):
+@given('infra.yml with invalid trust_level "{level}"')
+def infra_with_invalid_trust_level(context, level):
     """Create infra.yml with an invalid trust_level."""
     infra = {
         "project_name": "scenario-test",
@@ -305,10 +318,14 @@ def infra_with_invalid_trust_level(sandbox, level):
             },
         },
     }
-    dst = sandbox.project_dir / "infra.yml"
+    dst = context.sandbox.project_dir / "infra.yml"
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
 @given("no generated files exist")
-def no_generated_files(sandbox, clean_generated_files):
+def no_generated_files(context):
     """Remove all generated Ansible files."""
+    for dirname in PROTECTED_DIRS:
+        d = context.sandbox.project_dir / dirname
+        if d.exists():
+            shutil.rmtree(d)

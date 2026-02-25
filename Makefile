@@ -324,13 +324,13 @@ runner-destroy: ## Destroy the anklume runner container
 
 # ── Scenario Testing (Phase 22) ──────────────────────────
 scenario-test: ## Run all E2E scenarios in sandbox (slow, on-demand)
-	python3 -m pytest scenarios/ -v --tb=long
+	python3 -m behave scenarios/ --no-capture -v
 
 scenario-test-best: ## Run best-practice scenarios only
-	python3 -m pytest scenarios/best_practices/ -v --tb=long
+	python3 -m behave scenarios/best_practices/ --no-capture -v
 
 scenario-test-bad: ## Run bad-practice scenarios only
-	python3 -m pytest scenarios/bad_practices/ -v --tb=long
+	python3 -m behave scenarios/bad_practices/ --no-capture -v
 
 scenario-list: ## List all available scenarios
 	@echo "Best practices:"; grep -rh "Scenario:" scenarios/best_practices/ 2>/dev/null | sed 's/^/  /'; \
@@ -616,7 +616,7 @@ init: install-hooks ## Initial setup: install all dependencies
 	@if python3 -c "import yaml; r=yaml.safe_load(open('requirements.yml'))['roles']; exit(0 if r else 1)" 2>/dev/null; then \
 		ansible-galaxy role install -r requirements.yml -p roles_vendor/; \
 	fi
-	pip install --user --break-system-packages pyyaml pytest molecule ruff
+	pip install --user --break-system-packages pyyaml pytest molecule ruff behave fastapi uvicorn
 	@echo "---"
 	@echo "Also install system packages: ansible-lint yamllint shellcheck"
 	@echo "  Arch:   pacman -S ansible-lint yamllint shellcheck"
