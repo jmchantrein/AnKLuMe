@@ -140,6 +140,12 @@ live-update: ## Download and apply A/B update (URL=<image-url>)
 live-status: ## Show live OS status (active slot, boot count, data pool)
 	@scripts/live-os-lib.sh status
 
+live-os-test-vm: ## Boot live OS image in Incus VM for testing (IMAGE=file)
+	scripts/live-os-test-vm.sh $(if $(IMAGE),--image $(IMAGE)) $(if $(BASE),--base $(BASE)) --keep
+
+live-os-test-vm-clean: ## Destroy live OS test VM
+	scripts/live-os-test-vm.sh --clean
+
 # ── Quality ───────────────────────────────────────────────
 lint: lint-yaml lint-ansible lint-shell lint-python ## Run ALL validators
 
@@ -710,7 +716,7 @@ help-all: ## Show all available targets
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
-        build-image live-update live-status \
+        build-image live-update live-status live-os-test-vm live-os-test-vm-clean \
         flush upgrade install-update-notifier import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \

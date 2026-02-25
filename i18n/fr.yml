@@ -100,6 +100,8 @@ apply-print: "Configurer le service d'impression CUPS dans un conteneur"
 build-image: "Construire une image live OS anklume demarrable"
 live-update: "Telecharger et appliquer une mise a jour A/B"
 live-status: "Afficher l'etat du live OS (slot actif, demarrage, pool)"
+live-os-test-vm: "Demarrer l'image live OS dans une VM Incus pour test"
+live-os-test-vm-clean: "Detruire la VM de test live OS"
 
 # ── Lifecycle ────────────────────────────────────────────
 upgrade: "Mise a jour securisee du framework"

@@ -25,9 +25,8 @@ VAGUE 3 (COMPLETE):
 VAGUE 4 (RUNNING):
   Phase 40  ←── blocked by 38 + 39
 
-INDEPENDENT (hardware-dependent, not automatable):
-  Phase 27  ←── GPU + audio hardware
-  Phase 31  ←── physical boot media (already in progress)
+INDEPENDENT (requires specific environment):
+  Phase 31  ←── VM testing via Incus/KVM (in progress)
 ```
 
 ## Vague 1 — COMPLETE
@@ -80,16 +79,11 @@ Post-merge fixes: llm_sanitizer meta/molecule, SAN->LS prefix rename.
 - Doc: docs/network-inspection.md
 - Tests: NI-001 to NI-005
 
-## Phases NOT implementable autonomously
-
-### Phase 27: Streaming STT
-**Reason**: Needs GPU container with STT service + audio hardware
-for testing real-time latency. Cannot validate < 500ms requirement
-without physical audio input.
+## Phases requiring specific environment
 
 ### Phase 31: Live OS
-**Reason**: Already in progress. Needs physical hardware or VM for
-boot testing, UEFI, encrypted ZFS/BTRFS pool creation.
+**Reason**: Needs Incus/KVM VM for boot testing, UEFI, encrypted
+ZFS/BTRFS pool creation. Testable locally via `make live-os-test-vm`.
 **Status**: Arch Linux base support checked, 11 of 12 criteria remaining.
 
 ## Final summary
