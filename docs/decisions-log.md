@@ -503,11 +503,12 @@ QubesOS :
   permissions UNIX)
 
 **Implementation (2026-02-25)**: All features implemented in
-`scripts/clipboard.sh` except tmux domain-switch purge (requires tmux
-hook integration, deferred). New commands: `history`, `recall`, `purge`.
+`scripts/clipboard.sh`. New commands: `history`, `recall`, `purge`.
 `ANKLUME_CLIPBOARD_TIMEOUT` env var (default 30s). Trust-level warning
 on copy-from untrusted/disposable domains. History stored in
-`~/.anklume/clipboard/`.
+`~/.anklume/clipboard/`. Tmux domain-switch purge implemented via
+`scripts/hooks/tmux-domain-switch.sh` — registered as an
+`after-select-pane` hook in `scripts/console.py` (`create_session`).
 
 ---
 

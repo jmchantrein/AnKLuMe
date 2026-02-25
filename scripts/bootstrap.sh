@@ -778,7 +778,7 @@ ZABBLY
     # ── Install dependencies ────────────────────────────────
     echo "--- Checking dependencies ---"
     MISSING=()
-    for cmd in ansible-playbook ansible-lint yamllint python3 pip3; do
+    for cmd in ansible-playbook ansible-lint yamllint python3; do
         if ! command -v "$cmd" &>/dev/null; then
             MISSING+=("$cmd")
         fi
