@@ -405,7 +405,14 @@ pytest-bdd has ~1.5k GitHub stars and active maintenance. Adding
 "scenarios" to `testpaths` in pyproject.toml is sufficient — no
 separate runner configuration needed.
 
-**Status**: pending review
+**Status**: rejected — migrate to behave
+
+**Review outcome (2026-02-25)**: behave est préféré pour les scénarios
+Gherkin. behave est le framework BDD de référence en Python, avec un
+meilleur support Gherkin natif (tables, outlines, tags). pytest reste
+pour les tests unitaires et de propriétés. Les deux outils coexistent
+sans duplication : pytest pour les tests techniques, behave pour les
+scénarios BDD. La migration est ajoutée au ROADMAP (Deferred Enhancements).
 
 ---
 
@@ -432,7 +439,13 @@ provides reactive auto-refresh without writing JavaScript. No pip
 install needed to run the dashboard. This follows the project's
 principle of minimizing external dependencies.
 
-**Status**: pending review
+**Status**: validated with modification — migrate to FastAPI
+
+**Review outcome (2026-02-25)**: http.server fonctionne pour la v1
+lecture seule, mais ne permet pas d'évoluer facilement vers l'interactivité
+(formulaires, WebSocket, authentification). Décision : migrer vers FastAPI
+dès maintenant pour préparer les évolutions futures. FastAPI est ajouté au
+ROADMAP (Deferred Enhancements).
 
 ---
 
@@ -459,7 +472,26 @@ container, requires no setup, no running daemon, and no network access.
 It's the simplest mechanism that preserves the explicit-action security
 model. Compatible with MCP clipboard tools (same file path).
 
-**Status**: pending review
+**Status**: validated with enhancement — QubesOS-style clipboard security
+
+**Review outcome (2026-02-25)**: Le mécanisme `incus file push/pull`
+est validé comme transport. Ajout d'un modèle de sécurité inspiré de
+QubesOS :
+- **Purge automatique** : le presse-papier est purgé après chaque
+  collage (une seule utilisation par copie)
+- **Purge au changement de domaine** : le presse-papier est vidé lors
+  du switch de pane tmux vers un autre domaine
+- **Timeout configurable** : purge automatique après N secondes
+  d'inactivité (défaut raisonnable, ex: 30s)
+- **Historique** : `~/.anklume/clipboard/` conserve les entrées purgées
+  pour récupération via `anklume clipboard history` et `recall`
+- **Warning directionnel** : avertissement visuel lors d'un collage
+  depuis un domaine untrusted vers un domaine trusted
+- **Pas de chiffrement** : les entrées historiques ne sont pas chiffrées
+  (le répertoire `~/.anklume/` est déjà sur le host, protégé par les
+  permissions UNIX)
+
+Ce modèle est ajouté au ROADMAP (Deferred Enhancements).
 
 ---
 
@@ -485,11 +517,11 @@ infra.yml, ensuring desktop configs always match the actual infrastructure.
 Output to `desktop/` (gitignored) lets users copy what they need. Same
 pattern as `scripts/console.py` (reads infra.yml, generates output).
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
-## D-054: Phase 41 — Three-tier role resolution with Galaxy integration
+## D-058: Phase 41 — Three-tier role resolution with Galaxy integration
 
 **Problem**: anklume lacked a mechanism for leveraging official Ansible
 Galaxy roles (e.g., `geerlingguy.docker`), forcing custom implementations
@@ -515,7 +547,7 @@ keep the repo clean. ADR-045 formalized this decision.
 
 ---
 
-## D-055: Phase 42 — Desktop plugin system with schema-driven interface
+## D-059: Phase 42 — Desktop plugin system with schema-driven interface
 
 **Problem**: The desktop configuration generator (Phase 21) was tightly
 coupled to Sway. Users with GNOME, KDE, or Hyprland couldn't benefit.
@@ -543,7 +575,7 @@ mirror the console QubesOS-style visual identification.
 
 ---
 
-## D-056: Phase 31 — Toram copy integrity verification
+## D-060: Phase 31 — Toram copy integrity verification
 
 **Problem**: The `anklume-toram` initramfs hook copied the squashfs root
 image to RAM without verifying the copy was complete. A partial copy
