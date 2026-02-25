@@ -2944,7 +2944,7 @@ d) **Alerting pipeline**:
 
 ---
 
-## Phase 41: Official Roles and External Role Integration
+## Phase 41: Official Roles and External Role Integration ✅ COMPLETE
 
 **Goal**: Mechanism to prioritize installing official Ansible Galaxy
 roles for tools, adding project-specific configuration as thin
@@ -3014,7 +3014,7 @@ c) **Migration path** (gradual):
 
 ---
 
-## Phase 42: Desktop Environment Plugin System
+## Phase 42: Desktop Environment Plugin System ✅ COMPLETE
 
 **Goal**: Declarative desktop environment setup where users describe
 their DE preferences in `infra.yml` and anklume configures the host

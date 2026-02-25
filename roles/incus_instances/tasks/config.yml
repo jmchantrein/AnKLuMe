@@ -1,0 +1,154 @@
+---
+# IncusInstances | Config reconciliation
+#
+# Included from main.yml after launch.yml.
+# Reads current config, reconciles profiles, config keys, boot
+# autostart, ephemeral/protection, and snapshot scheduling.
+#
+# Requires: instance_name, instance_domain, incus_instances_existing
+
+- name: IncusInstances | Read current instance profiles
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - show
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: _incus_instances_config_raw
+  changed_when: false
+  check_mode: false
+  when: instance_name in incus_instances_existing
+
+- name: IncusInstances | Parse current profiles
+  ansible.builtin.set_fact:
+    _incus_instances_current_profiles: >-
+      {{ (_incus_instances_config_raw.stdout | from_yaml).profiles | default(['default']) }}
+  when: _incus_instances_config_raw is not skipped
+
+- name: IncusInstances | Parse current config keys
+  ansible.builtin.set_fact:
+    _incus_instances_current_config: >-
+      {{ (_incus_instances_config_raw.stdout | from_yaml).config | default({})
+         if (_incus_instances_config_raw is defined and _incus_instances_config_raw is not skipped)
+         else {} }}
+
+- name: IncusInstances | Assign profiles if changed
+  ansible.builtin.command:
+    argv:
+      - incus
+      - profile
+      - assign
+      - "{{ instance_name }}"
+      - "{{ (instance_profiles | default(['default'])) | join(',') }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - _incus_instances_current_profiles is defined
+    - (_incus_instances_current_profiles | sort) != ((instance_profiles | default(['default'])) | sort)
+  changed_when: true
+
+- name: IncusInstances | Apply instance config keys
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "{{ item.key }}={{ item.value }}"
+      - --project
+      - "{{ instance_domain }}"
+  loop: "{{ instance_config | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"
+  when:
+    - instance_config is defined and (instance_config | length > 0)
+    - (_incus_instances_current_config[item.key] | default('') | string) != (item.value | string)
+  changed_when: true
+
+# -- Boot autostart (from instance_boot_autostart / instance_boot_priority) --
+
+- name: IncusInstances | Set boot.autostart
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "boot.autostart={{ instance_boot_autostart | lower }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_boot_autostart is defined
+    - (_incus_instances_current_config['boot.autostart'] | default('')) != (instance_boot_autostart | string | lower)
+  changed_when: true
+
+- name: IncusInstances | Set boot.autostart.priority
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "boot.autostart.priority={{ instance_boot_priority }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_boot_priority is defined
+    - >-
+      (_incus_instances_current_config['boot.autostart.priority']
+      | default('') | string) != (instance_boot_priority | string)
+  changed_when: true
+
+# -- Delete protection (from instance_ephemeral) --
+# ephemeral: false -> security.protection.delete=true (protected)
+# ephemeral: true  -> security.protection.delete=false (deletable)
+
+- name: IncusInstances | Set security.protection.delete from ephemeral flag
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "security.protection.delete={{ 'false' if (instance_ephemeral | bool) else 'true' }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_ephemeral is defined
+    - (_incus_instances_current_config['security.protection.delete'] | default(''))
+      != ('false' if (instance_ephemeral | bool) else 'true')
+  changed_when: true
+
+# -- Snapshot scheduling (from instance_snapshots_schedule / _expiry) --
+
+- name: IncusInstances | Set snapshots.schedule
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "snapshots.schedule={{ instance_snapshots_schedule }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_snapshots_schedule is defined
+    - (_incus_instances_current_config['snapshots.schedule'] | default('')) != instance_snapshots_schedule
+  changed_when: true
+
+- name: IncusInstances | Set snapshots.expiry
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - set
+      - "{{ instance_name }}"
+      - "snapshots.expiry={{ instance_snapshots_expiry }}"
+      - --project
+      - "{{ instance_domain }}"
+  when:
+    - instance_snapshots_expiry is defined
+    - (_incus_instances_current_config['snapshots.expiry'] | default('')) != instance_snapshots_expiry
+  changed_when: true

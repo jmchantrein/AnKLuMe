@@ -55,8 +55,9 @@ la section globale :
 
 ```yaml
 global:
-  base_subnet: "10.100"
-  default_os_image: "images:debian/13"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   gpu_policy: shared
 ```
 

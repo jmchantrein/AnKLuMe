@@ -48,7 +48,10 @@ politique GPU exclusive par defaut.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
+    zone_step: 10
   # gpu_policy: exclusive  # Defaut -- un seul container possede le GPU
 
 domains:

@@ -1,0 +1,168 @@
+---
+# IncusInstances | Network, device, and storage volume management
+#
+# Included from main.yml after config.yml.
+# Handles eth0 IP override, declared devices, and storage volumes.
+#
+# Requires: instance_name, instance_domain, instance_ip,
+#           instance_devices, instance_storage_volumes,
+#           incus_instances_default_pool
+
+- name: IncusInstances | Check if eth0 is already overridden
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - show
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: incus_instance_devices_raw
+  changed_when: false
+  check_mode: false  # Safe: read-only command
+
+- name: IncusInstances | Parse instance devices
+  ansible.builtin.set_fact:
+    incus_instance_devices: >-
+      {{ incus_instance_devices_raw.stdout | from_yaml }}
+
+- name: IncusInstances | Override eth0 from profile (first time)
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - override
+      - "{{ instance_name }}"
+      - eth0
+      - "ipv4.address={{ instance_ip }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: incus_instances_eth0_override_result
+  when:
+    - instance_ip is defined and (instance_ip | length > 0)
+    - "'eth0' not in (incus_instance_devices | default({}))"
+  changed_when: true
+
+- name: IncusInstances | Update eth0 IP if already overridden
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - set
+      - "{{ instance_name }}"
+      - eth0
+      - "ipv4.address={{ instance_ip }}"
+      - --project
+      - "{{ instance_domain }}"
+  register: incus_instances_eth0_update_result
+  when:
+    - instance_ip is defined and (instance_ip | length > 0)
+    - "'eth0' in (incus_instance_devices | default({}))"
+    - (incus_instance_devices.eth0['ipv4.address'] | default('')) != instance_ip
+  changed_when: true
+
+- name: IncusInstances | Add declared device if missing
+  ansible.builtin.command:
+    cmd: >-
+      incus config device add
+      {{ instance_name }} {{ item.key }} {{ item.value.type }}
+      {% for k, v in item.value.items() if k != 'type' %}{{ k }}={{ v }} {% endfor %}
+      --project {{ instance_domain }}
+  loop: "{{ (instance_devices | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} ({{ item.value.type }})"
+  register: incus_device_add_result
+  when:
+    - instance_devices is defined and (instance_devices | length > 0)
+    - item.key not in (incus_instance_devices | default({}))
+  changed_when: true
+
+# -- Storage volumes (from instance_storage_volumes) --
+# Create volumes in the Incus storage pool and attach as disk devices.
+
+- name: IncusInstances | List existing storage volumes
+  ansible.builtin.command:
+    argv:
+      - incus
+      - storage
+      - volume
+      - list
+      - "{{ item.value.pool | default(incus_instances_default_pool) }}"
+      - --project
+      - "{{ instance_domain }}"
+      - --format
+      - json
+  loop: "{{ (instance_storage_volumes | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: _incus_instances_vol_list
+  changed_when: false
+  check_mode: false
+  when: instance_storage_volumes is defined and (instance_storage_volumes | length > 0)
+
+- name: IncusInstances | Create missing storage volumes
+  ansible.builtin.command:
+    argv:
+      - incus
+      - storage
+      - volume
+      - create
+      - "{{ item.item.value.pool | default(incus_instances_default_pool) }}"
+      - "{{ item.item.key }}"
+      - --project
+      - "{{ instance_domain }}"
+  loop: "{{ _incus_instances_vol_list.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when:
+    - item is not skipped
+    - item.item.key not in (item.stdout | from_json | map(attribute='name') | list)
+  changed_when: true
+
+- name: IncusInstances | Set storage volume size
+  ansible.builtin.command:
+    argv:
+      - incus
+      - storage
+      - volume
+      - set
+      - "{{ item.value.pool | default(incus_instances_default_pool) }}"
+      - "{{ item.key }}"
+      - "size={{ item.value.size }}"
+      - --project
+      - "{{ instance_domain }}"
+  loop: "{{ (instance_storage_volumes | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} ({{ item.value.size | default('unset') }})"
+  when:
+    - instance_storage_volumes is defined and (instance_storage_volumes | length > 0)
+    - item.value.size is defined
+  changed_when: true
+
+- name: IncusInstances | Attach storage volumes as disk devices
+  ansible.builtin.command:
+    argv:
+      - incus
+      - config
+      - device
+      - add
+      - "{{ instance_name }}"
+      - "{{ item.key }}"
+      - disk
+      - "pool={{ item.value.pool | default(incus_instances_default_pool) }}"
+      - "source={{ item.key }}"
+      - "path={{ item.value.path }}"
+      - --project
+      - "{{ instance_domain }}"
+  loop: "{{ (instance_storage_volumes | default({})) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} -> {{ item.value.path | default('/mnt') }}"
+  register: _incus_instances_vol_attach
+  when:
+    - instance_storage_volumes is defined and (instance_storage_volumes | length > 0)
+    - item.value.path is defined
+    - item.key not in (incus_instance_devices | default({}))
+  changed_when: true

@@ -1,0 +1,37 @@
+---
+# IncusInstances | Launch instances (LXC containers and VMs)
+#
+# Included from main.yml after setup/detection.
+# Requires: instance_name, instance_type, instance_os_image,
+#           instance_domain, incus_instances_existing,
+#           _incus_instances_profile_args
+
+- name: IncusInstances | Launch LXC container if missing
+  ansible.builtin.command:
+    argv: >-
+      {{ ['incus', 'launch', instance_os_image, instance_name,
+          '--project', instance_domain]
+         + (_incus_instances_profile_args | from_yaml) }}
+  register: incus_instances_launch_lxc_result
+  when:
+    - instance_name not in incus_instances_existing
+    - instance_type == 'lxc'
+  changed_when: incus_instances_launch_lxc_result.rc == 0
+  failed_when: >-
+    incus_instances_launch_lxc_result.rc != 0
+    and 'already exists' not in (incus_instances_launch_lxc_result.stderr | default(''))
+
+- name: IncusInstances | Launch VM if missing
+  ansible.builtin.command:
+    argv: >-
+      {{ ['incus', 'launch', instance_os_image, instance_name,
+          '--vm', '--project', instance_domain]
+         + (_incus_instances_profile_args | from_yaml) }}
+  register: incus_instances_launch_vm_result
+  when:
+    - instance_name not in incus_instances_existing
+    - instance_type == 'vm'
+  changed_when: incus_instances_launch_vm_result.rc == 0
+  failed_when: >-
+    incus_instances_launch_vm_result.rc != 0
+    and 'already exists' not in (incus_instances_launch_vm_result.stderr | default(''))
