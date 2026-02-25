@@ -229,8 +229,22 @@ bootstrap_rootfs_debian() {
     esac
 
     # Run debootstrap with core packages
+    # Workaround: on CachyOS/Arch hosts without dpkg, debootstrap reads
+    # pacman-conf Architecture which returns multiple lines (x86_64_v2/v3)
+    # and fails. Write the arch hint file so debootstrap skips pacman-conf.
+    # Workaround: on CachyOS/Arch hosts without dpkg, debootstrap reads
+    # pacman-conf Architecture which returns multiple lines (x86_64_v2/v3)
+    # and fails. Write the arch hint file so debootstrap skips pacman-conf.
+    local debootstrap_dir="${DEBOOTSTRAP_DIR:-/usr/share/debootstrap}"
+    local created_arch_hint=false
+    if [ ! -f "$debootstrap_dir/arch" ] && ! command -v dpkg &>/dev/null; then
+        echo "$ARCH" > "$debootstrap_dir/arch"
+        created_arch_hint=true
+        info "  Wrote $debootstrap_dir/arch = $ARCH (CachyOS workaround)"
+    fi
+
     local debootstrap_opts="--arch=$ARCH"
-    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,linux-firmware,openssh-server,curl,jq,python3,python3-pip,python3-yaml,ca-certificates"
+    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,openssh-server,curl,jq,python3,python3-pip,python3-yaml,ca-certificates"
 
     if [ -n "$MIRROR" ]; then
         # shellcheck disable=SC2086
@@ -238,6 +252,10 @@ bootstrap_rootfs_debian() {
     else
         # shellcheck disable=SC2086
         debootstrap $debootstrap_opts "$suite" "$ROOTFS_DIR"
+    fi
+    # Clean up the workaround arch file
+    if [ "$created_arch_hint" = true ]; then
+        rm -f "$debootstrap_dir/arch"
     fi
     info "  Debootstrap complete"
 
@@ -250,6 +268,7 @@ bootstrap_rootfs_debian() {
 
     # Install additional packages via chroot (all anklume runtime deps)
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
+    packages="$packages firmware-linux-free"
     packages="$packages ansible git make sudo nano"
     packages="$packages iproute2 dmidecode lsof htop"
     # Incus: Debian Trixie ships incus in official repos
