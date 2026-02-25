@@ -348,6 +348,69 @@ may be skipped — fix, add a regression test, validate, commit.
 | shellcheck | — | Shell script validation |
 | ruff | — | Python linting |
 
+## 11b. Dependencies (prod vs dev)
+
+Dependencies are classified into **production** (required at runtime
+for `make apply` and normal operations) and **development** (required
+only for testing, linting, and building).
+
+### Production dependencies (Live OS + installed host)
+
+| Package | Arch | Debian | Purpose |
+|---------|------|--------|---------|
+| incus | incus | incus | Container/VM runtime |
+| ansible | ansible | ansible | Orchestration |
+| python | python python-yaml python-pip | python3 python3-yaml python3-pip | PSOT generator |
+| git | git | git | Framework management |
+| nftables | nftables | nftables | Network isolation |
+| curl | curl | curl | Downloads, API calls |
+| jq | jq | jq | JSON processing |
+| make | make | make | Build system |
+| sudo | sudo | sudo | Privilege escalation |
+| openssh | openssh | openssh-server | Remote access |
+| iproute2 | iproute2 | iproute2 | Network config |
+| ca-certificates | ca-certificates | ca-certificates | TLS trust |
+
+### Additional Live OS dependencies
+
+| Package | Purpose |
+|---------|---------|
+| linux, linux-firmware | Kernel + hardware support |
+| cryptsetup | LUKS disk encryption |
+| btrfs-progs | BTRFS filesystem |
+| squashfs-tools | Rootfs compression |
+| dmidecode | Hardware detection |
+| systemd-resolvconf | DNS resolution |
+
+### Development dependencies (not in Live OS)
+
+| Package | Arch | Debian | Purpose |
+|---------|------|--------|---------|
+| ansible-lint | pip | pip | YAML linting |
+| yamllint | pip | pip | YAML validation |
+| shellcheck | shellcheck | shellcheck | Shell linting |
+| ruff | pip | pip | Python linting |
+| molecule | pip | pip | Role testing |
+| pytest | pip | pip | Generator testing |
+| behave | pip | pip | BDD scenarios |
+| fastapi, uvicorn | pip | pip | Dev dashboard |
+| xorriso | xorriso | xorriso | ISO image build |
+| grub | grub | grub2-common | ISO bootloader |
+| mtools | mtools | mtools | EFI image creation |
+
+### Build-only dependencies (ISO creation)
+
+These are only needed on the machine that builds the Live OS image:
+
+| Package | Purpose |
+|---------|---------|
+| xorriso | ISO 9660 assembly |
+| grub (grub-mkimage, grub-mkstandalone) | BIOS/UEFI bootloader |
+| mtools (mmd, mcopy) | FAT image manipulation |
+| mksquashfs | Rootfs compression |
+| veritysetup | dm-verity hash generation |
+| debootstrap (Debian) / pacstrap (Arch) | Rootfs bootstrap |
+
 ## 12. Bootstrap and lifecycle
 
 ### Bootstrap script
