@@ -187,6 +187,11 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
         if len(window.panes) > 1:
             window.select_layout("tiled")
 
+    # D-055: Purge clipboard on domain switch
+    hook_script = str(Path(__file__).resolve().parent / "hooks" / "tmux-domain-switch.sh")
+    session.cmd("set-hook", "-t", session_name, "after-select-pane",
+                f"run-shell '{hook_script}'")
+
     # Select first window
     session.windows[0].select()
 

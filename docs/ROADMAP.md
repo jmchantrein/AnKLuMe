@@ -3288,11 +3288,13 @@ PipeWire audio socket sharing is also pending.
 When Incus containers restart, stale veth pairs can remain in the
 host network namespace with the same MAC address as the new pair.
 The bridge FDB sends unicast frames to the wrong port, causing
-ARP to work (broadcast) but ping/DNS to fail (unicast). Current
-workaround: manually delete orphan paired veths. Root cause
-investigation needed: determine if this is an Incus bug or
-expected behavior, and whether `incus restart` should clean up
-old veths automatically.
+ARP to work (broadcast) but ping/DNS to fail (unicast).
+
+**Workaround**: `make doctor FIX=1` (or `scripts/doctor.sh --fix
+--check network`) detects and removes orphan veth pairs and stale
+routes automatically. Root cause investigation still needed:
+determine if this is an Incus bug or expected behavior, and
+whether `incus restart` should clean up old veths automatically.
 
 ---
 
@@ -3389,5 +3391,5 @@ tmux bootstrap, PipeWire audio).
 033, 034, 037 — deleted during documentation review)
 
 **Known issues**:
-- Orphan veth pairs on container restart (see Deferred Enhancements)
+- Orphan veth pairs on container restart — use `make doctor FIX=1` (see Deferred Enhancements)
 - Debian 13 (Trixie) bootstrap not yet validated (Phase 23)
