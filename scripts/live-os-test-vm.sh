@@ -3,7 +3,7 @@
 # Usage: live-os-test-vm.sh [OPTIONS]
 #
 # Options:
-#   --image FILE      Path to built image (default: anklume-live.img)
+#   --image FILE      Path to built image (.iso or .img, default: anklume-live.iso)
 #   --data-size SIZE  Virtual data disk size (default: 10GiB)
 #   --vm-name NAME    VM name (default: anklume-live-test)
 #   --project NAME    Incus project (default: default)
@@ -12,7 +12,7 @@
 #   --clean           Destroy existing test VM and exit
 #   --help            Show this help
 #
-# This script boots the live OS image inside an Incus VM for testing.
+# Supports both .iso (CD-ROM boot) and .img (raw disk) formats.
 # No physical hardware needed — all testing done locally via KVM.
 
 set -euo pipefail
@@ -23,7 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ── Defaults ──
-IMAGE="anklume-live.img"
+IMAGE="anklume-live.iso"
 DATA_SIZE="10GiB"
 VM_NAME="anklume-live-test"
 PROJECT="default"
@@ -40,7 +40,7 @@ usage() {
     echo "Test anklume Live OS image in an Incus VM (KVM)."
     echo ""
     echo "Options:"
-    echo "  --image FILE      Path to built image (default: anklume-live.img)"
+    echo "  --image FILE      Path to built image .iso or .img (default: anklume-live.iso)"
     echo "  --data-size SIZE  Virtual data disk size (default: 10GiB)"
     echo "  --vm-name NAME    VM name (default: anklume-live-test)"
     echo "  --project NAME    Incus project (default: default)"
@@ -50,8 +50,8 @@ usage() {
     echo "  --help            Show this help"
     echo ""
     echo "Examples:"
-    echo "  $(basename "$0") --image anklume-live.img"
-    echo "  $(basename "$0") --image anklume-arch.img --shell"
+    echo "  $(basename "$0") --image anklume-live.iso"
+    echo "  $(basename "$0") --image anklume-arch.iso --shell"
     echo "  $(basename "$0") --clean"
     exit 0
 }
@@ -130,39 +130,69 @@ if incus info "$VM_NAME" --project "$PROJECT" &>/dev/null; then
     cleanup_vm
 fi
 
+# ── Detect image format ──
+IMAGE_FORMAT=""
+case "$IMAGE_ABS" in
+    *.iso) IMAGE_FORMAT="iso" ;;
+    *.img) IMAGE_FORMAT="raw" ;;
+    *)
+        # Try to detect via file command
+        if file "$IMAGE_ABS" | grep -q "ISO 9660"; then
+            IMAGE_FORMAT="iso"
+        else
+            IMAGE_FORMAT="raw"
+        fi
+        ;;
+esac
+info "Detected image format: $IMAGE_FORMAT"
+
 # ── Import image as Incus VM ──
 info "Importing image into Incus VM..."
 
-# Convert raw image to qcow2 for Incus
-QCOW2_IMAGE="${IMAGE_ABS%.img}.qcow2"
-if [ ! -f "$QCOW2_IMAGE" ] || [ "$IMAGE_ABS" -nt "$QCOW2_IMAGE" ]; then
-    info "Converting image to qcow2..."
-    qemu-img convert -f raw -O qcow2 "$IMAGE_ABS" "$QCOW2_IMAGE"
-    ok "Converted to qcow2"
-fi
+if [ "$IMAGE_FORMAT" = "iso" ]; then
+    # ISO mode: create empty VM and attach ISO as CD-ROM
+    info "Creating empty VM for ISO boot..."
+    incus init "$VM_NAME" --project "$PROJECT" --vm --empty \
+        -c limits.cpu=2 \
+        -c limits.memory=4GiB \
+        -c security.secureboot=false
 
-# Create an empty VM with UEFI firmware
-info "Creating VM with UEFI boot..."
-incus init "$VM_NAME" --project "$PROJECT" --vm --empty \
-    -c limits.cpu=2 \
-    -c limits.memory=4GiB \
-    -c security.secureboot=false
+    # Attach ISO as CD-ROM device
+    info "Attaching ISO as CD-ROM..."
+    incus config device add "$VM_NAME" install-iso disk \
+        source="$IMAGE_ABS" \
+        readonly=true \
+        boot.priority=10 \
+        --project "$PROJECT"
+    ok "ISO attached as CD-ROM"
+else
+    # Raw mode: convert and write to root volume
+    QCOW2_IMAGE="${IMAGE_ABS%.img}.qcow2"
+    if [ ! -f "$QCOW2_IMAGE" ] || [ "$IMAGE_ABS" -nt "$QCOW2_IMAGE" ]; then
+        info "Converting image to qcow2..."
+        qemu-img convert -f raw -O qcow2 "$IMAGE_ABS" "$QCOW2_IMAGE"
+        ok "Converted to qcow2"
+    fi
 
-# Import the disk image as the root volume
-info "Importing root disk..."
-incus storage volume import default "$QCOW2_IMAGE" "$VM_NAME" \
-    --project "$PROJECT" --type=virtual-machine 2>/dev/null || {
-    # Fallback: create volume and copy
-    warn "Direct import failed, using manual copy..."
-    VOLUME_PATH=$(incus storage volume show default "$VM_NAME" \
-        --project "$PROJECT" 2>/dev/null | grep -oP '(?<=source: ).*' || true)
-    if [ -z "$VOLUME_PATH" ]; then
-        err "Could not determine volume path"
+    info "Creating VM with UEFI boot..."
+    incus init "$VM_NAME" --project "$PROJECT" --vm --empty \
+        -c limits.cpu=2 \
+        -c limits.memory=4GiB \
+        -c security.secureboot=false
+
+    info "Writing disk image to VM root volume..."
+    STORAGE_PATH="/var/lib/incus/storage-pools/default"
+    VM_ROOT="$STORAGE_PATH/virtual-machines/$VM_NAME/root.img"
+
+    if [ -f "$VM_ROOT" ]; then
+        qemu-img convert -f raw -O raw "$IMAGE_ABS" "$VM_ROOT"
+        ok "Image written to root volume"
+    else
+        err "VM root volume not found at $VM_ROOT"
         cleanup_vm
         exit 1
     fi
-    qemu-img convert -f qcow2 -O raw "$QCOW2_IMAGE" "$VOLUME_PATH"
-}
+fi
 
 # Create virtual data disk (simulates the separate data disk)
 info "Creating virtual data disk ($DATA_SIZE)..."

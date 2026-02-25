@@ -55,12 +55,11 @@ main() {
         exit 1
     fi
 
-    local pool_name pool_type pool_uuid data_device
+    local pool_name pool_type data_device
 
     # Parse pool.conf (expected format: key=value pairs)
     pool_name=$(grep "^pool_name=" "$POOL_CONF" | cut -d= -f2 | tr -d ' ')
     pool_type=$(grep "^pool_type=" "$POOL_CONF" | cut -d= -f2 | tr -d ' ')
-    pool_uuid=$(grep "^pool_uuid=" "$POOL_CONF" | cut -d= -f2 | tr -d ' ')
     data_device=$(grep "^data_device=" "$POOL_CONF" | cut -d= -f2 | tr -d ' ')
 
     if [ -z "$pool_name" ] || [ -z "$pool_type" ] || [ -z "$data_device" ]; then

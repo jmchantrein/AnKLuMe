@@ -2,12 +2,13 @@
 # shellcheck shell=dash
 # anklume-verity: dm-verity Hook for mkinitcpio
 # Sets up dm-verity root filesystem protection during early boot
-# Reads kernel cmdline: anklume.verity_hash=<hash> anklume.slot=A|B
+# Reads kernel cmdline: anklume.verity_hash=<hash> anklume.slot=A|B anklume.boot_mode=iso|raw
 
 run_hook() {
     # Read kernel cmdline parameters
     VERITY_HASH=""
     SLOT="A"
+    BOOT_MODE="raw"
 
     # cmdline is space-separated words, not lines — word splitting is intentional
     # shellcheck disable=SC2013
@@ -19,6 +20,9 @@ run_hook() {
             anklume.slot=*)
                 SLOT="${param#anklume.slot=}"
                 ;;
+            anklume.boot_mode=*)
+                BOOT_MODE="${param#anklume.boot_mode=}"
+                ;;
         esac
     done
 
@@ -28,36 +32,69 @@ run_hook() {
         return 0
     fi
 
-    # Determine OS partition based on slot
-    case "$SLOT" in
-        A)
-            OS_PARTITION_NAME="ANKLUME-OS-A"
-            ;;
-        B)
-            OS_PARTITION_NAME="ANKLUME-OS-B"
-            ;;
-        *)
-            warn "anklume: Invalid slot '$SLOT' (expected A or B)"
+    msg "anklume: Setting up dm-verity for slot $SLOT (mode: $BOOT_MODE)"
+
+    if [ "$BOOT_MODE" = "iso" ]; then
+        # ── ISO mode: mount ISO by label, use squashfs + verity files ──
+        mkdir -p /run/anklume-iso
+        ISO_DEV=$(blkid -L "ANKLUME-LIVE" 2>/dev/null)
+        if [ -z "$ISO_DEV" ]; then
+            warn "anklume: Could not find ISO device (label: ANKLUME-LIVE)"
             return 1
-            ;;
-    esac
+        fi
 
-    # Find the OS partition using blkid
-    msg "anklume: Setting up dm-verity for slot $SLOT"
+        msg "anklume: Found ISO device at $ISO_DEV"
+        if ! mount -o ro "$ISO_DEV" /run/anklume-iso 2>/dev/null; then
+            warn "anklume: Failed to mount ISO device"
+            return 1
+        fi
 
-    OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
-    if [ -z "$OS_PARTITION" ]; then
-        warn "anklume: Could not find partition '$OS_PARTITION_NAME'"
-        return 1
-    fi
+        SQUASHFS="/run/anklume-iso/live/rootfs.squashfs"
+        VERITY_FILE="/run/anklume-iso/live/rootfs.verity"
 
-    msg "anklume: Found OS partition at $OS_PARTITION"
+        if [ ! -f "$SQUASHFS" ] || [ ! -f "$VERITY_FILE" ]; then
+            warn "anklume: Missing squashfs or verity file in ISO"
+            return 1
+        fi
 
-    # Activate dm-verity using veritysetup
-    if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
-        --hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
-        warn "anklume: Failed to activate dm-verity device"
-        return 1
+        # Create loopback devices for squashfs (data) and verity hash
+        DATA_LOOP=$(losetup --find --show --read-only "$SQUASHFS")
+        HASH_LOOP=$(losetup --find --show --read-only "$VERITY_FILE")
+
+        msg "anklume: Data loop: $DATA_LOOP, Hash loop: $HASH_LOOP"
+
+        if ! veritysetup create anklume-root "$DATA_LOOP" "$HASH_LOOP" "$VERITY_HASH" \
+            --hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
+            warn "anklume: Failed to activate dm-verity device (ISO mode)"
+            losetup -d "$DATA_LOOP" 2>/dev/null || true
+            losetup -d "$HASH_LOOP" 2>/dev/null || true
+            return 1
+        fi
+    else
+        # ── Raw mode: partition-based approach ──
+        case "$SLOT" in
+            A) OS_PARTITION_NAME="ANKLUME-OS-A" ;;
+            B) OS_PARTITION_NAME="ANKLUME-OS-B" ;;
+            *)
+                warn "anklume: Invalid slot '$SLOT' (expected A or B)"
+                return 1
+                ;;
+        esac
+
+        OS_PARTITION=$(blkid -L "$OS_PARTITION_NAME" 2>/dev/null)
+        if [ -z "$OS_PARTITION" ]; then
+            warn "anklume: Could not find partition '$OS_PARTITION_NAME'"
+            return 1
+        fi
+
+        msg "anklume: Found OS partition at $OS_PARTITION"
+
+        # Note: raw mode uses same partition for data and hash (future: separate hash partition)
+        if ! veritysetup create anklume-root "$OS_PARTITION" "$OS_PARTITION" "$VERITY_HASH" \
+            --hash=sha256 --data-block-size=4096 --hash-block-size=4096; then
+            warn "anklume: Failed to activate dm-verity device"
+            return 1
+        fi
     fi
 
     msg "anklume: dm-verity device activated successfully"

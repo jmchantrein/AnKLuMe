@@ -2393,7 +2393,7 @@ f) **VM-based testing** (`scripts/live-os-test-vm.sh`):
 ### Validation criteria
 
 - [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
-- [ ] Hybrid ISO boots on both BIOS and UEFI systems
+- [x] Hybrid ISO boots on both BIOS and UEFI systems
 - [ ] Bootable image created for at least one base distro
 - [ ] Encrypted pool setup works (both ZFS and BTRFS)
 - [ ] toram mode functional (OS runs from RAM)

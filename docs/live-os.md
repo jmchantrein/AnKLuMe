@@ -13,7 +13,42 @@ anklume Live OS enables compartmentalized infrastructure to run from a USB boot 
 
 ## Architecture Overview
 
-### Boot Media Layout (GPT Partitioning)
+### Hybrid ISO Layout (Default)
+
+The default output format is a **hybrid ISO** (BIOS + UEFI bootable)
+with volume label `ANKLUME-LIVE`. This format works with `dd`, Ventoy,
+Rufus, Etcher, and any standard flashing tool.
+
+```
+ANKLUME-LIVE.iso (ISO 9660 + El Torito)
+├── boot/
+│   ├── grub/
+│   │   ├── grub.cfg         # GRUB config (toram + direct entries)
+│   │   ├── cdboot.img       # BIOS El Torito boot image
+│   │   └── boot.img         # BIOS MBR boot image
+│   ├── vmlinuz               # Linux kernel
+│   └── initrd.img            # Initramfs (with anklume hooks)
+├── EFI/
+│   └── BOOT/
+│       ├── BOOTX64.EFI       # GRUB EFI standalone
+│       └── efiboot.img        # FAT image for UEFI El Torito
+└── live/
+    ├── rootfs.squashfs        # Compressed OS (~200-600MB)
+    └── rootfs.verity          # dm-verity hash tree
+```
+
+**Boot flow (ISO):**
+1. GRUB loads from BIOS (El Torito) or UEFI (BOOTX64.EFI)
+2. Kernel boots with `anklume.boot_mode=iso` parameter
+3. `anklume-verity` hook mounts ISO by label, creates loop devices
+   for squashfs (data) and verity hash (separate files)
+4. `anklume-toram` hook copies squashfs to RAM (if `anklume.toram=1`)
+5. Root filesystem mounted from dm-verity device
+
+### Raw Image Layout (GPT Partitioning)
+
+The raw format (`--format raw`) produces a GPT disk image for direct
+`dd` to USB:
 
 ```
 ┌─────────────────────────────────────┐
@@ -51,7 +86,7 @@ anklume Live OS enables compartmentalized infrastructure to run from a USB boot 
 
 - Read-only squashfs OS partition with cryptographic integrity verification
 - Detected tampering prevents boot
-- Hash tree stored in ANKLUME-PERSIST
+- Hash tree stored in `live/rootfs.verity` (ISO format) or ANKLUME-PERSIST partition (raw format)
 - Veritysetup validates on each boot
 
 **What it protects:** OS kernel, systemd, essential binaries against tampering
@@ -87,13 +122,17 @@ anklume Live OS enables compartmentalized infrastructure to run from a USB boot 
 ```bash
 cd /path/to/anklume-repo
 
-# Build default image (Debian 13, amd64, 3GB)
-make build-image OUT=anklume-live.img
+# Build default hybrid ISO (Debian 13, BIOS + UEFI)
+sudo scripts/build-image.sh --output anklume-live.iso --base debian
 
-# Build with custom base OS
-make build-image OUT=custom.img BASE=ubuntu ARCH=arm64
+# Build Arch-based ISO
+sudo scripts/build-image.sh --output anklume-arch.iso --base arch
 
-# Output: /path/to/custom.img (ready to write to USB)
+# Build raw GPT image (legacy format)
+sudo scripts/build-image.sh --format raw --output anklume-live.img --size 4
+
+# Or via Makefile
+make build-image OUT=anklume-live.iso BASE=arch
 ```
 
 ### Flash to USB
@@ -102,23 +141,34 @@ make build-image OUT=custom.img BASE=ubuntu ARCH=arm64
 # Identify USB device (e.g., /dev/sdX)
 lsblk
 
-# Write image (WARNING: destructive)
-sudo dd if=anklume-live.img of=/dev/sdX bs=1M status=progress
+# Write ISO or raw image (WARNING: destructive)
+sudo dd if=anklume-live.iso of=/dev/sdX bs=4M status=progress
 sudo sync
+
+# Or use Ventoy: simply copy the .iso file to a Ventoy USB
 ```
 
-### Build Process
+### Build Process (ISO format)
 
-1. **Debootstrap** OS into temporary rootfs (Debian packages, systemd, Incus)
-2. **Configure** kernel, initramfs hooks, systemd services, systemd-boot
-3. **Mksquashfs** rootfs into read-only compressed OS image (~600MB → ~200MB)
-4. **Veritysetup** generate integrity hashes for dm-verity
-5. **Sgdisk** create GPT partitions on USB device
-6. **Write** EFI, kernel, initramfs, OS slots, persistent partition
+1. **Bootstrap** rootfs (debootstrap for Debian, pacstrap for Arch)
+2. **Configure** kernel, initramfs hooks, systemd services
+3. **Mksquashfs** rootfs into read-only compressed image (~600MB -> ~200MB)
+4. **Veritysetup** generate integrity hash tree (separate file)
+5. **GRUB** create BIOS (grub-mkimage) and UEFI (grub-mkstandalone) images
+6. **xorriso** assemble hybrid ISO with El Torito boot (BIOS + UEFI)
 
-**Image size:** ~1.2 GB on USB (includes boot loader, 2x OS slots, persist partition)
+**ISO size:** ~300-800 MB (depends on base OS and packages)
 
 **Build time:** ~10-15 minutes (depends on internet speed, CPU)
+
+### Build Process (raw format)
+
+1. Steps 1-4 same as ISO
+2. **Sgdisk** create GPT partitions (EFI, OS-A, OS-B, persist)
+3. **systemd-boot** install bootloader to EFI partition
+4. **Write** squashfs to OS-A slot
+
+**Image size:** ~4 GB (includes EFI, 2x OS slots, persist partition)
 
 ## First Boot Wizard
 
