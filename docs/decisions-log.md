@@ -511,7 +511,7 @@ need a separate install path.
 overrides (user > framework > vendor). `roles_vendor/` is gitignored to
 keep the repo clean. ADR-045 formalized this decision.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -539,7 +539,7 @@ new DE), testable (each plugin validated independently), and follows the
 framework's "detect then apply" pattern. Trust-level colors in the schema
 mirror the console QubesOS-style visual identification.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -557,7 +557,7 @@ hook returns an error, falling back to disk-based boot.
 negligible overhead (two stat calls) but prevents silent boot failures
 from corrupted RAM copies.
 
-**Status**: pending review
+**Status**: validated
 
 ---
 
@@ -587,4 +587,4 @@ Result: 40 passed (from 0 on host), 4 legitimately skipped.
 Also fixed the `add_domain_to_infra` step which used legacy `base_subnet`
 syntax incompatible with ADR-038 addressing convention.
 
-**Status**: pending review
+**Status**: validated
