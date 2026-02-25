@@ -25,6 +25,12 @@ ANKLUME_OSA_LABEL="ANKLUME-OS-A"
 ANKLUME_OSB_LABEL="ANKLUME-OS-B"
 ANKLUME_PERSIST_LABEL="ANKLUME-PERSIST"
 ANKLUME_DATA_LABEL="ANKLUME-DATA"
+ANKLUME_ISO_LABEL="ANKLUME-LIVE"
+
+# ── ISO layout paths ────────────────────────────────────────
+
+ISO_SQUASHFS_PATH="live/rootfs.squashfs"
+ISO_VERITY_PATH="live/rootfs.verity"
 
 # ── Partition size constants (MB) ──────────────────────────
 
@@ -254,7 +260,8 @@ ensure_persist_mounted() {
 
 # Export all constants and functions for use by sourcing scripts
 export ANKLUME_EFI_LABEL ANKLUME_OSA_LABEL ANKLUME_OSB_LABEL
-export ANKLUME_PERSIST_LABEL ANKLUME_DATA_LABEL
+export ANKLUME_PERSIST_LABEL ANKLUME_DATA_LABEL ANKLUME_ISO_LABEL
+export ISO_SQUASHFS_PATH ISO_VERITY_PATH
 export EFI_SIZE_MB OS_SIZE_MB PERSIST_SIZE_MB
 export PERSIST_MNT DATA_MNT
 export POOL_CONF AB_STATE BOOT_COUNT

@@ -5,6 +5,7 @@
 
 build() {
     add_binary file
+    add_binary blkid
     add_runscript
 }
 

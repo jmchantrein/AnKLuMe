@@ -3,10 +3,11 @@
 # Usage: build-image.sh [OPTIONS]
 #
 # Options:
-#   --output FILE     Output image file (default: anklume-live.img)
+#   --output FILE     Output image file (default: anklume-live.iso)
+#   --format FORMAT   Output format: iso or raw (default: iso)
 #   --base DISTRO     Base distribution (default: debian)
 #   --arch ARCH       Architecture (default: amd64)
-#   --size SIZE_GB    Total image size in GB (default: 4)
+#   --size SIZE_GB    Total image size in GB (default: 4, raw only)
 #   --mirror URL      APT mirror URL
 #   --no-verity       Skip dm-verity setup
 #   --help            Show this help
@@ -21,7 +22,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ── Defaults ──
-OUTPUT="anklume-live.img"
+OUTPUT=""
+FORMAT="iso"
 BASE="debian"
 ARCH="amd64"
 IMAGE_SIZE_GB=4
@@ -65,20 +67,21 @@ trap cleanup EXIT
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
     echo ""
-    echo "Build a bootable anklume Live OS image with GPT partitions, squashfs, and dm-verity."
+    echo "Build a bootable anklume Live OS image with squashfs and dm-verity."
     echo ""
     echo "Options:"
-    echo "  --output FILE     Output image file (default: anklume-live.img)"
+    echo "  --output FILE     Output image file (default: anklume-live.iso or .img)"
+    echo "  --format FORMAT   Output format: iso or raw (default: iso)"
     echo "  --base DISTRO     Base distribution (default: debian, arch)"
     echo "  --arch ARCH       Architecture (default: amd64)"
-    echo "  --size SIZE_GB    Total image size in GB (default: 4)"
+    echo "  --size SIZE_GB    Total image size in GB (default: 4, raw format only)"
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
     echo "  --help            Show this help"
     echo ""
     echo "Examples:"
-    echo "  $(basename "$0") --output my-image.img --size 6 --arch amd64"
-    echo "  $(basename "$0") --base arch --output anklume-arch.img"
+    echo "  $(basename "$0") --output anklume.iso --base arch"
+    echo "  $(basename "$0") --format raw --output anklume.img --size 6"
     exit 0
 }
 
@@ -97,11 +100,11 @@ check_dependencies() {
 
     local missing=()
     local cmds_common=(
-        "mksquashfs" "veritysetup" "sgdisk"
-        "mkfs.fat" "mkfs.ext4" "losetup" "mount" "umount"
-        "bootctl" "curl" "jq" "dd"
+        "mksquashfs" "veritysetup"
+        "mount" "umount" "curl" "jq" "dd"
     )
     local cmds_distro=()
+    local cmds_format=()
 
     case "$BASE" in
         debian|stable)
@@ -116,7 +119,16 @@ check_dependencies() {
             ;;
     esac
 
-    local cmds=("${cmds_common[@]}" "${cmds_distro[@]}")
+    case "$FORMAT" in
+        iso)
+            cmds_format=("xorriso" "grub-mkimage" "mtools")
+            ;;
+        raw)
+            cmds_format=("sgdisk" "mkfs.fat" "mkfs.ext4" "losetup" "bootctl")
+            ;;
+    esac
+
+    local cmds=("${cmds_common[@]}" "${cmds_distro[@]}" "${cmds_format[@]}")
 
     for cmd in "${cmds[@]}"; do
         if ! command -v "$cmd" &>/dev/null; then
@@ -315,7 +327,7 @@ bootstrap_rootfs_arch() {
     mkdir -p "$ROOTFS_DIR"
 
     # Run pacstrap
-    pacstrap -K "$ROOTFS_DIR" base linux openssh curl jq python nftables cryptsetup btrfs-progs
+    pacstrap -K "$ROOTFS_DIR" base linux mkinitcpio openssh curl jq python file nftables cryptsetup btrfs-progs
 
     info "  Pacstrap complete"
 
@@ -375,12 +387,9 @@ FSTAB
         info "  mkinitcpio hooks installed"
     fi
 
-    # Configure mkinitcpio
-    if grep -q "^HOOKS=" "$ROOTFS_DIR/etc/mkinitcpio.conf"; then
-        sed -i 's/^\(HOOKS=([^)]*\)/\1 anklume-verity anklume-toram/' "$ROOTFS_DIR/etc/mkinitcpio.conf"
-    else
-        echo "HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont anklume-verity anklume-toram filesystems fsck)" >> "$ROOTFS_DIR/etc/mkinitcpio.conf"
-    fi
+    # Configure mkinitcpio — custom hooks BEFORE filesystems, no autodetect (strips modules)
+    sed -i 's/^HOOKS=.*/HOOKS=(base udev modconf block keyboard consolefont anklume-verity anklume-toram filesystems fsck)/' \
+        "$ROOTFS_DIR/etc/mkinitcpio.conf"
     info "  mkinitcpio configured"
 
     # Copy systemd services
@@ -390,14 +399,83 @@ FSTAB
         info "  Systemd services installed"
     fi
 
+    # Install incus-agent service for VM testing
+    cat > "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" << 'AGENT'
+[Unit]
+Description=Incus VM Agent
+Documentation=https://linuxcontainers.org/incus
+ConditionVirtualization=vm
+After=local-fs.target
+
+[Service]
+Type=notify
+ExecStartPre=/bin/mkdir -p /run/incus_agent
+ExecStartPre=/bin/sh -c "mount -t virtiofs config /run/incus_agent 2>/dev/null || mount -t 9p config /run/incus_agent -o access=0,trans=virtio 2>/dev/null || true"
+ExecStartPre=/bin/sh -c "test -f /run/incus_agent/incus-agent && cp /run/incus_agent/incus-agent /usr/local/bin/ && chmod +x /usr/local/bin/incus-agent || true"
+ExecStart=/usr/local/bin/incus-agent
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+AGENT
+    info "  Incus agent service installed"
+
+    # Create vconsole.conf to avoid mkinitcpio warnings
+    echo "KEYMAP=us" > "$ROOTFS_DIR/etc/vconsole.conf"
+
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable incus-agent.service >/dev/null 2>&1 || true
     info "  anklume services enabled"
 
-    # Generate initramfs in chroot
-    chroot "$ROOTFS_DIR" mkinitcpio -P >/dev/null 2>&1 || true
-    info "  Initramfs generated"
+    # Detect installed kernel version in the rootfs
+    local kver
+    kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" 2>/dev/null | head -1)
+    info "  Detected kernel version: ${kver:-NONE}"
+
+    # Ensure kernel is in /boot/ (pacman hooks may fail in chroot)
+    if [ ! -f "$ROOTFS_DIR/boot/vmlinuz-linux" ] && [ -n "$kver" ]; then
+        if [ -f "$ROOTFS_DIR/usr/lib/modules/$kver/vmlinuz" ]; then
+            cp "$ROOTFS_DIR/usr/lib/modules/$kver/vmlinuz" "$ROOTFS_DIR/boot/vmlinuz-linux"
+            info "  Kernel copied to /boot/vmlinuz-linux from modules"
+        fi
+    fi
+
+    # Create preset file if missing (pacstrap hooks may have failed)
+    if [ ! -f "$ROOTFS_DIR/etc/mkinitcpio.d/linux.preset" ] && [ -n "$kver" ]; then
+        mkdir -p "$ROOTFS_DIR/etc/mkinitcpio.d"
+        cat > "$ROOTFS_DIR/etc/mkinitcpio.d/linux.preset" << PRESET
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="$kver"
+PRESETS=('default')
+default_image="/boot/initramfs-linux.img"
+PRESET
+        info "  Created linux.preset for kernel $kver"
+    fi
+
+    # Generate initramfs with explicit kernel version
+    if [ -n "$kver" ]; then
+        if ! chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
+            warn "mkinitcpio with custom hooks failed, trying without"
+            # Restore default hooks and retry
+            chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -S anklume-verity,anklume-toram \
+                -g /boot/initramfs-linux.img 2>&1 || warn "mkinitcpio fallback also failed"
+        fi
+    fi
+
+    # Verify kernel and initramfs exist
+    if [ -f "$ROOTFS_DIR/boot/vmlinuz-linux" ]; then
+        info "  Kernel: /boot/vmlinuz-linux"
+    else
+        warn "  Kernel NOT found in /boot/"
+    fi
+    if [ -f "$ROOTFS_DIR/boot/initramfs-linux.img" ]; then
+        info "  Initramfs: /boot/initramfs-linux.img ($(du -h "$ROOTFS_DIR/boot/initramfs-linux.img" | cut -f1))"
+    else
+        err "  Initramfs NOT generated — image will not boot"
+    fi
 
     # Unmount pseudo-filesystems before creating squashfs
     umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
@@ -548,28 +626,31 @@ LOADER
         arch)
             vmlinuz="$ROOTFS_DIR/boot/vmlinuz-linux"
             initrd="$ROOTFS_DIR/boot/initramfs-linux.img"
+            # Fallback: check /usr/lib/modules/*/vmlinuz if /boot is empty
+            if [ ! -f "$vmlinuz" ]; then
+                vmlinuz=$(find "$ROOTFS_DIR/usr/lib/modules" -name "vmlinuz" -type f 2>/dev/null | head -1)
+            fi
             ;;
     esac
 
     if [ -f "$vmlinuz" ] && [ -f "$initrd" ]; then
         cp "$vmlinuz" "$efi_mount/vmlinuz"
         cp "$initrd" "$efi_mount/initrd.img"
-        info "  Kernel and initramfs copied"
+        info "  Kernel and initramfs copied to ESP"
+    elif [ -f "$vmlinuz" ]; then
+        cp "$vmlinuz" "$efi_mount/vmlinuz"
+        warn "Kernel copied but initramfs not found — boot may fail"
     else
-        warn "Could not find kernel or initramfs"
+        err "Could not find kernel or initramfs — image will not boot"
     fi
 
     # Create boot entries
-    local kernel_version
-    # shellcheck disable=SC2034  # used in boot entry template below
-    kernel_version=$(basename "$vmlinuz" | sed 's/vmlinuz-//')
-
     # Entry for slot A (current)
     cat > "$efi_mount/loader/entries/anklume-a.conf" << ENTRY_A
 title           anklume (Slot A)
 linux           /vmlinuz
 initrd          /initrd.img
-options         root=/dev/dm-0 ro anklume.slot=A anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0
+options         root=/dev/dm-0 ro anklume.slot=A anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0 console=tty0 console=ttyS0,115200n8
 tries           3
 tries-left      3
 ENTRY_A
@@ -579,7 +660,7 @@ ENTRY_A
 title           anklume (Slot B)
 linux           /vmlinuz
 initrd          /initrd.img
-options         root=/dev/dm-0 ro anklume.slot=B anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0
+options         root=/dev/dm-0 ro anklume.slot=B anklume.verity_hash=$VERITY_HASH anklume.toram=1 systemd.unified_cgroup_hierarchy=0 console=tty0 console=ttyS0,115200n8
 tries           0
 ENTRY_B
 
@@ -619,30 +700,218 @@ write_squashfs_to_partition() {
     ok "SquashFS written to OS-A partition"
 }
 
+# ── Assemble hybrid ISO ──
+assemble_iso() {
+    info "Assembling hybrid ISO..."
+
+    local squashfs_file="$WORK_DIR/rootfs.squashfs"
+    local verity_file="$WORK_DIR/rootfs.squashfs.verity"
+    local staging="$WORK_DIR/iso-staging"
+
+    # Create ISO staging directory
+    mkdir -p "$staging/boot/grub"
+    mkdir -p "$staging/EFI/BOOT"
+    mkdir -p "$staging/live"
+
+    # Copy squashfs and verity hash
+    cp "$squashfs_file" "$staging/live/rootfs.squashfs"
+    if [ -f "$verity_file" ]; then
+        cp "$verity_file" "$staging/live/rootfs.verity"
+    fi
+    info "  Squashfs and verity files staged"
+
+    # Copy kernel and initramfs
+    local vmlinuz initrd
+    case "$BASE" in
+        debian|stable)
+            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f 2>/dev/null | head -1)
+            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f 2>/dev/null | head -1)
+            ;;
+        arch)
+            vmlinuz="$ROOTFS_DIR/boot/vmlinuz-linux"
+            initrd="$ROOTFS_DIR/boot/initramfs-linux.img"
+            if [ ! -f "$vmlinuz" ]; then
+                vmlinuz=$(find "$ROOTFS_DIR/usr/lib/modules" -name "vmlinuz" -type f 2>/dev/null | head -1)
+            fi
+            ;;
+    esac
+
+    if [ -f "$vmlinuz" ] && [ -f "$initrd" ]; then
+        cp "$vmlinuz" "$staging/boot/vmlinuz"
+        cp "$initrd" "$staging/boot/initrd.img"
+        info "  Kernel and initramfs staged"
+    else
+        err "Could not find kernel ($vmlinuz) or initramfs ($initrd)"
+        exit 1
+    fi
+
+    # Create GRUB config from template, substituting verity hash
+    local grub_template="$PROJECT_ROOT/host/boot/grub/grub.cfg"
+    if [ -f "$grub_template" ]; then
+        sed "s/VERITY_HASH_PLACEHOLDER/$VERITY_HASH/g" "$grub_template" > "$staging/boot/grub/grub.cfg"
+    else
+        # Inline fallback if template missing
+        cat > "$staging/boot/grub/grub.cfg" << GRUBCFG
+set timeout=5
+set default=0
+insmod all_video
+menuentry "anklume Live OS (toram)" {
+    linux /boot/vmlinuz ro anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    initrd /boot/initrd.img
+}
+menuentry "anklume Live OS (direct)" {
+    linux /boot/vmlinuz ro anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    initrd /boot/initrd.img
+}
+GRUBCFG
+    fi
+    info "  GRUB config created"
+
+    # Determine GRUB platform paths
+    local grub_prefix="/usr/lib/grub"
+    if [ -d "$ROOTFS_DIR/usr/lib/grub" ]; then
+        grub_prefix="$ROOTFS_DIR/usr/lib/grub"
+    fi
+
+    # Create GRUB UEFI standalone image
+    local grub_efi_dir=""
+    for d in "$grub_prefix/x86_64-efi" /usr/lib/grub/x86_64-efi; do
+        if [ -d "$d" ]; then
+            grub_efi_dir="$d"
+            break
+        fi
+    done
+
+    if [ -n "$grub_efi_dir" ]; then
+        grub-mkstandalone \
+            --format=x86_64-efi \
+            --output="$staging/EFI/BOOT/BOOTX64.EFI" \
+            --locales="" \
+            --fonts="" \
+            "boot/grub/grub.cfg=$staging/boot/grub/grub.cfg" \
+            2>/dev/null || warn "grub-mkstandalone failed, trying grub-mkimage"
+        info "  GRUB EFI standalone created"
+    fi
+
+    # Create EFI boot image (FAT) for El Torito
+    local efi_img="$staging/EFI/BOOT/efiboot.img"
+    local efi_size_kb=4096
+    dd if=/dev/zero of="$efi_img" bs=1K count=$efi_size_kb 2>/dev/null
+    mkfs.fat -F 12 "$efi_img" >/dev/null 2>&1
+    mmd -i "$efi_img" ::EFI ::EFI/BOOT 2>/dev/null
+    if [ -f "$staging/EFI/BOOT/BOOTX64.EFI" ]; then
+        mcopy -i "$efi_img" "$staging/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI
+    fi
+    info "  EFI boot image created"
+
+    # Create GRUB BIOS image (for hybrid MBR boot)
+    local grub_bios_dir=""
+    for d in "$grub_prefix/i386-pc" /usr/lib/grub/i386-pc; do
+        if [ -d "$d" ]; then
+            grub_bios_dir="$d"
+            break
+        fi
+    done
+
+    local bios_img="$WORK_DIR/bios.img"
+    if [ -n "$grub_bios_dir" ]; then
+        grub-mkimage \
+            -O i386-pc \
+            -o "$bios_img" \
+            -p /boot/grub \
+            --prefix=/boot/grub \
+            biosdisk iso9660 part_msdos \
+            2>/dev/null || warn "grub-mkimage for BIOS failed"
+        info "  GRUB BIOS image created"
+    else
+        warn "GRUB i386-pc modules not found — ISO will be UEFI-only"
+    fi
+
+    # Assemble ISO with xorriso
+    local xorriso_args=(
+        -as mkisofs
+        -iso-level 3
+        -full-iso9660-filenames
+        -volid "$ANKLUME_ISO_LABEL"
+        -joliet -joliet-long
+        -rational-rock
+    )
+
+    # UEFI boot (El Torito)
+    xorriso_args+=(
+        -eltorito-alt-boot
+        -e EFI/BOOT/efiboot.img
+        -no-emul-boot
+        -isohybrid-gpt-basdat
+    )
+
+    # BIOS boot (El Torito) if available
+    if [ -n "$grub_bios_dir" ] && [ -f "$grub_bios_dir/cdboot.img" ] && [ -f "$grub_bios_dir/boot.img" ]; then
+        cp "$grub_bios_dir/cdboot.img" "$staging/boot/grub/cdboot.img"
+        cp "$grub_bios_dir/boot.img" "$staging/boot/grub/boot.img"
+        # BIOS must be the first El Torito entry for hybrid MBR
+        xorriso_args=(
+            -as mkisofs
+            -iso-level 3
+            -full-iso9660-filenames
+            -volid "$ANKLUME_ISO_LABEL"
+            -joliet -joliet-long
+            -rational-rock
+            -eltorito-boot boot/grub/cdboot.img
+            -no-emul-boot
+            -boot-load-size 4
+            -boot-info-table
+            --grub2-boot-info
+            --grub2-mbr "$grub_bios_dir/boot_hybrid.img"
+            -eltorito-alt-boot
+            -e EFI/BOOT/efiboot.img
+            -no-emul-boot
+            -append_partition 2 0xef "$efi_img"
+        )
+    fi
+
+    xorriso_args+=(-output "$OUTPUT" "$staging")
+
+    info "  Running xorriso..."
+    xorriso "${xorriso_args[@]}" 2>&1 | tail -3
+
+    ok "Hybrid ISO assembled: $OUTPUT"
+}
+
 # ── Print summary ──
 print_summary() {
     local img_size
     img_size=$(stat -f%z "$OUTPUT" 2>/dev/null || stat -c%s "$OUTPUT")
 
+    local img_size_mb=$((img_size / 1024 / 1024))
+
     echo ""
     echo "=== anklume Live OS Build Complete ==="
     echo "Image file:      $OUTPUT"
-    echo "Image size:      $((img_size / 1024 / 1024 / 1024))GB ($img_size bytes)"
+    echo "Format:          $FORMAT"
+    echo "Image size:      ${img_size_mb}MB ($img_size bytes)"
     echo "Base distro:     $BASE"
     echo "Verity hash:     $VERITY_HASH"
-    echo "Boot slots:      A (active), B (fallback)"
-    echo "Boot timeout:    3 seconds"
-    echo "ToRAM enabled:   yes (loads OS into memory)"
     echo "Checksum:        ${OUTPUT}.sha256"
     echo ""
-    echo "Boot entries:"
-    echo "  - anklume-a.conf  (default)"
-    echo "  - anklume-b.conf  (fallback)"
-    echo ""
-    echo "Next steps:"
-    echo "  1. Write image to USB: sudo dd if=$OUTPUT of=/dev/sdX bs=4M status=progress"
-    echo "  2. Boot from USB and select anklume from boot menu"
-    echo "  3. System will load into RAM (toram) for performance"
+    if [ "$FORMAT" = "iso" ]; then
+        echo "Boot modes:      BIOS + UEFI (hybrid ISO)"
+        echo "Menu entries:    toram (default), direct"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Write to USB: sudo dd if=$OUTPUT of=/dev/sdX bs=4M status=progress"
+        echo "  2. Or use Ventoy: copy $OUTPUT to Ventoy USB"
+        echo "  3. Boot and select anklume from GRUB menu"
+    else
+        echo "Boot slots:      A (active), B (fallback)"
+        echo "Boot timeout:    3 seconds"
+        echo "ToRAM enabled:   yes (loads OS into memory)"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Write image to USB: sudo dd if=$OUTPUT of=/dev/sdX bs=4M status=progress"
+        echo "  2. Boot from USB and select anklume from boot menu"
+        echo "  3. System will load into RAM (toram) for performance"
+    fi
     echo ""
 }
 
@@ -651,6 +920,7 @@ main() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --output)     OUTPUT="$2"; shift 2 ;;
+            --format)     FORMAT="$2"; shift 2 ;;
             --base)       BASE="$2"; shift 2 ;;
             --arch)       ARCH="$2"; shift 2 ;;
             --size)       IMAGE_SIZE_GB="$2"; shift 2 ;;
@@ -661,7 +931,22 @@ main() {
         esac
     done
 
+    # Validate format
+    case "$FORMAT" in
+        iso|raw) ;;
+        *) err "Invalid format: $FORMAT (must be iso or raw)"; exit 1 ;;
+    esac
+
+    # Set default output name based on format
+    if [ -z "$OUTPUT" ]; then
+        OUTPUT="anklume-live.$FORMAT"
+        if [ "$FORMAT" = "raw" ]; then
+            OUTPUT="anklume-live.img"
+        fi
+    fi
+
     echo "=== anklume Live OS Image Builder ==="
+    info "Format: $FORMAT"
 
     # Create work directory
     WORK_DIR=$(mktemp -d)
@@ -669,16 +954,22 @@ main() {
 
     check_root
     check_dependencies
-    create_disk_image
-    setup_loop_device
-    format_partitions
     bootstrap_rootfs
     create_squashfs
     setup_verity
-    install_bootloader
-    setup_persistent
-    write_squashfs_to_partition
-    generate_checksums
+
+    if [ "$FORMAT" = "iso" ]; then
+        assemble_iso
+        generate_checksums
+    else
+        create_disk_image
+        setup_loop_device
+        format_partitions
+        install_bootloader
+        setup_persistent
+        write_squashfs_to_partition
+        generate_checksums
+    fi
 
     print_summary
 }

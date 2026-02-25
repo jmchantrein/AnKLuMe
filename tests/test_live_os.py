@@ -40,6 +40,8 @@ MKINITCPIO_TORAM_INSTALL = _MKINITCPIO / "install" / "anklume-toram"
 MKINITCPIO_TORAM_HOOK = _MKINITCPIO / "hooks" / "anklume-toram"
 MKINITCPIO_VERITY_INSTALL = _MKINITCPIO / "install" / "anklume-verity"
 MKINITCPIO_VERITY_HOOK = _MKINITCPIO / "hooks" / "anklume-verity"
+GRUB_CONFIG = Path(__file__).resolve().parent.parent / "host" / "boot" / "grub" / "grub.cfg"
+TEST_VM_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "live-os-test-vm.sh"
 
 
 # ── Fixtures ───────────────────────────────────────────────────────
@@ -985,6 +987,302 @@ class TestMkinitcpioHooks:
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
         content = MKINITCPIO_VERITY_HOOK.read_text()
         assert "slot" in content.lower()
+
+
+# ── TestISOSupport ───────────────────────────────────────────────
+
+
+class TestISOSupport:
+    """Verify build-image.sh has ISO output format support."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not BUILD_IMAGE.exists():
+            pytest.skip(f"File not found: {BUILD_IMAGE}")
+        cls.content = BUILD_IMAGE.read_text()
+
+    def test_format_flag_exists(self):
+        """Verify --format flag is accepted."""
+        assert "--format" in self.content
+
+    def test_format_iso_default(self):
+        """Verify default format is iso."""
+        assert re.search(r'FORMAT="iso"', self.content)
+
+    def test_format_validation(self):
+        """Verify format is validated (iso or raw)."""
+        assert "iso|raw" in self.content or ("iso" in self.content and "raw" in self.content)
+
+    def test_xorriso_referenced(self):
+        """Verify xorriso is used for ISO assembly."""
+        assert "xorriso" in self.content
+
+    def test_grub_mkimage_referenced(self):
+        """Verify grub-mkimage is used for BIOS boot."""
+        assert "grub-mkimage" in self.content or "grub-mkstandalone" in self.content
+
+    def test_assemble_iso_function(self):
+        """Verify assemble_iso() function exists."""
+        assert re.search(r'assemble_iso\(\)', self.content)
+
+    def test_iso_staging_directory(self):
+        """Verify ISO staging directory structure is created."""
+        assert "iso-staging" in self.content
+
+    def test_iso_label_used(self):
+        """Verify ANKLUME_ISO_LABEL is used for the ISO volume ID."""
+        assert "ANKLUME_ISO_LABEL" in self.content
+
+    def test_iso_squashfs_path(self):
+        """Verify squashfs is placed at live/rootfs.squashfs in ISO."""
+        assert "live/rootfs.squashfs" in self.content
+
+    def test_iso_verity_path(self):
+        """Verify verity hash is placed at live/rootfs.verity in ISO."""
+        assert "live/rootfs.verity" in self.content
+
+    def test_efi_boot_image(self):
+        """Verify EFI boot image (efiboot.img) is created."""
+        assert "efiboot.img" in self.content
+
+    def test_mtools_referenced(self):
+        """Verify mtools commands are used for EFI image."""
+        assert "mtools" in self.content
+
+
+# ── TestGrubConfig ───────────────────────────────────────────────
+
+
+class TestGrubConfig:
+    """Verify GRUB config template for ISO boot."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not GRUB_CONFIG.exists():
+            pytest.skip(f"File not found: {GRUB_CONFIG}")
+        cls.content = GRUB_CONFIG.read_text()
+
+    def test_file_exists(self):
+        """Verify grub.cfg template exists."""
+        assert GRUB_CONFIG.exists()
+
+    def test_boot_mode_iso(self):
+        """Verify anklume.boot_mode=iso parameter is set."""
+        assert "anklume.boot_mode=iso" in self.content
+
+    def test_verity_hash_placeholder(self):
+        """Verify VERITY_HASH_PLACEHOLDER is present for build-time substitution."""
+        assert "VERITY_HASH_PLACEHOLDER" in self.content
+
+    def test_toram_entry(self):
+        """Verify toram menu entry exists."""
+        assert "anklume.toram=1" in self.content
+
+    def test_direct_entry(self):
+        """Verify direct (non-toram) menu entry exists."""
+        assert re.search(r'menuentry.*direct', self.content, re.IGNORECASE)
+
+    def test_kernel_path(self):
+        """Verify kernel path is /boot/vmlinuz."""
+        assert "/boot/vmlinuz" in self.content
+
+    def test_initrd_path(self):
+        """Verify initrd path is /boot/initrd.img."""
+        assert "/boot/initrd.img" in self.content
+
+    def test_console_serial(self):
+        """Verify serial console is configured."""
+        assert "console=ttyS0" in self.content
+
+
+# ── TestVerityHookISO ────────────────────────────────────────────
+
+
+class TestVerityHookISO:
+    """Verify anklume-verity hooks support ISO boot mode."""
+
+    def test_mkinitcpio_boot_mode_parsing(self):
+        """Verify mkinitcpio verity hook parses anklume.boot_mode."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "anklume.boot_mode=" in content
+        assert "BOOT_MODE" in content
+
+    def test_mkinitcpio_iso_label_search(self):
+        """Verify mkinitcpio verity hook searches for ANKLUME-LIVE label."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "ANKLUME-LIVE" in content
+
+    def test_mkinitcpio_separate_data_hash(self):
+        """Verify mkinitcpio verity hook uses separate data and hash devices."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "DATA_LOOP" in content
+        assert "HASH_LOOP" in content
+
+    def test_mkinitcpio_losetup_usage(self):
+        """Verify mkinitcpio verity hook uses losetup for ISO files."""
+        if not MKINITCPIO_VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
+        content = MKINITCPIO_VERITY_HOOK.read_text()
+        assert "losetup" in content
+
+    def test_mkinitcpio_install_has_losetup(self):
+        """Verify mkinitcpio verity install hook includes losetup."""
+        if not MKINITCPIO_VERITY_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_INSTALL}")
+        content = MKINITCPIO_VERITY_INSTALL.read_text()
+        assert "add_binary losetup" in content
+
+    def test_mkinitcpio_install_has_loop_module(self):
+        """Verify mkinitcpio verity install hook includes loop module."""
+        if not MKINITCPIO_VERITY_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_VERITY_INSTALL}")
+        content = MKINITCPIO_VERITY_INSTALL.read_text()
+        assert "add_module loop" in content
+
+    def test_initramfs_boot_mode_parsing(self):
+        """Verify initramfs-tools verity hook parses anklume.boot_mode."""
+        if not VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {VERITY_HOOK}")
+        content = VERITY_HOOK.read_text()
+        assert "anklume.boot_mode=" in content
+        assert "BOOT_MODE" in content
+
+    def test_initramfs_iso_label_search(self):
+        """Verify initramfs-tools verity hook searches for ANKLUME-LIVE label."""
+        if not VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {VERITY_HOOK}")
+        content = VERITY_HOOK.read_text()
+        assert "ANKLUME-LIVE" in content
+
+    def test_initramfs_separate_data_hash(self):
+        """Verify initramfs-tools verity hook uses separate data and hash devices."""
+        if not VERITY_HOOK.exists():
+            pytest.skip(f"File not found: {VERITY_HOOK}")
+        content = VERITY_HOOK.read_text()
+        assert "DATA_LOOP" in content
+        assert "HASH_LOOP" in content
+
+
+# ── TestToramHookISO ─────────────────────────────────────────────
+
+
+class TestToramHookISO:
+    """Verify anklume-toram hooks support ISO boot mode."""
+
+    def test_mkinitcpio_boot_mode_parsing(self):
+        """Verify mkinitcpio toram hook parses anklume.boot_mode."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "anklume.boot_mode=" in content
+        assert "BOOT_MODE" in content
+
+    def test_mkinitcpio_iso_squashfs_path(self):
+        """Verify mkinitcpio toram hook searches ISO squashfs path."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "/run/anklume-iso/live/rootfs.squashfs" in content
+
+    def test_mkinitcpio_iso_fallback_locations(self):
+        """Verify mkinitcpio toram hook includes ISO mount in search."""
+        if not MKINITCPIO_TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
+        content = MKINITCPIO_TORAM_HOOK.read_text()
+        assert "/run/anklume-iso/live" in content
+
+    def test_mkinitcpio_install_has_blkid(self):
+        """Verify mkinitcpio toram install hook includes blkid."""
+        if not MKINITCPIO_TORAM_INSTALL.exists():
+            pytest.skip(f"File not found: {MKINITCPIO_TORAM_INSTALL}")
+        content = MKINITCPIO_TORAM_INSTALL.read_text()
+        assert "add_binary blkid" in content
+
+    def test_initramfs_boot_mode_parsing(self):
+        """Verify initramfs-tools toram hook parses anklume.boot_mode."""
+        if not TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {TORAM_HOOK}")
+        content = TORAM_HOOK.read_text()
+        assert "anklume.boot_mode=" in content
+        assert "BOOT_MODE" in content
+
+    def test_initramfs_iso_squashfs_path(self):
+        """Verify initramfs-tools toram hook searches ISO squashfs path."""
+        if not TORAM_HOOK.exists():
+            pytest.skip(f"File not found: {TORAM_HOOK}")
+        content = TORAM_HOOK.read_text()
+        assert "/run/anklume-iso/live/rootfs.squashfs" in content
+
+
+# ── TestLiveOsLibISO ─────────────────────────────────────────────
+
+
+class TestLiveOsLibISO:
+    """Verify live-os-lib.sh has ISO constants."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not LIVE_OS_LIB.exists():
+            pytest.skip(f"File not found: {LIVE_OS_LIB}")
+        cls.content = LIVE_OS_LIB.read_text()
+
+    def test_iso_label_constant(self):
+        """Verify ANKLUME_ISO_LABEL constant."""
+        assert "ANKLUME_ISO_LABEL" in self.content
+        assert "ANKLUME-LIVE" in self.content
+
+    def test_iso_squashfs_path_constant(self):
+        """Verify ISO_SQUASHFS_PATH constant."""
+        assert "ISO_SQUASHFS_PATH" in self.content
+        assert "live/rootfs.squashfs" in self.content
+
+    def test_iso_verity_path_constant(self):
+        """Verify ISO_VERITY_PATH constant."""
+        assert "ISO_VERITY_PATH" in self.content
+        assert "live/rootfs.verity" in self.content
+
+
+# ── TestVMTestScriptISO ──────────────────────────────────────────
+
+
+class TestVMTestScriptISO:
+    """Verify live-os-test-vm.sh supports ISO format."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not TEST_VM_SCRIPT.exists():
+            pytest.skip(f"File not found: {TEST_VM_SCRIPT}")
+        cls.content = TEST_VM_SCRIPT.read_text()
+
+    def test_iso_format_detection(self):
+        """Verify script detects .iso extension."""
+        assert "*.iso" in self.content or ".iso" in self.content
+
+    def test_raw_format_detection(self):
+        """Verify script detects .img extension."""
+        assert ".img" in self.content
+
+    def test_cdrom_attachment(self):
+        """Verify ISO is attached as CD-ROM device."""
+        assert "install-iso" in self.content or "CD-ROM" in self.content
+
+    def test_default_image_is_iso(self):
+        """Verify default image name is .iso."""
+        assert re.search(r'IMAGE="anklume-live\.iso"', self.content)
+
+    def test_iso_device_readonly(self):
+        """Verify ISO CD-ROM device is marked readonly."""
+        assert "readonly=true" in self.content
 
 
 if __name__ == "__main__":

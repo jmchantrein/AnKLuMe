@@ -10,7 +10,18 @@ run_hook() {
         return 0
     fi
 
-    msg "anklume: Detected anklume.toram=1, copying root to RAM..."
+    # Detect boot mode
+    BOOT_MODE="raw"
+    # shellcheck disable=SC2013
+    for param in $(cat /proc/cmdline); do
+        case "$param" in
+            anklume.boot_mode=*)
+                BOOT_MODE="${param#anklume.boot_mode=}"
+                ;;
+        esac
+    done
+
+    msg "anklume: Detected anklume.toram=1 (mode: $BOOT_MODE), copying root to RAM..."
 
     # Create tmpfs mount point
     if ! [ -d /run/anklume-toram ]; then
@@ -28,20 +39,29 @@ run_hook() {
 
     msg "anklume: tmpfs mounted at /run/anklume-toram"
 
-    # Find and copy the squashfs root image
+    # Find the squashfs root image
     ROOT_IMAGE=""
 
-    # Search for squashfs images in common boot locations
-    for location in /boot /cdrom /media /mnt; do
-        if [ -d "$location" ]; then
-            for image in "$location"/*.squashfs "$location"/*.img; do
-                if [ -f "$image" ] && file "$image" | grep -q "Squashfs"; then
-                    ROOT_IMAGE="$image"
-                    break 2
-                fi
-            done
+    if [ "$BOOT_MODE" = "iso" ]; then
+        # ISO mode: check ISO mount from anklume-verity hook first
+        if [ -f /run/anklume-iso/live/rootfs.squashfs ]; then
+            ROOT_IMAGE="/run/anklume-iso/live/rootfs.squashfs"
         fi
-    done
+    fi
+
+    # Fallback: search common boot locations
+    if [ -z "$ROOT_IMAGE" ]; then
+        for location in /run/anklume-iso/live /boot /cdrom /media /mnt; do
+            if [ -d "$location" ]; then
+                for image in "$location"/*.squashfs "$location"/*.img; do
+                    if [ -f "$image" ] && file "$image" | grep -q "Squashfs"; then
+                        ROOT_IMAGE="$image"
+                        break 2
+                    fi
+                done
+            fi
+        done
+    fi
 
     if [ -z "$ROOT_IMAGE" ]; then
         warn "anklume: No squashfs root image found in boot media"

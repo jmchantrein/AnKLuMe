@@ -5,6 +5,8 @@
 build() {
     add_binary veritysetup
     add_binary blkid
+    add_binary losetup
+    add_module loop
     add_runscript
 }
 
