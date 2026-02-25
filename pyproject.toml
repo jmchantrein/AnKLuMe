@@ -3,6 +3,10 @@ name = "anklume"
 version = "0.1.0"
 description = "QubesOS-like isolation using native Linux kernel features, orchestrated by Ansible and Incus"
 requires-python = ">=3.11"
+dependencies = ["typer[all]>=0.12", "pyyaml>=6.0"]
+
+[project.scripts]
+anklume = "scripts.cli:app"
 
 [project.optional-dependencies]
 test = ["pytest", "pyyaml", "hypothesis", "pytest-bdd"]
