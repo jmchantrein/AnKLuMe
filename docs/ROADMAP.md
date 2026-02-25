@@ -1807,42 +1807,6 @@ audio, controlled filesystem access via Phase 25 portals).
 
 ---
 
-## Phase 27: Streaming STT (Real-Time Transcription)
-
-**Goal**: Real-time speech-to-text that types words as they are
-spoken, without waiting for the end of the recording.
-
-**Prerequisites**: Phase 14 (STT service), Phase 23 (host layer).
-
-**Context**: The current push-to-talk mode works well but requires
-waiting for the full recording before transcription. A streaming
-mode was prototyped (`host/stt/stt-streaming.py`) but abandoned
-due to Whisper's batch-mode limitation: re-transcribing cumulative
-audio changes earlier words, making word-level diff unreliable.
-
-**Approach options** (to be evaluated):
-1. **Whisper streaming backends**: whisper-streaming, faster-whisper
-   with VAD-based chunking, or Speaches WebSocket endpoint
-2. **Non-Whisper alternatives**: Vosk (offline, streaming-native),
-   DeepSpeech, or Moonshine (streaming by design)
-3. **Hybrid**: use Whisper for final transcription, streaming engine
-   for real-time preview (two-pass approach)
-
-**Deliverables**:
-- Evaluate streaming STT backends compatible with local GPU
-- Implement streaming mode in `host/stt/stt-push-to-talk.sh`
-  (Meta+S long-press = streaming, Meta+S tap = toggle as today)
-- Anti-loop protections preserved from current prototype
-- Latency target: < 500ms from speech to typed text
-
-**Validation criteria**:
-- [ ] Words appear as they are spoken (< 500ms latency)
-- [ ] No text duplication or hallucination loops
-- [ ] Clean switch between toggle and streaming modes
-- [ ] GPU acceleration via Incus container
-
----
-
 ## Phase 28: Local LLM Delegation for Claude Code ✅ COMPLETE
 
 **Goal**: Claude Code CLI delegates routine tasks to local open-source
@@ -2101,7 +2065,7 @@ f) **Test rationalization** (deferred — Phase 22 dependency):
 
 ---
 
-## Phase 30: Educational Platform and Guided Labs (Framework)
+## Phase 30: Educational Platform and Guided Labs (Framework) ✅ COMPLETE
 
 **Status**: FRAMEWORK COMPLETE. Sandbox execution (Incus-in-Incus)
 and teacher mode deferred to a future iteration.
@@ -2415,6 +2379,17 @@ e) **Documentation**:
    - Performance comparison: toram vs direct, ZFS vs BTRFS
    - Security model explanation (three-layer encryption)
 
+f) **VM-based testing** (`scripts/live-os-test-vm.sh`):
+   - Build the image, then boot it in an Incus VM (or raw qemu/KVM)
+   - No physical hardware needed — all testing done locally
+   - `make live-os-test-vm` creates an Incus VM from the built image,
+     attaches a virtual data disk, and validates the boot flow
+   - Tests: UEFI boot, squashfs mount, persistent partition, Incus
+     daemon starts, first-boot wizard runs, encrypted pool creation
+   - Uses `incus launch --vm` with the built image as root disk
+   - Supports `--base arch` and `--base debian` variants
+   - Cleanup: `make live-os-test-vm-clean` destroys the test VM
+
 ### Validation criteria
 
 - [x] Arch Linux base support (`--base arch`, mkinitcpio hooks, SHA256 checksums)
@@ -2429,10 +2404,11 @@ e) **Documentation**:
 - [ ] dm-verity detects tampered OS blocks
 - [ ] RAM encryption enabled when hardware supports it
 - [ ] First-boot wizard handles both new pool and existing pool
+- [ ] `make live-os-test-vm` boots image in Incus VM and validates boot flow
 
 ---
 
-## Phase 32: Makefile UX and Robustness
+## Phase 32: Makefile UX and Robustness ✅ COMPLETE
 
 **Goal**: Make the CLI user-friendly for end users by categorizing
 targets, fixing naming inconsistencies, and improving robustness
@@ -2475,7 +2451,7 @@ e) **Upgrade notification** (admin_bootstrap role):
 
 ---
 
-## Phase 33: Student Mode and Internationalization
+## Phase 33: Student Mode and Internationalization ✅ COMPLETE
 
 **Goal**: Make anklume a learning tool with bilingual CLI support
 and transparent command execution for educational contexts.
@@ -2590,7 +2566,7 @@ e) **Updated SPEC.md, examples, and tests**:
 
 ---
 
-## Phase 35: Development Workflow Simplification
+## Phase 35: Development Workflow Simplification ✅ COMPLETE
 
 **Goal**: Replace the complex MCP proxy (`mcp-anklume-dev.py`) with
 lightweight, standard tools for the development workflow.
@@ -2640,7 +2616,7 @@ d) **Updated documentation**:
 
 ---
 
-## Phase 36: Naming Convention Migration
+## Phase 36: Naming Convention Migration ✅ COMPLETE
 
 **Goal**: Migrate from `sys-` prefix to domain-consistent naming and
 introduce the `shared` domain for shared services.
@@ -2683,10 +2659,10 @@ d) **Test updates**:
 
 ---
 
-## Phase 37: Per-Domain OpenClaw
+## Phase 37: OpenClaw Instances — KISS Simplification ✅ COMPLETE
 
-**Goal**: Reposition OpenClaw from a centralized service in ai-tools to
-per-domain instances, each isolated by Incus network boundaries.
+**Goal**: OpenClaw machines are declared like any other machine in
+infra.yml. No special domain-level directive, no auto-creation.
 
 **Prerequisites**: Phase 28b (OpenClaw role exists), Phase 34 (Addressing),
 Phase 36 (Naming).
@@ -2761,12 +2737,12 @@ e) **Security model**:
 
 ---
 
-## Phase 38: OpenClaw Heartbeat and Proactive Monitoring
+## Phase 38: OpenClaw Heartbeat and Proactive Monitoring ✅ COMPLETE
 
 **Goal**: Exploit OpenClaw's heartbeat and cron for proactive per-domain
 infrastructure monitoring.
 
-**Prerequisites**: Phase 37 (Per-Domain OpenClaw).
+**Prerequisites**: Phase 37 (OpenClaw KISS).
 
 **Context**: OpenClaw's heartbeat (every 30 min, configurable) and cron
 (standard 5-field expressions) enable proactive monitoring without
@@ -2815,12 +2791,12 @@ e) **Memory exploitation**:
 
 ---
 
-## Phase 39: LLM Sanitization Proxy
+## Phase 39: LLM Sanitization Proxy ✅ COMPLETE
 
 **Goal**: Deploy a sanitization proxy that anonymizes infrastructure
 data before it reaches cloud LLM APIs, configurable per domain.
 
-**Prerequisites**: Phase 34 (Addressing), Phase 37 (Per-Domain OpenClaw).
+**Prerequisites**: Phase 34 (Addressing), Phase 37 (OpenClaw KISS).
 
 **Context**: When AI queries leave the local perimeter (cloud LLM APIs),
 they may contain sensitive infrastructure data: IPs, hostnames, FQDNs,
@@ -2898,7 +2874,7 @@ f) **Transparent integration**:
 
 ---
 
-## Phase 40: Network Inspection and Security Monitoring
+## Phase 40: Network Inspection and Security Monitoring ✅ COMPLETE
 
 **Goal**: LLM-assisted network inspection per domain — mapping,
 anomaly detection, and forensic analysis via the three-level pipeline.
@@ -2968,6 +2944,165 @@ d) **Alerting pipeline**:
 
 ---
 
+## Phase 41: Official Roles and External Role Integration
+
+**Goal**: Mechanism to prioritize installing official Ansible Galaxy
+roles for tools, adding project-specific configuration as thin
+wrappers rather than maintaining ad-hoc roles. Benefits from
+upstream maintenance, security patches, and community testing.
+
+**Prerequisites**: Phase 29 (codebase simplification).
+
+**Context**: anklume currently maintains ad-hoc roles for every tool
+(Ollama, Open WebUI, STT, etc.). When upstream provides a
+well-maintained Galaxy role, anklume should use it and add only the
+project-specific glue (Incus integration, PSOT variables, network
+policy). This reduces maintenance burden and avoids reinventing
+packaging logic that upstream handles better.
+
+**Architecture**:
+
+```yaml
+# infra.yml — role declaration
+machines:
+  ai-gpu:
+    roles:
+      - base_system                          # anklume native role
+      - galaxy: geerlingguy.docker           # official Galaxy role
+        config:                              # project-specific overrides
+          docker_edition: ce
+          docker_users: [root]
+      - ollama_server                        # anklume wrapper role
+```
+
+```
+roles/                      # anklume-maintained roles
+roles_vendor/               # Galaxy roles (gitignored, installed by make init)
+roles_custom/               # User custom roles (gitignored)
+```
+
+**Mechanism**:
+- `requirements.yml` at project root lists Galaxy role dependencies
+- `make init` runs `ansible-galaxy install -r requirements.yml -p roles_vendor/`
+- `ansible.cfg` `roles_path` priority: `roles_custom:roles:roles_vendor`
+- anklume wrapper roles (thin) call the Galaxy role with project-specific
+  defaults, then add Incus-specific tasks (device setup, network config)
+- Generator validates that referenced Galaxy roles are declared in
+  `requirements.yml`
+
+**Deliverables**:
+
+a) **Role resolution** (generator + ansible.cfg):
+   - `roles_path` with three directories in priority order
+   - `requirements.yml` for Galaxy dependencies
+   - `make init` installs Galaxy roles
+
+b) **Wrapper role pattern** (documentation + example):
+   - Template for wrapping a Galaxy role with anklume glue
+   - Example: wrap `geerlingguy.docker` for container-in-container
+
+c) **Migration path** (gradual):
+   - Identify current roles that could be replaced by Galaxy roles
+   - Document migration guide per role
+   - No breaking changes — existing roles continue to work
+
+**Validation criteria**:
+- [ ] `make init` installs Galaxy roles to roles_vendor/
+- [ ] Wrapper role pattern documented with working example
+- [ ] roles_vendor/ gitignored, reproducible from requirements.yml
+- [ ] Generator validates Galaxy role references
+
+---
+
+## Phase 42: Desktop Environment Plugin System
+
+**Goal**: Declarative desktop environment setup where users describe
+their DE preferences in `infra.yml` and anklume configures the host
+DE accordingly. Out of scope to implement specific DEs; making the
+framework possible IS in scope.
+
+**Prerequisites**: Phase 21 (desktop integration), Phase 26 (app export).
+
+**Context**: Users want their desktop environment to reflect their
+compartmentalized infrastructure. Example: a KDE user wants 6 virtual
+desktops, each mapped to a domain with domain-colored wallpaper and
+QubesOS-style window borders. anklume should provide the hooks and
+declarations; DE-specific plugins implement the actual configuration.
+
+**Architecture**:
+
+```yaml
+# infra.yml — desktop declaration
+global:
+  desktop:
+    engine: kde                             # kde | gnome | sway | hyprland
+    virtual_desktops: auto                  # auto = one per enabled domain
+    window_borders: trust_level             # color by trust level (QubesOS-style)
+
+domains:
+  pro:
+    desktop:
+      wallpaper: /path/to/pro-wallpaper.jpg
+      panel_color: "#2E7D32"               # override trust-level default
+      pinned_apps: [code, firefox]          # apps pinned to taskbar
+```
+
+```
+plugins/desktop/                            # Plugin directory
+├── plugin.schema.yml                       # Plugin interface contract
+├── kde/
+│   ├── apply.sh                            # KDE-specific configuration
+│   ├── detect.sh                           # Detect KDE version
+│   └── README.md
+├── gnome/
+│   ├── apply.sh
+│   ├── detect.sh
+│   └── README.md
+├── sway/
+│   ├── apply.sh
+│   ├── detect.sh
+│   └── README.md
+└── hyprland/
+    ├── apply.sh
+    ├── detect.sh
+    └── README.md
+```
+
+**Plugin interface** (contract each plugin implements):
+- `detect.sh` — returns 0 if this DE is running, 1 otherwise
+- `apply.sh` — reads JSON config from stdin, applies DE settings
+- Idempotent: running `apply.sh` twice produces the same result
+- Reversible: `apply.sh --reset` restores default DE settings
+
+**Deliverables**:
+
+a) **Plugin framework** (`scripts/desktop-plugin.sh`):
+   - Plugin discovery and validation
+   - Config generation from infra.yml desktop section
+   - `make desktop-apply` / `make desktop-reset` targets
+
+b) **Plugin interface specification** (`plugins/desktop/plugin.schema.yml`):
+   - Required capabilities (detect, apply, reset)
+   - Config schema (virtual desktops, window borders, wallpapers)
+   - Trust-level color mapping
+
+c) **Reference plugin** (one DE — likely Sway or KDE):
+   - Working implementation of the plugin interface
+   - Serves as template for community contributions
+
+d) **Generator support**:
+   - Validate `desktop:` section in infra.yml
+   - Generate desktop config JSON for plugin consumption
+
+**Validation criteria**:
+- [ ] Plugin framework discovers and validates plugins
+- [ ] `make desktop-apply` configures DE from infra.yml
+- [ ] At least one reference plugin functional
+- [ ] Plugin interface documented for community contributions
+- [ ] `make desktop-reset` restores default DE settings
+
+---
+
 ## Current State
 
 **Completed** (Phases 1-29):
@@ -3007,22 +3142,17 @@ d) **Alerting pipeline**:
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
 - Phase 32: Makefile UX and Robustness
+- Phase 33: Student Mode and Internationalization
 - Phase 35: Development Workflow Simplification
 - Phase 36: Naming Convention Migration
-
-**In progress**:
-- Phase 31: Live OS with Encrypted Persistent Storage
-- Phase 37: Per-Domain OpenClaw
-- Phase 30: Educational Platform and Guided Labs
-
-**Short-term**:
+- Phase 37: OpenClaw Instances — KISS Simplification
 - Phase 38: OpenClaw Heartbeat and Proactive Monitoring
 - Phase 39: LLM Sanitization Proxy
-- Phase 33: Student Mode and Internationalization
 - Phase 40: Network Inspection and Security Monitoring
+- Phase 30: Educational Platform and Guided Labs
 
-**Long-term**:
-- Phase 27: Streaming STT (Real-Time Transcription)
+**In progress**:
+- Phase 31: Live OS with Encrypted Persistent Storage (VM testing via Incus/KVM)
 
 **Vision document**: `docs/vision-ai-integration.md` — consolidation of
 design discussions for Phases 35-40 (AI integration architecture).
