@@ -1,3 +1,5 @@
 # Built images are too large for git
 *.img
+*.iso
+*.qcow2
 *.sha256

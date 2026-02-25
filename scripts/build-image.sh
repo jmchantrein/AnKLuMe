@@ -228,9 +228,9 @@ bootstrap_rootfs_debian() {
         stable)  suite="bookworm" ;;
     esac
 
-    # Run debootstrap
+    # Run debootstrap with core packages
     local debootstrap_opts="--arch=$ARCH"
-    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,openssh-server,curl,jq,python3"
+    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,linux-firmware,openssh-server,curl,jq,python3,python3-pip,python3-yaml,ca-certificates"
 
     if [ -n "$MIRROR" ]; then
         # shellcheck disable=SC2086
@@ -248,12 +248,16 @@ bootstrap_rootfs_debian() {
     mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
     MOUNTED_PATHS+=("$ROOTFS_DIR/dev/pts" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/proc")
 
-    # Install additional packages via chroot
+    # Install additional packages via chroot (all anklume runtime deps)
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
+    packages="$packages ansible git make sudo nano"
+    packages="$packages iproute2 dmidecode lsof htop"
+    # Incus: Debian Trixie ships incus in official repos
+    packages="$packages incus"
     chroot "$ROOTFS_DIR" apt-get update -qq
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" apt-get install -y -qq $packages 2>&1 | tail -5
-    info "  Additional packages installed"
+    info "  Additional packages installed (incl. incus, ansible, git)"
 
     # Configure system
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
@@ -274,15 +278,28 @@ FSTAB
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
 
-    # Copy anklume framework files
+    # Copy entire anklume framework (git repo) into rootfs
     mkdir -p "$ROOTFS_DIR/opt/anklume"
-    if [ -d "$PROJECT_ROOT/scripts" ]; then
-        cp -r "$PROJECT_ROOT/scripts" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
-    fi
-    if [ -d "$PROJECT_ROOT/ansible" ]; then
-        cp -r "$PROJECT_ROOT/ansible" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+    # Use git archive to get a clean copy without .git and gitignored files
+    if command -v git &>/dev/null && [ -d "$PROJECT_ROOT/.git" ]; then
+        # Allow git archive from a repo owned by a different user (running as root)
+        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
+        git -C "$PROJECT_ROOT" archive HEAD | tar -x -C "$ROOTFS_DIR/opt/anklume/"
+    else
+        # Fallback: copy essential dirs
+        for d in scripts roles roles_custom Makefile site.yml snapshot.yml \
+                 ansible.cfg inventory group_vars host_vars pyproject.toml \
+                 infra.yml requirements.yml; do
+            [ -e "$PROJECT_ROOT/$d" ] && cp -r "$PROJECT_ROOT/$d" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+        done
     fi
     info "  anklume framework files copied"
+
+    # Create /etc/anklume marker
+    mkdir -p "$ROOTFS_DIR/etc/anklume"
+    echo "0" > "$ROOTFS_DIR/etc/anklume/absolute_level"
+    echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
+    echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
     # Copy initramfs hooks
     if [ -d "$PROJECT_ROOT/host/boot/initramfs" ]; then
@@ -326,8 +343,40 @@ bootstrap_rootfs_arch() {
     ROOTFS_DIR="$WORK_DIR/rootfs"
     mkdir -p "$ROOTFS_DIR"
 
-    # Run pacstrap
-    pacstrap -K "$ROOTFS_DIR" base linux mkinitcpio openssh curl jq python file nftables cryptsetup btrfs-progs
+    # Prepare a vanilla Arch pacman.conf to avoid CachyOS mirror issues.
+    # pacstrap -K copies host config; we override the mirrorlist first so
+    # that only standard Arch repos are used in the rootfs.
+    mkdir -p "$ROOTFS_DIR/etc/pacman.d"
+    cat > "$ROOTFS_DIR/etc/pacman.d/mirrorlist" << 'MIRRORS'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+Server = https://archlinux.mailtunnel.eu/$repo/os/$arch
+MIRRORS
+
+    # Create a minimal pacman.conf with only vanilla Arch repos
+    cat > "$WORK_DIR/pacman-vanilla.conf" << 'PACCONF'
+[options]
+HoldPkg     = pacman glibc
+Architecture = auto
+SigLevel    = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+PACCONF
+
+    # Run pacstrap with vanilla config
+    # Include all anklume runtime deps: Incus, Ansible, Python, Git, etc.
+    pacstrap -C "$WORK_DIR/pacman-vanilla.conf" -K "$ROOTFS_DIR" \
+        base linux linux-firmware mkinitcpio \
+        openssh curl jq python python-pip python-yaml file \
+        nftables cryptsetup btrfs-progs squashfs-tools \
+        incus ansible git make ca-certificates \
+        sudo nano iproute2 systemd-resolvconf \
+        dmidecode lsof htop
 
     info "  Pacstrap complete"
 
@@ -361,15 +410,24 @@ FSTAB
     ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
     info "  Timezone configured"
 
-    # Copy anklume framework files
+    # Copy entire anklume framework (git repo) into rootfs
     mkdir -p "$ROOTFS_DIR/opt/anklume"
-    if [ -d "$PROJECT_ROOT/scripts" ]; then
-        cp -r "$PROJECT_ROOT/scripts" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
-    fi
-    if [ -d "$PROJECT_ROOT/ansible" ]; then
-        cp -r "$PROJECT_ROOT/ansible" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+    if command -v git &>/dev/null && [ -d "$PROJECT_ROOT/.git" ]; then
+        git -C "$PROJECT_ROOT" archive HEAD | tar -x -C "$ROOTFS_DIR/opt/anklume/"
+    else
+        for d in scripts roles roles_custom Makefile site.yml snapshot.yml \
+                 ansible.cfg inventory group_vars host_vars pyproject.toml \
+                 infra.yml requirements.yml; do
+            [ -e "$PROJECT_ROOT/$d" ] && cp -r "$PROJECT_ROOT/$d" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
+        done
     fi
     info "  anklume framework files copied"
+
+    # Create /etc/anklume marker
+    mkdir -p "$ROOTFS_DIR/etc/anklume"
+    echo "0" > "$ROOTFS_DIR/etc/anklume/absolute_level"
+    echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
+    echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
     # Copy mkinitcpio hooks
     # ZFS not included by default on Arch (requires archzfs repo). Use BTRFS.
@@ -795,9 +853,9 @@ GRUBCFG
 
     # Create EFI boot image (FAT) for El Torito
     local efi_img="$staging/EFI/BOOT/efiboot.img"
-    local efi_size_kb=4096
+    local efi_size_kb=16384
     dd if=/dev/zero of="$efi_img" bs=1K count=$efi_size_kb 2>/dev/null
-    mkfs.fat -F 12 "$efi_img" >/dev/null 2>&1
+    mkfs.fat -F 16 "$efi_img" >/dev/null 2>&1
     mmd -i "$efi_img" ::EFI ::EFI/BOOT 2>/dev/null
     if [ -f "$staging/EFI/BOOT/BOOTX64.EFI" ]; then
         mcopy -i "$efi_img" "$staging/EFI/BOOT/BOOTX64.EFI" ::EFI/BOOT/BOOTX64.EFI
@@ -873,7 +931,12 @@ GRUBCFG
     xorriso_args+=(-output "$OUTPUT" "$staging")
 
     info "  Running xorriso..."
-    xorriso "${xorriso_args[@]}" 2>&1 | tail -3
+    # xorriso returns non-zero on MISHAP warnings even when ISO is valid
+    xorriso "${xorriso_args[@]}" 2>&1 | tail -5 || true
+    if [ ! -f "$OUTPUT" ]; then
+        err "xorriso failed — no output file"
+        exit 1
+    fi
 
     ok "Hybrid ISO assembled: $OUTPUT"
 }
