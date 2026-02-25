@@ -36,7 +36,9 @@ residuels des modeles ou le cache d'inference.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   ai_access_policy: exclusive    # Un seul domaine accede a ai-tools
   ai_access_default: pro         # Domaine par defaut avec acces IA
 

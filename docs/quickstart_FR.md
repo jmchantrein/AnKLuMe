@@ -75,7 +75,7 @@ le repertoire [examples/](../examples/). Regles principales :
 - **Noms de domaine** : minuscules alphanumeriques + tirets uniquement
 - **Noms de machine** : doivent etre globalement uniques entre tous les domaines
 - **subnet_id** : entier 0-254, unique par domaine
-- **IPs** : doivent correspondre au sous-reseau (`<base_subnet>.<subnet_id>.X`, X = 1-253)
+- **IPs** : auto-assignees depuis `10.<zone>.<seq>.<host>` (voir ADR-038)
 - **Passerelle** : `.254` est attribuee automatiquement, ne l'utilisez pas pour les machines
 
 Voir [SPEC.md section 5](SPEC.md) pour la reference complete du format.

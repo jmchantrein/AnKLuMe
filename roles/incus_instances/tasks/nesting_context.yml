@@ -1,0 +1,113 @@
+---
+# IncusInstances | Nesting context propagation (ADR-020)
+#
+# Included from main.yml after start_wait.yml.
+# Parent creates /etc/anklume/ in children with propagated context values.
+# Formula: absolute_level = parent + 1
+#          relative_level = 0 if VM, else parent + 1
+#          vm_nested = parent_vm_nested OR (instance_type == 'vm')
+#
+# Requires: instance_name, instance_type, instance_domain
+
+- name: IncusInstances | Read parent absolute_level
+  ansible.builtin.slurp:
+    src: /etc/anklume/absolute_level
+  register: incus_instances_parent_abs
+  failed_when: false
+
+- name: IncusInstances | Read parent relative_level
+  ansible.builtin.slurp:
+    src: /etc/anklume/relative_level
+  register: incus_instances_parent_rel
+  failed_when: false
+
+- name: IncusInstances | Read parent vm_nested
+  ansible.builtin.slurp:
+    src: /etc/anklume/vm_nested
+  register: incus_instances_parent_vm_nested
+  failed_when: false
+
+- name: IncusInstances | Read parent yolo
+  ansible.builtin.slurp:
+    src: /etc/anklume/yolo
+  register: incus_instances_parent_yolo
+  failed_when: false
+
+- name: IncusInstances | Compute child nesting context
+  ansible.builtin.set_fact:
+    incus_instances_child_abs: >-
+      {{ ((incus_instances_parent_abs.content | default('MA==') | b64decode | trim | int) + 1) | string }}
+    incus_instances_child_rel: >-
+      {{ '0' if instance_type == 'vm' else
+         ((incus_instances_parent_rel.content | default('MA==') | b64decode | trim | int) + 1) | string }}
+    incus_instances_child_vm_nested: >-
+      {{ 'true' if (instance_type == 'vm') or
+         ((incus_instances_parent_vm_nested.content | default('ZmFsc2U=') | b64decode | trim) == 'true')
+         else 'false' }}
+    incus_instances_child_yolo: >-
+      {{ incus_instances_parent_yolo.content | default('ZmFsc2U=') | b64decode | trim }}
+  when: incus_instances_parent_abs is defined
+
+- name: IncusInstances | Check /etc/anklume exists in child
+  ansible.builtin.command:
+    argv:
+      - incus
+      - exec
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+      - --
+      - test
+      - -d
+      - /etc/anklume
+  register: _incus_instances_anklume_dir_check
+  changed_when: false
+  failed_when: false
+  when: incus_instances_child_abs is defined
+
+- name: IncusInstances | Create /etc/anklume in child instance
+  ansible.builtin.command:
+    argv:
+      - incus
+      - exec
+      - "{{ instance_name }}"
+      - --project
+      - "{{ instance_domain }}"
+      - --
+      - mkdir
+      - -p
+      - /etc/anklume
+  changed_when: true
+  when:
+    - incus_instances_child_abs is defined
+    - _incus_instances_anklume_dir_check.rc | default(1) != 0
+
+- name: IncusInstances | Read current child context files
+  ansible.builtin.command:
+    cmd: >-
+      incus exec {{ instance_name }} --project {{ instance_domain }}
+      -- bash -c 'cat /etc/anklume/{{ item.key }} 2>/dev/null || echo __MISSING__'
+  loop:
+    - { key: "absolute_level", value: "{{ incus_instances_child_abs | trim }}" }
+    - { key: "relative_level", value: "{{ incus_instances_child_rel | trim }}" }
+    - { key: "vm_nested", value: "{{ incus_instances_child_vm_nested | trim }}" }
+    - { key: "yolo", value: "{{ incus_instances_child_yolo | trim }}" }
+  loop_control:
+    label: "{{ item.key }}"
+  register: _incus_instances_child_context_current
+  changed_when: false
+  when: incus_instances_child_abs is defined
+
+- name: IncusInstances | Write child context files
+  ansible.builtin.command:
+    cmd: >-
+      incus exec {{ instance_name }} --project {{ instance_domain }}
+      -- bash -c 'echo "{{ item.item.value }}" > /etc/anklume/{{ item.item.key }}'
+  loop: "{{ _incus_instances_child_context_current.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.key }}={{ item.item.value | trim }}"
+  changed_when: true
+  when:
+    - incus_instances_child_abs is defined
+    - item is not skipped
+    - (item.stdout | default('') | trim) != (item.item.value | trim)

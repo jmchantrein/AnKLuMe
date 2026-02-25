@@ -45,16 +45,18 @@ dans le domaine anklume si vous n'en avez pas declare une vous-meme :
 ```yaml
 # infra.yml -- ajoutez simplement firewall_mode: vm
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   firewall_mode: vm
 
 domains:
   anklume:
-    subnet_id: 0
+    trust_level: admin
     machines:
       anklume-instance:
         type: lxc
-        ip: "10.100.0.10"
+        roles: [base_system]
         roles: [base_system]
   # ... autres domaines ...
 ```
@@ -85,7 +87,9 @@ ci-dessous.
 
 ```yaml
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   firewall_mode: vm  # Activer le mode VM pare-feu
 ```
 

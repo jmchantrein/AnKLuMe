@@ -18,7 +18,9 @@ GPUs grand public.
 ```yaml
 # infra.yml -- une SEULE machine peut avoir gpu: true
 global:
-  base_subnet: "10.100"
+  addressing:
+    base_octet: 10
+    zone_base: 100
   # gpu_policy: exclusive  # C'est le defaut
 
 domains:
