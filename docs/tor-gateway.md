@@ -6,23 +6,23 @@ anonymous internet access, controlled by `network_policies` in `infra.yml`.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                         Host                             │
-│                                                          │
-│  net-anonymous ────┐                                    │
-│                    │      ┌───────────────────┐         │
-│                    ├─────▶│ net-tor-gateway    │         │
-│                    │      │  tor-gw            │         │
-│                    │      │  TransPort 9040    │         │
-│                    │      │  DNSPort 5353      │         │
-│  net-anklume ──────┘      │  nftables redirect │         │
-│    (blocked)              └────────┬──────────┘         │
-│                                    │                     │
-│                              Tor network                 │
-│                                    │                     │
-│                               Internet                   │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Host
+        nAnon["net-anonymous"]
+        nAnk["net-anklume<br/>(blocked)"]
+
+        subgraph TorGW["net-tor-gateway<br/>tor-gw<br/>TransPort 9040 / DNSPort 5353<br/>nftables redirect"]
+        end
+
+        nAnon -->|"routed"| TorGW
+        nAnk x--x|"blocked"| TorGW
+    end
+
+    TorGW -->|"Tor network"| Internet(("Internet"))
+
+    style TorGW fill:#ce93d8,stroke:#6a1b9a
+    style Internet fill:#e8f5e9,stroke:#2e7d32
 ```
 
 The Tor gateway container runs Tor as a transparent proxy. Inside the
