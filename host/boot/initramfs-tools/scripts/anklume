@@ -27,10 +27,26 @@ mountroot()
     log_begin_msg "anklume: Starting live ISO boot"
 
     # Ensure required kernel modules are loaded
+    # Device controller modules must be loaded BEFORE udev settle
+    # so the kernel can discover CDROM/disk devices
+    modprobe -q ata_piix 2>/dev/null || true
+    modprobe -q ahci 2>/dev/null || true
+    modprobe -q ata_generic 2>/dev/null || true
+    modprobe -q cdrom 2>/dev/null || true
+    modprobe -q sr_mod 2>/dev/null || true
+    modprobe -q virtio_blk 2>/dev/null || true
+    modprobe -q virtio_scsi 2>/dev/null || true
+    modprobe -q virtio_pci 2>/dev/null || true
+    # Filesystem modules
     modprobe -q overlay 2>/dev/null || true
     modprobe -q loop 2>/dev/null || true
     modprobe -q squashfs 2>/dev/null || true
     modprobe -q iso9660 2>/dev/null || true
+
+    # Re-trigger device discovery after loading modules
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm trigger --action=add 2>/dev/null || true
+    fi
 
     # Wait for udev to settle (device discovery)
     wait_for_udev 10
