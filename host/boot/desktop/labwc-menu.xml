@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- anklume labwc right-click menu -->
+<openbox_menu>
+  <menu id="root-menu" label="anklume">
+    <item label="Terminal"><action name="Execute"><command>foot</command></action></item>
+    <item label="Launcher"><action name="Execute"><command>fuzzel</command></action></item>
+    <item label="File Manager"><action name="Execute"><command>thunar</command></action></item>
+    <separator/>
+    <item label="anklume Guide"><action name="Execute"><command>foot -e python3 /opt/anklume/scripts/welcome.py --tui</command></action></item>
+    <item label="anklume Console"><action name="Execute"><command>foot -e bash -c 'cd /opt/anklume && make console'</command></action></item>
+    <separator/>
+    <item label="Exit"><action name="Exit"/></item>
+  </menu>
+</openbox_menu>

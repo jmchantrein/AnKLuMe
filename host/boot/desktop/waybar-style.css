@@ -1,0 +1,31 @@
+/* anklume waybar dark theme */
+* {
+    font-family: monospace;
+    font-size: 13px;
+    color: #e0e0e0;
+}
+
+window#waybar {
+    background-color: #1a1a2e;
+    border-bottom: 2px solid #4d4d6e;
+}
+
+#taskbar button {
+    padding: 0 6px;
+    background: transparent;
+    border: none;
+}
+
+#taskbar button.active {
+    background-color: #bd93f9;
+    color: #1a1a2e;
+    border-radius: 3px;
+}
+
+#cpu, #memory, #clock {
+    padding: 0 8px;
+}
+
+#clock {
+    font-weight: bold;
+}

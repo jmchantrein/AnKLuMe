@@ -131,9 +131,65 @@ sudo scripts/build-image.sh --output anklume-arch.iso --base arch
 # Build raw GPT image (legacy format)
 sudo scripts/build-image.sh --format raw --output anklume-live.img --size 4
 
+# Select desktop environment
+sudo scripts/build-image.sh --output anklume-sway.iso --desktop sway
+sudo scripts/build-image.sh --output anklume-kde.iso --desktop kde
+
 # Or via Makefile
 anklume live build OUT=anklume-live.iso BASE=arch
+anklume live build OUT=anklume-sway.iso DESKTOP=sway
 ```
+
+### Desktop Environments
+
+The live OS supports three desktop environments, selectable at GRUB boot:
+
+| Desktop | Description | ISO size impact |
+|---------|-------------|-----------------|
+| **sway** (default) | Tiling Wayland compositor, lightweight | +20 MB |
+| **labwc** | Stacking Wayland compositor (Openbox-like) | +150 MB |
+| **KDE Plasma** | Full desktop environment | +500-700 MB |
+| **minimal** | Console only (foot terminal, no compositor) | 0 |
+
+The `--desktop` build option controls which DEs are included:
+
+```bash
+# All DEs (default)
+sudo scripts/build-image.sh --desktop all
+
+# Single DE for smaller image
+sudo scripts/build-image.sh --desktop sway
+
+# Console only (smallest image)
+sudo scripts/build-image.sh --desktop minimal
+```
+
+**GRUB menu structure:**
+- Top level: sway Desktop + GPU, sway Desktop, Console + GPU, Console
+- Submenu "More Desktops": labwc and KDE Plasma variants
+- Submenu "Advanced": all DEs without toram (direct boot from media)
+
+**Keybindings** are consistent across sway and labwc:
+- `Super+Enter` opens terminal (foot)
+- `Super+d` opens application launcher (fuzzel)
+- `Alt+Shift` toggles keyboard layout (AZERTY/QWERTY)
+- Full reference: `cat /opt/anklume/host/boot/desktop/KEYBINDINGS.txt`
+
+### Welcome Guide
+
+On first desktop boot, a welcome guide launches automatically:
+
+```bash
+# Also accessible anytime via:
+anklume guide                  # TUI mode (terminal)
+anklume welcome WEB=1          # Web mode (browser)
+```
+
+The guide offers:
+1. **Configure persistence** — encrypted data disk setup (LUKS + ZFS/BTRFS)
+2. **Mount existing** — detect and mount a previously configured disk
+3. **Feature tour** — step-by-step introduction to anklume commands
+4. **Keybindings** — desktop keyboard shortcuts reference
 
 ### Flash to USB
 

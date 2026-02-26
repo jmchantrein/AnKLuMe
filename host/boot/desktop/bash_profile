@@ -1,0 +1,40 @@
+# shellcheck shell=bash
+# anklume: auto-start desktop environment from kernel cmdline
+# Parsed parameter: anklume.desktop=<sway|labwc|kde|1>
+# Only activates on tty1 with no existing Wayland session
+
+if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+    # Parse anklume.desktop=<de> from kernel cmdline
+    ANKLUME_DE=""
+    for param in $(cat /proc/cmdline); do
+        case "$param" in
+            anklume.desktop=*) ANKLUME_DE="${param#anklume.desktop=}" ;;
+        esac
+    done
+
+    # Splash: show ASCII art + random quote on every desktop boot
+    if [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
+        /opt/anklume/host/boot/desktop/anklume-splash.sh
+    fi
+
+    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
+    if lsmod | grep -q '^nvidia '; then
+        export WLR_RENDERER=vulkan
+    fi
+
+    export XDG_SESSION_TYPE=wayland
+
+    case "$ANKLUME_DE" in
+        sway|1)
+            exec sway 2>/dev/null
+            ;;
+        labwc)
+            exec labwc 2>/dev/null
+            ;;
+        kde)
+            # KDE Plasma manages its own renderer
+            unset WLR_RENDERER
+            exec startplasma-wayland 2>/dev/null
+            ;;
+    esac
+fi

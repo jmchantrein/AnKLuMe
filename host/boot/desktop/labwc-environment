@@ -1,0 +1,5 @@
+# anklume labwc environment variables
+XDG_SESSION_TYPE=wayland
+XDG_CURRENT_DESKTOP=wlroots
+MOZ_ENABLE_WAYLAND=1
+QT_QPA_PLATFORM=wayland

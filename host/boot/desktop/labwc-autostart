@@ -1,0 +1,10 @@
+#!/bin/sh
+# anklume labwc autostart
+
+# Panel
+waybar &
+
+# Welcome guide on first boot
+if [ ! -f ~/.anklume/welcome-done ]; then
+    foot -e python3 /opt/anklume/scripts/welcome.py --tui &
+fi
