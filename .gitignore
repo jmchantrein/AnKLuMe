@@ -86,3 +86,6 @@ watch_*
 control
 control.tar.xz
 *.bak
+
+# Documentation site build output
+site/
