@@ -10,23 +10,28 @@ kernel, with centralized logging and full nftables control inside the VM.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ Host                                                      │
-│                                                           │
-│  net-anklume  net-perso    net-pro    net-ai-tools        │
-│    │              │           │           │                │
-│    └──────┬───────┴───────┬──┘           │                │
-│           │               │              │                │
-│    ┌──────┴───────────────┴──────────────┴──────┐        │
-│    │       anklume-firewall (KVM VM)              │        │
-│    │  eth0=anklume  eth1=perso  eth2=pro  eth3=ai │        │
-│    │                                              │        │
-│    │  nftables: all inter-domain dropped            │        │
-│    │            anklume uses Incus socket (not net)  │        │
-│    │            centralized logging                │        │
-│    └──────────────────────────────────────────────┘        │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Host
+        nAnk["net-anklume"]
+        nPerso["net-perso"]
+        nPro["net-pro"]
+        nAi["net-ai-tools"]
+
+        subgraph FW["anklume-firewall (KVM VM)<br/><i>nftables: all inter-domain dropped</i><br/><i>anklume uses Incus socket, not net</i><br/><i>centralized logging</i>"]
+            eth0["eth0 = anklume"]
+            eth1["eth1 = perso"]
+            eth2["eth2 = pro"]
+            eth3["eth3 = ai"]
+        end
+
+        nAnk --- eth0
+        nPerso --- eth1
+        nPro --- eth2
+        nAi --- eth3
+    end
+
+    style FW fill:#ffe0b2,stroke:#e65100
 ```
 
 The firewall VM has one NIC per domain bridge. It acts as a Layer 3
