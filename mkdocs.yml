@@ -1,0 +1,112 @@
+---
+site_name: anklume
+site_description: QubesOS-like isolation using native Linux kernel features
+site_url: https://jmchantrein.github.io/AnKLuMe/
+repo_url: https://github.com/jmchantrein/AnKLuMe
+repo_name: jmchantrein/AnKLuMe
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+
+plugins:
+  - search:
+      lang:
+        - en
+        - fr
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: en
+          default: true
+          name: English
+        - locale: fr
+          name: "Français"
+          build: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: quickstart.md
+      - Interactive Guide: guide.md
+  - Specification:
+      - Core Spec: SPEC.md
+      - Operations: SPEC-operations.md
+      - Architecture (ADRs): ARCHITECTURE.md
+      - Decisions Log: decisions-log.md
+      - Roadmap: ROADMAP.md
+  - Networking:
+      - Addressing Convention: addressing-convention.md
+      - Network Isolation: network-isolation.md
+      - Firewall VM: firewall-vm.md
+      - Tor Gateway: tor-gateway.md
+  - Security:
+      - GPU Management: gpu-advanced.md
+      - Security Audit: security-audit-operational.md
+      - LLM Sanitizer: llm-sanitizer.md
+      - Network Inspection: network-inspection.md
+      - Disposable Containers: disposable.md
+  - AI Integration:
+      - GPU & LLM: gpu-llm.md
+      - AI Switch: ai-switch.md
+      - AI Testing: ai-testing.md
+      - STT Service: stt-service.md
+      - OpenClaw: openclaw.md
+      - MCP Services: mcp-services.md
+  - Desktop:
+      - Console: console.md
+      - Desktop Integration: desktop-integration.md
+      - Golden Images: golden-images.md
+  - Operations:
+      - VM Support: vm-support.md
+      - File Transfer: file-transfer.md
+      - CUPS Setup: cups-setup.md
+      - Live OS: live-os.md
+  - Development:
+      - Claude Code Workflow: claude-code-workflow.md
+      - Agent Teams: agent-teams.md
+      - Code Analysis: code-analysis.md
+      - Scenario Testing: scenario-testing.md
+      - Incus Coverage: incus-coverage.md
+  - Education:
+      - Lab Guide: lab-tp.md
+      - Telemetry: telemetry.md

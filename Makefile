@@ -356,6 +356,13 @@ test-summary: ## Run all test layers and show combined report
 test-summary-quick: ## Quick test summary (skip slow layers)
 	scripts/test-summary.sh --quick
 
+# ── Documentation Site (Phase 45) ────────────────────────
+docs: ## Build documentation site (MkDocs)
+	mkdocs build
+
+docs-serve: ## Serve documentation site locally (MkDocs)
+	mkdocs serve
+
 # ── Behavior Matrix (Phase 18b) ──────────────────────────
 matrix-coverage: ## Show behavior matrix test coverage
 	python3 scripts/matrix-coverage.py

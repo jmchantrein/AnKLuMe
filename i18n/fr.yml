@@ -168,6 +168,10 @@ telemetry-status: "Afficher l'etat et le nombre d'evenements de telemetrie"
 telemetry-clear: "Supprimer toutes les donnees de telemetrie"
 telemetry-report: "Graphiques terminaux des usages"
 
+# ── Documentation (Phase 45) ────────────────────────────
+docs: "Construire le site de documentation (MkDocs)"
+docs-serve: "Serveur local de documentation (MkDocs)"
+
 # ── Help / Mode ──────────────────────────────────────────
 help: "Afficher l'aide categorisee (help-all pour toutes les cibles)"
 help-all: "Afficher toutes les cibles disponibles"

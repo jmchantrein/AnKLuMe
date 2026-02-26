@@ -10,6 +10,7 @@ anklume = "scripts.cli:app"
 
 [project.optional-dependencies]
 test = ["pytest", "pyyaml", "hypothesis", "behave"]
+docs = ["mkdocs-material", "mkdocs-static-i18n>=1.2"]
 
 [tool.ruff]
 line-length = 120
