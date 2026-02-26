@@ -919,11 +919,16 @@ insmod search_label
 insmod linux
 insmod gzio
 insmod all_video
+insmod keylayouts
+insmod at_keyboard
 
 set timeout=5
 set default=0
 
 search --no-floppy --label ANKLUME-LIVE --set=root
+
+terminal_input at_keyboard console
+keymap /boot/grub/fr.gkb
 
 menuentry "anklume Live OS (toram)" {
     linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
@@ -936,6 +941,21 @@ menuentry "anklume Live OS (direct)" {
 GRUBCFG
     fi
     info "  GRUB config created"
+
+    # Generate AZERTY keyboard layout for GRUB
+    if command -v grub-kbdcomp >/dev/null 2>&1 && command -v ckbcomp >/dev/null 2>&1; then
+        grub-kbdcomp -o "$staging/boot/grub/fr.gkb" fr 2>/dev/null || true
+        if [ -s "$staging/boot/grub/fr.gkb" ]; then
+            info "  GRUB AZERTY keyboard layout generated"
+        else
+            warn "grub-kbdcomp produced empty output — GRUB will use QWERTY"
+            # Remove keyboard lines from grub.cfg to avoid boot error
+            sed -i '/terminal_input\|keymap\|keylayouts\|at_keyboard/d' "$staging/boot/grub/grub.cfg"
+        fi
+    else
+        warn "grub-kbdcomp or ckbcomp not found — GRUB will use QWERTY"
+        sed -i '/terminal_input\|keymap\|keylayouts\|at_keyboard/d' "$staging/boot/grub/grub.cfg"
+    fi
 
     # Determine GRUB platform paths
     local grub_prefix="/usr/lib/grub"
@@ -953,13 +973,19 @@ GRUBCFG
     done
 
     if [ -n "$grub_efi_dir" ]; then
-        grub-mkstandalone \
-            --format=x86_64-efi \
-            --output="$staging/EFI/BOOT/BOOTX64.EFI" \
-            --locales="" \
-            --fonts="" \
-            --install-modules="normal search search_fs_uuid search_fs_file search_label iso9660 part_gpt part_msdos fat ext2 linux gzio" \
-            "boot/grub/grub.cfg=$staging/boot/grub/grub.cfg" \
+        local standalone_args=(
+            --format=x86_64-efi
+            --output="$staging/EFI/BOOT/BOOTX64.EFI"
+            --locales=""
+            --fonts=""
+            --install-modules="normal search search_fs_uuid search_fs_file search_label iso9660 part_gpt part_msdos fat ext2 linux gzio keylayouts at_keyboard"
+            "boot/grub/grub.cfg=$staging/boot/grub/grub.cfg"
+        )
+        # Embed keyboard layout if generated
+        if [ -s "$staging/boot/grub/fr.gkb" ]; then
+            standalone_args+=("boot/grub/fr.gkb=$staging/boot/grub/fr.gkb")
+        fi
+        grub-mkstandalone "${standalone_args[@]}" \
             2>/dev/null || warn "grub-mkstandalone failed, trying grub-mkimage"
         info "  GRUB EFI standalone created"
     fi
