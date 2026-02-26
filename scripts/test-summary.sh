@@ -71,7 +71,7 @@ run_layer() {
             fi
             ;;
         "behavioral chains")
-            local cp ct
+            local cp
             cp=$(echo "$output" | grep -oP '\d+/\d+ chains passed' | head -1 || echo "")
             if [[ -n "$cp" ]]; then
                 count="$cp"
@@ -80,7 +80,7 @@ run_layer() {
             ;;
         "matrix coverage")
             local pct
-            pct=$(echo "$output" | grep -oP '\d+%' | tail -1 || echo "?%")
+            pct=$(echo "$output" | grep -oP 'Coverage \K\d+%' || echo "?%")
             count="$pct"
             status="$pct"
             ;;
