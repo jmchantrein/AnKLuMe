@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- anklume labwc configuration -->
+<labwc_config>
+  <core>
+    <gap>4</gap>
+  </core>
+
+  <theme>
+    <name>Adwaita</name>
+    <titlebar>
+      <layout>icon:minimize,maximize,close</layout>
+    </titlebar>
+  </theme>
+
+  <keyboard>
+    <!-- Launch -->
+    <keybind key="W-Return"><action name="Execute"><command>foot</command></action></keybind>
+    <keybind key="W-d"><action name="Execute"><command>fuzzel</command></action></keybind>
+    <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="W-S-e"><action name="Exit"/></keybind>
+
+    <!-- Snap windows -->
+    <keybind key="W-Left"><action name="SnapToEdge"><direction>left</direction></action></keybind>
+    <keybind key="W-Right"><action name="SnapToEdge"><direction>right</direction></action></keybind>
+    <keybind key="W-Up"><action name="Maximize"/></keybind>
+    <keybind key="W-Down"><action name="UnMaximize"/></keybind>
+    <keybind key="W-f"><action name="ToggleFullscreen"/></keybind>
+
+    <!-- Workspaces -->
+    <keybind key="W-1"><action name="GoToDesktop"><to>1</to></action></keybind>
+    <keybind key="W-2"><action name="GoToDesktop"><to>2</to></action></keybind>
+    <keybind key="W-3"><action name="GoToDesktop"><to>3</to></action></keybind>
+    <keybind key="W-4"><action name="GoToDesktop"><to>4</to></action></keybind>
+    <keybind key="W-S-1"><action name="SendToDesktop"><to>1</to></action></keybind>
+    <keybind key="W-S-2"><action name="SendToDesktop"><to>2</to></action></keybind>
+    <keybind key="W-S-3"><action name="SendToDesktop"><to>3</to></action></keybind>
+    <keybind key="W-S-4"><action name="SendToDesktop"><to>4</to></action></keybind>
+  </keyboard>
+
+  <mouse>
+    <context name="TitleBar">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Left" action="Drag"><action name="Move"/></mousebind>
+      <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind>
+    </context>
+    <context name="Root">
+      <mousebind button="Right" action="Press"><action name="ShowMenu"><menu>root-menu</menu></action></mousebind>
+    </context>
+  </mouse>
+</labwc_config>

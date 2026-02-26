@@ -8,6 +8,7 @@
 #   --base DISTRO     Base distribution (default: debian)
 #   --arch ARCH       Architecture (default: amd64)
 #   --size SIZE_GB    Total image size in GB (default: 4, raw only)
+#   --desktop DE      Desktop environment: all, sway, labwc, kde, minimal (default: all)
 #   --mirror URL      APT mirror URL
 #   --no-verity       Skip dm-verity setup
 #   --help            Show this help
@@ -27,6 +28,7 @@ FORMAT="iso"
 BASE="debian"
 ARCH="amd64"
 IMAGE_SIZE_GB=4
+DESKTOP="all"
 MIRROR=""
 NO_VERITY=false
 WORK_DIR=""
@@ -75,12 +77,15 @@ usage() {
     echo "  --base DISTRO     Base distribution (default: debian, arch)"
     echo "  --arch ARCH       Architecture (default: amd64)"
     echo "  --size SIZE_GB    Total image size in GB (default: 4, raw format only)"
+    echo "  --desktop DE      Desktop environment (default: all)"
+    echo "                    all=sway+labwc+kde, sway, labwc, kde, minimal=console only"
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
     echo "  --help            Show this help"
     echo ""
     echo "Examples:"
     echo "  $(basename "$0") --output anklume.iso --base arch"
+    echo "  $(basename "$0") --output anklume.iso --desktop sway"
     echo "  $(basename "$0") --format raw --output anklume.img --size 6"
     exit 0
 }
@@ -214,6 +219,58 @@ format_partitions() {
     ok "Partitions formatted"
 }
 
+# ── Install desktop configs (shared between Debian and Arch) ──
+install_desktop_configs() {
+    local rootfs="$1"
+    local desktop_dir="$PROJECT_ROOT/host/boot/desktop"
+
+    # Auto-login on tty1 (all modes — console uses it too)
+    mkdir -p "$rootfs/etc/systemd/system/getty@tty1.service.d"
+    cat > "$rootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+AUTOLOGIN
+
+    # bash_profile (DE dispatcher)
+    cp "$desktop_dir/bash_profile" "$rootfs/root/.bash_profile"
+
+    # foot terminal config (shared)
+    mkdir -p "$rootfs/root/.config/foot"
+    cp "$desktop_dir/foot.ini" "$rootfs/root/.config/foot/foot.ini"
+
+    # Splash script and quotes
+    cp "$desktop_dir/anklume-splash.sh" "$rootfs/opt/anklume/host/boot/desktop/anklume-splash.sh" 2>/dev/null || true
+    cp "$desktop_dir/quotes.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.txt" 2>/dev/null || true
+
+    # Keybindings reference
+    cp "$desktop_dir/KEYBINDINGS.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.txt" 2>/dev/null || true
+
+    # sway config
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
+        mkdir -p "$rootfs/root/.config/sway"
+        cp "$desktop_dir/sway-config" "$rootfs/root/.config/sway/config"
+        # Create empty domains conf for include directive
+        touch "$rootfs/root/.config/sway/anklume-domains.conf"
+    fi
+
+    # labwc config
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
+        mkdir -p "$rootfs/root/.config/labwc"
+        cp "$desktop_dir/labwc-rc.xml" "$rootfs/root/.config/labwc/rc.xml"
+        cp "$desktop_dir/labwc-menu.xml" "$rootfs/root/.config/labwc/menu.xml"
+        cp "$desktop_dir/labwc-autostart" "$rootfs/root/.config/labwc/autostart"
+        chmod +x "$rootfs/root/.config/labwc/autostart"
+        cp "$desktop_dir/labwc-environment" "$rootfs/root/.config/labwc/environment"
+        # waybar config
+        mkdir -p "$rootfs/root/.config/waybar"
+        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/root/.config/waybar/config"
+        cp "$desktop_dir/waybar-style.css" "$rootfs/root/.config/waybar/style.css"
+    fi
+
+    info "  Desktop configs installed (DESKTOP=$DESKTOP)"
+}
+
 # ── Bootstrap rootfs (Debian) ──
 bootstrap_rootfs_debian() {
     info "Bootstrapping Debian rootfs..."
@@ -276,8 +333,17 @@ bootstrap_rootfs_debian() {
     packages="$packages iproute2 dmidecode lsof htop file"
     # Incus: Debian Trixie ships incus in official repos
     packages="$packages incus"
-    # Wayland desktop (sway compositor + foot terminal)
-    packages="$packages sway foot"
+    # Wayland desktop — conditional on $DESKTOP
+    packages="$packages foot wl-clipboard xwayland"
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
+        packages="$packages sway fuzzel i3status"
+    fi
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
+        packages="$packages labwc waybar fuzzel"
+    fi
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        packages="$packages plasma-desktop kwin-wayland dolphin"
+    fi
     # Dev/lint/test tools
     packages="$packages ansible-lint yamllint shellcheck"
     packages="$packages python3-pytest python3-hypothesis python3-pexpect"
@@ -285,7 +351,7 @@ bootstrap_rootfs_debian() {
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
         apt-get install -y -qq $packages 2>&1 | tail -5
-    info "  System packages installed (apt: incus, ansible, sway, lint/test tools)"
+    info "  System packages installed (apt: incus, ansible, desktop=$DESKTOP, lint/test tools)"
 
     # Install Python packages not available in Debian system repos
     # --ignore-installed avoids conflict with Debian's system click package
@@ -493,27 +559,9 @@ KBD
     ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" 2>/dev/null || true
     info "  anklume services enabled"
 
-    # Wayland desktop: auto-login on tty1 + sway autostart
-    mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d"
-    cat > "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
-AUTOLOGIN
-    # Start sway when anklume.desktop=1 is on kernel cmdline
-    cat > "$ROOTFS_DIR/root/.bash_profile" << 'SWAY_AUTOSTART'
-# anklume: auto-start sway in desktop mode
-if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ] \
-   && grep -q 'anklume.desktop=1' /proc/cmdline; then
-    export XDG_SESSION_TYPE=wayland
-    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
-    if lsmod | grep -q '^nvidia '; then
-        export WLR_RENDERER=vulkan
-    fi
-    exec sway 2>/dev/null
-fi
-SWAY_AUTOSTART
-    info "  Wayland desktop (sway) autostart configured"
+    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
+    install_desktop_configs "$ROOTFS_DIR"
 
     # Regenerate initramfs for ALL installed kernels with our hooks and modules
     # Must run after NVIDIA/backports install to include all kernels
@@ -701,6 +749,17 @@ PACCONF
     # Include all anklume runtime deps: Incus, Ansible, Python, Git, etc.
     # NOTE: CachyOS pacstrap can't resolve some vanilla Arch packages (nvidia,
     # python-uvicorn, etc.) — those are installed via chroot pacman below.
+    # Build conditional package list for desktop
+    local desktop_pkgs="foot wl-clipboard xorg-xwayland"
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
+        desktop_pkgs="$desktop_pkgs sway fuzzel i3status"
+    fi
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
+        desktop_pkgs="$desktop_pkgs labwc waybar fuzzel"
+    fi
+    # KDE is installed via chroot pacman below (large dep tree)
+
+    # shellcheck disable=SC2086
     pacstrap -C "$WORK_DIR/pacman-vanilla.conf" -K "$ROOTFS_DIR" \
         base linux linux-firmware linux-headers mkinitcpio \
         openssh curl jq python python-pip python-yaml file \
@@ -708,9 +767,9 @@ PACCONF
         incus ansible git make ca-certificates \
         sudo nano iproute2 systemd-resolvconf \
         dmidecode lsof htop tmux rsync \
-        sway foot
+        $desktop_pkgs
 
-    info "  Pacstrap complete (base packages)"
+    info "  Pacstrap complete (base packages, desktop=$DESKTOP)"
 
     # Re-write mirrorlist (pacstrap's pacman-mirrorlist package overwrites ours)
     cat > "$ROOTFS_DIR/etc/pacman.d/mirrorlist" << 'MIRRORS'
@@ -747,12 +806,14 @@ PACCONF
 
     # Install packages that CachyOS pacstrap can't resolve from vanilla repos
     # Using chroot pacman (vanilla Arch inside rootfs) to install them
+    local extra_pkgs="nvidia-open-dkms nvidia-utils python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff"
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        extra_pkgs="$extra_pkgs plasma-desktop dolphin"
+    fi
+    # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" pacman -Sy --noconfirm \
-        nvidia-open-dkms nvidia-utils \
-        python-typer python-rich python-fastapi \
-        python-pytest python-hypothesis python-pexpect \
-        ansible-lint yamllint shellcheck ruff 2>&1 | tail -10
-    info "  Extra packages installed via chroot pacman (nvidia-dkms, dev tools)"
+        $extra_pkgs 2>&1 | tail -10
+    info "  Extra packages installed via chroot pacman (nvidia-dkms, dev tools, desktop=$DESKTOP)"
 
     # Install Python packages not in Arch repos
     chroot "$ROOTFS_DIR" pip install --break-system-packages \
@@ -876,27 +937,9 @@ AGENT
     chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
     info "  anklume services enabled"
 
-    # Wayland desktop: auto-login on tty1 + sway autostart
-    mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d"
-    cat > "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
-AUTOLOGIN
-    # Start sway when anklume.desktop=1 is on kernel cmdline
-    cat > "$ROOTFS_DIR/root/.bash_profile" << 'SWAY_AUTOSTART'
-# anklume: auto-start sway in desktop mode
-if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ] \
-   && grep -q 'anklume.desktop=1' /proc/cmdline; then
-    export XDG_SESSION_TYPE=wayland
-    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
-    if lsmod | grep -q '^nvidia '; then
-        export WLR_RENDERER=vulkan
-    fi
-    exec sway 2>/dev/null
-fi
-SWAY_AUTOSTART
-    info "  Wayland desktop (sway) autostart configured"
+    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
+    install_desktop_configs "$ROOTFS_DIR"
 
     # Detect installed kernel version in the rootfs
     local kver
@@ -1246,12 +1289,12 @@ search --no-floppy --label ANKLUME-LIVE --set=root
 terminal_input at_keyboard console
 keymap /boot/grub/fr.gkb
 
-menuentry "anklume Live OS (Desktop + GPU)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+menuentry "anklume Live OS (sway Desktop + GPU)" {
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
-menuentry "anklume Live OS (Desktop)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+menuentry "anklume Live OS (sway Desktop)" {
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
 menuentry "anklume Live OS (Console + GPU)" {
@@ -1262,13 +1305,31 @@ menuentry "anklume Live OS (Console)" {
     linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
-submenu "Advanced (direct boot from media)" {
-    menuentry "anklume Live OS (Desktop + GPU)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+submenu "More Desktops (labwc, KDE Plasma)" {
+    menuentry "anklume Live OS (labwc Desktop + GPU)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
-    menuentry "anklume Live OS (Desktop)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+    menuentry "anklume Live OS (labwc Desktop)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (KDE Plasma + GPU)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (KDE Plasma)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+}
+submenu "Advanced (direct boot from media)" {
+    menuentry "anklume Live OS (sway Desktop + GPU)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (sway Desktop)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=sway anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
     menuentry "anklume Live OS (Console + GPU)" {
@@ -1435,6 +1496,7 @@ print_summary() {
     echo "Format:          $FORMAT"
     echo "Image size:      ${img_size_mb}MB ($img_size bytes)"
     echo "Base distro:     $BASE"
+    echo "Desktop:         $DESKTOP"
     echo "Verity hash:     $VERITY_HASH"
     echo "Checksum:        ${OUTPUT}.sha256"
     echo ""
@@ -1468,6 +1530,7 @@ main() {
             --base)       BASE="$2"; shift 2 ;;
             --arch)       ARCH="$2"; shift 2 ;;
             --size)       IMAGE_SIZE_GB="$2"; shift 2 ;;
+            --desktop)    DESKTOP="$2"; shift 2 ;;
             --mirror)     MIRROR="$2"; shift 2 ;;
             --no-verity)  NO_VERITY=true; shift ;;
             --help|-h)    usage ;;
@@ -1481,6 +1544,12 @@ main() {
         *) err "Invalid format: $FORMAT (must be iso or raw)"; exit 1 ;;
     esac
 
+    # Validate desktop
+    case "$DESKTOP" in
+        all|sway|labwc|kde|minimal) ;;
+        *) err "Invalid desktop: $DESKTOP (must be all, sway, labwc, kde, or minimal)"; exit 1 ;;
+    esac
+
     # Set default output name based on format
     if [ -z "$OUTPUT" ]; then
         OUTPUT="anklume-live.$FORMAT"
@@ -1490,7 +1559,7 @@ main() {
     fi
 
     echo "=== anklume Live OS Image Builder ==="
-    info "Format: $FORMAT"
+    info "Format: $FORMAT, Desktop: $DESKTOP"
 
     # Create work directory
     WORK_DIR=$(mktemp -d)

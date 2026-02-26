@@ -1,0 +1,49 @@
+anklume Desktop — Keyboard Shortcuts
+=====================================
+
+Common across all desktop environments (sway, labwc):
+
+  Super + Enter       Open terminal (foot)
+  Super + d           Application launcher (fuzzel)
+  Super + Shift + q   Close window (sway) / Alt+F4 (labwc)
+  Super + f           Toggle fullscreen
+  Super + 1-9         Switch workspace
+  Super + Shift + 1-9 Move window to workspace
+
+sway-specific:
+
+  Super + Arrow keys        Navigate between windows
+  Super + Shift + Arrows    Move window
+  Super + h                 Split horizontally
+  Super + v                 Split vertically
+  Super + s                 Stacking layout
+  Super + w                 Tabbed layout
+  Super + e                 Toggle split layout
+  Super + Shift + Space     Toggle floating
+  Super + Space             Toggle focus (tiled/floating)
+  Super + r                 Enter resize mode (arrows to resize, Esc to exit)
+  Super + Shift + e         Exit sway
+
+labwc-specific:
+
+  Super + Left/Right        Snap window to half-screen
+  Super + Up                Maximize
+  Super + Down              Unmaximize
+  Alt + F4                  Close window
+  Super + Shift + e         Exit labwc
+  Right-click desktop       Application menu
+
+KDE Plasma:
+
+  Uses standard KDE/Plasma keybindings.
+  System Settings > Shortcuts for customization.
+
+Keyboard layout:
+
+  Alt + Shift              Toggle French (AZERTY) / US (QWERTY)
+
+Quick commands:
+
+  anklume guide            Launch setup wizard
+  anklume console          Open tmux domain console
+  anklume --help           Show all commands

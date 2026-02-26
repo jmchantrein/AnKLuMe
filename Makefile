@@ -139,8 +139,8 @@ export-remove: ## Remove exported app (I=<instance> APP=<app>)
 	scripts/export-app.sh remove $(I) $(APP)
 
 # ── Live OS (Phase 31) ───────────────────────────────────
-build-image: ## Build bootable anklume live OS image (OUT=output.img)
-	scripts/build-image.sh $(if $(OUT),--output $(OUT)) $(if $(BASE),--base $(BASE)) $(if $(ARCH),--arch $(ARCH))
+build-image: ## Build bootable anklume live OS image (OUT=output.img DESKTOP=all|sway|labwc|kde|minimal)
+	scripts/build-image.sh $(if $(OUT),--output $(OUT)) $(if $(BASE),--base $(BASE)) $(if $(ARCH),--arch $(ARCH)) $(if $(DESKTOP),--desktop $(DESKTOP))
 
 live-update: ## Download and apply A/B update (URL=<image-url>)
 	@test -n "$(URL)" || { echo "ERROR: URL required. Usage: make live-update URL=<image-url>"; exit 1; }
@@ -148,6 +148,9 @@ live-update: ## Download and apply A/B update (URL=<image-url>)
 
 live-status: ## Show live OS status (active slot, boot count, data pool)
 	@scripts/live-os-lib.sh status
+
+welcome: ## Launch welcome guide (--tui default, WEB=1 for browser)
+	python3 scripts/welcome.py $(if $(WEB),--web --port $(or $(PORT),8080))
 
 live-os-test-vm: ## Boot live OS image in Incus VM for testing (IMAGE=file)
 	scripts/live-os-test-vm.sh $(if $(IMAGE),--image $(IMAGE)) $(if $(BASE),--base $(BASE)) --keep
@@ -764,7 +767,7 @@ help-all: ## Show all available targets
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
-        build-image live-update live-status live-os-test-vm live-os-test-vm-clean \
+        build-image welcome live-update live-status live-os-test-vm live-os-test-vm-clean \
         flush upgrade install-update-notifier import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \

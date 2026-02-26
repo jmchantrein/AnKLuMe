@@ -96,7 +96,57 @@ anklume live build OUT=anklume-live.img
 anklume live build OUT=custom.img BASE=ubuntu ARCH=arm64
 
 # Output: /path/to/custom.img (ready to write to USB)
+
+# Selectionner l'environnement de bureau
+anklume live build OUT=anklume-sway.iso DESKTOP=sway
+anklume live build OUT=anklume-kde.iso DESKTOP=kde
 ```
+
+### Environnements de bureau
+
+Le live OS propose trois environnements de bureau, selectionnables au menu GRUB :
+
+| Bureau | Description | Impact sur la taille |
+|--------|-------------|----------------------|
+| **sway** (defaut) | Compositeur Wayland tiling, leger | +20 Mo |
+| **labwc** | Compositeur Wayland stacking (style Openbox) | +150 Mo |
+| **KDE Plasma** | Environnement de bureau complet | +500-700 Mo |
+| **minimal** | Console uniquement (terminal foot, pas de compositeur) | 0 |
+
+L'option `--desktop` controle les bureaux inclus dans l'image :
+
+```bash
+# Tous les bureaux (defaut)
+sudo scripts/build-image.sh --desktop all
+
+# Un seul bureau pour une image plus legere
+sudo scripts/build-image.sh --desktop sway
+
+# Console uniquement (image la plus legere)
+sudo scripts/build-image.sh --desktop minimal
+```
+
+**Raccourcis clavier** communs a sway et labwc :
+- `Super+Entree` ouvre un terminal (foot)
+- `Super+d` ouvre le lanceur d'applications (fuzzel)
+- `Alt+Maj` bascule la disposition clavier (AZERTY/QWERTY)
+- Reference complete : `cat /opt/anklume/host/boot/desktop/KEYBINDINGS.txt`
+
+### Guide de bienvenue
+
+Au premier demarrage du bureau, un guide de bienvenue se lance automatiquement :
+
+```bash
+# Accessible a tout moment via :
+anklume guide                  # Mode TUI (terminal)
+anklume welcome WEB=1          # Mode web (navigateur)
+```
+
+Le guide propose :
+1. **Configurer la persistance** — disque de donnees chiffre (LUKS + ZFS/BTRFS)
+2. **Monter un disque existant** — detecter et monter un disque deja configure
+3. **Visite guidee** — introduction pas a pas aux commandes anklume
+4. **Raccourcis clavier** — reference des raccourcis du bureau
 
 ### Flasher sur USB
 

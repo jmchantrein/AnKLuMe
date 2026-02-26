@@ -1,0 +1,25 @@
+// anklume waybar configuration (labwc panel)
+{
+    "layer": "top",
+    "position": "top",
+    "height": 28,
+    "modules-left": ["wlr/taskbar"],
+    "modules-center": [],
+    "modules-right": ["cpu", "memory", "clock"],
+    "wlr/taskbar": {
+        "format": "{icon} {title:.20}",
+        "on-click": "activate"
+    },
+    "cpu": {
+        "format": "CPU {usage}%",
+        "interval": 5
+    },
+    "memory": {
+        "format": "MEM {percentage}%",
+        "interval": 5
+    },
+    "clock": {
+        "format": "{:%H:%M  %Y-%m-%d}",
+        "interval": 60
+    }
+}
