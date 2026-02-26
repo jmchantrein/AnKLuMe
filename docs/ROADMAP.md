@@ -451,29 +451,20 @@ philosophy. Open WebUI already supports custom STT endpoints natively.
 
 **Architecture**:
 
-```
-┌─────────────────────────────────────────────────┐
-│ homelab domain (net-homelab, 10.100.3.0/24)     │
-│                                                   │
-│  ┌──────────────┐    ┌──────────────────────┐   │
-│  │ homelab-stt   │    │ gpu-server          │   │
-│  │ GPU (shared)  │    │ GPU (shared)         │   │
-│  │               │    │                      │   │
-│  │ faster-whisper│    │ Ollama               │   │
-│  │ + Speaches    │    │ :11434               │   │
-│  │ :8000         │    │                      │   │
-│  └──────┬───────┘    └──────────────────────┘   │
-│         │                      ▲                  │
-│         │    /v1/audio/        │  /api/generate   │
-│         │    transcriptions    │                  │
-│         ▼                      │                  │
-│  ┌──────────────────────────────┐                │
-│  │ homelab-webui                │                │
-│  │ Open WebUI :3000             │                │
-│  │ STT → homelab-stt:8000      │                │
-│  │ LLM → gpu-server:11434     │                │
-│  └──────────────────────────────┘                │
-└─────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph homelab["homelab domain (net-homelab, 10.100.3.0/24)"]
+        stt["<b>homelab-stt</b><br/>GPU (shared)<br/>faster-whisper + Speaches<br/>:8000"]
+        gpu["<b>gpu-server</b><br/>GPU (shared)<br/>Ollama<br/>:11434"]
+        webui["<b>homelab-webui</b><br/>Open WebUI :3000"]
+
+        stt -->|"/v1/audio/transcriptions"| webui
+        webui -->|"/api/generate"| gpu
+    end
+
+    style stt fill:#fff3e0,stroke:#e65100
+    style gpu fill:#e8f5e9,stroke:#2e7d32
+    style webui fill:#e3f2fd,stroke:#1565c0
 ```
 
 **Engine choice**: **faster-whisper** with **Whisper Large V3 Turbo**
@@ -978,16 +969,24 @@ local telemetry, and static code analysis tooling.
 QubesOS-style visual domain isolation in the terminal.
 
 **Architecture**:
-```
-┌─────────────────────────────────────────────────────┐
-│ tmux session "anklume"                               │
-│ ┌─────────────┐ ┌──────────┐ ┌──────────────────┐  │
-│ │ pane bg:blue │ │ bg:green │ │ bg:yellow        │  │
-│ │ anklume-instance   │ │ pro-dev  │ │ perso-desktop    │  │
-│ │ incus exec...│ │          │ │                  │  │
-│ └─────────────┘ └──────────┘ └──────────────────┘  │
-│ [0:anklume]  [1:pro]  [2:perso]  [3:ai-tools]       │
-└─────────────────────────────────────────────────────┘
+```mermaid
+block-beta
+    columns 4
+    block:tmux:4
+        columns 4
+        A["anklume-instance<br/>incus exec..."]:1
+        B["pro-dev"]:1
+        C["perso-desktop"]:2
+    end
+    D["[0:anklume]"]:1
+    E["[1:pro]"]:1
+    F["[2:perso]"]:1
+    G["[3:ai-tools]"]:1
+
+    style A fill:#1565c0,color:#fff
+    style B fill:#2e7d32,color:#fff
+    style C fill:#f9a825,color:#000
+    style tmux fill:#263238,color:#fff,stroke:#455a64
 ```
 
 **Deliverables**:

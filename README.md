@@ -105,23 +105,24 @@ See the [quick start guide](docs/quickstart.md) for details.
 
 ## Architecture
 
-```
-+---------------------------------------------------------------+
-| Host (any Linux distro)                                       |
-|  Incus daemon + nftables + (optional) NVIDIA GPU              |
-|                                                               |
-|  +-----------+ +-----------+ +-----------+                    |
-|  | net-aaa   | | net-bbb   | | net-ccc   |  ...              |
-|  | subnet A  | | subnet B  | | subnet C  |                   |
-|  +-----+-----+ +-----+-----+ +-----+-----+                  |
-|        |              |              |                         |
-|  +-----+-----+ +-----+-----+ +-----+-----+                  |
-|  | LXC / VM  | | LXC / VM  | | LXC / VM  |                  |
-|  +-----------+ +-----------+ +-----------+                    |
-|                                                               |
-|  nftables isolation: subnet A != B != C (no forwarding)       |
-|  Selective cross-domain access via network_policies            |
-+---------------------------------------------------------------+
+```mermaid
+graph TD
+    subgraph Host["Host (any Linux distro)<br/>Incus daemon + nftables + optional NVIDIA GPU"]
+        subgraph netA["net-aaa<br/>subnet A"]
+            vmA["LXC / VM"]
+        end
+        subgraph netB["net-bbb<br/>subnet B"]
+            vmB["LXC / VM"]
+        end
+        subgraph netC["net-ccc<br/>subnet C"]
+            vmC["LXC / VM"]
+        end
+    end
+
+    netA x--x|"nftables isolation"| netB
+    netB x--x|"no forwarding"| netC
+
+    style Host fill:#f9f9f9,stroke:#333
 ```
 
 Each **domain** is an isolated subnet with its own Incus project. Containers

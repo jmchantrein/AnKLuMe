@@ -6,27 +6,45 @@ maximum parallelism. Claude works overnight, user reviews
 
 ## Dependency graph
 
-```
-VAGUE 1 (COMPLETE):
-  Phase 20g  ──┐
-  Phase 32  ───┤─── all independent, 4 parallel agents
-  Phase 35  ───┤
-  Phase 36  ──┘
+```mermaid
+graph TD
+    subgraph V1["VAGUE 1 (COMPLETE) — 4 parallel agents"]
+        P20g["Phase 20g"]
+        P32["Phase 32"]
+        P35["Phase 35"]
+        P36["Phase 36"]
+    end
 
-VAGUE 2 (COMPLETE):
-  Phase 37  ←── blocked by 36
-  Phase 30  ←── no blocker (code framework only)
+    subgraph V2["VAGUE 2 (COMPLETE)"]
+        P37["Phase 37"]
+        P30["Phase 30"]
+    end
 
-VAGUE 3 (COMPLETE):
-  Phase 38  ←── blocked by 37
-  Phase 39  ←── blocked by 37
-  Phase 33  ←── blocked by 30 + 32
+    subgraph V3["VAGUE 3 (COMPLETE)"]
+        P38["Phase 38"]
+        P39["Phase 39"]
+        P33["Phase 33"]
+    end
 
-VAGUE 4 (RUNNING):
-  Phase 40  ←── blocked by 38 + 39
+    subgraph V4["VAGUE 4 (RUNNING)"]
+        P40["Phase 40"]
+    end
 
-INDEPENDENT (requires specific environment):
-  Phase 31  ←── VM testing via Incus/KVM (in progress)
+    P31["Phase 31<br/><i>VM testing via Incus/KVM</i>"]
+
+    P36 --> P37
+    P37 --> P38
+    P37 --> P39
+    P30 --> P33
+    P32 --> P33
+    P38 --> P40
+    P39 --> P40
+
+    style V1 fill:#c8e6c9,stroke:#2e7d32
+    style V2 fill:#c8e6c9,stroke:#2e7d32
+    style V3 fill:#c8e6c9,stroke:#2e7d32
+    style V4 fill:#fff3e0,stroke:#e65100
+    style P31 fill:#e3f2fd,stroke:#1565c0
 ```
 
 ## Vague 1 — COMPLETE

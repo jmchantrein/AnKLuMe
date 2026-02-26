@@ -80,28 +80,14 @@ restore, delete.
 
 ## 3. Source of truth model (PSOT)
 
-```
-┌─────────────────────┐     anklume sync     ┌─────────────────────────┐
-│     infra.yml       │ ────────────────▶ │  Ansible files          │
-│  (Primary Source     │                   │  (Secondary Source       │
-│   of Truth)         │                   │   of Truth)             │
-│                     │                   │                         │
-│  High-level infra   │                   │  inventory/<domain>.yml │
-│  description:       │                   │  group_vars/<domain>.yml│
-│  domains, machines, │                   │  host_vars/<host>.yml   │
-│  networks, profiles │                   │                         │
-│                     │                   │  Users may freely edit  │
-│                     │                   │  outside managed sections│
-└─────────────────────┘                   └────────────┬────────────┘
-                                                       │
-                                                  anklume domain apply
-                                                       │
-                                                       ▼
-                                          ┌─────────────────────────┐
-                                          │    Incus state          │
-                                          │  (bridges, projects,    │
-                                          │   profiles, instances)  │
-                                          └─────────────────────────┘
+```mermaid
+flowchart TD
+    A["<b>infra.yml</b><br/><i>(Primary Source of Truth)</i><br/><br/>High-level infra description:<br/>domains, machines,<br/>networks, profiles"]
+    B["<b>Ansible files</b><br/><i>(Secondary Source of Truth)</i><br/><br/>inventory/&lt;domain&gt;.yml<br/>group_vars/&lt;domain&gt;.yml<br/>host_vars/&lt;host&gt;.yml<br/><br/>Users may freely edit<br/>outside managed sections"]
+    C["<b>Incus state</b><br/><br/>bridges, projects,<br/>profiles, instances"]
+
+    A -->|"anklume sync"| B
+    B -->|"anklume domain apply"| C
 ```
 
 **Rules**:
@@ -114,22 +100,22 @@ restore, delete.
 
 ## 4. Host architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Host (any Linux distro)                                 │
-│  • Incus daemon + nftables + (optional) NVIDIA GPU      │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                │
-│  │ net-aaa  │ │ net-bbb  │ │ net-ccc  │  ...           │
-│  │ .X.0/24  │ │ .Y.0/24  │ │ .Z.0/24  │                │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘                │
-│       │             │             │                      │
-│  ┌────┴────┐  ┌─────┴────┐ ┌────┴──────┐               │
-│  │ LXC/VM  │  │ LXC/VM   │ │ LXC/VM   │               │
-│  └─────────┘  └──────────┘ └──────────┘                │
-│                                                         │
-│  nftables isolation: net-X ≠ net-Y (no forwarding)     │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Host["Host (any Linux distro)<br/>Incus daemon + nftables + optional NVIDIA GPU"]
+        subgraph netA["net-aaa<br/>.X.0/24"]
+            vmA["LXC/VM"]
+        end
+        subgraph netB["net-bbb<br/>.Y.0/24"]
+            vmB["LXC/VM"]
+        end
+        subgraph netC["net-ccc<br/>.Z.0/24"]
+            vmC["LXC/VM"]
+        end
+    end
+
+    netA x--x|"nftables isolation"| netB
+    netB x--x|"no forwarding"| netC
 ```
 
 The anklume container (`anklume-instance`):
