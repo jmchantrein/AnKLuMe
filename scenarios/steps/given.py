@@ -13,6 +13,13 @@ from scenarios.support import PROTECTED_DIRS, _clean_incus_state
 logger = logging.getLogger("anklume.scenarios")
 
 
+@given('"{tool}" is available')
+def tool_is_available(context, tool):
+    """Skip the scenario if an external tool is not installed."""
+    if not shutil.which(tool):
+        context.scenario.skip(f"'{tool}' not found in PATH")
+
+
 @given("a clean sandbox environment")
 def clean_sandbox(context):
     """Verify we're in a working anklume directory."""
