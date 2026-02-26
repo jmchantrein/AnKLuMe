@@ -136,6 +136,10 @@ pattern, add a rule here.
   `addressing:` is the current standard).
 - **French translations** — every English doc update must note the FR
   file as out-of-sync if not updated simultaneously.
+- **Mermaid for diagrams, not ASCII art** — all architecture diagrams,
+  flow charts, network topologies, and dependency graphs must use Mermaid
+  (```` ```mermaid ````). Directory tree structures (`├── └──`) are the
+  sole exception (ADR-046).
 
 ## LLM operating mode
 

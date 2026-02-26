@@ -792,3 +792,42 @@ like `node_modules/` or Python venvs.
 **Consequence**: Lower maintenance burden. When upstream improves a
 role, `anklume setup init` picks up the changes. Framework roles focus on
 Incus-specific glue only.
+
+---
+
+## ADR-046: Mermaid diagrams for all documentation visuals
+
+**Context**: Documentation contained ASCII art diagrams using
+box-drawing characters (`┌ ─ ┐ │ └ ┘`) and plus/dash patterns
+(`+ - |`). These render poorly across different fonts, break on
+copy-paste, are hard to maintain, and cannot be styled or themed.
+GitHub, MkDocs, and most modern Markdown renderers natively support
+Mermaid fenced code blocks.
+
+**Decision**: All architectural diagrams, flow charts, network
+topologies, and dependency graphs in documentation MUST use Mermaid
+syntax (```` ```mermaid ````). ASCII art is forbidden for diagrams.
+
+**Exceptions**:
+- **Directory tree structures** (`├── │ └──`) remain in plain text.
+  These are a universally recognized convention, render identically
+  everywhere, and have no Mermaid equivalent that improves readability.
+- **Inline ASCII notation** in tables or running text (e.g., arrows
+  `->` in protocol descriptions) is not affected.
+
+**Guidelines for Mermaid diagrams**:
+- Use `graph TD` (top-down) or `graph LR` (left-right) for
+  architecture and network topology.
+- Use `flowchart TD` for process flows (PSOT model, pipelines).
+- Use `subgraph` to represent containment (host, domains, VMs).
+- Use `x--x` for blocked/isolated connections, `-->` for allowed
+  flows, `==>` for emphasized paths.
+- Use `style` directives for semantic coloring (trust levels,
+  status indicators) when it aids comprehension.
+- Keep diagrams self-contained — no external CSS or theme
+  dependencies.
+
+**Consequence**: Diagrams render as interactive SVGs on GitHub and
+MkDocs. They are version-control friendly (text diffs), searchable,
+and consistent across platforms. Contributors edit diagram logic,
+not character alignment.
