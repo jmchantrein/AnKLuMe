@@ -3235,6 +3235,121 @@ d) **ADR-046**: Document CLI design decision (Typer over Go/Rust,
 
 ---
 
+## Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+
+**Goal**: Replace raw GitHub Markdown browsing with a modern,
+searchable, bilingual documentation site auto-deployed to GitHub
+Pages. Replace ASCII-art diagrams with Mermaid diagrams rendered
+both on GitHub (native) and in the built site.
+
+**Prerequisites**: Phase 7 (Documentation), Phase 33 (i18n).
+
+**Rationale**: The project has 77+ Markdown files across `docs/`,
+`examples/`, and `labs/`. Navigating them on GitHub is painful:
+no search, no sidebar, no cross-references, no proper diagrams.
+A documentation site improves accessibility for all audiences
+(sysadmins, students, teachers) without changing the source
+format — files remain plain Markdown, readable by LLMs and
+editable by contributors.
+
+**Why MkDocs Material**:
+- Python-native (pip install, YAML config) — same ecosystem as
+  Ansible and generate.py
+- Standard de facto for IaC projects (Ansible, Terraform providers,
+  CNCF projects)
+- Zero migration: existing `.md` files work as-is
+- Native Mermaid support via `pymdownx.superfences` (zero-config)
+- Excellent client-side search (lunr.js with French stemming)
+- Bilingual support via `mkdocs-static-i18n` plugin (file suffix
+  convention `.fr.md` matches existing `_FR.md` pattern after rename)
+- Versioning via `mike` if needed later
+- `mkdocstrings` plugin for auto-documenting `generate.py`
+
+**Why Mermaid** for diagrams:
+- Rendered natively by GitHub in `.md` files (dual rendering:
+  GitHub + site)
+- Text-based source (LLM-readable and LLM-writable)
+- Flowcharts, sequence diagrams, state diagrams, architecture
+  diagrams — all relevant for anklume
+- Integrated in MkDocs Material without plugins
+
+**Design decisions**:
+- Source files remain the single source of truth (PSOT principle)
+- `mkdocs.yml` at project root — minimal config, no duplication
+- French translations: rename `*_FR.md` → `*.fr.md` (required by
+  `mkdocs-static-i18n` suffix convention)
+- Diagrams are embedded in Markdown as fenced code blocks
+  (```` ```mermaid ````) — visible on GitHub AND in built site
+- Optional: `scripts/infra_diagram.py` generates architecture
+  diagram from `infra.yml` (PSOT-derived, not hand-maintained)
+- Build output (`site/`) is gitignored — CI builds and deploys
+- `llms.txt` endpoint for AI agent discoverability
+
+**Deliverables**:
+
+a) **MkDocs configuration** (`mkdocs.yml`):
+   - Material theme with custom palette (matches anklume identity)
+   - Navigation structure mirroring `docs/` layout
+   - Mermaid diagrams via `pymdownx.superfences`
+   - `mkdocs-static-i18n` for EN/FR bilingual support
+   - Search with French stemming enabled
+   - Code highlighting for YAML, Python, Bash, Jinja2
+   - Admonitions for warnings, tips, notes
+
+b) **French filename migration** (`*_FR.md` → `*.fr.md`):
+   - Rename all 37+ French translation files
+   - Update any internal cross-references
+   - Git `mv` to preserve history
+
+c) **Mermaid diagram conversion** (replace ASCII art):
+   - PSOT flow diagram (infra.yml → Ansible → Incus)
+   - Host architecture (bridges, instances, nftables)
+   - Network isolation (inter-bridge drop, policies)
+   - Bootstrap sequence (host → anklume-instance → domains)
+   - Reconciliation pattern (read → compare → create/update)
+   - AI switch sequence (VRAM flush + nftables swap)
+   - Nesting levels (physical → VM → LXC hierarchy)
+   - Trust zone addressing (10.1xx octets visualization)
+
+d) **CI/CD deployment** (`.github/workflows/docs.yml`):
+   - Trigger on push to `main` (paths: `docs/`, `mkdocs.yml`,
+     `README.md`, `examples/`, `labs/`)
+   - Build with `mkdocs build`
+   - Deploy to GitHub Pages via `actions/deploy-pages`
+   - Build validation on PRs (build but don't deploy)
+
+e) **Optional: auto-generated infrastructure diagram**:
+   - `scripts/infra_diagram.py` reads `infra.yml` and generates
+     a Mermaid or SVG architecture diagram
+   - Integrated in CI (regenerated on each push)
+   - Embedded in the documentation site
+
+f) **Dependencies** (added to `pyproject.toml`):
+   - `mkdocs-material` in `[project.optional-dependencies.docs]`
+   - `mkdocs-static-i18n`
+   - Optional: `mkdocstrings[python]` for API docs
+
+g) **Makefile / CLI integration**:
+   - `make docs` / `anklume docs build` — build site locally
+   - `make docs-serve` / `anklume docs serve` — local preview
+   - `make docs-deploy` / `anklume docs deploy` — manual deploy
+
+**Validation criteria**:
+- [ ] `mkdocs build --strict` passes with zero warnings
+- [ ] Site deployed to GitHub Pages and accessible
+- [ ] All 77+ docs visible in navigation sidebar
+- [ ] French toggle switches all pages to French translations
+- [ ] Search finds content in both EN and FR
+- [ ] Mermaid diagrams render correctly on GitHub AND in built site
+- [ ] ASCII art diagrams replaced in SPEC.md and ARCHITECTURE.md
+- [ ] CI auto-deploys on push to main
+- [ ] PR builds validate docs without deploying
+- [ ] Source `.md` files remain LLM-readable (no compiled-only content)
+- [ ] `site/` in `.gitignore`
+- [ ] `make lint` still passes (yamllint on mkdocs.yml)
+
+---
+
 ## Deferred Enhancements (from prior sessions)
 
 Items discussed and deferred during development sessions. Each is
@@ -3460,6 +3575,10 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 43: Docker-Style CLI (Typer)
 - Phase 44: Test Infrastructure Consolidation and Hardening (in progress)
 
+**In progress**:
+- Phase 44: Test Infrastructure Consolidation and Hardening
+- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
 - Phase 30: Educational Platform and Guided Labs
@@ -3476,7 +3595,7 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 
-**Phase 44 in progress.** All other phases implemented. Remaining unchecked criteria are deployment-dependent
+**Phases 44-45 in progress.** All prior phases implemented. Remaining unchecked criteria are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.
