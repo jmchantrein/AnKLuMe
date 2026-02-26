@@ -210,6 +210,14 @@ apply: ## Apply full infrastructure + provisioning
 		echo "ERROR: No inventory files found. Run 'make sync' first to generate them from infra.yml." >&2; \
 		exit 1; \
 	fi
+	@if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+		dirty=$$(git diff --name-only -- inventory/ group_vars/ host_vars/ 2>/dev/null); \
+		if [ -n "$$dirty" ]; then \
+			echo "WARNING: Uncommitted changes in generated files:" >&2; \
+			echo "$$dirty" | sed 's/^/  /' >&2; \
+			echo "  (These changes may be overwritten or cause drift)" >&2; \
+		fi; \
+	fi
 	$(call safe_apply_wrap,apply,ansible-playbook site.yml)
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
@@ -771,6 +779,7 @@ help-all: ## Show all available targets
         scenario-test scenario-test-best scenario-test-bad scenario-list \
         chain-test chain-test-one chain-test-dry chain-test-json \
         test-summary test-summary-quick \
+        docs docs-serve \
         clipboard-to clipboard-from domain-exec desktop-config desktop-apply desktop-reset desktop-plugins dashboard \
         export-app export-list export-remove \
         llm-switch llm-status llm-bench llm-dev ollama-dev \

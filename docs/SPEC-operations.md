@@ -621,3 +621,61 @@ make smoke    # Requires running Incus daemon
 **Purpose**: Quick validation that the entire toolchain works end-to-end
 on the host. Catches integration issues that unit tests cannot detect
 (missing packages, broken Incus state, config drift).
+
+---
+
+## 17. Security Model and Accepted Risks
+
+This section documents the trust boundaries and accepted risks in the
+anklume architecture. Understanding these is essential for operators
+deploying anklume in sensitive environments.
+
+### Trust boundary: anklume-instance
+
+`anklume-instance` holds the host Incus socket (`/var/run/incus/unix.socket`)
+mounted read/write. This socket provides **unrestricted root-equivalent access**
+to the entire Incus daemon. Any process inside `anklume-instance` can:
+
+- Create, delete, or modify any container or VM across all projects
+- Execute arbitrary commands as root inside any instance
+- Read or write any file in any instance
+- Modify network configuration, profiles, and storage
+
+**Consequence**: `anklume-instance` is the single point of trust. Its
+compromise equals total infrastructure compromise. This is an accepted
+architectural constraint (ADR-004) — the alternative (project-confined
+TLS certificates) is not yet mature in Incus.
+
+**Mitigations**:
+- Only the sysadmin should access `anklume-instance`
+- Pin all pip dependencies with hashes in `requirements.txt`
+- No special nftables exception for the anklume bridge (ADR-026)
+- Galaxy roles in `roles_vendor/` execute with socket access — review
+  new roles before adding to `requirements.yml`
+
+### Trust boundary: OpenClaw proxy
+
+The OpenClaw proxy (`docs/openclaw.md`) bridges internet-facing
+communication (Telegram bot) to infrastructure commands via the REST
+API. The proxy runs inside `anklume-instance` with full socket access.
+
+**Accepted risk**: The Telegram bot is designed for a single authorized
+user (the sysadmin). However, if `allowed_user_ids` is misconfigured
+or the Telegram API is compromised, an attacker gains infrastructure
+control via the proxy.
+
+**Required mitigations**:
+- The Telegram bot MUST restrict `allowed_user_ids` to known sysadmin IDs
+- The proxy `:9090` endpoint SHOULD require authentication
+- API endpoints SHOULD follow an allow-list pattern (not deny-list)
+
+### Trust-level enforcement
+
+The generator emits a warning when a machine uses `type: lxc` in a
+domain with `trust_level: untrusted` or `trust_level: disposable`.
+LXC containers share the host kernel and provide weaker isolation than
+VMs. For untrusted workloads, `type: vm` provides hardware-level
+isolation via KVM/QEMU.
+
+This is a warning, not an error — the operator decides the acceptable
+risk level for their environment.

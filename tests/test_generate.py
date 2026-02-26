@@ -435,6 +435,32 @@ class TestGPUPolicy:
         """No GPU instances produces no warnings."""
         assert get_warnings(sample_infra) == []
 
+    def test_untrusted_lxc_warning(self, sample_infra):
+        """Untrusted domain with LXC machine warns about isolation."""
+        sample_infra["domains"]["work"]["trust_level"] = "untrusted"
+        warnings = get_warnings(sample_infra)
+        assert any("untrusted" in w and "LXC" in w for w in warnings)
+
+    def test_disposable_lxc_warning(self, sample_infra):
+        """Disposable domain with LXC machine warns about isolation."""
+        sample_infra["domains"]["work"]["trust_level"] = "disposable"
+        warnings = get_warnings(sample_infra)
+        assert any("disposable" in w and "LXC" in w for w in warnings)
+
+    def test_trusted_lxc_no_warning(self, sample_infra):
+        """Trusted domain with LXC machine produces no trust warning."""
+        sample_infra["domains"]["work"]["trust_level"] = "trusted"
+        warnings = get_warnings(sample_infra)
+        assert not any("trust" in w.lower() for w in warnings)
+
+    def test_untrusted_vm_no_warning(self, sample_infra):
+        """Untrusted domain with VM machine produces no warning."""
+        sample_infra["domains"]["work"]["trust_level"] = "untrusted"
+        for m in sample_infra["domains"]["work"]["machines"].values():
+            m["type"] = "vm"
+        warnings = get_warnings(sample_infra)
+        assert not any("untrusted" in w for w in warnings)
+
     def test_single_gpu_no_warning(self, sample_infra):  # Matrix: GP-006
         """Single GPU instance produces no warning even in shared mode."""
         sample_infra["global"]["gpu_policy"] = "shared"
