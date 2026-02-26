@@ -1,17 +1,22 @@
 #!/bin/bash
 # anklume-verity: mkinitcpio install hook
-# Sets up dm-verity integrity verification for squashfs root
+# Live ISO boot with squashfs + overlayfs
 
 build() {
-    add_binary veritysetup
-    add_binary blkid
-    add_binary losetup
     add_module loop
+    add_module squashfs
+    add_module overlay
+    add_module iso9660
+    add_module cdrom
+    add_module sr_mod
+    add_binary losetup
+    add_binary blkid
+    add_binary mount
     add_runscript
 }
 
 help() {
     cat <<HELPEOF
-anklume: dm-verity integrity verification for squashfs root
+anklume: Live ISO boot with squashfs + overlayfs
 HELPEOF
 }

@@ -281,14 +281,16 @@ bootstrap_rootfs_debian() {
     # Configure system
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
 
-    # Create fstab for dm-verity
+    # Minimal fstab for live overlay — root is already mounted by initramfs
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
-# anklume Live OS fstab
-/dev/dm-0  /  squashfs  ro,defaults  0  0
-tmpfs      /tmp  tmpfs  mode=1777,nosuid,nodev,noexec  0  0
-tmpfs      /run  tmpfs  mode=0755,nosuid,nodev  0  0
+# anklume Live OS — root is overlay (squashfs ro + tmpfs rw)
+# No entries needed; systemd auto-mounts /proc /sys /dev /run
 FSTAB
     info "  Hostname and fstab configured"
+
+    # Set root password for live system (autologin, but needed for emergency/sulogin)
+    echo "root:anklume" | chroot "$ROOTFS_DIR" chpasswd 2>/dev/null || true
+    info "  Root password set (anklume)"
 
     # Configure locale and timezone
     chroot "$ROOTFS_DIR" locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
@@ -410,14 +412,16 @@ PACCONF
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
     info "  Hostname configured"
 
-    # Create fstab for dm-verity
+    # Minimal fstab for live overlay — root is already mounted by initramfs
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
-# anklume Live OS fstab
-/dev/dm-0  /  squashfs  ro,defaults  0  0
-tmpfs      /tmp  tmpfs  mode=1777,nosuid,nodev,noexec  0  0
-tmpfs      /run  tmpfs  mode=0755,nosuid,nodev  0  0
+# anklume Live OS — root is overlay (squashfs ro + tmpfs rw)
+# No entries needed; systemd auto-mounts /proc /sys /dev /run
 FSTAB
     info "  fstab configured"
+
+    # Set root password for live system
+    echo "root:anklume" | chroot "$ROOTFS_DIR" chpasswd 2>/dev/null || true
+    info "  Root password set (anklume)"
 
     # Configure locale
     sed -i 's/#en_US.UTF-8/en_US.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
@@ -465,6 +469,9 @@ FSTAB
     fi
 
     # Configure mkinitcpio — custom hooks BEFORE filesystems, no autodetect (strips modules)
+    # MODULES: virtio drivers for VM boot, iso9660/squashfs for live ISO, dm-verity
+    sed -i 's/^MODULES=.*/MODULES=(virtio_blk virtio_scsi virtio_pci virtio_net sr_mod cdrom iso9660 squashfs overlay loop dm-mod dm-verity)/' \
+        "$ROOTFS_DIR/etc/mkinitcpio.conf"
     sed -i 's/^HOOKS=.*/HOOKS=(base udev modconf block keyboard consolefont anklume-verity anklume-toram filesystems fsck)/' \
         "$ROOTFS_DIR/etc/mkinitcpio.conf"
     info "  mkinitcpio configured"
@@ -498,13 +505,15 @@ WantedBy=multi-user.target
 AGENT
     info "  Incus agent service installed"
 
-    # Create vconsole.conf to avoid mkinitcpio warnings
-    echo "KEYMAP=us" > "$ROOTFS_DIR/etc/vconsole.conf"
+    # Create vconsole.conf — French AZERTY keyboard layout
+    echo "KEYMAP=fr" > "$ROOTFS_DIR/etc/vconsole.conf"
 
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
-    chroot "$ROOTFS_DIR" systemctl enable incus-agent.service >/dev/null 2>&1 || true
+    # incus-agent: don't enable — not useful in live ISO (no virtiofs config channel)
+    # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
+    chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
     info "  anklume services enabled"
 
     # Detect installed kernel version in the rootfs
@@ -829,9 +838,20 @@ assemble_iso() {
     else
         # Inline fallback if template missing
         cat > "$staging/boot/grub/grub.cfg" << GRUBCFG
+insmod part_gpt
+insmod part_msdos
+insmod iso9660
+insmod fat
+insmod search_label
+insmod linux
+insmod gzio
+insmod all_video
+
 set timeout=5
 set default=0
-insmod all_video
+
+search --no-floppy --label ANKLUME-LIVE --set=root
+
 menuentry "anklume Live OS (toram)" {
     linux /boot/vmlinuz ro anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
@@ -865,6 +885,7 @@ GRUBCFG
             --output="$staging/EFI/BOOT/BOOTX64.EFI" \
             --locales="" \
             --fonts="" \
+            --install-modules="normal search search_fs_uuid search_fs_file search_label iso9660 part_gpt part_msdos fat ext2 linux gzio" \
             "boot/grub/grub.cfg=$staging/boot/grub/grub.cfg" \
             2>/dev/null || warn "grub-mkstandalone failed, trying grub-mkimage"
         info "  GRUB EFI standalone created"

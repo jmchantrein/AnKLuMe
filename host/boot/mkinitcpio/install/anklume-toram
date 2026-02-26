@@ -1,16 +1,12 @@
 #!/bin/bash
-# anklume-toram: mkinitcpio install hook
-# Copies anklume squashfs root image to RAM during early boot
-# Set kernel parameter anklume.toram=1 to enable
+# anklume-toram: stub — toram logic is handled in anklume-verity
 
 build() {
-    add_binary file
-    add_binary blkid
     add_runscript
 }
 
 help() {
     cat <<HELPEOF
-anklume: Copy squashfs root to RAM during early boot
+anklume: stub (toram handled by anklume-verity)
 HELPEOF
 }
