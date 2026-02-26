@@ -201,7 +201,7 @@ le socket Incus — pas besoin de SSH.
 | **Reseau** | [Isolation reseau (nftables)](docs/network-isolation.md) |
 | | [Firewall VM dedie](docs/firewall-vm.md) |
 | | [Passerelle Tor](docs/tor-gateway.md) |
-| **Services IA** | [Assistant IA OpenClaw](docs/openclaw_FR.md) |
+| **Services IA** | [Assistant IA OpenClaw](docs/openclaw.fr.md) |
 | | [Acces exclusif aux outils IA](docs/ai-switch.md) |
 | | [Service Speech-to-Text](docs/stt-service.md) |
 | **Calcul** | [Guide VM](docs/vm-support.md) |

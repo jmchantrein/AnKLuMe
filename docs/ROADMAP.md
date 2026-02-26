@@ -1445,7 +1445,7 @@ d) **Makefile targets**:
 
 e) **Documentation**:
    - `docs/scenario-testing.md` — how to write and run scenarios
-   - `docs/scenario-testing_FR.md` — French translation
+   - `docs/scenario-testing.fr.md` — French translation
    - Best-practice scenarios referenced from user-facing docs
 
 **Dependencies**: `pip install behave` (in `[project.optional-dependencies] test`)
@@ -2489,7 +2489,7 @@ c) **Transparent mode** (student mode):
 d) **Internationalization (i18n)**:
    - `ANKLUME_LANG=fr` environment variable
    - French translations for CLI messages (help, guide, errors)
-   - Extends existing `*_FR.md` documentation convention (ADR-011)
+   - Extends existing `*.fr.md` documentation convention (ADR-011)
    - Translation files in `i18n/` directory
 
 **Validation criteria**:

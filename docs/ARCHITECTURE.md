@@ -140,10 +140,10 @@ introduce transitive dependency bloat.
 ## ADR-011: All content in English, French translations maintained
 
 **Decision**: All code, comments, documentation, prompts in English.
-French translations (`*_FR.md`) are maintained for all documentation files,
+French translations (`*.fr.md`) are maintained for all documentation files,
 always in sync with their English counterparts. This includes `README_FR.md`
-and all files in `docs/` (e.g., `quickstart_FR.md`, `SPEC_FR.md`,
-`ARCHITECTURE_FR.md`, etc.). Each French file includes a header note
+and all files in `docs/` (e.g., `quickstart.fr.md`, `SPEC.fr.md`,
+`ARCHITECTURE.fr.md`, etc.). Each French file includes a header note
 indicating that the English version is authoritative in case of divergence.
 
 ---

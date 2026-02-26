@@ -4,7 +4,7 @@
 
 Ce fichier contient les details d'implementation et operationnels extraits
 de SPEC.md. Pour la specification principale (vision, concepts, modele PSOT,
-format infra.yml), voir [SPEC_FR.md](SPEC_FR.md).
+format infra.yml), voir [SPEC.fr.md](SPEC.fr.md).
 
 ## 6. Generateur (scripts/generate.py)
 

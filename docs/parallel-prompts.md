@@ -192,7 +192,7 @@ Commit final : `refactor(naming): rename sys-firewall to anklume-firewall (Phase
 
 ## Branche 5 (optionnelle) : `docs/french-sync`
 
-**Fichiers touches** : `docs/*_FR.md` uniquement
+**Fichiers touches** : `docs/*.fr.md` uniquement
 **Conflit avec** : aucune branche
 
 ```
@@ -202,12 +202,12 @@ Ta mission : synchroniser les traductions francaises avec les docs anglaises.
 
 Etapes :
 1. `git checkout -b docs/french-sync`
-2. Pour chaque fichier docs/*.md qui a un equivalent *_FR.md :
+2. Pour chaque fichier docs/*.md qui a un equivalent *.fr.md :
    - Compare les deux versions
    - Mets a jour la version FR pour refleter les changements recents de la version EN
 3. Fichiers prioritaires (ceux qui ont le plus change recemment) :
-   - docs/SPEC.md -> docs/SPEC_FR.md (addressing convention ADR-038)
-   - docs/ARCHITECTURE.md -> docs/ARCHITECTURE_FR.md (nouveaux ADRs)
+   - docs/SPEC.md -> docs/SPEC.fr.md (addressing convention ADR-038)
+   - docs/ARCHITECTURE.md -> docs/ARCHITECTURE.fr.md (nouveaux ADRs)
    - README.md -> README_FR.md
 4. Chaque fichier FR doit avoir le header :
    > Note : la version anglaise fait reference en cas de divergence.

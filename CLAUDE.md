@@ -69,7 +69,8 @@ anklume --help                  # List all commands
 - Explicit `changed_when` on all `command`/`shell` tasks
 - No `ignore_errors` — use `failed_when: false` when needed
 - All code, comments, docs, and prompts in English
-- A `README_FR.md` is maintained as a French translation of `README.md`
+- French translations use the `.fr.md` suffix (e.g., `docs/SPEC.fr.md`).
+  The root-level `README_FR.md` is the sole exception (legacy naming).
 
 ## Quality gates
 

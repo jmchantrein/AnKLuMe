@@ -70,7 +70,7 @@ You MUST follow these. Violations will be caught by linters.
 
 ### General
 - **Language**: code, comments, docs in English
-- **French translations**: `*_FR.md` maintained for all docs (ADR-011)
+- **French translations**: `*.fr.md` maintained for all docs (ADR-011)
 - **DRY/KISS**: no file over 200 lines, one file = one responsibility
 - **No wheel reinvented**: use native Ansible/Incus features first
 
