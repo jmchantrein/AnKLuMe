@@ -147,10 +147,10 @@ transitives excessives.
 ## ADR-011 : Tout le contenu en anglais, traductions francaises maintenues
 
 **Decision** : Tout le code, les commentaires, la documentation et les prompts sont
-en anglais. Des traductions francaises (`*_FR.md`) sont maintenues pour tous les
+en anglais. Des traductions francaises (`*.fr.md`) sont maintenues pour tous les
 fichiers de documentation, toujours synchronisees avec les versions anglaises. Cela
-inclut `README_FR.md` et tous les fichiers dans `docs/` (ex. `quickstart_FR.md`,
-`SPEC_FR.md`, `ARCHITECTURE_FR.md`, etc.). Chaque fichier francais inclut une note
+inclut `README_FR.md` et tous les fichiers dans `docs/` (ex. `quickstart.fr.md`,
+`SPEC.fr.md`, `ARCHITECTURE.fr.md`, etc.). Chaque fichier francais inclut une note
 d'en-tete indiquant que la version anglaise fait foi en cas de divergence.
 
 ---
