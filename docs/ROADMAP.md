@@ -3235,6 +3235,134 @@ d) **ADR-046**: Document CLI design decision (Typer over Go/Rust,
 
 ---
 
+## Phase 44: Security Hardening (from Operational Audit)
+
+**Goal**: Implement actionable fixes from the security audit
+(`docs/security-audit-operational.md`). Findings that are
+architectural constraints (FINDING-01, FINDING-02) get vigilance
+documentation; all others get concrete fixes.
+
+**Prerequisites**: Phase 8 (nftables), Phase 16 (security policy),
+Phase 39 (LLM sanitizer), Phase 41 (Galaxy roles).
+
+**Context**: The operational security audit identified 12 findings
+ranging from CRITICAL to LOW. Two findings (Incus socket access and
+OpenClaw proxy path) are inherent to the architecture and cannot be
+eliminated — only mitigated through documentation, monitoring, and
+access restrictions. The remaining findings are fixable through code
+changes, validation improvements, and tooling.
+
+**Accepted risks (vigilance documentation only)**:
+
+- **FINDING-01 (Incus socket = god mode)**: The socket mount is a
+  hard architectural requirement — `anklume-instance` must drive all
+  infrastructure via `incus` CLI. Mitigation: restrict who can access
+  `anklume-instance` (only the sysadmin), document the risk
+  prominently, pin pip dependencies with hashes. Future: evaluate
+  project-confined TLS certificates when Incus support matures.
+- **FINDING-02 (OpenClaw internet-to-infra bridge)**: The OpenClaw
+  proxy is designed so that only the sysadmin communicates with it
+  (Telegram bot with authorized user IDs). The proxy exposes
+  infrastructure commands by design. Mitigation: document that the
+  Telegram bot must restrict allowed user IDs, add authentication
+  on the proxy `:9090` endpoint, switch to allow-list for proxy
+  API endpoints.
+
+**Deliverables**:
+
+a) **Vigilance documentation** (FINDING-01, FINDING-02):
+   - Add a "Security Model and Accepted Risks" section to
+     `docs/SPEC-operations.md` documenting the Incus socket threat
+     model and the OpenClaw proxy trust assumptions
+   - Document that `anklume-instance` is the single point of trust
+     and that its compromise = total infrastructure compromise
+   - Document that the OpenClaw Telegram bot MUST restrict
+     `allowed_user_ids` and that the proxy MUST authenticate
+     requests
+
+b) **Credential permissions fix** (FINDING-03):
+   - Update `roles/openclaw_server/` or the relevant bootstrap
+     documentation to use `raw.idmap` instead of world-readable
+     `chmod 644` for credential files
+   - Credentials stay `0600` on the host; the container maps the
+     host UID to container root via `raw.idmap`
+
+c) **LXC trust-level warning in generator** (FINDING-04):
+   - `generate.py` emits a warning when a machine uses `type: lxc`
+     and its domain has `trust_level: untrusted` or
+     `trust_level: disposable`
+   - Warning text: "Domain '<name>' is <trust_level> but machine
+     '<machine>' uses LXC. Consider type: vm for stronger isolation."
+   - No error, no blocking — just a visible warning
+
+d) **VRAM flush verification** (FINDING-05):
+   - Add a verification step in `scripts/ai-switch.sh` after the
+     flush: allocate a small CUDA buffer, read it, verify zeros
+   - Add `--no-flush` warning: when used, log a security warning
+     to stderr
+
+e) **br_netfilter pre-flight check** (FINDING-06):
+   - `scripts/nftables-deploy.sh` checks that `br_netfilter` is
+     loaded and `bridge-nf-call-iptables=1` before applying rules,
+     exits with a clear error if not
+   - `scripts/bootstrap.sh` persists `br_netfilter` in
+     `/etc/modules-load.d/anklume.conf` and the sysctl in
+     `/etc/sysctl.d/99-anklume.conf`
+   - `scripts/doctor.sh` includes a `br_netfilter` check
+
+f) **nftables auto-regeneration on apply** (FINDING-07):
+   - `make apply` (and `anklume domain apply`) automatically runs
+     nftables generation after infrastructure changes
+   - Add a default-deny rule for `net-*` bridges not explicitly
+     listed in the allow rules (prevents new bridges from being
+     open during the regeneration window)
+
+g) **Disposable instances: prevent default project** (FINDING-08):
+   - `scripts/disp.sh` refuses to launch in the `default` project
+     without explicit `--force` flag
+   - Without `--domain`, defaults to a `disposable` domain if it
+     exists in `infra.yml`, otherwise errors with a message asking
+     the user to either create a disposable domain or use
+     `--domain <name>`
+   - Update `docs/disposable.md` with the new behavior
+
+h) **Galaxy role version pinning** (FINDING-09):
+   - Update `requirements.yml` to use exact version pins (no `>=`)
+   - Add a `make audit-roles` target that checks for known
+     vulnerabilities in pinned Galaxy role versions
+   - Document the review process for adopting new Galaxy roles
+
+i) **Agent sandbox network restriction** (FINDING-10):
+   - Update the agent runner VM network configuration to only allow
+     outbound connections to Anthropic API endpoints
+     (`api.anthropic.com`, port 443)
+   - Block all other egress from the sandbox VM
+
+j) **Generated file integrity check** (FINDING-12):
+   - `make apply` warns when there are uncommitted changes to files
+     in `group_vars/`, `host_vars/`, or `inventory/`
+   - The warning does not block execution (sysadmin may be
+     iterating) but makes the risk visible
+
+**Validation criteria**:
+- [ ] `docs/SPEC-operations.md` contains "Security Model and Accepted
+  Risks" section covering FINDING-01 and FINDING-02
+- [ ] Credential mount uses `raw.idmap`, host file is `0600`
+- [ ] `generate.py` warns on untrusted/disposable LXC machines
+- [ ] VRAM flush includes verification step
+- [ ] `scripts/nftables-deploy.sh` fails if `br_netfilter` not loaded
+- [ ] `bootstrap.sh` persists `br_netfilter` module and sysctl
+- [ ] `make apply` regenerates nftables rules automatically
+- [ ] Default-deny nftables rule covers unknown `net-*` bridges
+- [ ] `scripts/disp.sh` refuses `default` project without `--force`
+- [ ] `requirements.yml` uses exact version pins
+- [ ] Agent sandbox blocks non-API egress
+- [ ] `make apply` warns on uncommitted generated file changes
+- [ ] `make lint` passes
+- [ ] All existing tests pass
+
+---
+
 ## Deferred Enhancements (from prior sessions)
 
 Items discussed and deferred during development sessions. Each is
@@ -3345,6 +3473,7 @@ whether `incus restart` should clean up old veths automatically.
 - Phase 41: Official Roles and External Role Integration
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
+- Phase 44: Security Hardening (from operational audit) — in progress
 
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
@@ -3362,7 +3491,9 @@ whether `incus restart` should clean up old veths automatically.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 
-**All phases implemented.** Remaining unchecked criteria are deployment-dependent
+**Next**: Phase 44 — Security Hardening (from operational audit).
+
+Remaining unchecked criteria from prior phases are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.
