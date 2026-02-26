@@ -266,17 +266,132 @@ bootstrap_rootfs_debian() {
     mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
     MOUNTED_PATHS+=("$ROOTFS_DIR/dev/pts" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/proc")
 
-    # Install additional packages via chroot (all anklume runtime deps)
+    # Ensure DNS resolution works inside chroot
+    cp /etc/resolv.conf "$ROOTFS_DIR/etc/resolv.conf" 2>/dev/null || true
+
+    # Install additional packages via chroot (all anklume runtime + dev deps)
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
     packages="$packages firmware-linux-free"
-    packages="$packages ansible git make sudo nano"
+    packages="$packages ansible git make sudo nano tmux rsync"
     packages="$packages iproute2 dmidecode lsof htop file"
     # Incus: Debian Trixie ships incus in official repos
     packages="$packages incus"
+    # Wayland desktop (sway compositor + foot terminal)
+    packages="$packages sway foot"
+    # Dev/lint/test tools
+    packages="$packages ansible-lint yamllint shellcheck"
+    packages="$packages python3-pytest python3-hypothesis python3-pexpect"
     chroot "$ROOTFS_DIR" apt-get update -qq
     # shellcheck disable=SC2086
-    chroot "$ROOTFS_DIR" apt-get install -y -qq $packages 2>&1 | tail -5
-    info "  Additional packages installed (incl. incus, ansible, git)"
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
+        apt-get install -y -qq $packages 2>&1 | tail -5
+    info "  System packages installed (apt: incus, ansible, sway, lint/test tools)"
+
+    # Install Python packages not available in Debian system repos
+    # --ignore-installed avoids conflict with Debian's system click package
+    chroot "$ROOTFS_DIR" pip3 install --break-system-packages --ignore-installed \
+        "typer[all]>=0.12" "fastapi>=0.115" "uvicorn>=0.32" \
+        ruff behave 2>&1 | tail -5
+    info "  Python pip packages installed (pip: typer, fastapi, uvicorn, ruff, behave)"
+
+    # Install initramfs-tools hooks and boot scripts BEFORE NVIDIA/backports
+    # (backports kernel install triggers update-initramfs; hooks must be in place)
+    if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools" ]; then
+        mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/hooks"
+        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/hooks" ]; then
+            cp "$PROJECT_ROOT/host/boot/initramfs-tools/hooks"/* "$ROOTFS_DIR/etc/initramfs-tools/hooks/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/hooks"/* 2>/dev/null || true
+        fi
+        mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/scripts"
+        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/scripts" ]; then
+            cp "$PROJECT_ROOT/host/boot/initramfs-tools/scripts"/* "$ROOTFS_DIR/etc/initramfs-tools/scripts/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/scripts"/* 2>/dev/null || true
+        fi
+        info "  initramfs-tools hooks and boot scripts installed (early)"
+    fi
+
+    # Add required kernel modules for live ISO boot
+    cat >> "$ROOTFS_DIR/etc/initramfs-tools/modules" << 'MODULES'
+# anklume live ISO boot modules
+loop
+squashfs
+overlay
+iso9660
+cdrom
+sr_mod
+# ATA/AHCI controllers (needed for CDROM access in QEMU and real hardware)
+ata_piix
+ahci
+ata_generic
+# Virtio modules for VM boot
+virtio_blk
+virtio_scsi
+virtio_pci
+virtio_net
+MODULES
+    info "  initramfs-tools modules configured (early)"
+
+    # Install NVIDIA drivers from backports (non-free)
+    # Add non-free components to existing sources (for nvidia-driver)
+    sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib non-free non-free-firmware/' \
+        "$ROOTFS_DIR/etc/apt/sources.list" 2>/dev/null || true
+    cat > "$ROOTFS_DIR/etc/apt/sources.list.d/backports.list" << NVSRC
+deb http://deb.debian.org/debian trixie-backports main contrib non-free non-free-firmware
+NVSRC
+    chroot "$ROOTFS_DIR" apt-get update -qq
+    # DKMS auto-build fails in chroot because uname -r returns the HOST kernel
+    # (bind-mounted /proc). Strategy:
+    # 1. Install dkms + headers first (no NVIDIA trigger)
+    # 2. Install nvidia-driver (let DKMS trigger fail)
+    # 3. Fix broken packages, then manually build for Debian kernel
+    local deb_kernel chroot_path
+    chroot_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    # Step 1: Install DKMS, backports kernel + headers (newer = better hw support + NVIDIA compat)
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
+        apt-get install -y -qq -t trixie-backports \
+        dkms linux-image-amd64 linux-headers-amd64 2>&1 | tail -5
+    # Detect the kernel that has matching headers (build symlink present)
+    deb_kernel=""
+    for kdir in "$ROOTFS_DIR"/lib/modules/*/; do
+        kver=$(basename "$kdir")
+        if [ -e "$kdir/build" ]; then
+            deb_kernel="$kver"
+            break
+        fi
+    done
+    [ -z "$deb_kernel" ] && deb_kernel=$(ls "$ROOTFS_DIR/lib/modules/" | grep deb | tail -1)
+    info "  Target kernel for NVIDIA: $deb_kernel"
+    # Step 2: Install nvidia-driver from backports (matches backports kernel)
+    # DKMS trigger will fail (builds for host kernel via uname -r) — OK, we rebuild manually
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
+        apt-get install -y -qq -t trixie-backports \
+        nvidia-driver 2>&1 | tail -10 || true
+    # Step 3: Fix any broken packages
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
+        dpkg --configure -a 2>&1 | tail -5 || true
+    # Step 4: Manually build NVIDIA DKMS module for the Debian kernel
+    if [ -n "$deb_kernel" ]; then
+        # Read module name and version from dkms.conf
+        local dkms_conf nv_name nv_ver
+        dkms_conf=$(find "$ROOTFS_DIR/usr/src/" -maxdepth 2 -name "dkms.conf" \
+            -path "*/nvidia*" | head -1)
+        if [ -n "$dkms_conf" ]; then
+            nv_name=$(grep '^PACKAGE_NAME=' "$dkms_conf" | cut -d= -f2 | tr -d '"')
+            nv_ver=$(grep '^PACKAGE_VERSION=' "$dkms_conf" | cut -d= -f2 | tr -d '"')
+            info "  Building NVIDIA $nv_name/$nv_ver DKMS for kernel $deb_kernel..."
+            # Remove any failed auto-build first, then rebuild for the right kernel
+            chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+                dkms remove -m "$nv_name" -v "$nv_ver" --all 2>&1 | tail -3 || true
+            if ! chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+                dkms install -m "$nv_name" -v "$nv_ver" \
+                -k "$deb_kernel" --force 2>&1 | tail -10; then
+                warn "  NVIDIA DKMS build failed — modules not prebuilt (DKMS will rebuild at boot)"
+            fi
+        else
+            warn "  No NVIDIA DKMS source found — modules will not be built"
+        fi
+    fi
+    info "  NVIDIA drivers installed from backports"
 
     # Configure system
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
@@ -331,44 +446,20 @@ FSTAB
     fi
     info "  anklume framework files copied"
 
+    # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
+    if [ -f "$ROOTFS_DIR/opt/anklume/requirements.yml" ]; then
+        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 ansible-galaxy collection install \
+            -r /opt/anklume/requirements.yml 2>&1 | tail -3
+        info "  Ansible Galaxy collections pre-installed"
+    fi
+
     # Create /etc/anklume marker
     mkdir -p "$ROOTFS_DIR/etc/anklume"
     echo "0" > "$ROOTFS_DIR/etc/anklume/absolute_level"
     echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
     echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
-    # Install initramfs-tools hooks and boot scripts
-    if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools" ]; then
-        # BUILD-TIME hook: includes binaries and modules in the initramfs
-        mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/hooks"
-        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/hooks" ]; then
-            cp "$PROJECT_ROOT/host/boot/initramfs-tools/hooks"/* "$ROOTFS_DIR/etc/initramfs-tools/hooks/" 2>/dev/null || true
-            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/hooks"/* 2>/dev/null || true
-        fi
-        # BOOT-TIME script: defines mountroot() for live ISO boot
-        mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/scripts"
-        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/scripts" ]; then
-            cp "$PROJECT_ROOT/host/boot/initramfs-tools/scripts"/* "$ROOTFS_DIR/etc/initramfs-tools/scripts/" 2>/dev/null || true
-            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/scripts"/* 2>/dev/null || true
-        fi
-        info "  initramfs-tools hooks and boot scripts installed"
-    fi
-
-    # Add required kernel modules for live ISO boot
-    cat >> "$ROOTFS_DIR/etc/initramfs-tools/modules" << 'MODULES'
-# anklume live ISO boot modules
-loop
-squashfs
-overlay
-iso9660
-cdrom
-sr_mod
-virtio_blk
-virtio_scsi
-virtio_pci
-virtio_net
-MODULES
-    info "  initramfs-tools modules configured"
+    # (hooks and modules already installed before NVIDIA section above)
 
     # Create vconsole.conf — French AZERTY keyboard layout
     echo "KEYMAP=fr" > "$ROOTFS_DIR/etc/vconsole.conf"
@@ -400,17 +491,165 @@ KBD
     ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" 2>/dev/null || true
     info "  anklume services enabled"
 
-    # Regenerate initramfs to include our custom hooks and boot scripts
-    # The initial initramfs was generated during debootstrap before our hooks were installed
-    local deb_kver
-    deb_kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" 2>/dev/null | head -1)
-    info "  Detected kernel version: ${deb_kver:-NONE}"
-    if [ -n "$deb_kver" ]; then
+    # Wayland desktop: auto-login on tty1 + sway autostart
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+AUTOLOGIN
+    # Start sway when anklume.desktop=1 is on kernel cmdline
+    cat > "$ROOTFS_DIR/root/.bash_profile" << 'SWAY_AUTOSTART'
+# anklume: auto-start sway in desktop mode
+if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ] \
+   && grep -q 'anklume.desktop=1' /proc/cmdline; then
+    export XDG_SESSION_TYPE=wayland
+    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
+    if lsmod | grep -q '^nvidia '; then
+        export WLR_RENDERER=vulkan
+    fi
+    exec sway 2>/dev/null
+fi
+SWAY_AUTOSTART
+    info "  Wayland desktop (sway) autostart configured"
+
+    # Regenerate initramfs for ALL installed kernels with our hooks and modules
+    # Must run after NVIDIA/backports install to include all kernels
+    info "  Regenerating initramfs for all installed kernels..."
+    local kver
+    for kdir in "$ROOTFS_DIR"/usr/lib/modules/*/; do
+        kver=$(basename "$kdir")
+        [ -d "$kdir/kernel" ] || continue
+        info "    Regenerating initramfs for kernel $kver"
         chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
-            update-initramfs -u -k "$deb_kver" 2>&1 | tail -5 || warn "update-initramfs failed"
-        info "  Initramfs regenerated with anklume hooks (kernel $deb_kver)"
-    else
-        warn "  Could not detect kernel version — initramfs not regenerated"
+            update-initramfs -u -k "$kver" 2>&1 | tail -5 || warn "update-initramfs failed for $kver"
+    done
+    info "  Initramfs regenerated with anklume hooks"
+
+    # Workaround: Debian Trixie's initramfs-tools uses dracut-install for
+    # module copying, which can silently fail in chroot environments.
+    # Verify modules are present; if not, manually inject them.
+    local newest_kver initrd_path
+    newest_kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" | sort -V | tail -1)
+    initrd_path=$(find "$ROOTFS_DIR/boot" -name "initrd.img-$newest_kver" -type f 2>/dev/null | head -1)
+    if [ -n "$initrd_path" ] && [ -n "$newest_kver" ]; then
+        # Check if initramfs has any .ko files
+        local has_modules
+        has_modules=$(python3 -c "
+import sys
+with open('$initrd_path', 'rb') as f:
+    data = f.read()
+# Find CPIO TRAILER (end of microcode archive)
+trailer = b'TRAILER!!!'
+idx = data.find(trailer)
+if idx < 0:
+    sys.exit(1)
+end = ((idx + len(trailer) + 511) // 512) * 512
+# Check rest of file for .ko signature in filenames
+rest = data[end:]
+if b'.ko' in rest:
+    print('yes')
+else:
+    print('no')
+" 2>/dev/null)
+        if [ "$has_modules" = "no" ]; then
+            warn "  Initramfs has no kernel modules — injecting manually"
+            local inject_dir="$WORK_DIR/initrd-inject"
+            # Module names must match actual .ko filenames (e.g. isofs not iso9660)
+            local inject_modules="loop squashfs overlay isofs cdrom sr_mod"
+            inject_modules="$inject_modules ata_piix ahci ata_generic libata libahci"
+            inject_modules="$inject_modules scsi_mod scsi_common sd_mod sg"
+            inject_modules="$inject_modules virtio_blk virtio_scsi virtio_pci virtio_net virtio virtio_ring"
+            inject_modules="$inject_modules net_failover failover"
+            mkdir -p "$inject_dir/lib/modules/$newest_kver"
+            # Copy each module and its dependencies
+            local mod_src mod_file
+            for mod in $inject_modules; do
+                mod_file=$(find "$ROOTFS_DIR/usr/lib/modules/$newest_kver/kernel" \
+                    -name "${mod}.ko*" 2>/dev/null | head -1)
+                if [ -n "$mod_file" ]; then
+                    local rel_path="${mod_file#"$ROOTFS_DIR/usr/lib/modules/$newest_kver/"}"
+                    mkdir -p "$inject_dir/lib/modules/$newest_kver/$(dirname "$rel_path")"
+                    cp "$mod_file" "$inject_dir/lib/modules/$newest_kver/$rel_path"
+                fi
+            done
+            # Generate modules.dep for injected modules
+            depmod -b "$inject_dir" "$newest_kver" 2>/dev/null || true
+            # Append the modules to the initramfs (cpio concatenation)
+            # Find the main archive boundary (after microcode cpio)
+            python3 << INJECT_PYEOF
+import subprocess, sys, struct
+
+initrd = '$initrd_path'
+inject_dir = '$inject_dir'
+
+with open(initrd, 'rb') as f:
+    data = f.read()
+
+# Find CPIO TRAILER (end of microcode archive)
+trailer = b'TRAILER!!!'
+idx = data.find(trailer)
+if idx < 0:
+    print("ERROR: No CPIO trailer found")
+    sys.exit(1)
+end = ((idx + len(trailer) + 511) // 512) * 512
+
+# Extract the main archive (compressed)
+main_archive = data[end:]
+
+# Decompress the main archive
+import gzip, io, tempfile, os
+
+# Try gzip first
+try:
+    main_cpio = gzip.decompress(main_archive)
+except:
+    print("ERROR: Cannot decompress main archive")
+    sys.exit(1)
+
+# Write decompressed cpio to temp file
+with tempfile.NamedTemporaryFile(suffix='.cpio', delete=False) as tmp:
+    tmp.write(main_cpio)
+    tmp_cpio = tmp.name
+
+# Append new files to the cpio
+result = subprocess.run(
+    ['bash', '-c', f'cd {inject_dir} && find lib -type f -o -type d | sort | cpio -o -H newc --append -F {tmp_cpio}'],
+    capture_output=True, text=True
+)
+if result.returncode != 0:
+    # Try without --append (create new cpio and concatenate)
+    with tempfile.NamedTemporaryFile(suffix='.cpio', delete=False) as tmp2:
+        tmp2_path = tmp2.name
+    result = subprocess.run(
+        ['bash', '-c', f'cd {inject_dir} && find lib -type f -o -type d | sort | cpio -o -H newc > {tmp2_path}'],
+        capture_output=True, text=True
+    )
+    # Concatenate: original + new
+    with open(tmp_cpio, 'ab') as out:
+        with open(tmp2_path, 'rb') as inp:
+            out.write(inp.read())
+    os.unlink(tmp2_path)
+
+# Re-compress with gzip
+with open(tmp_cpio, 'rb') as f:
+    cpio_data = f.read()
+os.unlink(tmp_cpio)
+
+compressed = gzip.compress(cpio_data, compresslevel=6)
+
+# Write back: microcode + compressed main
+with open(initrd, 'wb') as f:
+    f.write(data[:end])
+    f.write(compressed)
+
+count = sum(1 for _ in os.scandir(f'{inject_dir}/lib/modules/{os.listdir(inject_dir + "/lib/modules")[0]}/kernel') if True)
+print(f"Injected modules into initramfs ({len(compressed)} bytes compressed)")
+INJECT_PYEOF
+            rm -rf "$inject_dir"
+        else
+            info "  Initramfs has kernel modules (OK)"
+        fi
     fi
 
     # Unmount pseudo-filesystems before creating squashfs
@@ -458,15 +697,26 @@ PACCONF
 
     # Run pacstrap with vanilla config
     # Include all anklume runtime deps: Incus, Ansible, Python, Git, etc.
+    # NOTE: CachyOS pacstrap can't resolve some vanilla Arch packages (nvidia,
+    # python-uvicorn, etc.) — those are installed via chroot pacman below.
     pacstrap -C "$WORK_DIR/pacman-vanilla.conf" -K "$ROOTFS_DIR" \
-        base linux linux-firmware mkinitcpio \
+        base linux linux-firmware linux-headers mkinitcpio \
         openssh curl jq python python-pip python-yaml file \
         nftables cryptsetup btrfs-progs squashfs-tools \
         incus ansible git make ca-certificates \
         sudo nano iproute2 systemd-resolvconf \
-        dmidecode lsof htop
+        dmidecode lsof htop tmux rsync \
+        sway foot
 
-    info "  Pacstrap complete"
+    info "  Pacstrap complete (base packages)"
+
+    # Re-write mirrorlist (pacstrap's pacman-mirrorlist package overwrites ours)
+    cat > "$ROOTFS_DIR/etc/pacman.d/mirrorlist" << 'MIRRORS'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+Server = https://archlinux.mailtunnel.eu/$repo/os/$arch
+MIRRORS
+    info "  Mirrorlist restored with working mirrors"
 
     # Bind-mount pseudo-filesystems for chroot operations
     mount --bind /proc "$ROOTFS_DIR/proc"
@@ -474,6 +724,38 @@ PACCONF
     mount --bind /dev "$ROOTFS_DIR/dev"
     mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
     MOUNTED_PATHS+=("$ROOTFS_DIR/dev/pts" "$ROOTFS_DIR/dev" "$ROOTFS_DIR/sys" "$ROOTFS_DIR/proc")
+
+    # Ensure DNS resolution works inside chroot
+    cp /etc/resolv.conf "$ROOTFS_DIR/etc/resolv.conf" 2>/dev/null || true
+
+    # Ensure vanilla Arch pacman.conf in rootfs (CachyOS pacstrap may copy host config)
+    cat > "$ROOTFS_DIR/etc/pacman.conf" << 'PACCONF'
+[options]
+HoldPkg     = pacman glibc
+Architecture = auto
+SigLevel    = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+PACCONF
+
+    # Install packages that CachyOS pacstrap can't resolve from vanilla repos
+    # Using chroot pacman (vanilla Arch inside rootfs) to install them
+    chroot "$ROOTFS_DIR" pacman -Sy --noconfirm \
+        nvidia-open-dkms nvidia-utils \
+        python-typer python-rich python-fastapi \
+        python-pytest python-hypothesis python-pexpect \
+        ansible-lint yamllint shellcheck ruff 2>&1 | tail -10
+    info "  Extra packages installed via chroot pacman (nvidia-dkms, dev tools)"
+
+    # Install Python packages not in Arch repos
+    chroot "$ROOTFS_DIR" pip install --break-system-packages \
+        behave uvicorn 2>&1 | tail -3
+    info "  Python pip packages installed (behave, uvicorn)"
 
     # Configure hostname
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
@@ -503,6 +785,8 @@ FSTAB
     # Copy entire anklume framework (git repo) into rootfs
     mkdir -p "$ROOTFS_DIR/opt/anklume"
     if command -v git &>/dev/null && [ -d "$PROJECT_ROOT/.git" ]; then
+        # Allow git archive from a repo owned by a different user (running as root)
+        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
         git -C "$PROJECT_ROOT" archive HEAD | tar -x -C "$ROOTFS_DIR/opt/anklume/"
     else
         for d in scripts roles roles_custom Makefile site.yml snapshot.yml \
@@ -512,6 +796,13 @@ FSTAB
         done
     fi
     info "  anklume framework files copied"
+
+    # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
+    if [ -f "$ROOTFS_DIR/opt/anklume/requirements.yml" ]; then
+        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 ansible-galaxy collection install \
+            -r /opt/anklume/requirements.yml 2>&1 | tail -3
+        info "  Ansible Galaxy collections pre-installed"
+    fi
 
     # Create /etc/anklume marker
     mkdir -p "$ROOTFS_DIR/etc/anklume"
@@ -582,6 +873,28 @@ AGENT
     # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
     chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
     info "  anklume services enabled"
+
+    # Wayland desktop: auto-login on tty1 + sway autostart
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+AUTOLOGIN
+    # Start sway when anklume.desktop=1 is on kernel cmdline
+    cat > "$ROOTFS_DIR/root/.bash_profile" << 'SWAY_AUTOSTART'
+# anklume: auto-start sway in desktop mode
+if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ] \
+   && grep -q 'anklume.desktop=1' /proc/cmdline; then
+    export XDG_SESSION_TYPE=wayland
+    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
+    if lsmod | grep -q '^nvidia '; then
+        export WLR_RENDERER=vulkan
+    fi
+    exec sway 2>/dev/null
+fi
+SWAY_AUTOSTART
+    info "  Wayland desktop (sway) autostart configured"
 
     # Detect installed kernel version in the rootfs
     local kver
@@ -779,8 +1092,8 @@ LOADER
 
     case "$BASE" in
         debian|stable)
-            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f | head -1)
-            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f | head -1)
+            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f | sort -V | tail -1)
+            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f | sort -V | tail -1)
             ;;
         arch)
             vmlinuz="$ROOTFS_DIR/boot/vmlinuz-linux"
@@ -883,8 +1196,9 @@ assemble_iso() {
     local vmlinuz initrd
     case "$BASE" in
         debian|stable)
-            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f 2>/dev/null | head -1)
-            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f 2>/dev/null | head -1)
+            # Use the newest kernel (sort by version, take last)
+            vmlinuz=$(find "$ROOTFS_DIR/boot" -name "vmlinuz-*" -type f 2>/dev/null | sort -V | tail -1)
+            initrd=$(find "$ROOTFS_DIR/boot" -name "initrd.img-*" -type f 2>/dev/null | sort -V | tail -1)
             ;;
         arch)
             vmlinuz="$ROOTFS_DIR/boot/vmlinuz-linux"
@@ -898,7 +1212,7 @@ assemble_iso() {
     if [ -f "$vmlinuz" ] && [ -f "$initrd" ]; then
         cp "$vmlinuz" "$staging/boot/vmlinuz"
         cp "$initrd" "$staging/boot/initrd.img"
-        info "  Kernel and initramfs staged"
+        info "  Kernel and initramfs staged ($(basename "$vmlinuz"))"
     else
         err "Could not find kernel ($vmlinuz) or initramfs ($initrd)"
         exit 1
@@ -930,13 +1244,39 @@ search --no-floppy --label ANKLUME-LIVE --set=root
 terminal_input at_keyboard console
 keymap /boot/grub/fr.gkb
 
-menuentry "anklume Live OS (toram)" {
+menuentry "anklume Live OS (Desktop + GPU)" {
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    initrd /boot/initrd.img
+}
+menuentry "anklume Live OS (Desktop)" {
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+    initrd /boot/initrd.img
+}
+menuentry "anklume Live OS (Console + GPU)" {
     linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
-menuentry "anklume Live OS (direct)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+menuentry "anklume Live OS (Console)" {
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
+}
+submenu "Advanced (direct boot from media)" {
+    menuentry "anklume Live OS (Desktop + GPU)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (Desktop)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (Console + GPU)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live OS (Console)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
 }
 GRUBCFG
     fi

@@ -168,6 +168,9 @@ def main():
             ("Make available",        "command -v make >/dev/null && echo PASS || echo FAIL"),
             ("Keyboard is fr",        "grep -q fr /etc/vconsole.conf && echo PASS || echo FAIL"),
             ("No incus-agent spam",   "! systemctl is-enabled incus-agent.service 2>/dev/null && echo PASS || echo FAIL"),
+            ("NVIDIA modules present", "find /lib/modules/ -name 'nvidia.ko*' 2>/dev/null | grep -q nvidia && echo PASS || echo FAIL"),
+            ("Sway installed",        "command -v sway >/dev/null && echo PASS || echo FAIL"),
+            ("Foot installed",        "command -v foot >/dev/null && echo PASS || echo FAIL"),
             ("Writable /tmp",         "touch /tmp/test-write && rm /tmp/test-write && echo PASS || echo FAIL"),
             ("Writable /root",        "touch /root/test-write && rm /root/test-write && echo PASS || echo FAIL"),
         ]

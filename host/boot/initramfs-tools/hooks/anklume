@@ -31,6 +31,11 @@ manual_add_modules iso9660
 manual_add_modules cdrom
 manual_add_modules sr_mod
 
+# ATA/AHCI controllers (needed for CDROM access in QEMU and real hardware)
+manual_add_modules ata_piix
+manual_add_modules ahci
+manual_add_modules ata_generic
+
 # Virtio modules for VM boot
 manual_add_modules virtio_blk
 manual_add_modules virtio_scsi
