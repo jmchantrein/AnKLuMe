@@ -336,6 +336,26 @@ scenario-list: ## List all available scenarios
 	@echo "Best practices:"; grep -rh "Scenario:" scenarios/best_practices/ 2>/dev/null | sed 's/^/  /'; \
 	echo ""; echo "Bad practices:"; grep -rh "Scenario:" scenarios/bad_practices/ 2>/dev/null | sed 's/^/  /'
 
+# ── Behavioral Chains (Phase 44) ────────────────────────
+chain-test: ## Run all behavioral chains (sequential admin workflows)
+	python3 scripts/run-behavioral-tests.py
+
+chain-test-one: ## Run a single behavioral chain (CHAIN=bootstrap-to-first-deploy)
+	python3 scripts/run-behavioral-tests.py --chain $(CHAIN)
+
+chain-test-dry: ## Dry-run: show behavioral chain plan without executing
+	python3 scripts/run-behavioral-tests.py --dry-run
+
+chain-test-json: ## Run behavioral chains with JSON output
+	python3 scripts/run-behavioral-tests.py --json
+
+# ── Unified Test Summary (Phase 44) ─────────────────────
+test-summary: ## Run all test layers and show combined report
+	scripts/test-summary.sh
+
+test-summary-quick: ## Quick test summary (skip slow layers)
+	scripts/test-summary.sh --quick
+
 # ── Behavior Matrix (Phase 18b) ──────────────────────────
 matrix-coverage: ## Show behavior matrix test coverage
 	python3 scripts/matrix-coverage.py
@@ -742,6 +762,8 @@ help-all: ## Show all available targets
         dead-code call-graph dep-graph code-graph \
         audit audit-json smoke doctor \
         scenario-test scenario-test-best scenario-test-bad scenario-list \
+        chain-test chain-test-one chain-test-dry chain-test-json \
+        test-summary test-summary-quick \
         clipboard-to clipboard-from domain-exec desktop-config desktop-apply desktop-reset desktop-plugins dashboard \
         export-app export-list export-remove \
         llm-switch llm-status llm-bench llm-dev ollama-dev \

@@ -1302,7 +1302,7 @@ a workstation with a graphical environment.
 
 ---
 
-## Phase 22: End-to-End Scenario Testing (BDD)
+## Phase 22: End-to-End Scenario Testing (BDD) ✅ COMPLETE
 
 **Goal**: Human-readable acceptance scenarios testing complete user
 workflows against real Incus infrastructure, covering both best
@@ -1316,7 +1316,7 @@ guide (Phase 18c) to steer users toward correct usage.
   via `make scenario-test`. Long execution time is acceptable (sandbox
   runs independently).
 - **Gherkin format** — `.feature` files using `Given/When/Then` syntax,
-  readable by non-developers. Runner: `pytest-bdd`.
+  readable by non-developers. Runner: `behave` (Python BDD framework).
 - **Two scenario categories**:
   - **Best practices**: validate recommended workflows, serve as living
     documentation of how to use anklume correctly.
@@ -1448,12 +1448,12 @@ e) **Documentation**:
    - `docs/scenario-testing_FR.md` — French translation
    - Best-practice scenarios referenced from user-facing docs
 
-**Dependencies**: `pip install pytest-bdd`
+**Dependencies**: `pip install behave` (in `[project.optional-dependencies] test`)
 
-**Step definitions pattern**:
+**Step definitions pattern** (actual implementation uses behave):
 ```python
-# scenarios/conftest.py
-from pytest_bdd import given, when, then, scenarios
+# scenarios/steps/given.py
+from behave import given
 import subprocess
 
 @given("a clean sandbox environment")
@@ -3297,6 +3297,119 @@ whether `incus restart` should clean up old veths automatically.
 
 ---
 
+## Phase 44: Test Infrastructure Consolidation and Hardening
+
+**Goal**: Consolidate the five testing layers (pytest, Gherkin/behave,
+behavioral chains, behavior matrix, Hypothesis) into a coherent,
+fully executable test pyramid. Every test artefact must be runnable
+via a `make` target. Eliminate dead links, fill coverage gaps, and
+establish automated coverage reporting.
+
+**Prerequisites**: Phase 22 (BDD scenarios), Phase 18b (behavior matrix),
+Phase 13 (LLM-assisted testing).
+
+**Context (audit findings)**:
+
+The project has accumulated five complementary testing layers over
+43 phases, but they are not uniformly integrated:
+
+| Layer | Tool | Status | Issue |
+|-------|------|--------|-------|
+| Unit/behavioral tests | pytest | Functional (2844 tests) | — |
+| E2E scenarios | Gherkin/behave | Files exist, runner works | No CI, `behave` install not verified |
+| Behavioral chains | YAML + runner | Runner exists | No Makefile target |
+| Behavior matrix | YAML + coverage script | 249 cells | Coverage % not tracked in CI |
+| Property-based | Hypothesis | Functional | Limited to `test_properties.py` |
+
+The Gherkin/behave layer is **preserved and reinforced** — it provides
+human-readable acceptance scenarios that serve as living documentation
+for both best practices and failure modes. The `pitfalls.yml` feedback
+loop to `scripts/guide.sh` is a unique asset.
+
+**Principles**:
+- **Every test artefact executes** — no dead YAML, no unrunnable features.
+- **Gherkin scenarios are the acceptance layer** — they test complete
+  user workflows at a higher abstraction than pytest. Not a duplication
+  of pytest — a complementary view.
+- **Behavioral chains are the E2E layer** — they test sequential admin
+  workflows that span multiple `make` targets.
+- **Coverage is measurable** — matrix coverage is computed automatically
+  and reported.
+- **`skipif` for optional tools** — scenarios requiring external tools
+  (yamllint, shellcheck, Incus) skip gracefully when tools are absent.
+
+**Deliverables**:
+
+### a) Makefile targets for behavioral chains
+
+```makefile
+chain-test:        ## Run all behavioral chains (sequential admin workflows)
+chain-test-one:    ## Run a single behavioral chain (CHAIN=<name>)
+chain-test-dry:    ## Dry-run: show behavioral chain plan without executing
+chain-test-json:   ## Run behavioral chains with JSON output
+```
+
+### b) Gherkin scenario hardening
+
+- Verify `behave` is installed (part of `[project.optional-dependencies] test`)
+- Add `skipif`-style guards in step definitions for external tools
+  (yamllint, shellcheck, Incus) so scenarios skip cleanly in minimal
+  environments instead of failing
+- Ensure `make scenario-test` exits cleanly in environments without
+  Incus (scenarios skip, not fail)
+
+### c) Hypothesis extension
+
+Extend property-based tests beyond `test_properties.py` to cover:
+- Optional field validation (`boot_autostart`, `boot_priority`,
+  `snapshots_schedule`, `snapshots_expiry`, `ai_provider`,
+  `ai_sanitize`, `weight`, `nesting_prefix`)
+- DNS-safe name generation and validation
+- Addressing convention edge cases (zone overflow, max domains
+  per zone, subnet_id boundary values)
+
+### d) Unified test report
+
+Create `scripts/test-summary.sh` that runs all test layers and
+produces a combined summary:
+
+```
+Test Layer          | Status | Count    | Duration
+--------------------|--------|----------|--------
+pytest              | PASS   | 2844/2844|   12.3s
+behave scenarios    | PASS   |   38/44  |   10.8s
+behavioral chains   | PASS   |   14/14  |   45.2s
+matrix coverage     | 87%    | 217/249  |    0.5s
+hypothesis          | PASS   |   50/50  |    3.1s
+--------------------|--------|----------|--------
+TOTAL               | PASS   |          |   71.9s
+```
+
+### e) Matrix coverage gate
+
+Add matrix coverage percentage to `make lint` or `make test` output.
+Track coverage trend over time. Goal: 90%+ matrix coverage.
+
+### f) Documentation update
+
+- Update `docs/scenario-testing.md` with behavioral chain documentation
+- Add `chain-test` targets to the mode-appropriate help output
+- Update `i18n/fr.yml` with French translations for new targets
+
+**Validation criteria**:
+- [ ] `make scenario-test` passes (skips gracefully when tools absent)
+- [ ] `make chain-test` passes (runs all 14 behavioral chains)
+- [ ] `make chain-test-dry` shows plan without executing
+- [ ] `make chain-test-one CHAIN=bootstrap-to-first-deploy` runs a single chain
+- [ ] Gherkin scenarios skip (not fail) when yamllint/shellcheck absent
+- [ ] `scripts/test-summary.sh` produces combined report
+- [ ] Hypothesis tests cover all optional infra.yml fields
+- [ ] Matrix coverage is computed and reported
+- [ ] `docs/scenario-testing.md` updated with chain documentation
+- [ ] `i18n/fr.yml` updated with new target translations
+
+---
+
 ## Current State
 
 **Completed** (all 43 phases):
@@ -3345,6 +3458,7 @@ whether `incus restart` should clean up old veths automatically.
 - Phase 41: Official Roles and External Role Integration
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
+- Phase 44: Test Infrastructure Consolidation and Hardening (in progress)
 
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
@@ -3362,7 +3476,7 @@ whether `incus restart` should clean up old veths automatically.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 
-**All phases implemented.** Remaining unchecked criteria are deployment-dependent
+**Phase 44 in progress.** All other phases implemented. Remaining unchecked criteria are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.
