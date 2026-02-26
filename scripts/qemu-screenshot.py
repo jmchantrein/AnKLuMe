@@ -197,7 +197,7 @@ def main():
         print(f"[INFO] Waiting {args.grub_wait}s for GRUB, sending keys to stop countdown...")
         time.sleep(2)
         # Send arrow down then up to stop countdown without changing selection
-        for t in range(args.grub_wait - 2):
+        for _t in range(args.grub_wait - 2):
             try:
                 qmp.send_key("down")
                 time.sleep(0.3)
@@ -284,10 +284,10 @@ def main():
     finally:
         # Shutdown
         print("[INFO] Shutting down QEMU...")
-        try:
+        import contextlib
+
+        with contextlib.suppress(Exception):
             qmp.quit()
-        except Exception:
-            pass
         qmp.close()
         time.sleep(1)
         if proc.poll() is None:

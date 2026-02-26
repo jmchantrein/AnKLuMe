@@ -15,7 +15,7 @@
 
 - name: LlmSanitizer | Skip when sanitization is disabled
   ansible.builtin.meta: end_role
-  when: domain_ai_sanitize is defined and domain_ai_sanitize == false
+  when: domain_ai_sanitize is defined and not domain_ai_sanitize
 
 - name: LlmSanitizer | Wait for dpkg lock
   ansible.builtin.include_tasks:

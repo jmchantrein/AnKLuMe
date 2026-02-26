@@ -9,7 +9,6 @@ Usage:
     python3 scripts/live-os-test-qemu.py images/anklume-arch.iso
 """
 
-import json
 import os
 import socket
 import subprocess
@@ -62,10 +61,10 @@ def run_cmd(child, cmd):
     if lines and cmd[:20] in lines[0]:
         lines = lines[1:]
     # Filter out marker, prompt lines, and empty lines
-    lines = [l for l in lines
-             if marker not in l
-             and not l.strip().startswith("root@")
-             and l.strip()]
+    lines = [line for line in lines
+             if marker not in line
+             and not line.strip().startswith("root@")
+             and line.strip()]
     return "\n".join(lines).strip()
 
 
@@ -167,8 +166,10 @@ def main():
             ("Git available",         "command -v git >/dev/null && echo PASS || echo FAIL"),
             ("Make available",        "command -v make >/dev/null && echo PASS || echo FAIL"),
             ("Keyboard is fr",        "grep -q fr /etc/vconsole.conf && echo PASS || echo FAIL"),
-            ("No incus-agent spam",   "! systemctl is-enabled incus-agent.service 2>/dev/null && echo PASS || echo FAIL"),
-            ("NVIDIA modules present", "find /lib/modules/ -name 'nvidia.ko*' 2>/dev/null | grep -q nvidia && echo PASS || echo FAIL"),
+            ("No incus-agent spam",
+             "! systemctl is-enabled incus-agent.service 2>/dev/null && echo PASS || echo FAIL"),
+            ("NVIDIA modules present",
+             "find /lib/modules/ -name 'nvidia.ko*' 2>/dev/null | grep -q nvidia && echo PASS || echo FAIL"),
             ("Sway installed",        "command -v sway >/dev/null && echo PASS || echo FAIL"),
             ("Foot installed",        "command -v foot >/dev/null && echo PASS || echo FAIL"),
             ("Writable /tmp",         "touch /tmp/test-write && rm /tmp/test-write && echo PASS || echo FAIL"),

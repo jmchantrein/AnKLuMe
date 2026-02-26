@@ -359,7 +359,9 @@ NVSRC
             break
         fi
     done
-    [ -z "$deb_kernel" ] && deb_kernel=$(ls "$ROOTFS_DIR/lib/modules/" | grep deb | tail -1)
+    if [ -z "$deb_kernel" ]; then
+        deb_kernel=$(find "$ROOTFS_DIR/lib/modules/" -maxdepth 1 -name "*deb*" -printf '%f\n' | tail -1)
+    fi
     info "  Target kernel for NVIDIA: $deb_kernel"
     # Step 2: Install nvidia-driver from backports (matches backports kernel)
     # DKMS trigger will fail (builds for host kernel via uname -r) — OK, we rebuild manually
@@ -530,7 +532,7 @@ SWAY_AUTOSTART
     # module copying, which can silently fail in chroot environments.
     # Verify modules are present; if not, manually inject them.
     local newest_kver initrd_path
-    newest_kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" | sort -V | tail -1)
+    newest_kver=$(find "$ROOTFS_DIR/usr/lib/modules/" -maxdepth 1 -mindepth 1 -printf '%f\n' | sort -V | tail -1)
     initrd_path=$(find "$ROOTFS_DIR/boot" -name "initrd.img-$newest_kver" -type f 2>/dev/null | head -1)
     if [ -n "$initrd_path" ] && [ -n "$newest_kver" ]; then
         # Check if initramfs has any .ko files
@@ -563,7 +565,7 @@ else:
             inject_modules="$inject_modules net_failover failover"
             mkdir -p "$inject_dir/lib/modules/$newest_kver"
             # Copy each module and its dependencies
-            local mod_src mod_file
+            local mod_file
             for mod in $inject_modules; do
                 mod_file=$(find "$ROOTFS_DIR/usr/lib/modules/$newest_kver/kernel" \
                     -name "${mod}.ko*" 2>/dev/null | head -1)
@@ -898,7 +900,7 @@ SWAY_AUTOSTART
 
     # Detect installed kernel version in the rootfs
     local kver
-    kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" 2>/dev/null | head -1)
+    kver=$(find "$ROOTFS_DIR/usr/lib/modules/" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | head -1)
     info "  Detected kernel version: ${kver:-NONE}"
 
     # Ensure kernel is in /boot/ (pacman hooks may fail in chroot)

@@ -7,6 +7,7 @@ exclude_paths:
   - tests/
   - molecule/shared/  # Template files, not real playbooks
   - roles/_shared/    # Shared task library, not a proper role
+  - mkdocs.yml        # Uses !!python/name YAML tag unsupported by ansible-lint
 
 skip_list:
   # Input variables (incus_project, incus_network, instance_name, etc.)
