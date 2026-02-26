@@ -392,14 +392,31 @@ Incus-in-Incus sandbox.
 
 ---
 
-## FINDING-11: LLM Sanitizer — Regex-Only Detection (LOW)
+## FINDING-11: LLM Sanitizer — Two-Level Architecture (LOW)
 
 ### Description
 
-The LLM sanitizer (Phase 39, ADR-044) uses curated regex patterns to
-detect and redact sensitive data in cloud-bound LLM requests.
+The LLM sanitizer (Phase 39, ADR-044) is designed as a **two-level**
+detection architecture (`docs/vision-ai-integration.md`):
 
-### Why It Matters
+1. **Level 1 — IaC-specific regex patterns** (implemented in
+   `roles/llm_sanitizer/templates/patterns.yml.j2`): curated regexes
+   targeting anklume-specific identifiers (trust-zone IPs, Incus
+   resource names, bridges, FQDN, credentials, Ansible paths, MAC
+   addresses, network scan output).
+2. **Level 2 — ML/NER-based detection** (planned): integration with
+   a proven base such as LLM Guard (NER via BERT, 30+ entity types)
+   or LLM Sentinel (80+ PII types). These tools handle semantic
+   detection that regex cannot cover.
+
+The vision doc states: "None of these understand IaC-specific data
+[...] anklume would add IaC-specific detection patterns on top of a
+proven base."
+
+### Current State
+
+Only Level 1 (regex) is implemented. Level 2 (ML/NER) is planned but
+not yet deployed. With only Level 1 active:
 
 - Regex patterns cannot detect semantic information leakage (e.g.,
   describing the infrastructure topology in natural language without
@@ -412,14 +429,19 @@ detect and redact sensitive data in cloud-bound LLM requests.
 
 ### Recommendations
 
-1. **This is an acceptable tradeoff**: The SPEC explicitly states
-   "Pattern-based, not AI-based: predictable, auditable, no false
-   positives from model drift." This is documented and intentional.
-2. **Extend patterns proactively**: When new infrastructure identifiers
-   are added (e.g., MCP service names), add corresponding patterns
+1. **Prioritize Level 2 integration**: Adding NER-based detection
+   (LLM Guard or equivalent) would close the semantic leakage gap
+   that regex alone cannot address
+2. **Extend Level 1 patterns proactively**: When new infrastructure
+   identifiers are added (e.g., MCP service names), add corresponding
+   patterns to `patterns.yml.j2`
 3. **Log bypass metrics**: Track what percentage of requests have zero
    redactions — a sudden drop could indicate a new identifier type
    leaking through
+4. **The two-level architecture is the right design**: Regex for
+   IaC-specific identifiers (fast, no false positives) + ML for
+   general PII/semantic detection (broad coverage) is a sound
+   layered approach
 
 ---
 
@@ -515,7 +537,7 @@ preserved:
 | FINDING-08: Disposable default project | LOW-MEDIUM | Low | No isolation | Fixable |
 | FINDING-09: Galaxy roles in trust boundary | LOW-MEDIUM | Low | Supply chain | Mitigable |
 | FINDING-10: Agent Teams bypass permissions | LOW | Very Low | API key exfiltration | Mitigable |
-| FINDING-11: LLM sanitizer regex-only | LOW | Low | Data leakage | By design |
+| FINDING-11: LLM sanitizer Level 2 not yet deployed | LOW | Low | Data leakage | Planned |
 | FINDING-12: No file integrity check | LOW | Very Low | Config injection | Acceptable |
 
 ---
