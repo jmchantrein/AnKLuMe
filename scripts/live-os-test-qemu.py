@@ -46,15 +46,26 @@ def qmp_shutdown():
         pass
 
 
+_cmd_seq = 0
+
 def run_cmd(child, cmd):
-    """Send command, wait for prompt, return output."""
-    child.sendline(cmd)
-    child.expect([r"root@.*#", r"#\s*$"], timeout=CMD_TIMEOUT)
+    """Send command, wait for unique end marker, return output."""
+    global _cmd_seq
+    _cmd_seq += 1
+    marker = f"ENDMARK{_cmd_seq:04d}"
+    full_cmd = f"{cmd}; echo {marker}"
+    child.sendline(full_cmd)
+    child.expect(marker.encode(), timeout=CMD_TIMEOUT)
     raw = child.before.decode("utf-8", errors="replace")
     lines = raw.split("\n")
-    # Strip echoed command
-    if lines and cmd in lines[0]:
+    # Strip echoed command (if echo is on)
+    if lines and cmd[:20] in lines[0]:
         lines = lines[1:]
+    # Filter out marker, prompt lines, and empty lines
+    lines = [l for l in lines
+             if marker not in l
+             and not l.strip().startswith("root@")
+             and l.strip()]
     return "\n".join(lines).strip()
 
 
@@ -133,6 +144,16 @@ def main():
         time.sleep(0.5)
         print("[ OK ] Logged in as root")
         results.append(("Root login", "PASS", ""))
+
+        # Disable bracketed paste mode (Debian bash enables it, garbles output)
+        child.sendline(b"bind 'set enable-bracketed-paste off' 2>/dev/null; stty -echo 2>/dev/null; export TERM=dumb")
+        child.expect([b"#", b"\\$"], timeout=CMD_TIMEOUT)
+        time.sleep(0.3)
+
+        # Wait for systemd to finish booting before running tests
+        child.sendline(b"systemctl is-system-running --wait 2>/dev/null; sleep 1; echo READY")
+        child.expect(b"READY", timeout=60)
+        time.sleep(0.5)
 
         # ── Validation tests ──
         tests = [

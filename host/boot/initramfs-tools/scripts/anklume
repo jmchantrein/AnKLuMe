@@ -1,0 +1,138 @@
+#!/bin/sh
+# anklume initramfs-tools BOOT-TIME script
+# Defines mountroot() for live ISO boot with squashfs + overlayfs
+# Activated by kernel parameter: boot=anklume
+#
+# Flow: find ISO by label -> optional toram -> loop-mount squashfs ->
+#       overlay (squashfs ro + tmpfs rw) -> mount on ${rootmnt}
+
+mountroot()
+{
+    # Parse kernel cmdline
+    anklume_boot_mode=""
+    anklume_toram=""
+    for param in $(cat /proc/cmdline); do
+        case "$param" in
+            anklume.boot_mode=*) anklume_boot_mode="${param#anklume.boot_mode=}" ;;
+            anklume.toram=*)     anklume_toram="${param#anklume.toram=}" ;;
+        esac
+    done
+
+    if [ "$anklume_boot_mode" != "iso" ]; then
+        log_failure_msg "anklume: boot=anklume but boot_mode is not iso"
+        panic "anklume: Cannot proceed without anklume.boot_mode=iso"
+        return
+    fi
+
+    log_begin_msg "anklume: Starting live ISO boot"
+
+    # Ensure required kernel modules are loaded
+    modprobe -q overlay 2>/dev/null || true
+    modprobe -q loop 2>/dev/null || true
+    modprobe -q squashfs 2>/dev/null || true
+    modprobe -q iso9660 2>/dev/null || true
+
+    # Wait for udev to settle (device discovery)
+    wait_for_udev 10
+
+    # ── 1. Find and mount ISO device ──
+    mkdir -p /run/anklume/bootmnt
+
+    tries=0
+    ISO_DEV=""
+    while [ $tries -lt 30 ]; do
+        ISO_DEV=$(blkid -L "ANKLUME-LIVE" 2>/dev/null)
+        [ -n "$ISO_DEV" ] && break
+        tries=$((tries + 1))
+        sleep 1
+    done
+
+    if [ -z "$ISO_DEV" ]; then
+        log_failure_msg "anklume: Could not find ISO device (label: ANKLUME-LIVE)"
+        panic "anklume: No boot device found"
+        return
+    fi
+
+    log_success_msg "anklume: Found ISO at $ISO_DEV"
+    if ! mount -t iso9660 -o ro "$ISO_DEV" /run/anklume/bootmnt; then
+        log_failure_msg "anklume: Failed to mount ISO"
+        panic "anklume: mount failed"
+        return
+    fi
+
+    squashfs="/run/anklume/bootmnt/live/rootfs.squashfs"
+    if [ ! -f "$squashfs" ]; then
+        log_failure_msg "anklume: rootfs.squashfs not found in ISO"
+        panic "anklume: missing squashfs"
+        return
+    fi
+
+    # ── 2. Optional: copy squashfs to RAM ──
+    if [ "$anklume_toram" = "1" ]; then
+        log_begin_msg "anklume: Copying squashfs to RAM"
+        mkdir -p /run/anklume/copytoram
+        mount -t tmpfs -o "size=75%,mode=0755" copytoram /run/anklume/copytoram
+        # Use cat as fallback if cp is not available in initramfs
+        if command -v cp >/dev/null 2>&1; then
+            copy_cmd="cp -- $squashfs /run/anklume/copytoram/rootfs.squashfs"
+        else
+            copy_cmd="cat $squashfs > /run/anklume/copytoram/rootfs.squashfs"
+        fi
+        if eval "$copy_cmd"; then
+            squashfs="/run/anklume/copytoram/rootfs.squashfs"
+            log_success_msg "anklume: Squashfs copied to RAM"
+            # Release the ISO device
+            umount /run/anklume/bootmnt
+            log_success_msg "anklume: ISO device released (running from RAM)"
+        else
+            log_warning_msg "anklume: toram copy failed, booting from ISO directly"
+            umount /run/anklume/copytoram 2>/dev/null
+        fi
+    fi
+
+    # ── 3. Loop-mount squashfs read-only ──
+    mkdir -p /run/anklume/rootfs
+    loopdev="$(losetup --find --show --read-only -- "$squashfs")"
+    if ! mount -t squashfs -o ro "$loopdev" /run/anklume/rootfs; then
+        log_failure_msg "anklume: Failed to mount squashfs"
+        panic "anklume: squashfs mount failed"
+        return
+    fi
+    log_success_msg "anklume: Squashfs mounted read-only"
+
+    # ── 4. Create COW space (tmpfs) ──
+    mkdir -p /run/anklume/cowspace
+    mount -t tmpfs -o "size=50%,mode=0755" cowspace /run/anklume/cowspace
+    mkdir -p /run/anklume/cowspace/upper /run/anklume/cowspace/work
+
+    # ── 5. Mount overlayfs as root ──
+    if ! mount -t overlay -o \
+        "lowerdir=/run/anklume/rootfs,upperdir=/run/anklume/cowspace/upper,workdir=/run/anklume/cowspace/work" \
+        rootfs "${rootmnt}"; then
+        log_failure_msg "anklume: Failed to mount overlayfs"
+        panic "anklume: overlay mount failed"
+        return
+    fi
+    log_success_msg "anklume: Overlay root mounted on ${rootmnt}"
+
+    # ── 6. Create required directories excluded from squashfs ──
+    # mksquashfs -e dev proc sys run tmp removes these entirely;
+    # run-init and systemd need them to exist
+    for d in dev proc sys run; do
+        mkdir -p "${rootmnt}/${d}" 2>/dev/null || true
+    done
+    # /tmp needs 1777 permissions (sticky bit) like a standard Linux system
+    mkdir -p "${rootmnt}/tmp" 2>/dev/null || true
+    chmod 1777 "${rootmnt}/tmp" 2>/dev/null || true
+    # Create /dev/console — required by run-init to redirect I/O
+    if [ -c /dev/console ] && [ ! -c "${rootmnt}/dev/console" ]; then
+        mknod -m 622 "${rootmnt}/dev/console" c 5 1 2>/dev/null || true
+    fi
+    # Create /dev/null — needed by many init scripts
+    if [ ! -c "${rootmnt}/dev/null" ]; then
+        mknod -m 666 "${rootmnt}/dev/null" c 1 3 2>/dev/null || true
+    fi
+
+    log_success_msg "anklume: Boot setup complete, switching to real root"
+    log_end_msg 0
+}

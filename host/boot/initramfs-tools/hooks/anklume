@@ -1,0 +1,38 @@
+#!/bin/sh
+# anklume initramfs-tools BUILD-TIME hook
+# Includes required binaries and kernel modules for live ISO boot
+# (squashfs + overlayfs + toram support)
+
+PREREQ=""
+
+prereqs()
+{
+    echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Binaries needed at boot time
+copy_exec /sbin/losetup /sbin
+copy_exec /sbin/blkid /sbin
+
+# Kernel modules for live ISO boot
+manual_add_modules loop
+manual_add_modules squashfs
+manual_add_modules overlay
+manual_add_modules iso9660
+manual_add_modules cdrom
+manual_add_modules sr_mod
+
+# Virtio modules for VM boot
+manual_add_modules virtio_blk
+manual_add_modules virtio_scsi
+manual_add_modules virtio_pci
+manual_add_modules virtio_net
