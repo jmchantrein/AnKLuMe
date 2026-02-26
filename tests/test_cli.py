@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
+# Disable Rich color output to avoid ANSI escape codes in help text assertions
+os.environ.setdefault("NO_COLOR", "1")
+
 # Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
