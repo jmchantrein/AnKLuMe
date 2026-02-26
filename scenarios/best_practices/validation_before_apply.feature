@@ -7,7 +7,8 @@ Feature: Validation before apply
     Given a clean sandbox environment
 
   Scenario: Lint passes on generated files
-    Given infra.yml from "student-sysadmin"
+    Given "yamllint" is available
+    And infra.yml from "student-sysadmin"
     When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
     When I run "yamllint -c .yamllint.yml inventory/ group_vars/ host_vars/" and it may fail
