@@ -83,29 +83,14 @@ Un etat sauvegarde d'une instance. Supporte : individuel, par lot
 
 ## 3. Modele de source de verite (PSOT)
 
-```
-+-----------------------+     anklume sync     +---------------------------+
-|     infra.yml         | -----------------> |  Fichiers Ansible         |
-|  (Source de Verite    |                    |  (Source de Verite        |
-|   Primaire)           |                    |   Secondaire)             |
-|                       |                    |                           |
-|  Description de       |                    |  inventory/<domaine>.yml  |
-|  l'infra de haut      |                    |  group_vars/<domaine>.yml |
-|  niveau : domaines,   |                    |  host_vars/<hote>.yml     |
-|  machines, reseaux,   |                    |                           |
-|  profils              |                    |  Les utilisateurs peuvent |
-|                       |                    |  editer librement en      |
-|                       |                    |  dehors des sections gerees|
-+-----------------------+                    +-------------+-------------+
-                                                          |
-                                                     anklume domain apply
-                                                          |
-                                                          v
-                                             +---------------------------+
-                                             |    Etat Incus             |
-                                             |  (bridges, projets,       |
-                                             |   profils, instances)     |
-                                             +---------------------------+
+```mermaid
+flowchart TD
+    A["<b>infra.yml</b><br/><i>(Source de Verite Primaire)</i><br/><br/>Description de l'infra<br/>de haut niveau :<br/>domaines, machines,<br/>reseaux, profils"]
+    B["<b>Fichiers Ansible</b><br/><i>(Source de Verite Secondaire)</i><br/><br/>inventory/&lt;domaine&gt;.yml<br/>group_vars/&lt;domaine&gt;.yml<br/>host_vars/&lt;hote&gt;.yml<br/><br/>Les utilisateurs peuvent<br/>editer librement en<br/>dehors des sections gerees"]
+    C["<b>Etat Incus</b><br/><br/>bridges, projets,<br/>profils, instances"]
+
+    A -->|"anklume sync"| B
+    B -->|"anklume domain apply"| C
 ```
 
 **Regles** :
@@ -120,22 +105,22 @@ Un etat sauvegarde d'une instance. Supporte : individuel, par lot
 
 ## 4. Architecture de l'hote
 
-```
-+---------------------------------------------------------+
-| Hote (n'importe quelle distribution Linux)              |
-|  . Daemon Incus + nftables + (optionnel) GPU NVIDIA     |
-|                                                          |
-|  +----------+ +----------+ +----------+                  |
-|  | net-aaa  | | net-bbb  | | net-ccc  |  ...            |
-|  | .X.0/24  | | .Y.0/24  | | .Z.0/24  |                 |
-|  +----+-----+ +----+-----+ +----+-----+                 |
-|       |             |             |                       |
-|  +----+----+  +-----+----+ +----+------+                 |
-|  | LXC/VM  |  | LXC/VM   | | LXC/VM   |                 |
-|  +---------+  +----------+ +----------+                  |
-|                                                          |
-|  Isolation nftables : net-X != net-Y (pas de forwarding) |
-+---------------------------------------------------------+
+```mermaid
+graph TD
+    subgraph Hote["Hote (n'importe quelle distribution Linux)<br/>Daemon Incus + nftables + optionnel GPU NVIDIA"]
+        subgraph netA["net-aaa<br/>.X.0/24"]
+            vmA["LXC/VM"]
+        end
+        subgraph netB["net-bbb<br/>.Y.0/24"]
+            vmB["LXC/VM"]
+        end
+        subgraph netC["net-ccc<br/>.Z.0/24"]
+            vmC["LXC/VM"]
+        end
+    end
+
+    netA x--x|"isolation nftables"| netB
+    netB x--x|"pas de forwarding"| netC
 ```
 
 Le container anklume (`anklume-instance`) :

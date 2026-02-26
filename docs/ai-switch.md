@@ -7,18 +7,27 @@ between access switches to clear residual model state.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                         Host                             │
-│                                                          │
-│  net-pro ──────┐                                        │
-│                │ ✓ (current)      ┌──────────────┐      │
-│  net-perso ────┤ ✗ (blocked)  ──▶│ net-ai-tools │      │
-│                │                  │  gpu-server   │      │
-│  net-anklume ──┘ ✗ (blocked)     │  ai-webui    │      │
-│                                   └──────────────┘      │
-│  nftables: only net-pro <-> net-ai-tools allowed        │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Host
+        nPro["net-pro"]
+        nPerso["net-perso"]
+        nAnk["net-anklume"]
+
+        subgraph AI["net-ai-tools"]
+            gpu["gpu-server"]
+            webui["ai-webui"]
+        end
+
+        nPro ==>|"✓ current"| AI
+        nPerso x--x|"✗ blocked"| AI
+        nAnk x--x|"✗ blocked"| AI
+    end
+
+    style AI fill:#e3f2fd,stroke:#1565c0
+    style nPro fill:#c8e6c9,stroke:#2e7d32
+    style nPerso fill:#ffcdd2,stroke:#c62828
+    style nAnk fill:#ffcdd2,stroke:#c62828
 ```
 
 At any time, exactly one domain bridge has nftables accept rules to

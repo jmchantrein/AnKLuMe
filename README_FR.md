@@ -112,23 +112,24 @@ Voir le [guide de demarrage rapide](docs/quickstart.md) pour plus de details.
 
 ## Architecture
 
-```
-+---------------------------------------------------------------+
-| Hote (n'importe quelle distro Linux)                          |
-|  Incus daemon + nftables + (optionnel) GPU NVIDIA             |
-|                                                               |
-|  +-----------+ +-----------+ +-----------+                    |
-|  | net-aaa   | | net-bbb   | | net-ccc   |  ...              |
-|  | subnet A  | | subnet B  | | subnet C  |                   |
-|  +-----+-----+ +-----+-----+ +-----+-----+                  |
-|        |              |              |                         |
-|  +-----+-----+ +-----+-----+ +-----+-----+                  |
-|  | LXC / VM  | | LXC / VM  | | LXC / VM  |                  |
-|  +-----------+ +-----------+ +-----------+                    |
-|                                                               |
-|  Isolation nftables : subnet A != B != C (pas de forwarding)  |
-|  Acces inter-domaines selectif via network_policies            |
-+---------------------------------------------------------------+
+```mermaid
+graph TD
+    subgraph Hote["Hote (n'importe quelle distro Linux)<br/>Incus daemon + nftables + optionnel GPU NVIDIA"]
+        subgraph netA["net-aaa<br/>subnet A"]
+            vmA["LXC / VM"]
+        end
+        subgraph netB["net-bbb<br/>subnet B"]
+            vmB["LXC / VM"]
+        end
+        subgraph netC["net-ccc<br/>subnet C"]
+            vmC["LXC / VM"]
+        end
+    end
+
+    netA x--x|"isolation nftables"| netB
+    netB x--x|"pas de forwarding"| netC
+
+    style Hote fill:#f9f9f9,stroke:#333
 ```
 
 Chaque **domaine** est un sous-reseau isole avec son propre projet Incus.
