@@ -51,6 +51,19 @@ def get_warnings(infra):
                     f"isolation. This is unsafe for production."
                 )
 
+    # Warn when untrusted/disposable domains use LXC instead of VM
+    for dname, domain in domains.items():
+        trust = domain.get("trust_level", "")
+        if trust not in ("untrusted", "disposable"):
+            continue
+        for mname, machine in (domain.get("machines") or {}).items():
+            if machine.get("type", "lxc") == "lxc":
+                warnings.append(
+                    f"Domain '{dname}' is {trust} but machine "
+                    f"'{mname}' uses LXC. Consider type: vm for "
+                    f"stronger isolation."
+                )
+
     if len(gpu_instances) > 1 and gpu_policy == "shared":
         warnings.append(
             f"GPU policy is 'shared': {len(gpu_instances)} instances "
