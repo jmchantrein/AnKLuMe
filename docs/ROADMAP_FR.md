@@ -923,6 +923,100 @@ les VMs Incus imbriquees pour eviter les telechargements redondants.
 
 ---
 
+## Phase 44 : Site de Documentation (MkDocs Material + Mermaid + CI)
+
+**Objectif** : Remplacer la navigation brute des Markdown sur GitHub
+par un site de documentation moderne, avec recherche, bilingue, et
+auto-deploye sur GitHub Pages. Remplacer les diagrammes ASCII par
+des diagrammes Mermaid rendus nativement sur GitHub et dans le site.
+
+**Prerequis** : Phase 7 (Documentation), Phase 33 (i18n).
+
+**Justification** : Le projet compte 77+ fichiers Markdown dans
+`docs/`, `examples/` et `labs/`. Les parcourir sur GitHub est
+penible : pas de recherche, pas de barre laterale, pas de
+references croisees, pas de vrais diagrammes. Un site de
+documentation ameliore l'accessibilite pour tous les publics
+(sysadmins, etudiants, enseignants) sans changer le format
+source — les fichiers restent du Markdown pur, lisibles par les
+LLMs et editables par les contributeurs.
+
+**Pourquoi MkDocs Material** :
+- Python natif (pip install, config YAML) — meme ecosysteme
+  qu'Ansible et generate.py
+- Standard de facto pour les projets IaC (Ansible, Terraform,
+  projets CNCF)
+- Zero migration : les fichiers `.md` existants fonctionnent tels quels
+- Support Mermaid natif via `pymdownx.superfences`
+- Excellente recherche client-side (lunr.js avec stemming francais)
+- Support bilingue via `mkdocs-static-i18n` (suffixe `.fr.md`)
+- Auto-documentation de `generate.py` via `mkdocstrings`
+
+**Pourquoi Mermaid** pour les diagrammes :
+- Rendu natif par GitHub dans les `.md` (double rendu : GitHub + site)
+- Source textuelle (lisible et genereable par les LLMs)
+- Flowcharts, diagrammes de sequence, d'etats, d'architecture
+- Integre dans MkDocs Material sans plugin additionnel
+
+**Livrables** :
+
+a) **Configuration MkDocs** (`mkdocs.yml`) :
+   - Theme Material avec palette personnalisee
+   - Navigation structuree selon `docs/`
+   - Diagrammes Mermaid via `pymdownx.superfences`
+   - `mkdocs-static-i18n` pour le support bilingue EN/FR
+   - Recherche avec stemming francais
+   - Coloration syntaxique YAML, Python, Bash, Jinja2
+
+b) **Migration des noms de fichiers FR** (`*_FR.md` -> `*.fr.md`) :
+   - Renommage des 37+ fichiers de traduction
+   - Mise a jour des references croisees internes
+   - `git mv` pour preserver l'historique
+
+c) **Conversion des diagrammes ASCII en Mermaid** :
+   - Flux PSOT (infra.yml -> Ansible -> Incus)
+   - Architecture hote (bridges, instances, nftables)
+   - Isolation reseau (drop inter-bridges, policies)
+   - Sequence de bootstrap
+   - Pattern de reconciliation
+   - Sequence de bascule AI (purge VRAM + swap nftables)
+   - Niveaux d'imbrication (physique -> VM -> LXC)
+   - Adressage par zone de confiance (octets 10.1xx)
+
+d) **Deploiement CI/CD** (`.github/workflows/docs.yml`) :
+   - Declenchement sur push vers `main`
+   - Build avec `mkdocs build`
+   - Deploiement sur GitHub Pages via `actions/deploy-pages`
+   - Validation du build sur les PRs
+
+e) **Optionnel : diagramme d'infrastructure auto-genere** :
+   - `scripts/infra_diagram.py` lit `infra.yml` et genere un
+     diagramme Mermaid ou SVG
+   - Integre dans le CI
+
+f) **Dependances** (ajoutees dans `pyproject.toml`) :
+   - `mkdocs-material` dans `[project.optional-dependencies.docs]`
+   - `mkdocs-static-i18n`
+   - Optionnel : `mkdocstrings[python]`
+
+g) **Integration Makefile / CLI** :
+   - `make docs` / `anklume docs build`
+   - `make docs-serve` / `anklume docs serve`
+
+**Criteres de validation** :
+- [ ] `mkdocs build --strict` passe sans avertissement
+- [ ] Site deploye sur GitHub Pages et accessible
+- [ ] Les 77+ documents visibles dans la navigation
+- [ ] Le basculement FR affiche les traductions francaises
+- [ ] La recherche trouve du contenu en EN et FR
+- [ ] Les diagrammes Mermaid s'affichent sur GitHub ET dans le site
+- [ ] Les diagrammes ASCII remplaces dans SPEC.md et ARCHITECTURE.md
+- [ ] Le CI deploie automatiquement sur push vers main
+- [ ] Les fichiers source `.md` restent lisibles par les LLMs
+- [ ] `site/` dans `.gitignore`
+
+---
+
 ## Etat Actuel
 
 **Complete** :
