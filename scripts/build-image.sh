@@ -244,7 +244,7 @@ bootstrap_rootfs_debian() {
     fi
 
     local debootstrap_opts="--arch=$ARCH"
-    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,openssh-server,curl,jq,python3,python3-pip,python3-yaml,ca-certificates"
+    debootstrap_opts="$debootstrap_opts --include=systemd,linux-image-$ARCH,initramfs-tools,openssh-server,curl,jq,python3,python3-pip,python3-yaml,ca-certificates,console-setup,kbd"
 
     if [ -n "$MIRROR" ]; then
         # shellcheck disable=SC2086
@@ -270,7 +270,7 @@ bootstrap_rootfs_debian() {
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
     packages="$packages firmware-linux-free"
     packages="$packages ansible git make sudo nano"
-    packages="$packages iproute2 dmidecode lsof htop"
+    packages="$packages iproute2 dmidecode lsof htop file"
     # Incus: Debian Trixie ships incus in official repos
     packages="$packages incus"
     chroot "$ROOTFS_DIR" apt-get update -qq
@@ -288,9 +288,24 @@ bootstrap_rootfs_debian() {
 FSTAB
     info "  Hostname and fstab configured"
 
-    # Set root password for live system (autologin, but needed for emergency/sulogin)
-    echo "root:anklume" | chroot "$ROOTFS_DIR" chpasswd 2>/dev/null || true
-    info "  Root password set (anklume)"
+    # Set root password for live system — use openssl to generate hash directly
+    # (chpasswd in chroot can fail silently due to PAM config)
+    local pw_hash
+    pw_hash=$(openssl passwd -6 "anklume")
+    sed -i "s|^root:[^:]*:|root:${pw_hash}:|" "$ROOTFS_DIR/etc/shadow"
+    # Also unlock the account (remove ! prefix if present)
+    sed -i 's|^root:!|root:|' "$ROOTFS_DIR/etc/shadow"
+    info "  Root password set (anklume) via shadow"
+
+    # Allow root login on serial console (remove securetty restrictions)
+    rm -f "$ROOTFS_DIR/etc/securetty"
+    # Disable pam_securetty for login (allows root on any terminal)
+    if [ -f "$ROOTFS_DIR/etc/pam.d/login" ]; then
+        sed -i 's/^auth.*pam_securetty.so/#&/' "$ROOTFS_DIR/etc/pam.d/login"
+    fi
+    # Enable serial console getty for QEMU testing
+    chroot "$ROOTFS_DIR" systemctl enable serial-getty@ttyS0.service >/dev/null 2>&1 || true
+    info "  Serial console and root login configured"
 
     # Configure locale and timezone
     chroot "$ROOTFS_DIR" locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
@@ -322,13 +337,51 @@ FSTAB
     echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
     echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
-    # Copy initramfs hooks
-    if [ -d "$PROJECT_ROOT/host/boot/initramfs" ]; then
+    # Install initramfs-tools hooks and boot scripts
+    if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools" ]; then
+        # BUILD-TIME hook: includes binaries and modules in the initramfs
         mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/hooks"
-        cp "$PROJECT_ROOT/host/boot/initramfs"/* "$ROOTFS_DIR/etc/initramfs-tools/hooks/" 2>/dev/null || true
-        chmod +x "$ROOTFS_DIR/etc/initramfs-tools/hooks"/* 2>/dev/null || true
-        info "  Initramfs hooks installed"
+        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/hooks" ]; then
+            cp "$PROJECT_ROOT/host/boot/initramfs-tools/hooks"/* "$ROOTFS_DIR/etc/initramfs-tools/hooks/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/hooks"/* 2>/dev/null || true
+        fi
+        # BOOT-TIME script: defines mountroot() for live ISO boot
+        mkdir -p "$ROOTFS_DIR/etc/initramfs-tools/scripts"
+        if [ -d "$PROJECT_ROOT/host/boot/initramfs-tools/scripts" ]; then
+            cp "$PROJECT_ROOT/host/boot/initramfs-tools/scripts"/* "$ROOTFS_DIR/etc/initramfs-tools/scripts/" 2>/dev/null || true
+            chmod +x "$ROOTFS_DIR/etc/initramfs-tools/scripts"/* 2>/dev/null || true
+        fi
+        info "  initramfs-tools hooks and boot scripts installed"
     fi
+
+    # Add required kernel modules for live ISO boot
+    cat >> "$ROOTFS_DIR/etc/initramfs-tools/modules" << 'MODULES'
+# anklume live ISO boot modules
+loop
+squashfs
+overlay
+iso9660
+cdrom
+sr_mod
+virtio_blk
+virtio_scsi
+virtio_pci
+virtio_net
+MODULES
+    info "  initramfs-tools modules configured"
+
+    # Create vconsole.conf — French AZERTY keyboard layout
+    echo "KEYMAP=fr" > "$ROOTFS_DIR/etc/vconsole.conf"
+    # Also configure console-setup for Debian (vconsole.conf is Arch-style)
+    mkdir -p "$ROOTFS_DIR/etc/default"
+    cat > "$ROOTFS_DIR/etc/default/keyboard" << 'KBD'
+XKBMODEL="pc105"
+XKBLAYOUT="fr"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+KBD
+    info "  Keyboard configured (fr)"
 
     # Copy systemd services
     if [ -d "$PROJECT_ROOT/host/boot/systemd" ]; then
@@ -340,11 +393,25 @@ FSTAB
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
+    # Use manual symlink (systemctl mask may not work without running systemd)
+    ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/tmp.mount" 2>/dev/null || true
+    # Disable incus-agent — not useful in live ISO (no virtiofs config channel)
+    ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" 2>/dev/null || true
     info "  anklume services enabled"
 
-    # Generate initramfs in chroot
-    chroot "$ROOTFS_DIR" update-initramfs -c -k all >/dev/null 2>&1 || true
-    info "  Initramfs generated"
+    # Regenerate initramfs to include our custom hooks and boot scripts
+    # The initial initramfs was generated during debootstrap before our hooks were installed
+    local deb_kver
+    deb_kver=$(ls "$ROOTFS_DIR/usr/lib/modules/" 2>/dev/null | head -1)
+    info "  Detected kernel version: ${deb_kver:-NONE}"
+    if [ -n "$deb_kver" ]; then
+        chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+            update-initramfs -u -k "$deb_kver" 2>&1 | tail -5 || warn "update-initramfs failed"
+        info "  Initramfs regenerated with anklume hooks (kernel $deb_kver)"
+    else
+        warn "  Could not detect kernel version — initramfs not regenerated"
+    fi
 
     # Unmount pseudo-filesystems before creating squashfs
     umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
@@ -596,12 +663,18 @@ create_squashfs() {
 
     local squashfs_file="$WORK_DIR/rootfs.squashfs"
 
+    # Clean directories that should be empty in the squashfs
+    # /tmp: keep the directory (mode 1777) but remove contents
+    rm -rf "${ROOTFS_DIR:?}/tmp/"* 2>/dev/null || true
+    chmod 1777 "$ROOTFS_DIR/tmp" 2>/dev/null || true
+
     # Create squashfs with zstd compression (fast, good ratio)
-    # Exclude pseudo-filesystem mount points just in case
+    # Exclude kernel virtual fs mount points (populated at runtime)
+    # Keep /tmp and /run as empty dirs in the squashfs
     mksquashfs "$ROOTFS_DIR" "$squashfs_file" \
         -comp zstd -Xcompression-level 15 -b 256K \
         -no-exports -no-xattrs \
-        -e proc sys dev run tmp
+        -e proc sys dev
 
     local size
     size=$(du -h "$squashfs_file" | cut -f1)
@@ -853,11 +926,11 @@ set default=0
 search --no-floppy --label ANKLUME-LIVE --set=root
 
 menuentry "anklume Live OS (toram)" {
-    linux /boot/vmlinuz ro anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
 menuentry "anklume Live OS (direct)" {
-    linux /boot/vmlinuz ro anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
 GRUBCFG
