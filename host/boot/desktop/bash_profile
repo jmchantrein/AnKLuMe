@@ -3,6 +3,16 @@
 # Parsed parameter: anklume.desktop=<sway|labwc|kde|1>
 # Only activates on tty1 with no existing Wayland session
 
+# Auto-detect locale from keyboard layout
+# Fixes foot "'C' is not a UTF-8 locale" warning
+if [ -z "$LANG" ] || [ "$LANG" = "C" ]; then
+    if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
+        export LANG=fr_FR.UTF-8
+    else
+        export LANG=en_US.UTF-8
+    fi
+fi
+
 if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
     # Parse anklume.desktop=<de> from kernel cmdline
     ANKLUME_DE=""
