@@ -637,3 +637,58 @@ Also fixed the `add_domain_to_infra` step which used legacy `base_subnet`
 syntax incompatible with ADR-038 addressing convention.
 
 **Status**: validated
+
+---
+
+## D-061: Phase numbering — three branches merged as 44/45/46
+
+**Problem**: Three remote branches independently proposed "Phase 44":
+- `claude/audit-testing-gherkin-ZwzaI` → test infrastructure consolidation
+- `claude/improve-documentation-0INTB` → MkDocs documentation site
+- `claude/anklume-security-audit-a3ooi` → security hardening from audit
+
+All were based on commit `4a6aa27` (pre-Live-ISO work). Merging all
+three as "Phase 44" would create numbering chaos.
+
+**Choice**: Assign sequential numbers based on implementation priority:
+- Phase 44: Test Infrastructure Consolidation (has actual code deliverables)
+- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+- Phase 46: Security Hardening (from operational audit)
+
+**Alternatives considered**:
+(a) Single mega-Phase 44 combining all three — too broad, violates KISS
+(b) Cherry-pick only one branch — wastes valid work from other branches
+(c) Security first — reasonable, but testing has concrete code ready
+
+**Rationale**: Testing consolidation already shipped partial code (Makefile
+targets, test-summary.sh, Gherkin fixes). Documentation and security are
+roadmap entries only. Ordering by implementation readiness minimizes
+context-switching.
+
+**Status**: pending review
+
+---
+
+## D-062: Security audit merged as documentation, not as blocking findings
+
+**Problem**: The security audit branch (`docs/security-audit-operational.md`)
+contains 12 findings rated CRITICAL to LOW. The previous agent analysis
+recommended "NOT merging as-is" due to alarming findings without actionable
+solutions.
+
+**Choice**: Merged the audit document as-is (it IS well-structured and
+constructive) and created Phase 46 as the roadmap entry for implementing
+the fixes. The audit document serves as reference documentation, not as a
+blocker.
+
+**Alternatives considered**:
+(a) Reject the branch entirely — loses valuable security analysis
+(b) Rewrite the audit with softer language — dishonest
+(c) Merge only the ROADMAP entry, not the audit doc — loses context
+
+**Rationale**: The executive summary correctly states the architecture is
+"fundamentally sound." FINDING-01 (Incus socket) and FINDING-02 (OpenClaw
+proxy) are accepted architectural constraints documented in ADR-004 and
+ADR-043. The remaining findings have concrete fixes in Phase 46 deliverables.
+
+**Status**: pending review
