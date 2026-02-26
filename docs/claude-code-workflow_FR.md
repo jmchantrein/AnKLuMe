@@ -42,14 +42,14 @@ un contexte plus approfondi sur une tache specifique, chargez le document pertin
 
 3. **Implementer** : Ecrivez le code jusqu'a ce que les tests passent.
 
-4. **Valider** : Executez `make lint` (chaine tous les validateurs).
+4. **Valider** : Executez `anklume dev lint` (chaine tous les validateurs).
 
 5. **Revue** : Invoquez l'agent de revue :
    ```
    @.claude/agents/reviewer.md Review the changes in roles/incus_networks/
    ```
 
-6. **Commiter** : Seulement quand `make lint && make test` passent.
+6. **Commiter** : Seulement quand `anklume dev lint && anklume dev test` passent.
 
 ## Delegation aux LLM locaux
 
@@ -91,7 +91,7 @@ et les commandes Incus courantes.
 
 - **Gardez le contexte concentre** : Chargez uniquement ce qui est pertinent pour la tache en cours.
 - **Utilisez des sous-agents pour des taches distinctes** : Evitez la pollution de contexte.
-- **Executez `make lint` frequemment** : Detectez les problemes tot.
+- **Executez `anklume dev lint` frequemment** : Detectez les problemes tot.
 - **Consultez ROADMAP.md** : Sachez dans quelle phase vous etes.
 - **Le mode local est le defaut** : Utilisez les outils `mcp-ollama-coder`
   pour la generation et la revue de code afin d'economiser les tokens API.

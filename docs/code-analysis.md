@@ -6,15 +6,15 @@ call graph generation, and module dependency visualization.
 ## Quick start
 
 ```bash
-make dead-code    # Dead code detection (Python + Shell)
-make call-graph   # Python call graph (DOT + SVG)
-make dep-graph    # Python module dependency graph (SVG)
-make code-graph   # Run all analysis tools
+anklume dev graph --type dead    # Dead code detection (Python + Shell)
+anklume dev graph --type call   # Python call graph (DOT + SVG)
+anklume dev graph --type dep    # Python module dependency graph (SVG)
+anklume dev graph --type code   # Run all analysis tools
 ```
 
 ## Tools
 
-### Dead code detection (`make dead-code`)
+### Dead code detection (`anklume dev graph --type dead`)
 
 Detects unused code across Python and Shell files:
 
@@ -29,7 +29,7 @@ Findings are **informational** — vulture may report false positives
 for pytest fixtures, dynamically used functions, and abstract method
 parameters. Review findings manually before removing code.
 
-### Call graph (`make call-graph`)
+### Call graph (`anklume dev graph --type call`)
 
 Generates a call graph of Python functions in `scripts/`. Output is
 saved to `reports/call-graph.dot` (GraphViz DOT format) and
@@ -38,7 +38,7 @@ saved to `reports/call-graph.dot` (GraphViz DOT format) and
 Uses [pyan3](https://github.com/Technologicat/pyan) when available,
 with an AST-based fallback for compatibility with newer Python versions.
 
-### Dependency graph (`make dep-graph`)
+### Dependency graph (`anklume dev graph --type dep`)
 
 Generates a module dependency graph using
 [pydeps](https://github.com/thebjorn/pydeps). Output is saved to
@@ -48,11 +48,11 @@ Generates a module dependency graph using
 
 | Tool | Install | Required for |
 |------|---------|-------------|
-| vulture | `pip install vulture` | `make dead-code` |
-| shellcheck | `apt install shellcheck` | `make dead-code` (shell section) |
-| pyan3 | `pip install pyan3` | `make call-graph` (optional, AST fallback available) |
-| pydeps | `pip install pydeps` | `make dep-graph` |
-| graphviz | `apt install graphviz` | SVG output for `make call-graph` and `make dep-graph` |
+| vulture | `pip install vulture` | `anklume dev graph --type dead` |
+| shellcheck | `apt install shellcheck` | `anklume dev graph --type dead` (shell section) |
+| pyan3 | `pip install pyan3` | `anklume dev graph --type call` (optional, AST fallback available) |
+| pydeps | `pip install pydeps` | `anklume dev graph --type dep` |
+| graphviz | `apt install graphviz` | SVG output for `anklume dev graph --type call` and `anklume dev graph --type dep` |
 
 The script checks for each tool before use and provides clear
 installation instructions if missing.

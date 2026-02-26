@@ -148,7 +148,7 @@ for proj in corp-office corp-dev corp-dmz corp-sandbox; do
   incus project delete "$proj" 2>/dev/null || true
 done
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 ```
 
 ## What you learned

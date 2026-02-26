@@ -23,7 +23,7 @@ host_vars/<machine>.yml     # Variables specifiques a la machine
 
 ```yaml
 # === MANAGED BY infra.yml ===
-# Do not edit this section — it will be overwritten by `make sync`
+# Do not edit this section — it will be overwritten by `anklume sync`
 incus_network:
   name: net-example
   subnet: 10.100.0.0/24   # Zone-aware: 10.<zone_base+offset>.<seq>.0/24
@@ -119,7 +119,7 @@ de l'infrastructure.
 
 **`openclaw_server`** (ADR-036) : Les fichiers operationnels des agents
 sont des templates Jinja2 deployes avec `force: true` a chaque
-`make apply` :
+`anklume domain apply` :
 - `AGENTS.md.j2` -> `~/.openclaw/agents/main/AGENTS.md`
 - `TOOLS.md.j2` -> `~/.openclaw/workspace/TOOLS.md`
 - `USER.md.j2` -> `~/.openclaw/workspace/USER.md`
@@ -178,7 +178,7 @@ Utiliser `--force` pour sauter la confirmation (pour un usage scripte).
 
 ## 8b. Snapshots pre-apply (scripts/snapshot-apply.sh)
 
-Filet de securite automatique par snapshot pour `make apply`. Cree des
+Filet de securite automatique par snapshot pour `anklume domain apply`. Cree des
 snapshots de toutes les instances concernees avant d'appliquer les
 changements, avec une politique de retention et un rollback en une
 seule commande. C'est un wrapper operationnel, pas declaratif.
@@ -200,12 +200,12 @@ avant chaque apply et `snapshot-apply.sh cleanup` apres. Controlable via
 est configurable via `KEEP=N`.
 
 ```bash
-make apply                      # Auto-snapshots all instances before apply
-make apply-limit G=ai-tools     # Auto-snapshots only ai-tools instances
-make rollback                   # Restore most recent pre-apply snapshot
-make rollback T=20260219-143022 # Restore specific pre-apply snapshot
-make rollback-list              # List available pre-apply snapshots
-make rollback-cleanup KEEP=5    # Remove old snapshots, keep 5
+anklume domain apply                      # Auto-snapshots all instances before apply
+anklume domain apply ai-tools     # Auto-snapshots only ai-tools instances
+anklume snapshot rollback                   # Restore most recent pre-apply snapshot
+anklume snapshot rollback T=20260219-143022 # Restore specific pre-apply snapshot
+anklume snapshot rollback --list              # List available pre-apply snapshots
+anklume snapshot rollback --cleanup KEEP=5    # Remove old snapshots, keep 5
 ```
 
 ### Nommage des snapshots
@@ -251,7 +251,7 @@ plus recents. Le fichier `history` est reduit en consequence.
 - Instances manquantes (introuvables dans Incus) : averties et ignorees lors de la creation
 - Snapshots echoues : avertis, l'apply continue, le rollback peut etre incomplet
 - Pas d'inventaire : averti, retourne 0 (no-op)
-- Pas de snapshots pour le rollback : erreur avec suggestion d'executer `make rollback-list`
+- Pas de snapshots pour le rollback : erreur avec suggestion d'executer `anklume snapshot rollback --list`
 
 ## 9. Validateurs
 
@@ -267,7 +267,7 @@ a la validation.
 | `markdownlint` | `**/*.md` (optionnel) | Coherence Markdown |
 | `ansible-playbook --syntax-check` | Playbooks | Syntaxe YAML/Jinja2 |
 
-`make lint` execute tous les validateurs en sequence. Le CI doit tous
+`anklume dev lint` execute tous les validateurs en sequence. Le CI doit tous
 les passer.
 
 ## 10. Flux de developpement
@@ -283,7 +283,7 @@ l'ordre strict est :
    (`# Matrix: XX-NNN`) le cas echeant.
 3. **Implementer ensuite** : Coder jusqu'a ce que les tests passent (Molecule
    pour les roles, pytest pour le generateur)
-4. **Valider** : `make lint`
+4. **Valider** : `anklume dev lint`
 5. **Revoir** : Executer l'agent de revue
 6. **Commiter** : Uniquement quand tout passe
 
@@ -354,13 +354,13 @@ n'ont pas le peripherique proxy.
 
 ### Importer une infrastructure existante
 
-`make import-infra` scanne l'etat Incus en cours et genere un
+`anklume setup import` scanne l'etat Incus en cours et genere un
 `infra.yml` correspondant. L'utilisateur modifie le resultat, puis
-execute `make sync && make apply` pour converger de maniere idempotente.
+execute `anklume sync && anklume domain apply` pour converger de maniere idempotente.
 
 ### Flush (remise a zero)
 
-`make flush` detruit toute l'infrastructure anklume :
+`anklume flush` detruit toute l'infrastructure anklume :
 - Toutes les instances, profils, projets et bridges `net-*`
 - Les fichiers Ansible generes (inventory/, group_vars/, host_vars/)
 - Preserve : infra.yml, roles/, scripts/, docs/
@@ -368,10 +368,10 @@ execute `make sync && make apply` pour converger de maniere idempotente.
 
 ### Mise a jour (upgrade)
 
-`make upgrade` met a jour les fichiers du framework anklume en toute securite :
+`anklume upgrade` met a jour les fichiers du framework anklume en toute securite :
 - Tire les changements en amont
 - Detecte les fichiers du framework modifies localement -- cree des `.bak`
-- Regenere les sections gerees via `make sync`
+- Regenere les sections gerees via `anklume sync`
 - Verifie la compatibilite de version
 
 Les fichiers utilisateur (`infra.yml`, `roles_custom/`, `anklume.conf.yml`)
@@ -389,7 +389,7 @@ Gere par `bootstrap.sh` ou la configuration manuelle de l'hote :
 - Installation/configuration du pilote NVIDIA
 - Configuration du noyau / mkinitcpio
 - Installation du daemon Incus et preseed (`bootstrap.sh --prod` assiste)
-- Configuration nftables de l'hote (`make nftables-deploy` assiste)
+- Configuration nftables de l'hote (`anklume network deploy` assiste)
 - Configuration Sway/Wayland pour le transfert d'affichage GUI
 - Snapshots du systeme de fichiers pour le rollback (`bootstrap.sh --snapshot` assiste)
 
@@ -424,7 +424,7 @@ les invariants du generateur.
 Pour eviter les telechargements redondants d'images dans les
 environnements Incus imbriques :
 
-1. L'hote exporte les images : `make export-images` (via le role
+1. L'hote exporte les images : `anklume setup export-images` (via le role
    `incus_images` avec `incus_images_export_for_nesting: true`)
 2. Le repertoire d'export est monte en lecture seule dans les VM
    imbriquees comme peripherique disque
@@ -440,8 +440,8 @@ Un script Python qui produit un rapport d'audit structure du code source.
 
 **Utilisation** :
 ```bash
-make audit          # Terminal report
-make audit-json     # JSON to reports/audit.json
+anklume dev audit          # Terminal report
+anklume dev audit --json     # JSON to reports/audit.json
 scripts/code-audit.py --json --output FILE
 ```
 
@@ -499,13 +499,13 @@ fonctionnalites de base d'anklume sur une infrastructure Incus reelle
 
 **Utilisation** :
 ```bash
-make smoke    # Requires running Incus daemon
+anklume dev smoke    # Requires running Incus daemon
 ```
 
 **Deroulement du test** (5 etapes) :
-1. `make sync-dry` -- verifier que le generateur fonctionne sur le vrai `infra.yml`
-2. `make check` -- dry-run de l'apply (aucun changement reel)
-3. `make lint` -- tous les validateurs passent
+1. `anklume sync --dry-run` -- verifier que le generateur fonctionne sur le vrai `infra.yml`
+2. `anklume domain check` -- dry-run de l'apply (aucun changement reel)
+3. `anklume dev lint` -- tous les validateurs passent
 4. `snapshot-list` -- l'infrastructure de snapshot repond
 5. `incus list` -- le daemon Incus est joignable
 

@@ -6,7 +6,7 @@ title: "First Deployment"
 description: >-
   Learn the anklume workflow by creating your first domain with two
   LXC containers. You will edit infra.yml, generate Ansible files
-  with make sync, deploy with make apply, and verify that both
+  with anklume sync, deploy with anklume domain apply, and verify that both
   containers are running and can communicate on the same subnet.
 
 difficulty: beginner
@@ -15,7 +15,7 @@ duration: "30m"
 prerequisites: []
 
 objectives:
-  - "Understand the infra.yml -> make sync -> make apply workflow"
+  - "Understand the infra.yml -> anklume sync -> anklume domain apply workflow"
   - "Create a domain with two LXC containers"
   - "Verify containers are running via incus list"
   - "Confirm intra-domain connectivity with ping"
@@ -24,14 +24,14 @@ steps:
   - id: "01"
     title: "Create the infrastructure"
     instruction_file: "steps/01-create-infra.md"
-    hint: "Copy the lab's infra.yml to the project root and run make sync"
+    hint: "Copy the lab's infra.yml to the project root and run anklume sync"
     validation: "test -f inventory/lab-net.yml && test -f group_vars/lab-net.yml"
   - id: "02"
     title: "Deploy and verify"
     instruction_file: "steps/02-verify.md"
-    hint: "Run make apply, then use incus list to check container status"
+    hint: "Run anklume domain apply, then use incus list to check container status"
     validation: "incus list --project lab-net --format csv -c s 2>/dev/null | grep -qc RUNNING"
   - id: "03"
     title: "Clean up"
     instruction_file: "steps/03-cleanup.md"
-    hint: "Use make flush or incus delete to remove lab resources"
+    hint: "Use anklume flush or incus delete to remove lab resources"

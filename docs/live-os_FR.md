@@ -90,10 +90,10 @@ anklume Live OS permet de faire fonctionner une infrastructure compartimentee de
 cd /path/to/anklume-repo
 
 # Build default image (Debian 13, amd64, 3GB)
-make build-image OUT=anklume-live.img
+anklume live build OUT=anklume-live.img
 
 # Build with custom base OS
-make build-image OUT=custom.img BASE=ubuntu ARCH=arm64
+anklume live build OUT=custom.img BASE=ubuntu ARCH=arm64
 
 # Output: /path/to/custom.img (ready to write to USB)
 ```
@@ -173,7 +173,7 @@ Le Live OS utilise des mises a jour atomiques A/B pour garantir des mises a nive
 
 ```bash
 # Download and apply update
-make live-update URL=https://example.com/anklume-live-v1.2.img
+anklume live update URL=https://example.com/anklume-live-v1.2.img
 
 # Behind the scenes:
 # 1. Detects active slot (A or B)
@@ -188,7 +188,7 @@ make live-update URL=https://example.com/anklume-live-v1.2.img
 
 ```bash
 # Check current status
-make live-status
+anklume live status
 # Output: Active slot: A, Boot count: 0, Data pool: datapool
 
 # Trigger manual update (requires USB write access)
@@ -287,7 +287,7 @@ Ajouter le parametre kernel : `anklume.toram=1`
 ### Isolation Incus
 
 - Isolation des conteneurs basee sur les espaces de noms (pas au niveau hyperviseur)
-- Necessite des regles nftables pour l'isolation reseau (voir `make nftables`)
+- Necessite des regles nftables pour l'isolation reseau (voir `anklume network rules`)
 - La separation par domaines de confiance garantit que les conteneurs non fiables ne peuvent pas acceder au systeme de fichiers d'administration
 
 ## Support Arch Linux
@@ -298,10 +298,10 @@ anklume Live OS peut etre construit avec Arch Linux comme OS de base, offrant un
 
 ```bash
 # Build Arch-based Live OS image
-make build-image OUT=anklume-arch.img BASE=arch
+anklume live build OUT=anklume-arch.img BASE=arch
 
 # Specify architecture
-make build-image OUT=anklume-arch-arm64.img BASE=arch ARCH=arm64
+anklume live build OUT=anklume-arch-arm64.img BASE=arch ARCH=arm64
 ```
 
 ### Quand choisir Arch vs Debian

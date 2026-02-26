@@ -39,7 +39,7 @@ domains:
         profiles: [default, nvidia-compute]
 ```
 
-Si vous ajoutez une seconde machine GPU en mode exclusif, `make sync` echouera :
+Si vous ajoutez une seconde machine GPU en mode exclusif, `anklume sync` echouera :
 
 ```
 Validation errors:
@@ -57,7 +57,7 @@ global:
   gpu_policy: shared  # Permettre a plusieurs instances de partager le GPU
 ```
 
-`make sync` emettra un avertissement mais continuera :
+`anklume sync` emettra un avertissement mais continuera :
 
 ```
 WARNING: GPU policy is 'shared': 2 instances share GPU access
@@ -214,7 +214,7 @@ Si ce n'est pas le cas :
 
 ```bash
 # Re-appliquer l'infrastructure
-make apply-infra
+anklume domain apply --tags infra
 
 # Ou redemarrer l'instance specifique
 incus restart my-container --project my-domain

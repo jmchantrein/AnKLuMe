@@ -25,7 +25,7 @@ Confirm that traffic between domains is blocked.
 3. Generate and deploy nftables rules to make isolation explicit:
 
    ```bash
-   make nftables
+   anklume network rules
    ```
 
    Examine the generated rules to see the drop policy.
@@ -49,7 +49,7 @@ standard Linux networking.
 When done, restore your original infrastructure:
 
 ```bash
-make flush FORCE=true
+anklume flush --force
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 ```

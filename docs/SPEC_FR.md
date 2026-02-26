@@ -10,7 +10,7 @@ natives du noyau Linux (KVM/LXC), avec des capacites IA integrees
 optionnelles.
 
 L'utilisateur decrit son infrastructure dans un seul fichier YAML
-(`infra.yml`), execute `make sync && make apply`, et obtient des
+(`infra.yml`), execute `anklume sync && anklume domain apply`, et obtient des
 environnements isoles, reproductibles et jetables. anklume abstrait
 la complexite des technologies sous-jacentes (Incus, Ansible, nftables)
 derriere un format declaratif haut niveau -- maitriser ces outils est
@@ -65,7 +65,7 @@ Chaque domaine devient :
 - Un projet Incus (isolation par espace de noms)
 - Un fichier `group_vars/<domaine>.yml`
 
-Ajouter un domaine = ajouter une section dans `infra.yml` + `make sync`.
+Ajouter un domaine = ajouter une section dans `infra.yml` + `anklume sync`.
 
 ### Instance (machine)
 Un container LXC ou une machine virtuelle KVM. Definie dans un domaine
@@ -84,7 +84,7 @@ Un etat sauvegarde d'une instance. Supporte : individuel, par lot
 ## 3. Modele de source de verite (PSOT)
 
 ```
-+-----------------------+     make sync     +---------------------------+
++-----------------------+     anklume sync     +---------------------------+
 |     infra.yml         | -----------------> |  Fichiers Ansible         |
 |  (Source de Verite    |                    |  (Source de Verite        |
 |   Primaire)           |                    |   Secondaire)             |
@@ -98,7 +98,7 @@ Un etat sauvegarde d'une instance. Supporte : individuel, par lot
 |                       |                    |  dehors des sections gerees|
 +-----------------------+                    +-------------+-------------+
                                                           |
-                                                     make apply
+                                                     anklume domain apply
                                                           |
                                                           v
                                              +---------------------------+
@@ -115,7 +115,7 @@ Un etat sauvegarde d'une instance. Supporte : individuel, par lot
   (variables personnalisees, configuration supplementaire, parametres
   de roles ajoutes par l'utilisateur).
 - Les deux doivent etre commites dans git.
-- `make sync` ne reecrit que les sections `=== MANAGED ===` ; tout le
+- `anklume sync` ne reecrit que les sections `=== MANAGED ===` ; tout le
   reste est preserve.
 
 ## 4. Architecture de l'hote
@@ -150,7 +150,7 @@ Le container anklume (`anklume-instance`) :
 
 ```yaml
 # infra.yml -- Source de Verite Primaire
-# Decrit l'infrastructure. Executez `make sync` apres modification.
+# Decrit l'infrastructure. Executez `anklume sync` apres modification.
 
 project_name: my-infra
 
@@ -658,7 +658,7 @@ re-declarer le volume avec `source:` pointant vers le chemin de montage
 propage. Il n'y a pas de propagation recursive automatique -- chaque
 niveau d'imbrication doit declarer explicitement ses volumes.
 
-**Repertoires hote** : `make shares` cree les repertoires cote hote
+**Repertoires hote** : `anklume setup shares` cree les repertoires cote hote
 pour tous les volumes partages declares. `global.shared_volumes_base`
 definit le chemin de base (defaut : `/srv/anklume/shares`).
 

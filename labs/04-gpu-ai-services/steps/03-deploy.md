@@ -10,7 +10,7 @@ GPU-enabled container.
 1. Deploy the infrastructure:
 
    ```bash
-   make apply
+   anklume domain apply
    ```
 
    Watch the output carefully. The playbook will:

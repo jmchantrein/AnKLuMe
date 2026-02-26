@@ -11,7 +11,7 @@ calmly orchestrated by Ansible, Incus and Molecule.
 
 anklume is a declarative infrastructure compartmentalization framework.
 Describe your infrastructure in a single YAML file (`infra.yml`), run
-`make sync && make apply`, and get isolated, reproducible, disposable
+`anklume sync && anklume domain apply`, and get isolated, reproducible, disposable
 environments.
 
 ## Quick links

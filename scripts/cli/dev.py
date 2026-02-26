@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from scripts.cli._helpers import PROJECT_ROOT, run_cmd, run_script
+from scripts.cli._helpers import PROJECT_ROOT, run_cmd, run_make, run_script
 
 app = typer.Typer(name="dev", help="Development, testing, and code quality tools.", hidden=True)
 
@@ -14,9 +14,12 @@ def test(
     generator: Annotated[bool, typer.Option("--generator", help="Run generator tests only")] = False,
     roles: Annotated[bool, typer.Option("--roles", help="Run Molecule role tests")] = False,
     role: Annotated[str | None, typer.Option("--role", "-r", help="Test a specific role")] = None,
+    sandboxed: Annotated[bool, typer.Option("--sandboxed", help="Run tests in sandbox VM")] = False,
 ) -> None:
     """Run tests (pytest + Molecule)."""
-    if role:
+    if sandboxed:
+        run_make("test-sandboxed")
+    elif role:
         run_cmd(["molecule", "test", "-s", "default"], cwd=str(PROJECT_ROOT / "roles" / role))
     elif generator:
         run_cmd(["python3", "-m", "pytest", "tests/", "-v", "--tb=short"], cwd=str(PROJECT_ROOT))
@@ -81,8 +84,84 @@ def scenario(
 ) -> None:
     """Run end-to-end scenarios."""
     if best:
-        run_cmd(["make", "-C", str(PROJECT_ROOT), "scenario-test-best"])
+        run_make("scenario-test-best")
     elif bad:
-        run_cmd(["make", "-C", str(PROJECT_ROOT), "scenario-test-bad"])
+        run_make("scenario-test-bad")
     else:
-        run_cmd(["make", "-C", str(PROJECT_ROOT), "scenario-test"])
+        run_make("scenario-test")
+
+
+@app.command()
+def syntax() -> None:
+    """Check playbook syntax (ansible-playbook --syntax-check)."""
+    run_cmd(["ansible-playbook", str(PROJECT_ROOT / "site.yml"), "--syntax-check"])
+
+
+@app.command("chain-test")
+def chain_test(
+    target: Annotated[str | None, typer.Option("--target", "-t", help="Test a specific target")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview without executing")] = False,
+    json_: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Run chained integration tests."""
+    if target:
+        run_make("chain-test-one", f"T={target}")
+    elif dry_run:
+        run_make("chain-test-dry")
+    elif json_:
+        run_make("chain-test-json")
+    else:
+        run_make("chain-test")
+
+
+@app.command("test-summary")
+def test_summary(
+    quick: Annotated[bool, typer.Option("--quick", help="Quick summary")] = False,
+) -> None:
+    """Show test execution summary."""
+    if quick:
+        run_make("test-summary-quick")
+    else:
+        run_make("test-summary")
+
+
+@app.command("test-report")
+def test_report() -> None:
+    """Generate detailed test report."""
+    run_make("test-report")
+
+
+@app.command()
+def graph(
+    type_: Annotated[str, typer.Option("--type", "-t", help="Graph type: call, dep, code, dead")] = "call",
+) -> None:
+    """Generate code analysis graphs."""
+    graph_targets = {
+        "call": "call-graph",
+        "dep": "dep-graph",
+        "code": "code-graph",
+        "dead": "dead-code",
+    }
+    target = graph_targets.get(type_)
+    if not target:
+        from scripts.cli._helpers import console
+
+        console.print(f"[red]Unknown graph type:[/red] {type_}. Use: call, dep, code, dead")
+        raise typer.Exit(1)
+    run_make(target)
+
+
+@app.command("runner")
+def runner(
+    action: Annotated[str, typer.Argument(help="Action: create or destroy")],
+) -> None:
+    """Manage the test runner VM."""
+    if action == "create":
+        run_make("runner-create")
+    elif action == "destroy":
+        run_make("runner-destroy")
+    else:
+        from scripts.cli._helpers import console
+
+        console.print(f"[red]Unknown action:[/red] {action}. Use: create, destroy")
+        raise typer.Exit(1)

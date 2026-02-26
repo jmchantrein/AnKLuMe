@@ -53,8 +53,8 @@ domains:
           - base_system
 
 # Allow the anonymous domain to route traffic through the Tor gateway.
-# After `make apply`, run:
-#   make apply-tor I=tor-gw
+# After `anklume domain apply`, run:
+#   anklume domain apply-tor I=tor-gw
 # to install and configure the Tor transparent proxy inside the container.
 network_policies:
   - description: "Anonymous domain routes through Tor gateway"

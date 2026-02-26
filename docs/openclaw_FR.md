@@ -151,7 +151,7 @@ les tests et la creation de PR sans creer de conteneurs supplementaires.
 
 Toute la connaissance operationnelle de l'agent est stockee sous forme
 de templates Jinja2 dans le depot anklume
-(`roles/openclaw_server/templates/`). Chaque `make apply` deploie ces
+(`roles/openclaw_server/templates/`). Chaque `anklume domain apply` deploie ces
 templates dans le workspace de l'agent, **ecrasant** les versions
 precedentes. Le depot git est la source unique de verite.
 
@@ -170,7 +170,7 @@ precedentes. Le depot git est la source unique de verite.
 Les **fichiers operationnels** (AGENTS.md, TOOLS.md, USER.md, IDENTITY.md)
 ne sont jamais modifies directement. Pour les changer, l'agent suit le
 workflow de developpement standard : editer le template, tester, commit,
-push, PR, merge, puis `make apply` deploie le changement.
+push, PR, merge, puis `anklume domain apply` deploie le changement.
 
 **SOUL.md** (personnalite) est le seul fichier que l'agent modifie
 directement. Il est `.gitignore` globalement et jamais commite dans le depot.
@@ -199,10 +199,10 @@ anklume en contribuant via le workflow git standard :
 Ada sur Telegram → identifie une amelioration
   → clone/met a jour le depot dans son conteneur openclaw
   → edite un template dans roles/openclaw_server/templates/
-  → lance les tests (make lint, pytest tests/test_proxy.py)
+  → lance les tests (anklume dev lint, pytest tests/test_proxy.py)
   → commit sur une branche feature, pousse, cree une PR
   → anklume revoit et merge
-  → make apply deploie le template mis a jour dans le workspace d'Ada
+  → anklume domain apply deploie le template mis a jour dans le workspace d'Ada
 ```
 
 Cela cree une boucle vertueuse : l'assistant IA ameliore le framework
@@ -225,7 +225,7 @@ le workflow PR.
 - **Workflow git** : tous les changements operationnels passent par des
   branches et des PR
 - **Controle humain** : anklume revoit chaque PR avant la mise en production
-- **Ecrasement par template** : `make apply` restaure toujours la version
+- **Ecrasement par template** : `anklume domain apply` restaure toujours la version
   autoritaire des fichiers operationnels — pas de derive possible
 - **SOUL.md est prive** : la personnalite ne quitte jamais le conteneur
 

@@ -56,7 +56,7 @@ Review checklist:
 - [ ] Spec was written/updated before implementation
 - [ ] Tests were written before implementation
 - [ ] New tests reference a behavior matrix ID (`# Matrix: XX-NNN`)
-- [ ] All tests pass (`make test`)
+- [ ] All tests pass (`anklume dev test`)
 
 Produce a structured report:
 - ✅ What is compliant

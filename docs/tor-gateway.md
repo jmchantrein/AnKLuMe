@@ -68,14 +68,14 @@ network_policies:
 ### 2. Deploy infrastructure
 
 ```bash
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ### 3. Setup Tor in the gateway container
 
 ```bash
-make apply-tor I=tor-gw
+anklume domain apply-tor I=tor-gw
 ```
 
 This installs Tor, configures it as a transparent proxy, creates nftables
@@ -128,7 +128,7 @@ Checks:
 
 | Target | Description |
 |--------|-------------|
-| `make apply-tor I=<instance>` | Setup Tor transparent proxy in container |
+| `anklume domain apply-tor I=<instance>` | Setup Tor transparent proxy in container |
 
 Accepts optional `PROJECT=<project>` parameter.
 

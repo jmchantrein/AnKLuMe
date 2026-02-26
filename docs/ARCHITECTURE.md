@@ -27,7 +27,7 @@ produces the Ansible file tree with managed sections. Generated files are the
 Secondary Source of Truth — freely editable outside managed sections. Both
 must be committed to git.
 
-**Consequence**: To add a machine, edit `infra.yml` + `make sync`. To
+**Consequence**: To add a machine, edit `infra.yml` + `anklume sync`. To
 customize further, edit generated files outside managed sections.
 
 ---
@@ -58,7 +58,7 @@ is more KISS/DRY and does not compromise overall security.
 
 **Consequence**: The host is not managed by Ansible but may receive
 targeted manual or scripted changes when isolation constraints require
-it (e.g., `make nftables-deploy`).
+it (e.g., `anklume network deploy`).
 
 ---
 
@@ -105,7 +105,7 @@ provide both coverage tracking and living documentation.
 2. Write behavior tests (Given/When/Then style) describing expected
    behavior from the spec — not from existing code
 3. Implement until tests pass (Molecule for roles, pytest for generator)
-4. Validate (`make lint`)
+4. Validate (`anklume dev lint`)
 5. Review (reviewer agent)
 6. Commit only when everything passes
 
@@ -153,12 +153,12 @@ indicating that the English version is authoritative in case of divergence.
 **Context**: Code quality must be enforced consistently across all file types.
 
 **Decision**: Every file type in the project has a mandatory validator.
-`make lint` chains all validators. CI must pass all of them. No file
+`anklume dev lint` chains all validators. CI must pass all of them. No file
 escapes validation. Zero violations tolerated.
 
 See SPEC-operations.md Section 9 for the full validator table.
 
-**Consequence**: Contributors must have all validators installed. `make init`
+**Consequence**: Contributors must have all validators installed. `anklume setup init`
 installs them.
 
 ---
@@ -174,7 +174,7 @@ all infra roles use.
 - `scripts/snap.sh`: standalone Bash script for ad-hoc snapshot operations.
   Queries Incus directly, supports `self` keyword. Validated by `shellcheck`.
 - `incus_snapshots` Ansible role + `snapshot.yml` playbook: declarative
-  snapshot management invoked via Makefile (`make snapshot`, `make restore`,
+  snapshot management invoked via Makefile (`anklume snapshot create`, `anklume snapshot restore`,
   etc.). Supports domain-level batch operations.
 
 **History**: The original MVP (snap.sh only) was superseded by the Ansible
@@ -389,8 +389,8 @@ rules. anklume isolation is evaluated first.
 nftables rules must be applied on the host kernel.
 
 **Decision**: Split into two steps:
-1. `make nftables` — runs inside anklume container, generates rules
-2. `make nftables-deploy` — runs on the host, pulls rules from anklume,
+1. `anklume network rules` — runs inside anklume container, generates rules
+2. `anklume network deploy` — runs on the host, pulls rules from anklume,
    validates, and applies
 
 **Consequence**: The operator reviews rules before deploying. The anklume
@@ -484,7 +484,7 @@ generated file customizations.
 1. Explicit file classification: framework (overwritten), user config
    (never touched), generated (managed sections), runtime (never touched)
 2. `roles_custom/` directory (gitignored) with priority in `roles_path`
-3. `make upgrade` with conflict detection and `.bak` creation
+3. `anklume upgrade` with conflict detection and `.bak` creation
 4. Version marker for compatibility checking
 
 **Consequence**: Users never lose data during upgrades. Custom roles
@@ -539,7 +539,7 @@ comes from the framework.
 
 **Decision**: The anklume git repository is the **single source of
 truth** for agent operational knowledge. All agent files are Jinja2
-templates deployed with `force: true` on every `make apply`. Agents
+templates deployed with `force: true` on every `anklume domain apply`. Agents
 MUST NOT modify their operational files directly — they follow the
 standard development workflow (edit template, test, PR, merge, apply).
 
@@ -652,14 +652,14 @@ The existing `incus_instances` role handles the devices transparently.
 **Naming convention**: Injected devices use the prefix `pd-` to avoid
 collisions with user-declared devices and `sv-*` shared volume devices.
 
-**Host directories**: `make data-dirs` creates the host-side
+**Host directories**: `anklume setup data-dirs` creates the host-side
 directories. `persistent_data_base` defaults to `/srv/anklume/data`.
 
 **Why not Incus custom volumes**: Same reasoning as ADR-039 — custom
 storage volumes cannot span projects and cross-project attachment is
 fragile. Host bind mounts are native and reliable.
 
-**Consequence**: Data survives `make flush`, container rebuilds, and
+**Consequence**: Data survives `anklume flush`, container rebuilds, and
 upgrades. Adding persistent storage is a declarative change in
 `infra.yml`. No new Ansible role needed.
 
@@ -667,7 +667,7 @@ upgrades. Adding persistent storage is a declarative change in
 
 ## ADR-042: Flush protection for non-ephemeral instances
 
-**Context**: `make flush` destroys all infrastructure indiscriminately.
+**Context**: `anklume flush` destroys all infrastructure indiscriminately.
 This is dangerous for instances with `ephemeral: false` (protected)
 and their associated persistent data directories.
 
@@ -677,10 +677,10 @@ unless `FORCE=true` is set. Projects with remaining instances are
 also skipped. Host data directories (`/srv/anklume/data/`,
 `/srv/anklume/shares/`) are never deleted by flush.
 
-**Consequence**: `make flush` is safe by default — it respects the
+**Consequence**: `anklume flush` is safe by default — it respects the
 protection flag already set by `incus_instances` role. Users who
 truly want to destroy everything use `FORCE=true`. A targeted
-`make instance-remove` provides surgical removal of individual
+`anklume instance remove` provides surgical removal of individual
 instances.
 
 ---
@@ -775,7 +775,7 @@ upstream security patches and improvements.
 3. `roles_vendor/` — Galaxy roles installed from `requirements.yml`
 
 Galaxy roles are declared in `requirements.yml` alongside collections.
-`make init` installs them to `roles_vendor/` (gitignored). Framework
+`anklume setup init` installs them to `roles_vendor/` (gitignored). Framework
 roles can wrap Galaxy roles as thin shims adding Incus-specific glue
 (device setup, network config, PSOT variables) without duplicating
 the packaging logic.
@@ -786,9 +786,9 @@ device configuration, project-scoped operations). The wrapper pattern
 keeps both concerns clean.
 
 **Why roles_vendor/ gitignored**: `requirements.yml` is the source of
-truth. `roles_vendor/` is fully reproducible via `make init`, just
+truth. `roles_vendor/` is fully reproducible via `anklume setup init`, just
 like `node_modules/` or Python venvs.
 
 **Consequence**: Lower maintenance burden. When upstream improves a
-role, `make init` picks up the changes. Framework roles focus on
+role, `anklume setup init` picks up the changes. Framework roles focus on
 Incus-specific glue only.

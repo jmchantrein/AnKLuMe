@@ -6,7 +6,7 @@ import typer
 from rich.table import Table
 
 from scripts.cli._completions import complete_domain
-from scripts.cli._helpers import PROJECT_ROOT, console, load_infra_safe, run_cmd
+from scripts.cli._helpers import PROJECT_ROOT, console, load_infra_safe, run_cmd, run_make
 
 app = typer.Typer(name="domain", help="Manage infrastructure domains.")
 
@@ -53,12 +53,47 @@ def apply(
     all_: Annotated[
         bool, typer.Option("--all", help="Apply all domains")
     ] = False,
+    tags: Annotated[
+        str | None,
+        typer.Option(
+            "--tags", "-t",
+            help="Ansible tags (infra, provision, llm, stt, ai, openclaw, base, images, code-sandbox)",
+        ),
+    ] = None,
 ) -> None:
     """Apply infrastructure for a domain (or all)."""
     cmd = ["ansible-playbook", str(PROJECT_ROOT / "site.yml")]
     if domain and not all_:
         cmd.extend(["--limit", domain])
+    if tags:
+        cmd.extend(["--tags", tags])
     run_cmd(cmd)
+
+
+@app.command()
+def check(
+    domain: Annotated[
+        str | None,
+        typer.Argument(
+            help="Domain to check (all if omitted)",
+            autocompletion=complete_domain,
+        ),
+    ] = None,
+) -> None:
+    """Dry-run: preview changes without applying."""
+    cmd = ["ansible-playbook", str(PROJECT_ROOT / "site.yml"), "--check", "--diff"]
+    if domain:
+        cmd.extend(["--limit", domain])
+    run_cmd(cmd)
+
+
+@app.command("exec")
+def exec_(
+    domain: Annotated[str, typer.Argument(help="Domain name", autocompletion=complete_domain)],
+    command: Annotated[list[str], typer.Argument(help="Command to execute")],
+) -> None:
+    """Execute a command in all instances of a domain."""
+    run_make("domain-exec", f"D={domain}", f"CMD={' '.join(command)}")
 
 
 @app.command()

@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from scripts.cli._completions import complete_instance
-from scripts.cli._helpers import run_script
+from scripts.cli._helpers import run_make, run_script
 
 app = typer.Typer(name="portal", help="File transfer between host and instances.")
 
@@ -43,3 +43,12 @@ def pull(
 def list_portals() -> None:
     """List configured file portals."""
     run_script("file-portal.sh", "list")
+
+
+@app.command()
+def copy(
+    src: Annotated[str, typer.Argument(help="Source (instance:path or local path)")],
+    dst: Annotated[str, typer.Argument(help="Destination (instance:path or local path)")],
+) -> None:
+    """Copy files between host and instances."""
+    run_make("file-copy", f"SRC={src}", f"DST={dst}")

@@ -18,11 +18,11 @@ avant que la phase N ne soit complete et validee.
 - group_vars et host_vars generes avec sections gerees
 - Validation des contraintes (noms uniques, sous-reseaux uniques, IPs valides)
 - Detection d'orphelins
-- `make sync` et `make sync-dry`
+- `anklume sync` et `anklume sync --dry-run`
 
 **Criteres de validation** :
-- [x] `make sync` idempotent (re-executer ne change rien)
-- [x] Ajouter un domaine dans infra.yml + `make sync` -> fichiers crees
+- [x] `anklume sync` idempotent (re-executer ne change rien)
+- [x] Ajouter un domaine dans infra.yml + `anklume sync` -> fichiers crees
 - [x] Supprimer un domaine -> orphelins detectes et listes
 - [x] Sections gerees preservees, contenu utilisateur conserve
 - [x] Contraintes de validation : erreur claire en cas de doublon nom/sous-reseau/IP
@@ -31,7 +31,7 @@ avant que la phase N ne soit complete et validee.
 
 ## Phase 2 : Roles d'Infrastructure (Reconciliation Incus) -- COMPLETE
 
-**Objectif** : `make apply --tags infra` cree toute l'infrastructure Incus
+**Objectif** : `anklume domain apply --tags infra` cree toute l'infrastructure Incus
 
 **Livrables** :
 - `roles/incus_networks/` -- bridges
@@ -69,14 +69,14 @@ avant que la phase N ne soit complete et validee.
 **Criteres de validation** :
 - [x] anklume-instance redemarre sans intervention manuelle
 - [x] `ansible-playbook site.yml` idempotent apres corrections
-- [x] `make lint` passe
+- [x] `anklume dev lint` passe
 - [x] ADR-017 a ADR-019 presents dans ARCHITECTURE.md
 
 ---
 
 ## Phase 3 : Provisionnement des Instances -- COMPLETE
 
-**Objectif** : `make apply --tags provision` installe les paquets et services
+**Objectif** : `anklume domain apply --tags provision` installe les paquets et services
 
 **Livrables** :
 - `roles/base_system/` -- paquets de base, locale, fuseau horaire
@@ -85,7 +85,7 @@ avant que la phase N ne soit complete et validee.
 - Plugin de connexion `community.general.incus` configure
 
 **Criteres de validation** :
-- [x] Instance creee + provisionnee en un seul `make apply`
+- [x] Instance creee + provisionnee en un seul `anklume domain apply`
 - [x] Re-provisionnement idempotent
 - [x] Paquets installes verifiables
 
@@ -93,7 +93,7 @@ avant que la phase N ne soit complete et validee.
 
 ## Phase 4 : Snapshots -- COMPLETE
 
-**Objectif** : `make snapshot` / `make restore`
+**Objectif** : `anklume snapshot create` / `anklume snapshot restore`
 
 **Livrables** :
 - `roles/incus_snapshots/` -- role Ansible pour la gestion des snapshots
@@ -116,7 +116,7 @@ avant que la phase N ne soit complete et validee.
 - `roles/open_webui/` -- frontend Open WebUI via pip
 - Support `instance_devices` dans le generateur PSOT et le role incus_instances
 - Provisionnement conditionnel dans site.yml (base sur instance_roles)
-- Cible `make apply-llm`
+- Cible `anklume domain apply --tags llm`
 
 **Criteres de validation** :
 - [x] Peripherique GPU correctement ajoute a l'instance cible
@@ -224,7 +224,7 @@ que LXC (charges non fiables, GPU vfio-pci, noyau personnalise, systemes non-Lin
 - [x] `type: vm` dans infra.yml -> VM KVM creee avec le flag `--vm`
 - [x] Provisionnement via `community.general.incus` fonctionne (attente agent garantit la disponibilite)
 - [x] VM et LXC coexistent dans le meme domaine (valide par tests + exemple)
-- [x] `make apply` idempotent avec un mix LXC + VM
+- [x] `anklume domain apply` idempotent avec un mix LXC + VM
 
 **Decisions de conception** :
 - Timeouts d'attente separes : LXC 30x2s=60s, VM 60x2s=120s (configurables)
@@ -317,8 +317,8 @@ Les tests Molecule s'executent dans cet environnement imbrique.
   3. Collecte les resultats
   4. Detruit optionnellement le container test-runner
 - `examples/developer.infra.yml` incluant le domaine dev-test
-- Cibles Makefile : `make test-sandboxed`, `make test-runner-create`,
-  `make test-runner-destroy`
+- Cibles Makefile : `anklume dev test --sandboxed`, `anklume dev test-runner-create`,
+  `anklume dev test-runner-destroy`
 
 **References** :
 - [Documentation d'imbrication Incus](https://linuxcontainers.org/incus/docs/main/faq/)
@@ -401,8 +401,8 @@ c) Configuration (`anklume.conf.yml` ou variables d'environnement) :
    ```
 
 d) Cibles Makefile :
-   - `make ai-test` -- executer les tests avec correction assistee par IA
-   - `make ai-develop` -- session de developpement autonome
+   - `anklume ai test` -- executer les tests avec correction assistee par IA
+   - `anklume ai develop` -- session de developpement autonome
 
 e) Script `scripts/ai-develop.sh` -- developpement autonome :
    - Prend une description de tache en entree (TASK)
@@ -432,10 +432,10 @@ e) Script `scripts/ai-develop.sh` -- developpement autonome :
 - [Cookbook Self-Evolving Agents](https://developers.openai.com/cookbook/examples/partners/self_evolving_agents/autonomous_agent_retraining)
 
 **Criteres de validation** :
-- [x] `make ai-test AI_MODE=none` = tests Molecule standards (pas de regression)
-- [x] `make ai-test AI_MODE=local` = tests + analyse d'echec par Ollama local
-- [x] `make ai-test AI_MODE=claude-code` = tests + correction proposee par Claude Code
-- [x] `make ai-test AI_MODE=aider` = tests + correction via Aider
+- [x] `anklume ai test AI_MODE=none` = tests Molecule standards (pas de regression)
+- [x] `anklume ai test AI_MODE=local` = tests + analyse d'echec par Ollama local
+- [x] `anklume ai test AI_MODE=claude-code` = tests + correction proposee par Claude Code
+- [x] `anklume ai test AI_MODE=aider` = tests + correction via Aider
 - [x] dry_run empeche toute modification automatique par defaut
 - [x] Les PRs creees automatiquement sont clairement etiquetees (ai-generated)
 - [x] Journal de session complet pour chaque execution
@@ -503,7 +503,7 @@ consommer directement. Container unique, pas d'orchestration necessaire.
 - Support PSOT : instance `homelab-stt` avec peripherique GPU + config
 - Integration Open WebUI : configurer le point d'acces STT dans les parametres admin
   (ou via la variable `open_webui_stt_url`)
-- Cible Makefile `make apply-stt`
+- Cible Makefile `anklume domain apply --tags stt`
 - `gpu_policy: shared` requis si le STT et Ollama partagent le meme GPU
   (ADR-018). Documenter le compromis : GPU partage signifie que l'inference
   concurrente se dispute la VRAM.
@@ -599,7 +599,7 @@ a Claude Code.
 
 **Modes operationnels** :
 
-a) **Mode correction** (`make agent-fix`) :
+a) **Mode correction** (`anklume ai agent-fix`) :
    - Le chef execute `molecule test` pour tous les roles
    - En cas d'echec : lance des coequipiers Fixer par role en echec
    - Les Fixers analysent les journaux + le code source, proposent et appliquent des patchs
@@ -607,7 +607,7 @@ a) **Mode correction** (`make agent-fix`) :
    - Boucle jusqu'a ce que tous les tests passent ou nombre max de tentatives atteint
    - En cas de succes : le chef cree une PR avec un resume de toutes les corrections
 
-b) **Mode developpement** (`make agent-develop TASK="Implementer Phase N"`) :
+b) **Mode developpement** (`anklume ai agent-develop TASK="Implementer Phase N"`) :
    - Le chef lit ROADMAP.md, CLAUDE.md et la description de la tache
    - Decompose la phase en sous-taches paralleles
    - Lance Builder(s) pour l'implementation, Tester pour la validation,
@@ -638,7 +638,7 @@ a) Role `dev_agent_runner` -- etend `dev_test_runner` (Phase 12) :
            "Bash(yamllint *)",
            "Bash(git *)",
            "Bash(incus *)",
-           "Bash(make *)"
+           "Bash(anklume *)"
          ],
          "deny": [
            "Bash(rm -rf /)",
@@ -759,8 +759,8 @@ a la frontiere de la production (fusion de la PR).
 
 **Criteres de validation** :
 - [x] `make agent-runner-setup` cree le container avec Claude Code + Agent Teams
-- [x] `make agent-fix` execute le cycle test-correction de maniere autonome, cree une PR
-- [x] `make agent-develop TASK="..."` implemente une tache, la teste, cree une PR
+- [x] `anklume ai agent-fix` execute le cycle test-correction de maniere autonome, cree une PR
+- [x] `anklume ai agent-develop TASK="..."` implemente une tache, la teste, cree une PR
 - [x] Toutes les actions des agents journalisees dans la transcription de session
 - [x] Les agents ne touchent jamais la production (isolation du bac a sable verifiee)
 - [x] La PR contient une description claire des changements et resultats de tests
@@ -794,7 +794,7 @@ c) **Support du repertoire infra/** :
 d) **Domaine AI tools** :
    - Nouveaux roles : `lobechat` (interface web LobeChat), `opencode_server` (serveur OpenCode headless)
    - Exemple `examples/ai-tools/` avec configuration complete du stack IA
-   - Cible `make apply-ai`
+   - Cible `anklume domain apply --tags ai`
 
 e) **Script de bootstrap** (`bootstrap.sh`) :
    - Modes `--prod` / `--dev` avec auto-configuration du preseed Incus
@@ -802,16 +802,16 @@ e) **Script de bootstrap** (`bootstrap.sh`) :
    - Mode `--YOLO`
 
 f) **Outillage de cycle de vie** :
-   - `make flush` -- detruire toute l'infrastructure anklume
-   - `make upgrade` -- mise a jour securisee du framework
-   - `make import-infra` -- generer infra.yml depuis l'etat Incus existant
+   - `anklume flush` -- detruire toute l'infrastructure anklume
+   - `anklume upgrade` -- mise a jour securisee du framework
+   - `anklume setup import` -- generer infra.yml depuis l'etat Incus existant
 
 **Criteres de validation** :
 - [x] `security.privileged: true` sur LXC rejete quand `vm_nested=false`
 - [x] `network_policies` genere les regles nftables accept correctes
 - [x] Le repertoire `infra/` produit une sortie identique a l'equivalent `infra.yml`
 - [x] `bootstrap.sh --prod` configure Incus avec le backend FS detecte
-- [x] `make flush` detruit l'infrastructure, preserve les fichiers utilisateur
+- [x] `anklume flush` detruit l'infrastructure, preserve les fichiers utilisateur
 - [x] Les roles `lobechat` et `opencode_server` crees et integres
 
 ---
@@ -847,7 +847,7 @@ c) **Nettoyage du ROADMAP** :
 
 **Criteres de validation** :
 - [x] La CI GitHub Actions passe sur push vers main
-- [x] `make lint` + `make test-generator` s'executent en CI
+- [x] `anklume dev lint` + `anklume dev test --generator` s'executent en CI
 - [x] Les 18 roles ont des repertoires `molecule/`
 - [x] Badge CI actif dans README.md
 - [x] Incoherences du ROADMAP resolues
@@ -862,7 +862,7 @@ les tests, l'onboarding, l'auto-amelioration et le partage d'images.
 ### Phase 18a : Acces exclusif au reseau AI-Tools avec purge VRAM
 
 **Objectif** : Un seul domaine a la fois peut acceder a ai-tools.
-`make ai-switch DOMAIN=<nom>` bascule atomiquement l'acces avec purge VRAM.
+`anklume ai switch DOMAIN=<nom>` bascule atomiquement l'acces avec purge VRAM.
 
 **Livrables** :
 - `ai_access_policy: exclusive|open` dans la section `global:` d'infra.yml
@@ -870,7 +870,7 @@ les tests, l'onboarding, l'auto-amelioration et le partage d'images.
 - Validation et auto-enrichissement des politiques reseau dans le generateur
 - `scripts/ai-switch.sh` -- bascule atomique avec purge VRAM
 - `roles/incus_nftables/` etendu avec `incus_nftables_ai_override`
-- Cible Makefile `make ai-switch DOMAIN=<nom>`
+- Cible Makefile `anklume ai switch DOMAIN=<nom>`
 - Documentation `docs/ai-switch.md`
 - 11 nouveaux tests pytest
 
@@ -889,12 +889,12 @@ attendues, avec couverture par tests generes par LLM et tests Hypothesis.
 
 ### Phase 18c : Guide d'onboarding interactif
 
-**Objectif** : `make guide` lance un tutoriel interactif etape par etape.
+**Objectif** : `anklume guide` lance un tutoriel interactif etape par etape.
 
 **Livrables** :
 - `scripts/guide.sh` -- tutoriel en 9 etapes (Bash pur, couleurs ANSI)
-- Cibles Makefile `make guide`, `make quickstart`
-- `make help` restructure avec categorie "GETTING STARTED"
+- Cibles Makefile `anklume guide`, `anklume setup quickstart`
+- `anklume --help` restructure avec categorie "GETTING STARTED"
 - Documentation `docs/guide.md`
 
 ### Phase 18d : Logiciel auto-ameliorant (bibliotheque d'experiences)
@@ -908,7 +908,7 @@ l'historique git, avec boucle d'amelioration pilotee par les specs.
 - `scripts/ai-improve.sh` -- boucle d'amelioration pilotee par les specs
 - `scripts/ai-test-loop.sh` etendu avec recherche d'experiences avant LLM
 - Flag `--learn` pour capturer de nouveaux correctifs
-- Cibles `make mine-experiences` et `make ai-improve`
+- Cibles `anklume ai mine-experiences` et `anklume ai improve`
 
 ### Phase 18e : Depot d'images partage entre niveaux d'imbrication
 
@@ -919,7 +919,7 @@ les VMs Incus imbriquees pour eviter les telechargements redondants.
 - `roles/incus_images/` etendu avec taches d'export + `incus_images_export_for_nesting`
 - `roles/dev_test_runner/` etendu avec import depuis images montees
 - Timeout intelligent (`incus_images_download_timeout: 600`)
-- Cible Makefile `make export-images`
+- Cible Makefile `anklume setup export-images`
 
 ---
 
@@ -1000,8 +1000,8 @@ f) **Dependances** (ajoutees dans `pyproject.toml`) :
    - Optionnel : `mkdocstrings[python]`
 
 g) **Integration Makefile / CLI** :
-   - `make docs` / `anklume docs build`
-   - `make docs-serve` / `anklume docs serve`
+   - `anklume docs build` / `anklume docs build`
+   - `anklume docs serve` / `anklume docs serve`
 
 **Criteres de validation** :
 - [ ] `mkdocs build --strict` passe sans avertissement
@@ -1020,7 +1020,7 @@ g) **Integration Makefile / CLI** :
 ## Etat Actuel
 
 **Complete** :
-- Phase 1 : Generateur PSOT fonctionnel (make sync idempotent)
+- Phase 1 : Generateur PSOT fonctionnel (anklume sync idempotent)
 - Phase 2 : Infrastructure Incus deployee et idempotente
 - Phase 2b : Durcissement post-deploiement (ADR-017 a ADR-019)
 - Phase 3 : Provisionnement des instances (base_system + admin_bootstrap)

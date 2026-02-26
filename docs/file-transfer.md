@@ -12,22 +12,22 @@ with RO/RW access control. `transfer.sh` is for one-off transfers.
 ### Copy a file between instances
 
 ```bash
-make file-copy SRC=pro-dev:/etc/hosts DST=perso-desktop:/tmp/hosts
+anklume portal copy pro-dev:/etc/hosts perso-desktop:/tmp/hosts
 ```
 
 ### Backup an instance
 
 ```bash
-make backup I=anklume-instance
-make backup I=anklume-instance GPG=user@example.com
-make backup I=anklume-instance O=/mnt/external
+anklume backup create anklume-instance
+anklume backup create anklume-instance --gpg user@example.com
+anklume backup create anklume-instance --output /mnt/external
 ```
 
 ### Restore from backup
 
 ```bash
-make restore-backup FILE=backups/anklume-instance-20260214-120000.tar.gz
-make restore-backup FILE=backups/anklume-instance.tar.gz.gpg NAME=admin-v2 PROJECT=anklume
+anklume backup restore --file backups/anklume-instance-20260214-120000.tar.gz
+anklume backup restore --file backups/anklume-instance.tar.gz.gpg --name admin-v2 --project anklume
 ```
 
 ## Commands
@@ -130,9 +130,9 @@ scripts/transfer.sh restore backups/anklume-instance.tar.gz.gpg
 
 | Target | Usage |
 |--------|-------|
-| `file-copy` | `make file-copy SRC=instance:/path DST=instance:/path` |
-| `backup` | `make backup I=<instance> [GPG=<recipient>] [O=<dir>]` |
-| `restore-backup` | `make restore-backup FILE=<file> [NAME=<name>] [PROJECT=<project>]` |
+| `file-copy` | `anklume portal copy instance:/path instance:/path` |
+| `backup` | `anklume backup create <instance> [GPG=<recipient>] [O=<dir>]` |
+| `restore-backup` | `anklume backup restore --file <file> [NAME=<name>] [PROJECT=<project>]` |
 
 ## GPG encryption
 
@@ -150,7 +150,7 @@ gpg --full-generate-key
 gpg --list-keys
 
 # Backup with encryption
-make backup I=anklume-instance GPG=admin@example.com
+anklume backup create anklume-instance --gpg admin@example.com
 ```
 
 ### Key management
@@ -173,13 +173,13 @@ and `restore`:
 
 ```bash
 # On source host
-make backup I=pro-dev O=/tmp
+anklume backup create pro-dev --output /tmp
 
 # Transfer to destination host
 scp /tmp/backups/pro-dev-*.tar.gz dest-host:/tmp/
 
 # On destination host
-make restore-backup FILE=/tmp/pro-dev-*.tar.gz NAME=pro-dev PROJECT=pro
+anklume backup restore --file /tmp/pro-dev-*.tar.gz --name pro-dev --project pro
 ```
 
 For live migration between Incus hosts with direct connectivity:
@@ -217,5 +217,5 @@ gpg --list-secret-keys
 before backing up to reduce file size:
 
 ```bash
-make snap-delete I=<instance> S=<snapshot-name>
+anklume snapshot delete <instance> --name <snapshot-name>
 ```

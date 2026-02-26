@@ -44,9 +44,9 @@ serveur web et un container client. Conventions de nommage :
 ## Etape 2 : Deployer
 
 ```bash
-make sync    # Generer les fichiers Ansible
-make check   # Previsualiser les changements
-make apply   # Tout creer
+anklume sync    # Generer les fichiers Ansible
+anklume domain check   # Previsualiser les changements
+anklume domain apply   # Tout creer
 ```
 
 Pour une classe de 30 etudiants avec 2 containers chacun, cela cree :
@@ -59,14 +59,14 @@ Pour une classe de 30 etudiants avec 2 containers chacun, cela cree :
 Avant que les etudiants ne commencent a travailler, prenez un snapshot de l'etat propre :
 
 ```bash
-make snapshot NAME=pre-lab
+anklume snapshot create NAME=pre-lab
 ```
 
 Cela prend un snapshot de chaque instance dans tous les domaines. Vous pouvez
 aussi prendre un snapshot d'un seul domaine etudiant :
 
 ```bash
-make snapshot-domain D=student-01 NAME=pre-lab
+anklume snapshot create --domain student-01 NAME=pre-lab
 ```
 
 ## Isolation reseau
@@ -88,7 +88,7 @@ Cela signifie :
 Restaurer le snapshot pre-TP pour un etudiant :
 
 ```bash
-make restore-domain D=student-05 NAME=pre-lab
+anklume snapshot restore --domain student-05 NAME=pre-lab
 ```
 
 ### Reinitialiser tous les etudiants
@@ -96,26 +96,26 @@ make restore-domain D=student-05 NAME=pre-lab
 Restaurer le snapshot pre-TP globalement :
 
 ```bash
-make restore NAME=pre-lab
+anklume snapshot restore --name pre-lab
 ```
 
 ### Destruction et reconstruction complete
 
 Puisque les domaines etudiants sont `ephemeral: true`, vous pouvez les detruire
-et les recreer. Retirez le domaine d'`infra.yml`, executez `make sync
---clean-orphans`, puis re-ajoutez-le et `make apply`.
+et les recreer. Retirez le domaine d'`infra.yml`, executez `anklume sync
+--clean-orphans`, puis re-ajoutez-le et `anklume domain apply`.
 
 ## Mise a l'echelle
 
 ### Ajouter un etudiant
 
 Ajoutez un nouveau bloc de domaine dans `infra.yml` avec le prochain `subnet_id`
-et des noms de machine uniques, puis executez `make sync && make apply-limit
+et des noms de machine uniques, puis executez `anklume sync && anklume domain apply-limit
 G=student-04`.
 
 ### Retirer un etudiant
 
-Retirez le domaine d'`infra.yml` et executez `make sync-clean`. Les ressources
+Retirez le domaine d'`infra.yml` et executez `anklume sync --clean`. Les ressources
 Incus doivent etre detruites separement via le CLI `incus`.
 
 ## Exigences materielles
@@ -140,7 +140,7 @@ Les etudiants accedent aux containers via `incus exec s01-web --project student-
 
 - Utilisez `ephemeral: true` pour tous les domaines etudiants pour un nettoyage facile
 - Prenez des snapshots avant chaque session de TP
-- Utilisez `make apply-limit G=student-XX` pour reconstruire un seul etudiant
+- Utilisez `anklume domain apply student-XX` pour reconstruire un seul etudiant
 
 ## Exemples de configurations
 

@@ -8,12 +8,12 @@ as QubesOS colored window borders.
 ## Quick start
 
 ```bash
-make console                    # tmux console with colored panes
-make domain-exec I=pro-dev TERMINAL=1  # Colored terminal window
-make clipboard-to I=pro-dev     # Copy host clipboard to container
-make clipboard-from I=pro-dev   # Copy container clipboard to host
-make desktop-config             # Generate Sway/foot/.desktop configs
-make dashboard                  # Web dashboard on http://localhost:8888
+anklume console                    # tmux console with colored panes
+anklume domain exec pro-dev --terminal  # Colored terminal window
+anklume instance clipboard to pro-dev     # Copy host clipboard to container
+anklume instance clipboard from pro-dev   # Copy container clipboard to host
+anklume desktop config             # Generate Sway/foot/.desktop configs
+anklume dashboard                  # Web dashboard on http://localhost:8888
 ```
 
 ## tmux Console (Phase 19a)
@@ -22,9 +22,9 @@ The tmux console auto-generates a session from `infra.yml` with
 per-domain colored panes:
 
 ```bash
-make console          # Create and attach
-make console KILL=1   # Recreate session
-make console DRY_RUN=1  # Preview without creating
+anklume console          # Create and attach
+anklume console --kill   # Recreate session
+anklume console --dry-run  # Preview without creating
 ```
 
 Colors are set **server-side** via `select-pane -P 'bg=...'` — containers
@@ -49,11 +49,11 @@ domains.
 
 ```bash
 # Host clipboard → container
-make clipboard-to I=pro-dev
+anklume instance clipboard to pro-dev
 scripts/clipboard.sh copy-to pro-dev --project pro
 
 # Container clipboard → host
-make clipboard-from I=pro-dev
+anklume instance clipboard from pro-dev
 scripts/clipboard.sh copy-from pro-dev --project pro
 ```
 
@@ -77,10 +77,10 @@ Launch commands in containers with domain context:
 
 ```bash
 # Interactive shell in container
-make domain-exec I=pro-dev
+anklume domain exec pro-dev
 
 # Colored terminal window
-make domain-exec I=pro-dev TERMINAL=1
+anklume domain exec pro-dev --terminal
 
 # Run a specific command
 scripts/domain-exec.sh pro-dev -- htop
@@ -111,7 +111,7 @@ With `--terminal`, the wrapper opens a new terminal window with:
 Generate configuration snippets for desktop environments:
 
 ```bash
-make desktop-config             # Generate all configs
+anklume desktop config             # Generate all configs
 python3 scripts/desktop_config.py --sway    # Sway/i3 only
 python3 scripts/desktop_config.py --foot    # foot terminal only
 python3 scripts/desktop_config.py --desktop # .desktop entries only
@@ -163,9 +163,9 @@ corresponding instance.
 Live infrastructure status in a browser:
 
 ```bash
-make dashboard              # http://localhost:8888
-make dashboard PORT=9090    # Custom port
-make dashboard HOST=0.0.0.0 # Listen on all interfaces
+anklume dashboard              # http://localhost:8888
+anklume dashboard --port 9090    # Custom port
+anklume dashboard --host 0.0.0.0 # Listen on all interfaces
 ```
 
 ### Features

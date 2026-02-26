@@ -58,14 +58,14 @@ Think [QubesOS](https://www.qubes-os.org/) philosophy, but:
 ## How it works
 
 ```
-infra.yml          ->    make sync    ->    Ansible files    ->    make apply    ->    Incus state
+infra.yml          ->    anklume sync    ->    Ansible files    ->    anklume domain apply    ->    Incus state
 (you describe)          (generate)        (you enrich)          (converge)         (running infra)
 ```
 
 1. **Describe** your infrastructure in `infra.yml` (Primary Source of Truth)
-2. **Generate** the Ansible file tree: `make sync`
+2. **Generate** the Ansible file tree: `anklume sync`
 3. **Enrich** the generated files with your custom variables (Secondary Source of Truth)
-4. **Apply**: `make apply` — networks, projects, profiles, instances, provisioning
+4. **Apply**: `anklume domain apply` — networks, projects, profiles, instances, provisioning
 
 ## Prerequisites
 
@@ -89,16 +89,16 @@ git clone https://github.com/jmchantrein/anklume.git
 cd anklume
 
 # Install Ansible dependencies
-make init
+anklume setup init
 
 # Interactive guided setup (recommended for new users)
-make guide
+anklume guide
 
 # Or manual setup:
 cp infra.yml.example infra.yml   # Edit infra.yml to match your needs
-make sync                        # Generate Ansible files
-make check                       # Preview changes (dry-run)
-make apply                       # Apply infrastructure
+anklume sync                        # Generate Ansible files
+anklume domain check                       # Preview changes (dry-run)
+anklume domain apply                       # Apply infrastructure
 ```
 
 See the [quick start guide](docs/quickstart.md) for details.
@@ -156,10 +156,10 @@ The anklume container drives everything via the Incus socket — no SSH needed.
 | | Golden images with CoW-based derivation |
 | | Disposable (ephemeral) instances |
 | | Encrypted backup/restore |
-| | Flush and rebuild (`make flush && make sync && make apply`) |
-| | Safe framework upgrade (`make upgrade`) |
-| | Import existing Incus state (`make import-infra`) |
-| **Desktop** | QubesOS-style colored tmux console (`make console`) |
+| | Flush and rebuild (`anklume flush && anklume sync && anklume domain apply`) |
+| | Safe framework upgrade (`anklume upgrade`) |
+| | Import existing Incus state (`anklume setup import`) |
+| **Desktop** | QubesOS-style colored tmux console (`anklume console`) |
 | | Clipboard bridging (host <-> container) |
 | | Sway/i3 window rules generator |
 | | Read-only web dashboard |
@@ -258,21 +258,21 @@ Ready-to-use `infra.yml` configurations:
 
 | Target | Description |
 |--------|-------------|
-| `make guide` | Interactive onboarding tutorial |
-| `make sync` | Generate Ansible files from infra.yml |
-| `make sync-dry` | Preview changes without writing |
-| `make lint` | Run all validators (ansible-lint, yamllint, shellcheck, ruff) |
-| `make check` | Dry-run (--check --diff) |
-| `make apply` | Apply full infrastructure |
-| `make apply-limit G=<domain>` | Apply a single domain |
-| `make console` | Launch colored tmux session |
-| `make nftables` | Generate nftables isolation rules |
-| `make nftables-deploy` | Deploy rules on host |
-| `make snap I=<name>` | Create snapshot |
-| `make flush` | Destroy all anklume infrastructure |
-| `make upgrade` | Safe framework update |
-| `make import-infra` | Generate infra.yml from existing Incus state |
-| `make help` | List all available targets |
+| `anklume guide` | Interactive onboarding tutorial |
+| `anklume sync` | Generate Ansible files from infra.yml |
+| `anklume sync --dry-run` | Preview changes without writing |
+| `anklume dev lint` | Run all validators (ansible-lint, yamllint, shellcheck, ruff) |
+| `anklume domain check` | Dry-run (--check --diff) |
+| `anklume domain apply` | Apply full infrastructure |
+| `anklume domain apply <domain>` | Apply a single domain |
+| `anklume console` | Launch colored tmux session |
+| `anklume network rules` | Generate nftables isolation rules |
+| `anklume network deploy` | Deploy rules on host |
+| `anklume snapshot create <name>` | Create snapshot |
+| `anklume flush` | Destroy all anklume infrastructure |
+| `anklume upgrade` | Safe framework update |
+| `anklume setup import` | Generate infra.yml from existing Incus state |
+| `anklume --help` | List all available targets |
 
 ## Tech stack
 

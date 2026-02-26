@@ -33,7 +33,7 @@ an Incus-in-Incus sandbox, with human oversight at the PR merge level.
 
 ### Prerequisites
 
-1. Runner container (Phase 12): `make runner-create`
+1. Runner container (Phase 12): `anklume dev runner create`
 2. Claude Code installed in runner: `make agent-runner-setup`
 3. Anthropic API key: `export ANTHROPIC_API_KEY=sk-ant-...`
 
@@ -43,10 +43,10 @@ Fix failing Molecule tests autonomously:
 
 ```bash
 # Fix all roles
-make agent-fix
+anklume ai agent-fix
 
 # Fix a specific role
-make agent-fix R=base_system
+anklume ai agent-fix R=base_system
 ```
 
 ### Develop mode
@@ -54,7 +54,7 @@ make agent-fix R=base_system
 Implement a feature autonomously:
 
 ```bash
-make agent-develop TASK="Add monitoring role with Prometheus node exporter"
+anklume ai agent-develop TASK="Add monitoring role with Prometheus node exporter"
 ```
 
 ## Setup
@@ -62,7 +62,7 @@ make agent-develop TASK="Add monitoring role with Prometheus node exporter"
 ### 1. Create the runner container
 
 ```bash
-make runner-create     # Creates Incus-in-Incus sandbox
+anklume dev runner create     # Creates Incus-in-Incus sandbox
 ```
 
 ### 2. Install Claude Code in the runner
@@ -86,7 +86,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## Operational modes
 
-### Fix mode (`make agent-fix`)
+### Fix mode (`anklume ai agent-fix`)
 
 ```
 1. Launch Claude Code in the runner container
@@ -98,7 +98,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 7. Commit fixes, optionally create PR
 ```
 
-### Develop mode (`make agent-develop TASK="..."`)
+### Develop mode (`anklume ai agent-develop TASK="..."`)
 
 ```
 1. Launch Claude Code with the task description
@@ -183,7 +183,7 @@ complex development tasks.
 ### Runner not found
 
 ```bash
-make runner-create     # Create the sandbox container
+anklume dev runner create     # Create the sandbox container
 ```
 
 ### Claude Code not installed

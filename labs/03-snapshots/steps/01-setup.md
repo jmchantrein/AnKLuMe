@@ -19,13 +19,13 @@ Set up a single container for snapshot exercises.
    ```bash
    cp infra.yml infra.yml.bak 2>/dev/null || true
    cp labs/03-snapshots/infra.yml infra.yml
-   make sync
+   anklume sync
    ```
 
 3. Deploy the container:
 
    ```bash
-   make apply
+   anklume domain apply
    ```
 
 4. Verify it is running:

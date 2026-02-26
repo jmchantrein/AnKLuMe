@@ -8,7 +8,7 @@
 #   - Ephemeral OS with persistent application state
 #
 # Setup:
-#   1. Build image: make build-image OUT=anklume-live.img
+#   1. Build image: anklume live build OUT=anklume-live.img
 #   2. Write to USB: dd if=anklume-live.img of=/dev/sdX bs=1M
 #   3. Boot from USB, run first-boot wizard
 #   4. Specify data disk (e.g., /dev/nvme0n1)
@@ -142,7 +142,7 @@ networks:
 #
 # 4. Updates:
 #    To update the live OS to a newer version:
-#      make live-update URL=https://cdn.example.com/anklume-v1.2.img
+#      anklume live update URL=https://cdn.example.com/anklume-v1.2.img
 #    The update downloads to the inactive slot, verifies integrity, and reboots.
 #    If boot fails 3 times, automatically rolls back to previous version.
 #

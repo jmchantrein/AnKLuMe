@@ -10,7 +10,7 @@ LLM (Claude, GPT, Gemini, Mistral, local models) to work on anklume.
 anklume is a **declarative infrastructure compartmentalization framework**.
 It provides QubesOS-like isolation using native Linux kernel features
 (KVM/LXC), orchestrated by Ansible and Incus. The user describes their
-infrastructure in `infra.yml`, runs `make sync && make apply`, and gets
+infrastructure in `infra.yml`, runs `anklume sync && anklume domain apply`, and gets
 isolated, reproducible environments.
 
 **It is NOT a web app, NOT an API.** It is Infrastructure-as-Code.
@@ -30,7 +30,7 @@ isolated, reproducible environments.
 ## Source of truth model (PSOT)
 
 ```
-infra.yml  --(make sync)-->  Ansible files  --(make apply)-->  Incus state
+infra.yml  --(anklume sync)-->  Ansible files  --(anklume domain apply)-->  Incus state
  (PSOT)                     (inventory/,                    (bridges, projects,
                              group_vars/,                    profiles, instances)
                              host_vars/)
@@ -77,10 +77,10 @@ You MUST follow these. Violations will be caught by linters.
 ## Validation commands
 
 ```bash
-make lint          # ALL validators (ansible-lint, yamllint, shellcheck, ruff)
-make test          # pytest (2238+ tests)
-make check         # ansible-playbook --check --diff
-make sync-dry      # Preview generator output
+anklume dev lint          # ALL validators (ansible-lint, yamllint, shellcheck, ruff)
+anklume dev test          # pytest (2238+ tests)
+anklume domain check         # ansible-playbook --check --diff
+anklume sync --dry-run      # Preview generator output
 ```
 
 ALL must pass before committing. Zero violations tolerated.
@@ -90,7 +90,7 @@ ALL must pass before committing. Zero violations tolerated.
 1. **Spec first**: update SPEC.md or ARCHITECTURE.md
 2. **Test second**: write tests (Molecule for roles, pytest for generator)
 3. **Implement third**: code until tests pass
-4. **Validate**: `make lint`
+4. **Validate**: `anklume dev lint`
 5. **Commit**: one commit per logical change
 
 ## Project structure
@@ -159,7 +159,7 @@ anklume/
 The following features are planned but not yet implemented:
 
 ### Phase 19: Terminal UX and Observability
-- **tmux/tmuxp console** (`make console`): auto-generated tmux session
+- **tmux/tmuxp console** (`anklume console`): auto-generated tmux session
   from infra.yml — one window per domain, one pane per machine,
   per-pane background color by trust level (QubesOS-style visual
   domain isolation in the terminal). Uses libtmux (Python API) for
@@ -169,15 +169,15 @@ The following features are planned but not yet implemented:
 - **Local telemetry** (opt-in, local-only): usage logging in JSON Lines
   (`~/.anklume/telemetry/usage.jsonl`). No network calls, no phone home.
   Tracks: make targets, domains, duration, exit codes.
-  `make telemetry-on/off/report/clear`. Terminal visualization via
+  `anklume telemetry on/off/report/clear`. Terminal visualization via
   plotext. Optional HTML report generation.
-- **Static analysis** (`make code-graph`): dead code detection (vulture
+- **Static analysis** (`anklume dev graph --type code`): dead code detection (vulture
   for Python, shellcheck for bash), call graphs (pyan), dependency
   graphs (pydeps), unused Ansible variables (little-timmy). GraphViz
   visualization of the full codebase architecture.
 
 ### Phase 20: Native Incus Features and QubesOS Parity
-- **Disposable instances**: `make disp IMAGE=debian/13 CMD=bash` using
+- **Disposable instances**: `anklume instance disp --image debian/13 CMD=bash` using
   Incus native `--ephemeral` flag (auto-destroyed on stop)
 - **Golden images / templates**: CoW-based instance derivation using
   `incus copy` on ZFS/Btrfs backends. `incus publish` for reusable
@@ -188,10 +188,10 @@ The following features are planned but not yet implemented:
   needed. Standard protocol with SDKs in Python/Go/Rust. Policy
   engine in admin container controls which containers can call which
   services. AI agents can use the same MCP endpoints natively.
-- **File transfer**: `make file-copy SRC=a:/path DST=b:/path` wrapping
+- **File transfer**: `anklume portal copy a:/path b:/path` wrapping
   `incus file pull/push` pipe. Shared volumes for bulk transfers.
-- **Backup/export**: `make backup` wrapping `incus export` + GPG
-  encryption. `make restore-backup` for import. Cross-machine
+- **Backup/export**: `anklume backup create` wrapping `incus export` + GPG
+  encryption. `anklume backup restore` for import. Cross-machine
   migration via `incus copy local: remote:`.
 - **Tor gateway domain**: transparent Tor proxy container with
   network_policies routing traffic from selected domains.
@@ -219,4 +219,4 @@ The following features are planned but not yet implemented:
 4. Log autonomous decisions in `docs/decisions-log.md`
 5. One commit per logical change
 6. Never modify `=== MANAGED ===` sections manually
-7. Run `make lint && make test` before every commit
+7. Run `anklume dev lint && anklume dev test` before every commit

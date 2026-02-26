@@ -12,7 +12,7 @@
   category: architecture
   decision: "infra.yml is the Primary Source of Truth (PSOT)"
   rationale: "Reduces tedious manual editing of inventory files"
-  consequence: "make sync generates files; both infra.yml and generated files committed"
+  consequence: "anklume sync generates files; both infra.yml and generated files committed"
   adr: "ADR-002"
 
 - id: DEC-ADR-004
@@ -103,7 +103,7 @@
   category: architecture
   decision: "Two-step nftables deployment (admin to host)"
   rationale: "Admin container generates rules; host applies them"
-  consequence: "make nftables (generate) + make nftables-deploy (apply on host)"
+  consequence: "anklume network rules (generate) + anklume network deploy (apply on host)"
   adr: "ADR-023"
 
 - id: DEC-ADR-027

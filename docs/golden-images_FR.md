@@ -56,17 +56,17 @@ incus storage list
 
 ```bash
 # Déployer l'instance avec ses rôles d'abord
-make apply
+anklume domain apply
 
 # Créer l'image de référence (arrêt + snapshot pristine)
-make golden-create NAME=pro-dev
+anklume golden create pro-dev
 ```
 
 ### 2. Dériver de nouvelles instances
 
 ```bash
 # Créer un clone depuis l'image de référence
-make golden-derive TEMPLATE=pro-dev INSTANCE=pro-dev-v2
+anklume golden derive pro-dev pro-dev-v2
 
 # Démarrer le clone
 incus start pro-dev-v2 --project pro
@@ -76,7 +76,7 @@ incus start pro-dev-v2 --project pro
 
 ```bash
 # Publier l'image de référence en image Incus locale
-make golden-publish TEMPLATE=pro-dev ALIAS=golden-pro
+anklume golden publish pro-dev --alias golden-pro
 
 # Utiliser dans infra.yml
 # machines:
@@ -87,18 +87,18 @@ make golden-publish TEMPLATE=pro-dev ALIAS=golden-pro
 ### 4. Lister les images de référence
 
 ```bash
-make golden-list                  # Tous les projets
-make golden-list PROJECT=admin    # Projet spécifique
+anklume golden list                  # Tous les projets
+anklume golden list --project admin    # Projet spécifique
 ```
 
 ## Cibles Makefile
 
 | Cible | Description |
 |-------|-------------|
-| `make golden-create NAME=<nom>` | Arrêter l'instance + créer le snapshot pristine |
-| `make golden-derive TEMPLATE=<nom> INSTANCE=<nouveau>` | Copie CoW depuis pristine |
-| `make golden-publish TEMPLATE=<nom> ALIAS=<alias>` | Publier en image Incus |
-| `make golden-list` | Lister les instances avec snapshot pristine |
+| `anklume golden create <nom>` | Arrêter l'instance + créer le snapshot pristine |
+| `anklume golden derive <nom> <nouveau>` | Copie CoW depuis pristine |
+| `anklume golden publish <nom> --alias <alias>` | Publier en image Incus |
+| `anklume golden list` | Lister les instances avec snapshot pristine |
 
 Toutes les cibles acceptent un paramètre optionnel `PROJECT=<projet>`
 pour spécifier le projet Incus (détecté automatiquement si omis).
@@ -123,31 +123,31 @@ les profils.
 
 ```bash
 # 1. Provisionner un environnement de développement
-make apply-limit G=pro
+anklume domain apply pro
 
 # 2. Installer des outils supplémentaires manuellement
 incus exec pro-dev --project pro -- apt install -y vim tmux git
 
 # 3. Créer l'image de référence
-make golden-create NAME=pro-dev
+anklume golden create pro-dev
 
 # 4. Dériver pour chaque développeur
-make golden-derive TEMPLATE=pro-dev INSTANCE=pro-alice
-make golden-derive TEMPLATE=pro-dev INSTANCE=pro-bob
+anklume golden derive pro-dev pro-alice
+anklume golden derive pro-dev pro-bob
 ```
 
 ### Déploiement de TP pour étudiants
 
 ```bash
 # 1. Créer une instance de référence pour le TP
-make apply-limit G=lab
+anklume domain apply lab
 
 # 2. En faire une image de référence
-make golden-create NAME=lab-reference
+anklume golden create lab-reference
 
 # 3. Dériver N instances étudiantes
 for i in $(seq 1 20); do
-    make golden-derive TEMPLATE=lab-reference INSTANCE="lab-student-${i}"
+    anklume golden derive lab-reference "lab-student-${i}"
 done
 ```
 
@@ -161,10 +161,10 @@ incus start pro-dev --project pro
 incus exec pro-dev --project pro -- apt update && apt upgrade -y
 
 # 3. Re-créer l'image de référence (remplace le snapshot pristine)
-make golden-create NAME=pro-dev
+anklume golden create pro-dev
 
 # 4. Dériver des instances fraîches depuis le modèle mis à jour
-make golden-derive TEMPLATE=pro-dev INSTANCE=pro-dev-updated
+anklume golden derive pro-dev pro-dev-updated
 ```
 
 ## Dépannage
@@ -208,5 +208,5 @@ incus snapshot list <instance> --project <projet>
 Sinon, le créer d'abord :
 
 ```bash
-make golden-create NAME=<instance>
+anklume golden create <instance>
 ```

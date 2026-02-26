@@ -80,10 +80,10 @@ domains:
 ### 2. Deployer
 
 ```bash
-make sync          # Generer les fichiers Ansible
-make apply         # Infrastructure complete + provisionnement
+anklume sync          # Generer les fichiers Ansible
+anklume domain apply         # Infrastructure complete + provisionnement
 # ou :
-make apply-stt     # Role STT uniquement
+anklume domain apply --tags stt     # Role STT uniquement
 ```
 
 ### 3. Configurer Open WebUI
@@ -239,7 +239,7 @@ stt_server_model: "small"
 stt_server_quantization: "int8"
 
 # Re-provisionner
-make apply-stt
+anklume domain apply --tags stt
 ```
 
 ### Le service ne demarre pas

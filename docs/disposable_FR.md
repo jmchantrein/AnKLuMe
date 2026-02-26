@@ -21,19 +21,19 @@ Le nom de l'instance est genere automatiquement avec un horodatage :
 
 ```bash
 # Lancer une instance jetable et ouvrir un shell
-make disp
+anklume instance disp
 
 # Lancer avec une image specifique
-make disp IMAGE=images:alpine/3.20
+anklume instance disp --image images:alpine/3.20
 
 # Lancer dans un domaine/projet specifique
-make disp DOMAIN=sandbox
+anklume instance disp sandbox
 
 # Executer une commande puis detruire
-make disp CMD="apt update && apt upgrade -y"
+anklume instance disp --cmd "apt update && apt upgrade -y"
 
 # Lancer en tant que VM (au lieu d'un conteneur)
-make disp VM=1
+anklume instance disp --vm
 ```
 
 Ou utiliser le script directement :
@@ -122,7 +122,7 @@ la detruire.
 ## Cible Makefile
 
 ```makefile
-make disp [IMAGE=...] [CMD=...] [DOMAIN=...] [VM=1]
+anklume instance disp [OPTIONS]
 ```
 
 | Variable | Defaut | Description |

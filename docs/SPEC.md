@@ -8,7 +8,7 @@ Linux kernel features (KVM/LXC), with optional integrated AI
 capabilities.
 
 The user describes their infrastructure in a single YAML file
-(`infra.yml`), runs `make sync && make apply`, and gets
+(`infra.yml`), runs `anklume sync && anklume domain apply`, and gets
 isolated, reproducible, disposable environments. anklume
 abstracts away the complexity of the underlying technologies
 (Incus, Ansible, nftables) behind a high-level declarative
@@ -63,7 +63,7 @@ Each domain becomes:
 - An Incus project (namespace isolation)
 - A `group_vars/<domain>.yml` file
 
-Adding a domain = adding a section in `infra.yml` + `make sync`.
+Adding a domain = adding a section in `infra.yml` + `anklume sync`.
 
 ### Instance (machine)
 An LXC container or KVM virtual machine. Defined within a domain in `infra.yml`.
@@ -81,7 +81,7 @@ restore, delete.
 ## 3. Source of truth model (PSOT)
 
 ```
-┌─────────────────────┐     make sync     ┌─────────────────────────┐
+┌─────────────────────┐     anklume sync     ┌─────────────────────────┐
 │     infra.yml       │ ────────────────▶ │  Ansible files          │
 │  (Primary Source     │                   │  (Secondary Source       │
 │   of Truth)         │                   │   of Truth)             │
@@ -94,7 +94,7 @@ restore, delete.
 │                     │                   │  outside managed sections│
 └─────────────────────┘                   └────────────┬────────────┘
                                                        │
-                                                  make apply
+                                                  anklume domain apply
                                                        │
                                                        ▼
                                           ┌─────────────────────────┐
@@ -109,7 +109,7 @@ restore, delete.
 - Generated Ansible files hold the operational truth (custom variables, extra
   config, role parameters added by the user).
 - Both must be committed to git.
-- `make sync` only overwrites `=== MANAGED ===` sections; everything else
+- `anklume sync` only overwrites `=== MANAGED ===` sections; everything else
   is preserved.
 
 ## 4. Host architecture
@@ -143,7 +143,7 @@ The anklume container (`anklume-instance`):
 
 ```yaml
 # infra.yml — Primary Source of Truth
-# Describes the infrastructure. Run `make sync` after editing.
+# Describes the infrastructure. Run `anklume sync` after editing.
 
 project_name: my-infra
 
@@ -394,7 +394,7 @@ Roles are resolved from three directories in priority order
 
 **Galaxy role integration** (ADR-045): Official upstream Ansible Galaxy
 roles can be declared in `requirements.yml` and installed to
-`roles_vendor/` via `make init`. Framework roles can wrap Galaxy roles
+`roles_vendor/` via `anklume setup init`. Framework roles can wrap Galaxy roles
 with thin wrappers that add Incus-specific glue.
 
 `requirements.yml` format:
@@ -406,7 +406,7 @@ roles:
     version: ">=7.0.0"
 ```
 
-`make init` installs both collections and roles. `roles_vendor/` is
+`anklume setup init` installs both collections and roles. `roles_vendor/` is
 gitignored and fully reproducible from `requirements.yml`.
 
 ### Validation constraints
@@ -703,7 +703,7 @@ volume with `source:` pointing to the propagated mount path. There is
 no automatic recursive propagation — each nesting level must explicitly
 declare its volumes.
 
-**Host directories**: `make shares` creates the host-side directories
+**Host directories**: `anklume setup shares` creates the host-side directories
 for all declared shared volumes. `global.shared_volumes_base` sets
 the base path (default: `/srv/anklume/shares`).
 
@@ -743,11 +743,11 @@ disk devices injected into `instance_devices`. Device naming:
 devices and `sv-*` shared volume devices). Source directory:
 `<persistent_data_base>/<domain_name>/<machine_name>/<volume_name>`.
 
-**Host directories**: `make data-dirs` creates the host-side
+**Host directories**: `anklume setup data-dirs` creates the host-side
 directories. `global.persistent_data_base` sets the base path
 (default: `/srv/anklume/data`).
 
-**Flush protection**: `make flush` never deletes
+**Flush protection**: `anklume flush` never deletes
 `/srv/anklume/data/` or `/srv/anklume/shares/`. Data persists
 across infrastructure rebuilds. See ADR-042.
 
@@ -832,12 +832,12 @@ displays its instructions.
 ### Make targets
 
 ```bash
-make lab-list              # List all labs (number, title, difficulty)
-make lab-start L=01        # Start lab 01, display first step
-make lab-check L=01        # Validate current step
-make lab-hint  L=01        # Show hint for current step
-make lab-reset L=01        # Reset lab progress
-make lab-solution L=01     # Show solution (marks as assisted)
+anklume lab list              # List all labs (number, title, difficulty)
+anklume lab start 01        # Start lab 01, display first step
+anklume lab check 01        # Validate current step
+anklume lab hint 01        # Show hint for current step
+anklume lab reset 01        # Reset lab progress
+anklume lab solution 01     # Show solution (marks as assisted)
 ```
 
 ### Progress tracking
@@ -857,14 +857,14 @@ Viewing the solution marks the lab as `assisted: true`.
 
 ### CLI modes and internationalization
 
-anklume provides three CLI modes that control the `make help` output,
+anklume provides three CLI modes that control the `anklume --help` output,
 targeting different user profiles:
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| `user` | `make mode-user` | Standard help (default). ~35 categorized targets. |
-| `student` | `make mode-student` | Bilingual help (English + French descriptions). Same targets as user. |
-| `dev` | `make mode-dev` | All 110+ targets visible, with French translations in dim text. |
+| `user` | `anklume mode user` | Standard help (default). ~35 categorized targets. |
+| `student` | `anklume mode student` | Bilingual help (English + French descriptions). Same targets as user. |
+| `dev` | `anklume mode dev` | All 110+ targets visible, with French translations in dim text. |
 
 The active mode is persisted in `~/.anklume/mode` (plain text file).
 Default: `user` (when no mode file exists).
@@ -878,8 +878,8 @@ ANKLUME_MODE ?= $(shell cat ~/.anklume/mode 2>/dev/null || echo user)
 the default language. In student mode, `ANKLUME_LANG` defaults to `fr`.
 
 ```bash
-ANKLUME_LANG=fr make help        # French help regardless of mode
-ANKLUME_MODE=student make help   # Equivalent (student defaults to fr)
+ANKLUME_LANG=fr anklume --help        # French help regardless of mode
+ANKLUME_MODE=student anklume --help   # Equivalent (student defaults to fr)
 ```
 
 **Translation files**: `i18n/<lang>.yml` contains translations for all
@@ -892,7 +892,7 @@ The `i18n/fr.yml` file covers all documented Makefile targets (those
 with `##` comments). Adding a new target requires adding a corresponding
 entry in `i18n/fr.yml`.
 
-**Student mode specifics**: In student mode, `make help` shows:
+**Student mode specifics**: In student mode, `anklume --help` shows:
 - Bilingual category headers (English / French)
 - French descriptions for each target
 - A mode indicator showing how to switch modes

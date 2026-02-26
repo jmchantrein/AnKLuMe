@@ -37,7 +37,7 @@ domains:
         roles: [base_system, ollama_server, stt_server]
 ```
 
-If you add a second GPU machine in exclusive mode, `make sync` will fail:
+If you add a second GPU machine in exclusive mode, `anklume sync` will fail:
 
 ```
 Validation errors:
@@ -55,7 +55,7 @@ global:
   gpu_policy: shared  # Allow multiple instances to share the GPU
 ```
 
-`make sync` will emit a warning but proceed:
+`anklume sync` will emit a warning but proceed:
 
 ```
 WARNING: GPU policy is 'shared': 2 instances share GPU access
@@ -222,7 +222,7 @@ After a container restart, GPU devices should persist. If they don't:
 
 ```bash
 # Re-apply the infrastructure
-make apply-infra
+anklume domain apply --tags infra
 
 # Or restart the specific instance
 incus restart my-container --project my-domain

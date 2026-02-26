@@ -42,9 +42,9 @@ web server and a client container. Key naming conventions:
 ## Step 2: Deploy
 
 ```bash
-make sync    # Generate Ansible files
-make check   # Preview changes
-make apply   # Create everything
+anklume sync    # Generate Ansible files
+anklume domain check   # Preview changes
+anklume domain apply   # Create everything
 ```
 
 For a class of 30 students with 2 containers each, this creates:
@@ -57,14 +57,14 @@ For a class of 30 students with 2 containers each, this creates:
 Before students start working, snapshot the clean state:
 
 ```bash
-make snapshot NAME=pre-lab
+anklume snapshot create NAME=pre-lab
 ```
 
 This snapshots every instance across all domains. You can also snapshot
 a single student domain:
 
 ```bash
-make snapshot-domain D=student-01 NAME=pre-lab
+anklume snapshot create --domain student-01 NAME=pre-lab
 ```
 
 ## Network isolation
@@ -86,7 +86,7 @@ This means:
 Restore the pre-lab snapshot for one student:
 
 ```bash
-make restore-domain D=student-05 NAME=pre-lab
+anklume snapshot restore --domain student-05 NAME=pre-lab
 ```
 
 ### Reset all students
@@ -94,26 +94,26 @@ make restore-domain D=student-05 NAME=pre-lab
 Restore the pre-lab snapshot globally:
 
 ```bash
-make restore NAME=pre-lab
+anklume snapshot restore --name pre-lab
 ```
 
 ### Full teardown and rebuild
 
 Since student domains are `ephemeral: true`, you can destroy and
-recreate them. Remove the domain from `infra.yml`, run `make sync
---clean-orphans`, then re-add it and `make apply`.
+recreate them. Remove the domain from `infra.yml`, run `anklume sync
+--clean-orphans`, then re-add it and `anklume domain apply`.
 
 ## Scaling
 
 ### Adding a student
 
 Add a new domain block in `infra.yml` with the next `subnet_id` and
-unique machine names, then run `make sync && make apply-limit
+unique machine names, then run `anklume sync && anklume domain apply-limit
 G=student-04`.
 
 ### Removing a student
 
-Remove the domain from `infra.yml` and run `make sync-clean`. Incus
+Remove the domain from `infra.yml` and run `anklume sync --clean`. Incus
 resources must be destroyed separately via the `incus` CLI.
 
 ## Hardware requirements
@@ -138,7 +138,7 @@ Students access containers via `incus exec s01-web --project student-01
 
 - Use `ephemeral: true` for all student domains for easy cleanup
 - Take snapshots before each lab session
-- Use `make apply-limit G=student-XX` to rebuild a single student
+- Use `anklume domain apply student-XX` to rebuild a single student
 
 ## Example configurations
 

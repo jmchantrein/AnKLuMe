@@ -156,8 +156,8 @@ class TestADR045:
     def test_adr045_requirements_yml(self):
         assert "requirements.yml" in self.content
 
-    def test_adr045_make_init(self):
-        assert "make init" in self.content
+    def test_adr045_setup_init(self):
+        assert "anklume setup init" in self.content
 
 
 # -- GR-005: SPEC.md role resolution ----------------------------------------

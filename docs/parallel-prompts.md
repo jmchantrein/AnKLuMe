@@ -106,7 +106,7 @@ Commit final : `feat(tests): add depth 2-3 matrix tests for nesting_prefix and r
 ```
 Tu travailles sur le projet AnKLuMe. Lis CLAUDE.md et docs/ROADMAP.md (section Phase 32) pour comprendre le contexte.
 
-Ta mission : restructurer `make help` pour afficher les targets groupees par categorie, et corriger le bug warn() dans llm-bench.sh.
+Ta mission : restructurer `anklume --help` pour afficher les targets groupees par categorie, et corriger le bug warn() dans llm-bench.sh.
 
 Etapes :
 1. `git checkout -b feat/make-help-categories`
@@ -128,16 +128,16 @@ Etapes :
    - `shellcheck scripts/llm-bench.sh`
 
 Contraintes :
-- Garde la retrocompatibilite : `make help` doit toujours fonctionner
+- Garde la retrocompatibilite : `anklume --help` doit toujours fonctionner
 - Ne change PAS le comportement des targets existantes
 - Les noms de categories doivent correspondre au ROADMAP
 
 A la fin, cree un fichier DECISIONS.md a la racine avec :
 - Mapping complet target -> categorie
 - Decisions sur quelles targets sont "user-facing" vs "internes"
-- Screenshots ou copie de la sortie de `make help`
+- Screenshots ou copie de la sortie de `anklume --help`
 
-Commit final : `feat(ux): categorized make help with color-coded groups`
+Commit final : `feat(ux): categorized anklume --help with color-coded groups`
 ```
 
 ---
@@ -232,10 +232,10 @@ Commit final : `docs(i18n): sync French translations with latest English docs`
 
 Ordre de merge recommande :
 1. Branches 1 et 2 (tests) — en premier car elles ne modifient que des tests
-2. Branche 3 (make help) — independante
+2. Branche 3 (anklume --help) — independante
 3. Branche 4 (rename) — apres 1+2 car touche generate.py
 4. Branche 5 (FR) — en dernier, independante
 
 Apres chaque merge :
-- `make lint && make test` pour verifier
+- `anklume dev lint && anklume dev test` pour verifier
 - Review du DECISIONS.md de la branche

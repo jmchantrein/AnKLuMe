@@ -66,14 +66,14 @@ network_policies:
 ### 2. Deployer l'infrastructure
 
 ```bash
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ### 3. Configurer CUPS dans le conteneur
 
 ```bash
-make apply-print I=shared-print
+anklume domain apply-print I=shared-print
 ```
 
 ### 4. Ajouter des imprimantes
@@ -156,7 +156,7 @@ scripts/cups-setup.sh status <instance> [--project PROJET]
 
 | Cible | Description |
 |-------|-------------|
-| `make apply-print I=<instance>` | Configurer le service CUPS dans le conteneur |
+| `anklume domain apply-print I=<instance>` | Configurer le service CUPS dans le conteneur |
 
 Accepte un parametre optionnel `PROJECT=<projet>`.
 

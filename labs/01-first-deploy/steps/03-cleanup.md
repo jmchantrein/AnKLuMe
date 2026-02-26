@@ -18,7 +18,7 @@ Remove lab resources and restore your original infrastructure.
    Alternatively, if you have no other infrastructure to preserve:
 
    ```bash
-   make flush FORCE=true
+   anklume flush --force
    ```
 
 2. Restore your original infra.yml:
@@ -30,12 +30,12 @@ Remove lab resources and restore your original infrastructure.
 3. Regenerate your original Ansible files:
 
    ```bash
-   make sync
+   anklume sync
    ```
 
 ## What you learned
 
-- The `infra.yml -> make sync -> make apply` workflow
+- The `infra.yml -> anklume sync -> anklume domain apply` workflow
 - How domains map to Incus projects, bridges, and subnets
 - How containers on the same bridge can communicate
 - How to inspect generated Ansible files

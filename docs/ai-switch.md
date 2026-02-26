@@ -58,7 +58,7 @@ domains:
         type: lxc
 ```
 
-Running `make sync` with `ai_access_policy: exclusive` auto-creates a
+Running `anklume sync` with `ai_access_policy: exclusive` auto-creates a
 bidirectional network policy from the default domain to `ai-tools`.
 
 ### Validation rules
@@ -79,8 +79,8 @@ The PSOT generator enforces:
 ### Switch AI access to a different domain
 
 ```bash
-make ai-switch DOMAIN=perso       # Switch access + flush VRAM
-make ai-switch DOMAIN=pro NO_FLUSH=1  # Switch without VRAM flush
+anklume ai switch DOMAIN=perso       # Switch access + flush VRAM
+anklume ai switch DOMAIN=pro NO_FLUSH=1  # Switch without VRAM flush
 ```
 
 Or use the script directly:
@@ -141,7 +141,7 @@ python3 scripts/generate.py infra.yml --dry-run 2>&1 | head
 
 The switch uses `ansible-playbook` internally. Check that:
 - `site.yml` is present at the project root
-- The `incus_nftables` role is functional: `make nftables`
+- The `incus_nftables` role is functional: `anklume network rules`
 - Incus bridges exist: `incus network list | grep net-`
 
 ### GPU reset not supported

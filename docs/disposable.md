@@ -17,19 +17,19 @@ The instance name is auto-generated with a timestamp pattern:
 
 ```bash
 # Launch a disposable instance and attach a shell
-make disp
+anklume instance disp
 
 # Launch with a specific image
-make disp IMAGE=images:alpine/3.20
+anklume instance disp --image images:alpine/3.20
 
 # Launch in a specific domain/project
-make disp DOMAIN=sandbox
+anklume instance disp sandbox
 
 # Run a command and auto-destroy
-make disp CMD="apt update && apt upgrade -y"
+anklume instance disp --cmd "apt update && apt upgrade -y"
 
 # Launch as a VM (instead of container)
-make disp VM=1
+anklume instance disp --vm
 ```
 
 Or use the script directly:
@@ -116,7 +116,7 @@ destroy it.
 ## Makefile target
 
 ```makefile
-make disp [IMAGE=...] [CMD=...] [DOMAIN=...] [VM=1]
+anklume instance disp [OPTIONS]
 ```
 
 | Variable | Default | Description |

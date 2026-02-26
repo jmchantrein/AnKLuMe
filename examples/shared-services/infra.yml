@@ -63,8 +63,8 @@ domains:
           - base_system
 
 # Allow pro and perso domains to access CUPS via IPP (port 631).
-# After `make apply`, run:
-#   make apply-print I=shared-print
+# After `anklume domain apply`, run:
+#   anklume domain apply-print I=shared-print
 # to install CUPS, then add printers:
 #   scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
 #   scripts/cups-setup.sh add-network shared-print --nic-parent enp3s0

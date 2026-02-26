@@ -7,9 +7,9 @@ domain isolation similar to QubesOS colored window borders.
 ## Quick start
 
 ```bash
-make console              # Launch tmux console
-make console DRY_RUN=1    # Preview without creating session
-make console KILL=1       # Force recreation (kill existing session)
+anklume console              # Launch tmux console
+anklume console --dry-run    # Preview without creating session
+anklume console --kill       # Force recreation (kill existing session)
 ```
 
 Or use the script directly:
@@ -111,7 +111,7 @@ with:
 tmux attach -t anklume
 ```
 
-If the session already exists, `make console` attaches to it instead of
+If the session already exists, `anklume console` attaches to it instead of
 creating a new one.
 
 ## Recreation
@@ -119,7 +119,7 @@ creating a new one.
 To force recreation of the session (e.g., after adding/removing domains):
 
 ```bash
-make console KILL=1
+anklume console --kill
 ```
 
 This kills the existing session and creates a fresh one.
@@ -231,12 +231,12 @@ Verify the machine exists and is running:
 incus list --all-projects
 ```
 
-If the machine does not exist yet, run `make apply` to create infrastructure.
+If the machine does not exist yet, run `anklume domain apply` to create infrastructure.
 
 ### Cannot attach to session
 
 If `tmux attach -t anklume` fails with "session not found", the session
-was killed or tmux was restarted. Run `make console` to recreate it.
+was killed or tmux was restarted. Run `anklume console` to recreate it.
 
 ### Pane border labels not showing
 
@@ -254,7 +254,7 @@ On older tmux versions, the console works but border labels are not displayed.
 
 ```bash
 # Create and attach to console
-make console
+anklume console
 
 # Detach
 Ctrl-a d
@@ -266,7 +266,7 @@ tmux attach -t anklume
 ### Dry-run preview
 
 ```bash
-make console DRY_RUN=1
+anklume console --dry-run
 ```
 
 Output:
@@ -297,7 +297,7 @@ python3 scripts/console.py --no-attach
 ## Dependencies
 
 - Python 3.11+
-- `pip install libtmux` (installed via `make init`)
+- `pip install libtmux` (installed via `anklume setup init`)
 - tmux >= 3.0 (for pane border labels)
 
 ## Security model

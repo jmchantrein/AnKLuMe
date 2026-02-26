@@ -27,7 +27,7 @@ Generate Ansible files for a two-domain infrastructure.
 3. Generate files:
 
    ```bash
-   make sync
+   anklume sync
    ```
 
 4. Compare the two domains:

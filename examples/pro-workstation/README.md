@@ -49,8 +49,8 @@ between the two processes.
 
 ```bash
 cp examples/pro-workstation/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 After deployment, configure Open WebUI to connect to the AI server

@@ -81,8 +81,16 @@ def delete(
 @app.command()
 def rollback(
     timestamp: Annotated[str | None, typer.Option("--timestamp", "-t", help="Specific pre-apply timestamp")] = None,
+    list_: Annotated[bool, typer.Option("--list", "-l", help="List available rollback points")] = False,
+    cleanup: Annotated[bool, typer.Option("--cleanup", help="Clean up old rollback snapshots")] = False,
 ) -> None:
     """Restore the latest pre-apply snapshot."""
+    if list_:
+        run_script("snap.sh", "rollback", "--list")
+        return
+    if cleanup:
+        run_script("snap.sh", "rollback", "--cleanup")
+        return
     args = ["rollback"]
     if timestamp:
         args.extend(["--timestamp", timestamp])

@@ -52,15 +52,15 @@ time without affecting your main system.
 
 ```bash
 cp examples/sandbox-isolation/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ## Workflow
 
 ```bash
 # Snapshot clean state
-make snapshot-domain D=sandbox NAME=clean
+anklume snapshot create --domain sandbox NAME=clean
 
 # Enter the test container
 incus exec sbx-test --project sandbox -- bash
@@ -68,7 +68,7 @@ incus exec sbx-test --project sandbox -- bash
 # ... run untrusted software ...
 
 # Restore clean state
-make restore-domain D=sandbox NAME=clean
+anklume snapshot restore --domain sandbox NAME=clean
 ```
 
 ## Network isolation

@@ -34,15 +34,15 @@ their main system.
 
 ```bash
 cp examples/student-sysadmin/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 The lab domain is ephemeral, so you can freely destroy and recreate it.
 Take snapshots before experiments:
 
 ```bash
-make snapshot-domain D=lab NAME=clean-state
+anklume snapshot create --domain lab NAME=clean-state
 # ... do your exercises ...
-make restore-domain D=lab NAME=clean-state
+anklume snapshot restore --domain lab NAME=clean-state
 ```

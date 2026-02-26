@@ -29,7 +29,7 @@ produit l'arborescence de fichiers Ansible avec des sections gerees. Les fichier
 generes sont la Source de Verite Secondaire -- librement editables en dehors des
 sections gerees. Les deux doivent etre commites dans git.
 
-**Consequence** : Pour ajouter une machine, editer `infra.yml` + `make sync`. Pour
+**Consequence** : Pour ajouter une machine, editer `infra.yml` + `anklume sync`. Pour
 personnaliser davantage, editer les fichiers generes en dehors des sections gerees.
 
 ---
@@ -60,7 +60,7 @@ plus KISS/DRY et ne compromet pas la securite globale.
 
 **Consequence** : L'hote n'est pas gere par Ansible mais peut recevoir des
 modifications ciblees manuelles ou scriptees quand les contraintes d'isolation
-l'exigent (ex. `make nftables-deploy`).
+l'exigent (ex. `anklume network deploy`).
 
 ---
 
@@ -109,7 +109,7 @@ une documentation vivante.
    le comportement attendu depuis la spec -- pas depuis le code existant
 3. Implementer jusqu'a ce que les tests passent (Molecule pour les roles,
    pytest pour le generateur)
-4. Valider (`make lint`)
+4. Valider (`anklume dev lint`)
 5. Revue (agent de revue)
 6. Commiter seulement quand tout passe
 
@@ -161,13 +161,13 @@ d'en-tete indiquant que la version anglaise fait foi en cas de divergence.
 les types de fichiers.
 
 **Decision** : Chaque type de fichier du projet a un validateur obligatoire.
-`make lint` chaine tous les validateurs. Le CI doit tous les passer. Aucun fichier
+`anklume dev lint` chaine tous les validateurs. Le CI doit tous les passer. Aucun fichier
 n'echappe a la validation. Zero violation toleree.
 
 Voir SPEC-operations.md Section 9 pour le tableau complet des validateurs.
 
 **Consequence** : Les contributeurs doivent avoir tous les validateurs installes.
-`make init` les installe.
+`anklume setup init` les installe.
 
 ---
 
@@ -182,7 +182,7 @@ Elles ne suivent pas le patron de reconciliation declaratif
 - `scripts/snap.sh` : script Bash autonome pour les operations de snapshot ponctuelles.
   Interroge Incus directement, supporte le mot-cle `self`. Valide par `shellcheck`.
 - Role Ansible `incus_snapshots` + playbook `snapshot.yml` : gestion declarative
-  des snapshots invoquee via Makefile (`make snapshot`, `make restore`, etc.).
+  des snapshots invoquee via Makefile (`anklume snapshot create`, `anklume snapshot restore`, etc.).
   Supporte les operations par lot au niveau du domaine.
 
 **Historique** : Le MVP original (snap.sh uniquement) a ete complete par le role
@@ -405,8 +405,8 @@ bridge d'Incus. L'isolation anklume est evaluee en premier.
 les regles nftables doivent etre appliquees sur le noyau de l'hote.
 
 **Decision** : Decouper en deux etapes :
-1. `make nftables` -- s'execute dans le container anklume, genere les regles
-2. `make nftables-deploy` -- s'execute sur l'hote, recupere les regles
+1. `anklume network rules` -- s'execute dans le container anklume, genere les regles
+2. `anklume network deploy` -- s'execute sur l'hote, recupere les regles
    depuis anklume, valide et applique
 
 **Consequence** : L'operateur revoit les regles avant de deployer. Le
@@ -507,7 +507,7 @@ roles personnalises ni les personnalisations des fichiers generes.
    utilisateur (jamais touche), genere (sections gerees), runtime (jamais
    touche)
 2. Repertoire `roles_custom/` (gitignore) avec priorite dans `roles_path`
-3. `make upgrade` avec detection de conflits et creation de `.bak`
+3. `anklume upgrade` avec detection de conflits et creation de `.bak`
 4. Marqueur de version pour verification de compatibilite
 
 **Consequence** : Les utilisateurs ne perdent jamais de donnees pendant
@@ -568,7 +568,7 @@ perdues a moins qu'elles proviennent du framework.
 **Decision** : Le depot git anklume est la **seule source de verite** pour
 les connaissances operationnelles des agents. Tous les fichiers agents
 sont des templates Jinja2 deployes avec `force: true` a chaque
-`make apply`. Les agents NE DOIVENT PAS modifier leurs fichiers
+`anklume domain apply`. Les agents NE DOIVENT PAS modifier leurs fichiers
 operationnels directement -- ils suivent le flux de travail de
 developpement standard (editer le template, tester, PR, merger, appliquer).
 

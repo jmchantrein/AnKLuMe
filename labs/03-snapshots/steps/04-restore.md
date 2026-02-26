@@ -9,7 +9,7 @@ Recover the container to its pre-break state.
 1. Restore the `baseline` snapshot:
 
    ```bash
-   make restore NAME=baseline
+   anklume snapshot restore --name baseline
    ```
 
    Or directly:
@@ -41,5 +41,5 @@ Snapshot restore is atomic and near-instant. The entire filesystem
 reverts to the snapshot state. This is the foundation of safe
 experimentation: snapshot before changes, restore if things go wrong.
 
-anklume's `make apply` can automatically create pre-apply snapshots
+anklume's `anklume domain apply` can automatically create pre-apply snapshots
 (Phase 24) so you always have a rollback point.

@@ -16,11 +16,11 @@ before phase N is complete and validated.
 - Generated group_vars and host_vars with managed sections
 - Constraint validation (unique names, unique subnets, valid IPs)
 - Orphan detection
-- `make sync` and `make sync-dry`
+- `anklume sync` and `anklume sync --dry-run`
 
 **Validation criteria**:
-- [x] `make sync` idempotent (re-running changes nothing)
-- [x] Add a domain in infra.yml + `make sync` → files created
+- [x] `anklume sync` idempotent (re-running changes nothing)
+- [x] Add a domain in infra.yml + `anklume sync` → files created
 - [x] Remove a domain → orphans detected and listed
 - [x] Managed sections preserved, user content kept
 - [x] Validation constraints: clear error on duplicate name/subnet/IP
@@ -29,7 +29,7 @@ before phase N is complete and validated.
 
 ## Phase 2: Infrastructure Roles (Incus Reconciliation) ✅ COMPLETE
 
-**Goal**: `make apply --tags infra` creates all Incus infrastructure
+**Goal**: `anklume domain apply --tags infra` creates all Incus infrastructure
 
 **Deliverables**:
 - `roles/incus_networks/` — bridges
@@ -67,14 +67,14 @@ before phase N is complete and validated.
 **Validation criteria**:
 - [x] anklume-instance restarts without manual intervention
 - [x] `ansible-playbook site.yml` idempotent after fixes
-- [x] `make lint` passes
+- [x] `anklume dev lint` passes
 - [x] ADR-017 to ADR-019 present in ARCHITECTURE.md
 
 ---
 
 ## Phase 3: Instance Provisioning ✅ COMPLETE
 
-**Goal**: `make apply --tags provision` installs packages and services
+**Goal**: `anklume domain apply --tags provision` installs packages and services
 
 **Deliverables**:
 - `roles/base_system/` — base packages, locale, timezone
@@ -83,7 +83,7 @@ before phase N is complete and validated.
 - Connection plugin `community.general.incus` configured
 
 **Validation criteria**:
-- [x] Instance created + provisioned in a single `make apply`
+- [x] Instance created + provisioned in a single `anklume domain apply`
 - [x] Re-provisioning idempotent
 - [x] Installed packages verifiable
 
@@ -91,7 +91,7 @@ before phase N is complete and validated.
 
 ## Phase 4: Snapshots ✅ COMPLETE
 
-**Goal**: `make snapshot` / `make restore`
+**Goal**: `anklume snapshot create` / `anklume snapshot restore`
 
 **Deliverables**:
 - `roles/incus_snapshots/` — Ansible role for snapshot management
@@ -114,7 +114,7 @@ before phase N is complete and validated.
 - `roles/open_webui/` — Open WebUI frontend via pip
 - `instance_devices` support in PSOT generator and incus_instances role
 - Conditional provisioning in site.yml (instance_roles-based)
-- `make apply-llm` target
+- `anklume domain apply --tags llm` target
 
 **Validation criteria**:
 - [x] GPU device correctly added to target instance
@@ -222,7 +222,7 @@ network isolation.
 - [x] `type: vm` in infra.yml → KVM VM created with `--vm` flag
 - [x] Provisioning via `community.general.incus` works (agent wait ensures readiness)
 - [x] VM and LXC coexist in the same domain (validated by tests + example)
-- [x] `make apply` idempotent with LXC + VM mix
+- [x] `anklume domain apply` idempotent with LXC + VM mix
 
 **Design decisions**:
 - Separate wait timeouts: LXC 30×2s=60s, VM 60×2s=120s (configurable)
@@ -315,8 +315,8 @@ Molecule tests execute within this nested environment.
   3. Collects results
   4. Optionally destroys the test-runner container
 - `examples/developer.infra.yml` including the dev-test domain
-- Makefile targets: `make test-sandboxed`, `make test-runner-create`,
-  `make test-runner-destroy`
+- Makefile targets: `anklume dev test --sandboxed`, `anklume dev test-runner-create`,
+  `anklume dev test-runner-destroy`
 
 **References**:
 - [Incus nesting documentation](https://linuxcontainers.org/incus/docs/main/faq/)
@@ -398,8 +398,8 @@ c) Configuration (`anklume.conf.yml` or environment variables):
    ```
 
 d) Makefile targets:
-   - `make ai-test` — run tests with AI-assisted fixing
-   - `make ai-develop` — autonomous development session
+   - `anklume ai test` — run tests with AI-assisted fixing
+   - `anklume ai develop` — autonomous development session
 
 e) Script `scripts/ai-develop.sh` — autonomous development:
    - Takes a task description as input (TASK)
@@ -429,10 +429,10 @@ e) Script `scripts/ai-develop.sh` — autonomous development:
 - [Self-Evolving Agents cookbook](https://developers.openai.com/cookbook/examples/partners/self_evolving_agents/autonomous_agent_retraining)
 
 **Validation criteria**:
-- [x] `make ai-test AI_MODE=none` = standard Molecule tests (no regression)
-- [x] `make ai-test AI_MODE=local` = tests + failure analysis by local Ollama
-- [x] `make ai-test AI_MODE=claude-code` = tests + fix proposed by Claude Code
-- [x] `make ai-test AI_MODE=aider` = tests + fix via Aider
+- [x] `anklume ai test AI_MODE=none` = standard Molecule tests (no regression)
+- [x] `anklume ai test AI_MODE=local` = tests + failure analysis by local Ollama
+- [x] `anklume ai test AI_MODE=claude-code` = tests + fix proposed by Claude Code
+- [x] `anklume ai test AI_MODE=aider` = tests + fix via Aider
 - [x] dry_run prevents any automatic modification by default
 - [x] Auto-created PRs are clearly labeled (ai-generated)
 - [x] Full session log for every execution
@@ -500,7 +500,7 @@ WebUI can consume directly. Single container, no orchestration needed.
 - PSOT support: `homelab-stt` instance with GPU device + config
 - Open WebUI integration: configure STT endpoint in admin settings
   (or via `open_webui_stt_url` variable)
-- `make apply-stt` Makefile target
+- `anklume domain apply --tags stt` Makefile target
 - `gpu_policy: shared` required if STT and Ollama share the same GPU
   (ADR-018). Document the trade-off: shared GPU means concurrent
   inference competes for VRAM.
@@ -595,7 +595,7 @@ the full-power option for users with Claude Code access.
 
 **Operational modes**:
 
-a) **Fix mode** (`make agent-fix`):
+a) **Fix mode** (`anklume ai agent-fix`):
    - Lead runs `molecule test` across all roles
    - On failure: spawns Fixer teammate(s) per failing role
    - Fixers analyze logs + source, propose and apply patches
@@ -603,7 +603,7 @@ a) **Fix mode** (`make agent-fix`):
    - Loop until all tests pass or max retries reached
    - On success: Lead creates PR with summary of all fixes
 
-b) **Develop mode** (`make agent-develop TASK="Implement Phase N"`):
+b) **Develop mode** (`anklume ai agent-develop TASK="Implement Phase N"`):
    - Lead reads ROADMAP.md, CLAUDE.md, and task description
    - Decomposes the phase into parallel subtasks
    - Spawns Builder(s) for implementation, Tester for validation,
@@ -634,7 +634,7 @@ a) Role `dev_agent_runner` — extends `dev_test_runner` (Phase 12):
            "Bash(yamllint *)",
            "Bash(git *)",
            "Bash(incus *)",
-           "Bash(make *)"
+           "Bash(anklume *)"
          ],
          "deny": [
            "Bash(rm -rf /)",
@@ -755,8 +755,8 @@ the production boundary (PR merge).
 
 **Validation criteria**:
 - [x] `make agent-runner-setup` creates container with Claude Code + Agent Teams
-- [x] `make agent-fix` runs test-fix cycle autonomously, creates PR
-- [x] `make agent-develop TASK="..."` implements a task, tests it, creates PR
+- [x] `anklume ai agent-fix` runs test-fix cycle autonomously, creates PR
+- [x] `anklume ai agent-develop TASK="..."` implements a task, tests it, creates PR
 - [x] All agent actions logged in session transcript
 - [x] Agents never touch production (sandbox isolation verified)
 - [x] PR contains clear description of changes and test results
@@ -795,7 +795,7 @@ d) **AI tools domain**:
    - New `ai-tools` domain with 4 machines (gpu-server, ai-openwebui, ai-lobechat, ai-opencode)
    - New roles: `lobechat` (LobeChat web UI), `opencode_server` (OpenCode headless server)
    - Example `examples/ai-tools/` with full AI stack configuration
-   - `make apply-ai` target for deploying all AI roles
+   - `anklume domain apply --tags ai` target for deploying all AI roles
 
 e) **Bootstrap script** (`bootstrap.sh`):
    - `--prod` / `--dev` modes with Incus preseed auto-configuration
@@ -804,9 +804,9 @@ e) **Bootstrap script** (`bootstrap.sh`):
    - `--import` for existing infrastructure import
 
 f) **Lifecycle tooling**:
-   - `make flush` — destroy all anklume infrastructure
-   - `make upgrade` — safe framework update with conflict detection
-   - `make import-infra` — reverse-generate infra.yml from Incus state
+   - `anklume flush` — destroy all anklume infrastructure
+   - `anklume upgrade` — safe framework update with conflict detection
+   - `anklume setup import` — reverse-generate infra.yml from Incus state
    - `roles_custom/` directory for user role customization
    - Version marker for compatibility checking
 
@@ -818,9 +818,9 @@ f) **Lifecycle tooling**:
 - [x] `network_policies` rules generate correct nftables accept lines
 - [x] `infra/` directory produces identical output to equivalent `infra.yml`
 - [x] `bootstrap.sh --prod` configures Incus with detected FS backend
-- [x] `make flush` destroys infrastructure, preserves user files
-- [x] `make upgrade` preserves user files, detects conflicts
-- [x] `make import-infra` generates valid infra.yml from running Incus
+- [x] `anklume flush` destroys infrastructure, preserves user files
+- [x] `anklume upgrade` preserves user files, detects conflicts
+- [x] `anklume setup import` generates valid infra.yml from running Incus
 - [x] `lobechat` and `opencode_server` roles created and integrated
 - [x] AI tools example validates with PSOT generator
 
@@ -859,7 +859,7 @@ c) **ROADMAP cleanup**:
 
 **Validation criteria**:
 - [x] GitHub Actions CI passes on push to main
-- [x] `make lint` + `make test-generator` run in CI
+- [x] `anklume dev lint` + `anklume dev test --generator` run in CI
 - [x] All 18 roles have `molecule/` directories
 - [x] README.md CI badge active
 - [x] ROADMAP inconsistencies resolved
@@ -873,7 +873,7 @@ onboarding, self-improvement, and image sharing.
 
 ### Phase 18a: Exclusive AI-Tools Network Access with VRAM Flush
 
-**Goal**: Only one domain at a time can access ai-tools. `make ai-switch
+**Goal**: Only one domain at a time can access ai-tools. `anklume ai switch
 DOMAIN=<name>` atomically switches access with GPU VRAM flush.
 
 **Deliverables**:
@@ -882,7 +882,7 @@ DOMAIN=<name>` atomically switches access with GPU VRAM flush.
 - PSOT generator validation and auto-enrichment of network policies
 - `scripts/ai-switch.sh` — atomic domain switch with VRAM flush
 - `roles/incus_nftables/` extended with `incus_nftables_ai_override`
-- `make ai-switch DOMAIN=<name>` Makefile target
+- `anklume ai switch DOMAIN=<name>` Makefile target
 - `docs/ai-switch.md` documentation
 - 11 new pytest tests for AI access policy validation
 
@@ -905,27 +905,27 @@ with LLM-generated test coverage and Hypothesis property-based tests.
 - `tests/test_properties.py` — 9 Hypothesis property-based tests for generator
 - Matrix ID annotations on 54 existing tests (`# Matrix: XX-NNN`)
 - CI integration: `matrix-coverage` informational job
-- `make matrix-coverage` and `make matrix-generate` targets
+- `anklume dev matrix` and `anklume dev matrix --generate` targets
 
 **Validation criteria**:
-- [x] `make matrix-coverage` reports coverage (48% initial)
+- [x] `anklume dev matrix` reports coverage (48% initial)
 - [x] Hypothesis tests pass (idempotency, no duplicate IPs, managed markers)
 - [x] Matrix IDs annotated on existing tests
 - [x] CI job added for matrix coverage
 
 ### Phase 18c: Interactive Onboarding Guide
 
-**Goal**: `make guide` launches a step-by-step interactive tutorial.
+**Goal**: `anklume guide` launches a step-by-step interactive tutorial.
 
 **Deliverables**:
 - `scripts/guide.sh` — 9-step interactive tutorial (pure Bash, ANSI colors)
-- `make guide`, `make quickstart` Makefile targets
-- Restructured `make help` with "GETTING STARTED" category
+- `anklume guide`, `anklume setup quickstart` Makefile targets
+- Restructured `anklume --help` with "GETTING STARTED" category
 - `docs/guide.md` documentation
 
 **Validation criteria**:
-- [x] `make guide --auto` runs as CI smoke test
-- [x] `make quickstart` copies example and provides instructions
+- [x] `anklume guide --auto` runs as CI smoke test
+- [x] `anklume setup quickstart` copies example and provides instructions
 - [x] shellcheck clean
 
 ### Phase 18d: Self-Improving Software (Experience Library + Improvement Loop)
@@ -939,7 +939,7 @@ spec-driven improvement loop proposing enhancements via PRs.
 - `scripts/ai-improve.sh` — spec-driven improvement loop
 - `scripts/ai-test-loop.sh` extended with experience search before LLM
 - `--learn` flag for capturing new fixes to library
-- `make mine-experiences` and `make ai-improve` targets
+- `anklume ai mine-experiences` and `anklume ai improve` targets
 
 **Validation criteria**:
 - [x] Experience library populated with fix patterns, implementation patterns
@@ -956,7 +956,7 @@ to avoid redundant downloads.
 - `roles/incus_images/` extended with export tasks + `incus_images_export_for_nesting`
 - `roles/dev_test_runner/` extended with import from mounted images
 - Smart timeout (`incus_images_download_timeout: 600`)
-- `make export-images` Makefile target
+- `anklume setup export-images` Makefile target
 
 **Validation criteria**:
 - [x] Export tasks create tar.gz files with idempotency (`creates:`)
@@ -972,7 +972,7 @@ local telemetry, and static code analysis tooling.
 
 **Prerequisites**: All previous phases.
 
-### Phase 19a: tmux Console (`make console`)
+### Phase 19a: tmux Console (`anklume console`)
 
 **Goal**: Auto-generate a tmux session from `infra.yml` with
 QubesOS-style visual domain isolation in the terminal.
@@ -1002,19 +1002,19 @@ QubesOS-style visual domain isolation in the terminal.
   (semi-trusted), red (untrusted), magenta (disposable).
   Configurable via `infra.yml` domain-level `trust_level:` field
   or auto-assigned.
-- `make console` Makefile target.
+- `anklume console` Makefile target.
 - Supports reconnection: `tmux attach -t anklume`.
 
 **Dependencies**: `pip install tmuxp libtmux`
 
 **Validation criteria**:
-- [x] `make console` generates and launches tmux session from infra.yml
+- [x] `anklume console` generates and launches tmux session from infra.yml
 - [x] Each domain has its own window with correct panes
 - [x] Per-pane background colors match domain trust level
 - [x] Pane border labels show domain and machine name
 - [x] Session survives disconnection and reconnection
 
-### Phase 19b: Local Telemetry (`make telemetry-*`)
+### Phase 19b: Local Telemetry (`anklume telemetry`)
 
 **Goal**: Opt-in, local-only usage analytics to understand usage
 patterns. Data never leaves the machine.
@@ -1022,51 +1022,51 @@ patterns. Data never leaves the machine.
 **Deliverables**:
 - Makefile wrapper logging each target invocation to
   `~/.anklume/telemetry/usage.jsonl` (append-only JSON Lines).
-- Logged fields: timestamp (UTC), make target, domain argument (if
+- Logged fields: timestamp (UTC), CLI command, domain argument (if
   any), duration in seconds, exit code. NO usernames, hostnames,
   IPs, secrets, or file contents.
-- `make telemetry-on` / `make telemetry-off` (default: disabled)
-- `make telemetry-status` — show state + event count
-- `make telemetry-clear` — delete all data
-- `make telemetry-report` — terminal charts via plotext (Python)
-- Optional: `make telemetry-report-html` — static HTML with Chart.js
+- `anklume telemetry on` / `anklume telemetry off` (default: disabled)
+- `anklume telemetry status` — show state + event count
+- `anklume telemetry clear` — delete all data
+- `anklume telemetry report` — terminal charts via plotext (Python)
+- Optional: `anklume telemetry report-html` — static HTML with Chart.js
 
 **Privacy guarantees**:
 - **Default: disabled** (opt-in model)
 - **Local-only**: data in `~/.anklume/telemetry/`, no network calls
 - **Inspectable**: user can `cat` the JSONL file at any time
-- **Deletable**: `make telemetry-clear` removes everything
+- **Deletable**: `anklume telemetry clear` removes everything
 
 **Dependencies**: `pip install plotext` (for terminal charts)
 
 **Validation criteria**:
-- [x] Default is disabled; `make telemetry-on` enables
+- [x] Default is disabled; `anklume telemetry on` enables
 - [x] JSONL file contains only the specified fields
-- [x] `make telemetry-report` produces readable terminal charts
+- [x] `anklume telemetry report` produces readable terminal charts
 - [x] No network calls (verified by strace or audit)
 
-### Phase 19c: Static Code Analysis (`make code-graph`)
+### Phase 19c: Static Code Analysis (`anklume dev graph --type code`)
 
 **Goal**: Dead code detection, call graphs, and dependency
 visualization across Python, YAML (Ansible), and Shell.
 
 **Deliverables**:
-- `make dead-code` — runs vulture (Python) + ShellCheck unused
+- `anklume dev graph --type dead` — runs vulture (Python) + ShellCheck unused
   vars (bash) + little-timmy (Ansible unused variables)
-- `make call-graph` — generates call graph via pyan (Python) +
+- `anklume dev graph --type call` — generates call graph via pyan (Python) +
   callGraph (bash). Output: GraphViz DOT + SVG.
-- `make dep-graph` — module dependency graph via pydeps (Python).
+- `anklume dev graph --type dep` — module dependency graph via pydeps (Python).
   Output: SVG.
-- `make code-graph` — runs all three above.
+- `anklume dev graph --type code` — runs all three above.
 - CI integration: `dead-code` as informational job.
 
 **Dependencies**: `pip install vulture pyan3 pydeps`, `apt install
 graphviz`, little-timmy for Ansible.
 
 **Validation criteria**:
-- [x] `make dead-code` reports findings (may have false positives)
-- [x] `make call-graph` produces readable DOT (SVG when graphviz available)
-- [x] `make dep-graph` produces module dependency graph (when pydeps + graphviz available)
+- [x] `anklume dev graph --type dead` reports findings (may have false positives)
+- [x] `anklume dev graph --type call` produces readable DOT (SVG when graphviz available)
+- [x] `anklume dev graph --type dep` produces module dependency graph (when pydeps + graphviz available)
 - [x] CI job added (informational, non-blocking)
 
 ---
@@ -1086,13 +1086,13 @@ QubesOS user-facing functionality.
 **Deliverables**:
 - `scripts/disp.sh` — launches an ephemeral instance from a base
   image, optionally runs a command, instance auto-destroyed on stop.
-- `make disp IMAGE=debian/13 [CMD=bash] [DOMAIN=sandbox]`
+- `anklume instance disp --image debian/13 [CMD=bash] [DOMAIN=sandbox]`
 - Instance name auto-generated: `disp-<timestamp>`.
 - Uses `incus launch <image> <name> --ephemeral [-e]`.
 - Optional: `--console` flag to attach immediately.
 
 **Validation criteria**:
-- [x] `make disp` creates an ephemeral instance
+- [x] `anklume instance disp` creates an ephemeral instance
 - [x] Instance is auto-destroyed on stop
 - [x] Custom command runs and instance exits cleanly
 
@@ -1102,12 +1102,12 @@ QubesOS user-facing functionality.
 creation and centralized updates.
 
 **Deliverables**:
-- `make golden-create NAME=<name>` — provisions an instance with
+- `anklume golden create <name>` — provisions an instance with
   roles, stops it, creates a snapshot named `pristine`.
-- `make golden-derive TEMPLATE=<name> INSTANCE=<new>` — creates
+- `anklume golden derive <name> <new>` — creates
   a new instance from the golden image snapshot using `incus copy`
   (CoW on ZFS/Btrfs, full copy on dir backend).
-- `make golden-publish TEMPLATE=<name> ALIAS=<alias>` — publishes
+- `anklume golden publish <name> --alias <alias>` — publishes
   as a reusable Incus image via `incus publish`.
 - Documentation of profile propagation: modifying a profile
   automatically updates all instances using it (native Incus
@@ -1163,12 +1163,12 @@ container-work                host              container-vault
 backup/restore.
 
 **Deliverables**:
-- `make file-copy SRC=<instance>:<path> DST=<instance>:<path>` —
+- `anklume portal copy <instance>:<path> <instance>:<path>` —
   wraps `incus file pull ... | incus file push ...` pipe.
   Policy check against `infra.yml` service declarations.
-- `make backup [I=<instance>] [GPG_RECIPIENT=<id>]` — wraps
+- `anklume backup create [<instance>] [GPG_RECIPIENT=<id>]` — wraps
   `incus export` with optional GPG encryption.
-- `make restore-backup FILE=<backup.tar.gz> [NAME=<new-name>]` —
+- `anklume backup restore --file <backup.tar.gz> [NAME=<new-name>]` —
   wraps `incus import`.
 - Shared volumes for bulk transfers between containers
   (`incus storage volume attach` to multiple instances).
@@ -1194,7 +1194,7 @@ print management.
     `shared-print` access to the physical LAN. Other domains access
     `shared-print` via IPP (port 631) through `network_policies`.
 - Example `infra.yml` configurations for both.
-- `make apply-print` and `make apply-tor` targets.
+- `anklume domain apply-print` and `anklume domain apply-tor` targets.
 
 **Validation criteria**:
 - [x] Tor gateway routes traffic transparently
@@ -1212,7 +1212,7 @@ access control via host bind mounts (ADR-039).
   domain and machine consumers, RO/RW access modes
 - Generator resolves consumers into `sv-*` Incus disk devices
   injected into `instance_devices` (host_vars)
-- `make shares` creates host-side directories
+- `anklume setup shares` creates host-side directories
 - Validation: DNS-safe names, absolute paths, consumer
   resolution, device collision detection, path uniqueness
 - `global.shared_volumes_base` for configurable base path
@@ -1224,7 +1224,7 @@ access control via host bind mounts (ADR-039).
 - [x] Machine consumer overrides domain-level access
 - [x] Device name collision detected
 - [x] Duplicate mount paths detected
-- [x] `make sync-dry` shows sv-* devices in host_vars
+- [x] `anklume sync --dry-run` shows sv-* devices in host_vars
 
 ---
 
@@ -1245,7 +1245,7 @@ a) **Flush protection** (ADR-041):
    - `FORCE=true` overrides protection
    - Host data dirs never deleted
 
-b) **Instance removal** (`make instance-remove`):
+b) **Instance removal** (`anklume instance remove`):
    - New `scripts/instance-remove.sh`
    - Modes: single instance, domain ephemeral, domain all, with FORCE
 
@@ -1253,12 +1253,12 @@ c) **Persistent data** (ADR-040):
    - `persistent_data:` per-machine section in infra.yml
    - Host bind mounts at `<persistent_data_base>/<domain>/<machine>/<volume>`
    - Devices injected as `pd-<name>` (like `sv-*` for shared volumes)
-   - `scripts/create-data-dirs.py` + `make data-dirs`
+   - `scripts/create-data-dirs.py` + `anklume setup data-dirs`
 
 **Validation criteria**:
-- [x] `make flush` skips protected instances (ephemeral: false)
-- [x] `make flush FORCE=true` overrides protection
-- [x] `make instance-remove I=pro-dev` removes single instance
+- [x] `anklume flush` skips protected instances (ephemeral: false)
+- [x] `anklume flush --force` overrides protection
+- [x] `anklume instance remove pro-dev` removes single instance
 - [x] persistent_data volumes appear as pd-* in host_vars
 - [x] Mount path collision with shared_volumes detected
 - [x] Host data directories survive flush
@@ -1313,7 +1313,7 @@ guide (Phase 18c) to steer users toward correct usage.
 
 **Principles**:
 - **On-demand only** — not in CI, launched explicitly by the developer
-  via `make scenario-test`. Long execution time is acceptable (sandbox
+  via `anklume dev scenario`. Long execution time is acceptable (sandbox
   runs independently).
 - **Gherkin format** — `.feature` files using `Given/When/Then` syntax,
   readable by non-developers. Runner: `behave` (Python BDD framework).
@@ -1364,11 +1364,11 @@ Feature: Pro workstation setup
 
   Scenario: Full deployment with isolation verified
     Given infra.yml from "examples/pro-workstation.infra.yml"
-    When I run "make sync"
+    When I run "anklume sync"
     Then exit code is 0
     And inventory files exist for all domains
 
-    When I run "make apply"
+    When I run "anklume domain apply"
     Then all declared instances are running
     And each instance has the correct static IP
 
@@ -1391,15 +1391,15 @@ Feature: Apply without sync
 
   Scenario: No inventory files exist
     Given infra.yml exists but no inventory files
-    When I run "make apply"
+    When I run "anklume domain apply"
     Then exit code is non-zero
-    And stderr contains guidance to run "make sync" first
+    And stderr contains guidance to run "anklume sync" first
     And no Incus resources were created
 
   Scenario: Stale inventory after infra.yml change
     Given a deployed infrastructure
     When I add a new domain to infra.yml without running sync
-    And I run "make apply"
+    And I run "anklume domain apply"
     Then the new domain is not deployed
     And output warns about potential drift
 ```
@@ -1482,7 +1482,7 @@ def check_isolation(sandbox):
 ```
 
 **Validation criteria**:
-- [x] `make scenario-test` runs all scenarios in sandbox
+- [x] `anklume dev scenario` runs all scenarios in sandbox
 - [x] Best-practice scenarios pass on clean deployment
 - [x] Bad-practice scenarios verify error detection and guidance
 - [x] Guide enhanced with pitfall warnings from bad-practice scenarios
@@ -1513,7 +1513,7 @@ host-side components.
 ```
 anklume/                           ← Cloned on the host
 ├── bootstrap.sh                   ← Phase 0: installs Incus, creates container,
-│                                     sets up bind mount, runs first make apply
+│                                     sets up bind mount, runs first anklume domain apply
 ├── host/
 │   ├── boot/
 │   │   ├── setup-boot-services.sh ← uinput module, udev rules, container autostart
@@ -1558,7 +1558,7 @@ a) **`bootstrap.sh`** — Phase 0 script:
    - Set up Incus socket proxy device
    - Add disk device (bind mount of the repo)
    - Install Ansible + dependencies inside the container
-   - Run first `make sync && make apply`
+   - Run first `anklume sync && anklume domain apply`
    - Configure host networking (IP forwarding, NAT, DHCP checksum)
    - Run `host/boot/setup-boot-services.sh` for uinput/udev/autostart
    - **GPU detection**: if NVIDIA GPU present, offer to deploy the
@@ -1578,13 +1578,13 @@ b) **`host/` directory** — Host-side scripts:
    - `host/stt/stt-streaming.py` — streaming STT (experimental)
 
 c) **Host Makefile wrapper** (future):
-   - `make apply` on host → `incus exec anklume-instance -- make apply`
+   - `anklume domain apply` on host → `incus exec anklume-instance -- anklume domain apply`
    - Transparent delegation to the container
 
 **Validation criteria**:
 - [x] `bootstrap.sh` runs on Arch (CachyOS) from a fresh host
 - [ ] `bootstrap.sh` runs on Debian 13 (Trixie) from a fresh host
-- [x] After bootstrap, `make apply` works without manual intervention
+- [x] After bootstrap, `anklume domain apply` works without manual intervention
 - [x] Bind mount allows editing on host, running in container
 - [x] STT scripts functional from `host/stt/` location
 - [x] Network (NAT, IP forwarding) configured automatically
@@ -1592,7 +1592,7 @@ c) **Host Makefile wrapper** (future):
 - [x] `scripts/bootstrap.sh` creates anklume-instance container (idempotent)
 - [x] `scripts/bootstrap.sh` sets up socket proxy + bind mount devices
 - [x] `scripts/bootstrap.sh` provisions container (ansible, deps)
-- [x] `scripts/bootstrap.sh` runs `make sync && make apply`
+- [x] `scripts/bootstrap.sh` runs `anklume sync && anklume domain apply`
 - [x] `scripts/bootstrap.sh` configures host networking (NAT, DHCP fix)
 - [x] `scripts/bootstrap.sh` detects GPU and offers AI-tools deployment
 - [x] `scripts/bootstrap.sh` calls setup-boot-services.sh
@@ -1686,7 +1686,7 @@ c) **Host-side wrapper**:
 
 ## Phase 24: Snapshot-Before-Apply and Rollback ✅ COMPLETE
 
-**Goal**: Automatic safety snapshots before each `make apply`,
+**Goal**: Automatic safety snapshots before each `anklume domain apply`,
 with one-command rollback if something breaks.
 
 **Prerequisites**: Phase 4 (snapshots).
@@ -1705,7 +1705,7 @@ a) **`scripts/snapshot-apply.sh`** — Pre-apply snapshot manager:
    - Records history in `~/.anklume/pre-apply-snapshots/`
 
 b) **`safe_apply_wrap` enhanced** (Makefile):
-   - Pre-apply snapshot created before every `make apply` / `apply-infra`
+   - Pre-apply snapshot created before every `anklume domain apply` / `apply-infra`
    - `apply-limit G=<group>` scopes snapshots to that domain
    - Automatic cleanup of old snapshots after successful apply
    - `SKIP_SNAPSHOT=1` to bypass for development speed
@@ -1713,16 +1713,16 @@ b) **`safe_apply_wrap` enhanced** (Makefile):
 
 c) **Makefile targets**:
    ```
-   make rollback              # Restore most recent pre-apply snapshot
-   make rollback T=<ts>       # Restore specific timestamp
-   make rollback-list         # List available pre-apply snapshots
-   make rollback-cleanup      # Remove old snapshots (KEEP=3)
-   make apply SKIP_SNAPSHOT=1 # Skip pre-apply snapshot
+   anklume snapshot rollback              # Restore most recent pre-apply snapshot
+   anklume snapshot rollback T=<ts>       # Restore specific timestamp
+   anklume snapshot rollback --list         # List available pre-apply snapshots
+   anklume snapshot rollback --cleanup      # Remove old snapshots (KEEP=3)
+   anklume domain apply SKIP_SNAPSHOT=1 # Skip pre-apply snapshot
    ```
 
 **Validation criteria**:
 - [x] Pre-apply snapshots created automatically
-- [x] `make rollback` restores previous state
+- [x] `anklume snapshot rollback` restores previous state
 - [x] Old snapshots cleaned up per retention policy
 - [x] Snapshot skippable for development speed
 
@@ -1739,7 +1739,7 @@ chooser dialog for controlled file sharing between domains.
 Flatpak portal sandboxing.
 
 **Context**: The current file transfer mechanism
-(`scripts/transfer.sh`, `make file-copy`) works but requires
+(`scripts/transfer.sh`, `anklume portal copy`) works but requires
 CLI commands. XDG Desktop Portal would provide a native file
 picker dialog: when a container app requests a file, the host
 shows a file chooser restricted to authorized paths. This is
@@ -1782,11 +1782,11 @@ preserved (Waypipe or virtio-gpu for display, PipeWire socket for
 audio, controlled filesystem access via Phase 25 portals).
 
 **Deliverables**:
-- `make export-app I=<instance> APP=<app>` — generates a `.desktop`
+- `anklume app export I=<instance> APP=<app>` — generates a `.desktop`
   file on the host that launches the app inside its container with
   Waypipe display forwarding
-- `make export-list` — lists all exported apps
-- `make export-remove I=<instance> APP=<app>` — removes the export
+- `anklume app list` — lists all exported apps
+- `anklume app remove I=<instance> APP=<app>` — removes the export
 - Auto-export via `infra.yml`:
   ```yaml
   instances:
@@ -2019,7 +2019,7 @@ tests. A simplification pass is needed to:
 a) **Code audit** (done):
    - `scripts/code-audit.py` — structured audit report with line counts,
      test-to-impl ratios, untested scripts, role size analysis
-   - `make audit` / `make audit-json` targets
+   - `anklume dev audit` / `anklume dev audit --json` targets
    - Dead code detection (delegates to Phase 19 tools)
    - Roles flagged as simplification candidates (>200 lines)
    - 19 tests in `tests/test_code_audit.py`
@@ -2032,7 +2032,7 @@ b) **Guard script consolidation** (done):
    - 11 tests in `tests/test_incus_guard.py`
 
 c) **Smoke testing** (done):
-   - `make smoke` — 5-step real-world validation against running Incus
+   - `anklume dev smoke` — 5-step real-world validation against running Incus
    - Tests: generator, dry-run apply, linting, snapshots, Incus connectivity
 
 d) **Dead code removal** (done):
@@ -2058,7 +2058,7 @@ f) **Test rationalization** (deferred — Phase 22 dependency):
 - [x] Code audit report produced with actionable items
 - [x] Conftest.py modularized (750 → 366 lines + 3 step modules)
 - [x] Color constants shared via scripts/colors.py
-- [x] `make smoke` target available for real-world validation
+- [x] `anklume dev smoke` target available for real-world validation
 - [x] Guard scripts consolidated (3 files → 1)
 - [x] All existing tests still pass
 - [ ] Test suite runs faster than before simplification (deferred)
@@ -2080,7 +2080,7 @@ Phase 12 (Incus-in-Incus).
 **Context**: anklume's architecture (declarative YAML, isolated
 domains, reproducible environments) makes it a natural fit for
 teaching system administration, networking, and security. The
-existing `make guide` and example configurations provide a starting
+existing `anklume guide` and example configurations provide a starting
 point, but a full educational experience requires structured labs,
 sandboxed execution, and progress tracking.
 
@@ -2089,7 +2089,7 @@ sandboxed execution, and progress tracking.
 ```
 Student flow:
   1. Clone anklume, run bootstrap
-  2. Select a lab: make lab LIST → choose "Networking 101"
+  2. Select a lab: anklume lab list → choose "Networking 101"
   3. Lab creates sandboxed environment (Incus-in-Incus)
   4. Student follows guided steps with validation at each step
   5. Lab auto-grades and provides feedback
@@ -2115,8 +2115,8 @@ b) **Example labs** (3 of 5 implemented):
    - [ ] **Lab 05**: Security audit (deferred)
 
 c) **Make targets**:
-   - [x] `make lab-list`, `make lab-start`, `make lab-check`,
-     `make lab-hint`, `make lab-reset`, `make lab-solution`
+   - [x] `anklume lab list`, `anklume lab start`, `anklume lab check`,
+     `anklume lab hint`, `anklume lab reset`, `anklume lab solution`
 
 d) **Lab runner** (`scripts/lab-runner.sh` + `scripts/lab-lib.sh`):
    - [x] Lab discovery, progress tracking, step validation
@@ -2128,13 +2128,13 @@ e) **Tests** (`tests/test_labs.py`):
      infra.yml validity, solution file checks
 
 f) **Teacher mode** (deferred):
-   - [ ] `make lab-deploy N=30 L=02` — deploy for N students
+   - [ ] `anklume lab deploy --count 30 --lab 02` — deploy for N students
    - [ ] Student dashboards and auto-grading
 
 **Validation criteria**:
 - [x] At least 3 labs implemented and tested
 - [x] Step validation provides clear pass/fail feedback
-- [x] `make lab-reset` fully restores initial state
+- [x] `anklume lab reset` fully restores initial state
 - [ ] Labs run in isolated sandbox (deferred — Incus-in-Incus)
 - [ ] Teacher mode deploys N isolated lab instances (deferred)
 
@@ -2382,13 +2382,13 @@ e) **Documentation**:
 f) **VM-based testing** (`scripts/live-os-test-vm.sh`):
    - Build the image, then boot it in an Incus VM (or raw qemu/KVM)
    - No physical hardware needed — all testing done locally
-   - `make live-os-test-vm` creates an Incus VM from the built image,
+   - `anklume live test` creates an Incus VM from the built image,
      attaches a virtual data disk, and validates the boot flow
    - Tests: UEFI boot, squashfs mount, persistent partition, Incus
      daemon starts, first-boot wizard runs, encrypted pool creation
    - Uses `incus launch --vm` with the built image as root disk
    - Supports `--base arch` and `--base debian` variants
-   - Cleanup: `make live-os-test-vm-clean` destroys the test VM
+   - Cleanup: `anklume live test-clean` destroys the test VM
 
 ### Validation criteria
 
@@ -2404,7 +2404,7 @@ f) **VM-based testing** (`scripts/live-os-test-vm.sh`):
 - [x] dm-verity detects tampered OS blocks
 - [x] RAM encryption enabled when hardware supports it
 - [x] First-boot wizard handles both new pool and existing pool
-- [x] `make live-os-test-vm` boots image in Incus VM and validates boot flow
+- [x] `anklume live test` boots image in Incus VM and validates boot flow
 
 ---
 
@@ -2427,9 +2427,9 @@ b) **Target renaming** (Makefile):
    - All LLM targets consistently prefixed with `llm-*`
 
 c) **Categorized help** (Makefile):
-   - `make help` shows ~28 user-facing targets, grouped by category
+   - `anklume --help` shows ~28 user-facing targets, grouped by category
      (Getting Started, Core, Snapshots, LLM, Console, Instances, Lifecycle)
-   - `make help-all` shows all 110+ targets (current behavior)
+   - `anklume --help-all` shows all 110+ targets (current behavior)
    - Hardcoded curated help for stability, dynamic grep for help-all
 
 d) **Robust upgrade** (`scripts/upgrade.sh`):
@@ -2443,10 +2443,10 @@ e) **Upgrade notification** (admin_bootstrap role):
    - Non-blocking (background fetch with timeout)
 
 **Validation criteria**:
-- [x] `make help` shows ~28 targets in categories
-- [x] `make help-all` shows all targets
-- [x] `make llm-bench` does not crash on benchmark failure
-- [x] `make upgrade` handles untracked file conflicts gracefully
+- [x] `anklume --help` shows ~28 targets in categories
+- [x] `anklume --help-all` shows all targets
+- [x] `anklume llm bench` does not crash on benchmark failure
+- [x] `anklume upgrade` handles untracked file conflicts gracefully
 - [x] Login to anklume-instance shows update notification when available
 
 ---
@@ -2461,8 +2461,8 @@ and transparent command execution for educational contexts.
 **Deliverables**:
 
 a) **CLI profiles** (`~/.anklume/mode`):
-   - `make mode-student` / `make mode-user` / `make mode-dev`
-   - Persisted in `~/.anklume/mode`, affects `make help` output
+   - `anklume mode student` / `anklume mode user` / `anklume mode dev`
+   - Persisted in `~/.anklume/mode`, affects `anklume --help` output
    - User mode (default): ~28 targets
    - Student mode: same targets + bilingual display + transparent mode
    - Dev mode: all 110+ targets
@@ -2473,11 +2473,11 @@ b) **Bilingual commands** (student mode):
    - Translation file: `i18n/fr.yml` (command → description mapping)
 
 c) **Transparent mode** (student mode):
-   - When running an abstraction (e.g., `make apply`), display the
+   - When running an abstraction (e.g., `anklume domain apply`), display the
      underlying commands as they execute with brief explanations
    - Example output:
      ```
-     make apply
+     anklume domain apply
        → ansible-playbook site.yml
          Applique le playbook principal sur toute l'infrastructure
        → incus launch images:debian/13 pro-dev --project pro
@@ -2493,10 +2493,10 @@ d) **Internationalization (i18n)**:
    - Translation files in `i18n/` directory
 
 **Validation criteria**:
-- [x] `make mode-student` activates student mode
+- [x] `anklume mode student` activates student mode
 - [x] Student mode shows bilingual help
 - [x] Transparent mode displays underlying commands during execution
-- [x] `ANKLUME_LANG=fr make help` shows French descriptions
+- [x] `ANKLUME_LANG=fr anklume --help` shows French descriptions
 - [x] Mode persists across sessions
 
 ---
@@ -2555,11 +2555,11 @@ e) **Updated SPEC.md, examples, and tests**:
    - New tests for zone addressing, enabled/disabled, auto-IP
 
 **Validation criteria**:
-- [x] `make sync` with canonical infra.yml produces correct files
+- [x] `anklume sync` with canonical infra.yml produces correct files
 - [x] IPs encode trust zones (admin=10.100, trusted=10.110, etc.)
 - [x] Disabled domains produce no generated files
 - [x] Auto-IP assigns within correct subnet
-- [x] `make lint` passes
+- [x] `anklume dev lint` passes
 - [x] All tests pass
 - [x] `detect_orphans()` ignores disabled domains
 - [x] Machine names follow `<domain>-<role>` convention
@@ -2611,7 +2611,7 @@ d) **Updated documentation**:
 - [x] Claude Code + claude-code-router routes background tasks to Ollama
 - [x] `mcp-ollama-coder` still works for explicit delegation
 - [x] No proxy process needed for development workflow
-- [x] `make lint` passes
+- [x] `anklume dev lint` passes
 - [x] All tests pass (proxy-dependent tests updated or removed)
 
 ---
@@ -2655,7 +2655,7 @@ d) **Test updates**:
 - [x] `shared` domain documented in SPEC.md
 - [x] `examples/shared-services/` validates successfully
 - [x] All tests pass
-- [x] `make lint` passes
+- [x] `anklume dev lint` passes
 
 ---
 
@@ -2729,7 +2729,7 @@ e) **Security model**:
 **Validation criteria** (design-level; live infra validation deferred):
 - [x] ADR-043 adopted: no `openclaw: true`, standard machine declaration
 - [x] Generator warns on `openclaw_server` role without `network_policy`
-- [x] `make lint` passes
+- [x] `anklume dev lint` passes
 - [x] Tests for multi-instance configuration (generator-level)
 - [ ] Two OpenClaw instances in different domains coexist (live infra)
 - [ ] Heartbeat functional (live infra)
@@ -2869,7 +2869,7 @@ f) **Transparent integration**:
 - [ ] Latency overhead < 200ms per request
 - [x] `ai_provider` and `ai_sanitize` validated by generator
 - [ ] Works transparently with Claude Code (`ANTHROPIC_BASE_URL`)
-- [x] `make lint` passes, all tests pass
+- [x] `anklume dev lint` passes, all tests pass
 
 ---
 
@@ -2976,13 +2976,13 @@ machines:
 
 ```
 roles/                      # anklume-maintained roles
-roles_vendor/               # Galaxy roles (gitignored, installed by make init)
+roles_vendor/               # Galaxy roles (gitignored, installed by anklume setup init)
 roles_custom/               # User custom roles (gitignored)
 ```
 
 **Mechanism**:
 - `requirements.yml` at project root lists Galaxy role dependencies
-- `make init` runs `ansible-galaxy install -r requirements.yml -p roles_vendor/`
+- `anklume setup init` runs `ansible-galaxy install -r requirements.yml -p roles_vendor/`
 - `ansible.cfg` `roles_path` priority: `roles_custom:roles:roles_vendor`
 - anklume wrapper roles (thin) call the Galaxy role with project-specific
   defaults, then add Incus-specific tasks (device setup, network config)
@@ -2994,7 +2994,7 @@ roles_custom/               # User custom roles (gitignored)
 a) **Role resolution** (generator + ansible.cfg):
    - `roles_path` with three directories in priority order
    - `requirements.yml` for Galaxy dependencies
-   - `make init` installs Galaxy roles
+   - `anklume setup init` installs Galaxy roles
 
 b) **Wrapper role pattern** (documentation + example):
    - Template for wrapping a Galaxy role with anklume glue
@@ -3006,7 +3006,7 @@ c) **Migration path** (gradual):
    - No breaking changes — existing roles continue to work
 
 **Validation criteria**:
-- [x] `make init` installs Galaxy roles to roles_vendor/
+- [x] `anklume setup init` installs Galaxy roles to roles_vendor/
 - [x] Wrapper role pattern documented with working example
 - [x] roles_vendor/ gitignored, reproducible from requirements.yml
 - [x] Generator validates Galaxy role references
@@ -3078,7 +3078,7 @@ plugins/desktop/                            # Plugin directory
 a) **Plugin framework** (`scripts/desktop-plugin.sh`):
    - Plugin discovery and validation
    - Config generation from infra.yml desktop section
-   - `make desktop-apply` / `make desktop-reset` targets
+   - `anklume desktop apply` / `anklume desktop reset` targets
 
 b) **Plugin interface specification** (`plugins/desktop/plugin.schema.yml`):
    - Required capabilities (detect, apply, reset)
@@ -3095,10 +3095,10 @@ d) **Generator support**:
 
 **Validation criteria**:
 - [x] Plugin framework discovers and validates plugins
-- [x] `make desktop-apply` configures DE from infra.yml
+- [x] `anklume desktop apply` configures DE from infra.yml
 - [x] At least one reference plugin functional
 - [x] Plugin interface documented for community contributions
-- [x] `make desktop-reset` restores default DE settings
+- [x] `anklume desktop reset` restores default DE settings
 
 ---
 
@@ -3330,9 +3330,9 @@ f) **Dependencies** (added to `pyproject.toml`):
    - Optional: `mkdocstrings[python]` for API docs
 
 g) **Makefile / CLI integration**:
-   - `make docs` / `anklume docs build` — build site locally
-   - `make docs-serve` / `anklume docs serve` — local preview
-   - `make docs-deploy` / `anklume docs deploy` — manual deploy
+   - `anklume docs build` / `anklume docs build` — build site locally
+   - `anklume docs serve` / `anklume docs serve` — local preview
+   - `anklume docs build-deploy` / `anklume docs deploy` — manual deploy
 
 **Validation criteria**:
 - [ ] `mkdocs build --strict` passes with zero warnings
@@ -3346,7 +3346,7 @@ g) **Makefile / CLI integration**:
 - [ ] PR builds validate docs without deploying
 - [ ] Source `.md` files remain LLM-readable (no compiled-only content)
 - [ ] `site/` in `.gitignore`
-- [ ] `make lint` still passes (yamllint on mkdocs.yml)
+- [ ] `anklume dev lint` still passes (yamllint on mkdocs.yml)
 
 ---
 
@@ -3426,7 +3426,7 @@ e) **br_netfilter pre-flight check** (FINDING-06):
    - `scripts/doctor.sh` includes a `br_netfilter` check
 
 f) **nftables auto-regeneration on apply** (FINDING-07):
-   - `make apply` (and `anklume domain apply`) automatically runs
+   - `anklume domain apply` (and `anklume domain apply`) automatically runs
      nftables generation after infrastructure changes
    - Add a default-deny rule for `net-*` bridges not explicitly
      listed in the allow rules (prevents new bridges from being
@@ -3443,7 +3443,7 @@ g) **Disposable instances: prevent default project** (FINDING-08):
 
 h) **Galaxy role version pinning** (FINDING-09):
    - Update `requirements.yml` to use exact version pins (no `>=`)
-   - Add a `make audit-roles` target that checks for known
+   - Add a `anklume dev audit-roles` target that checks for known
      vulnerabilities in pinned Galaxy role versions
    - Document the review process for adopting new Galaxy roles
 
@@ -3454,7 +3454,7 @@ i) **Agent sandbox network restriction** (FINDING-10):
    - Block all other egress from the sandbox VM
 
 j) **Generated file integrity check** (FINDING-12):
-   - `make apply` warns when there are uncommitted changes to files
+   - `anklume domain apply` warns when there are uncommitted changes to files
      in `group_vars/`, `host_vars/`, or `inventory/`
    - The warning does not block execution (sysadmin may be
      iterating) but makes the risk visible
@@ -3467,13 +3467,13 @@ j) **Generated file integrity check** (FINDING-12):
 - [ ] VRAM flush includes verification step
 - [ ] `scripts/nftables-deploy.sh` fails if `br_netfilter` not loaded
 - [ ] `bootstrap.sh` persists `br_netfilter` module and sysctl
-- [ ] `make apply` regenerates nftables rules automatically
+- [ ] `anklume domain apply` regenerates nftables rules automatically
 - [ ] Default-deny nftables rule covers unknown `net-*` bridges
 - [ ] `scripts/disp.sh` refuses `default` project without `--force`
 - [ ] `requirements.yml` uses exact version pins
 - [ ] Agent sandbox blocks non-API egress
-- [ ] `make apply` warns on uncommitted generated file changes
-- [ ] `make lint` passes
+- [ ] `anklume domain apply` warns on uncommitted generated file changes
+- [ ] `anklume dev lint` passes
 - [ ] All existing tests pass
 
 ---
@@ -3513,7 +3513,7 @@ across `~/.anklume/mode`, `~/.anklume/telemetry/`, etc.
 
 `tmux` and `libtmux` (Python) are currently installed manually in
 `anklume-instance`. They should be added to `scripts/bootstrap.sh`
-as part of the container provisioning step, since `make console`
+as part of the container provisioning step, since `anklume console`
 (Phase 19a) depends on them.
 
 ### GUI app forwarding priority (Phase 26 enhancement)
@@ -3532,7 +3532,7 @@ host network namespace with the same MAC address as the new pair.
 The bridge FDB sends unicast frames to the wrong port, causing
 ARP to work (broadcast) but ping/DNS to fail (unicast).
 
-**Workaround**: `make doctor FIX=1` (or `scripts/doctor.sh --fix
+**Workaround**: `anklume doctor FIX=1` (or `scripts/doctor.sh --fix
 --check network`) detects and removes orphan veth pairs and stale
 routes automatically. Root cause investigation still needed:
 determine if this is an Incus bug or expected behavior, and
@@ -3598,7 +3598,7 @@ chain-test-json:   ## Run behavioral chains with JSON output
 - Add `skipif`-style guards in step definitions for external tools
   (yamllint, shellcheck, Incus) so scenarios skip cleanly in minimal
   environments instead of failing
-- Ensure `make scenario-test` exits cleanly in environments without
+- Ensure `anklume dev scenario` exits cleanly in environments without
   Incus (scenarios skip, not fail)
 
 ### c) Hypothesis extension
@@ -3630,7 +3630,7 @@ TOTAL               | PASS   |          |   71.9s
 
 ### e) Matrix coverage gate
 
-Add matrix coverage percentage to `make lint` or `make test` output.
+Add matrix coverage percentage to `anklume dev lint` or `anklume dev test` output.
 Track coverage trend over time. Goal: 90%+ matrix coverage.
 
 ### f) Documentation update
@@ -3640,10 +3640,10 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Update `i18n/fr.yml` with French translations for new targets
 
 **Validation criteria**:
-- [ ] `make scenario-test` passes (skips gracefully when tools absent)
-- [ ] `make chain-test` passes (runs all 14 behavioral chains)
-- [ ] `make chain-test-dry` shows plan without executing
-- [ ] `make chain-test-one CHAIN=bootstrap-to-first-deploy` runs a single chain
+- [ ] `anklume dev scenario` passes (skips gracefully when tools absent)
+- [ ] `anklume dev chain-test` passes (runs all 14 behavioral chains)
+- [ ] `anklume dev chain-test --dry-run` shows plan without executing
+- [ ] `anklume dev chain-test-one CHAIN=bootstrap-to-first-deploy` runs a single chain
 - [ ] Gherkin scenarios skip (not fail) when yamllint/shellcheck absent
 - [ ] `scripts/test-summary.sh` produces combined report
 - [ ] Hypothesis tests cover all optional infra.yml fields
@@ -3656,7 +3656,7 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 ## Current State
 
 **Completed** (all 43 phases):
-- Phase 1: PSOT generator functional (make sync idempotent)
+- Phase 1: PSOT generator functional (anklume sync idempotent)
 - Phase 2: Incus infrastructure deployed and idempotent
 - Phase 2b: Post-deployment hardening (ADR-017 to ADR-019)
 - Phase 3: Instance provisioning (base_system + admin_bootstrap)
@@ -3752,5 +3752,5 @@ tmux bootstrap, PipeWire audio).
 033, 034, 037 — deleted during documentation review)
 
 **Known issues**:
-- Orphan veth pairs on container restart — use `make doctor FIX=1` (see Deferred Enhancements)
+- Orphan veth pairs on container restart — use `anklume doctor FIX=1` (see Deferred Enhancements)
 - Debian 13 (Trixie) bootstrap not yet validated (Phase 23)

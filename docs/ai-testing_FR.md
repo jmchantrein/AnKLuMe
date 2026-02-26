@@ -21,7 +21,7 @@ Definissez le mode via une variable d'environnement ou un fichier de configurati
 
 ```bash
 export ANKLUME_AI_MODE=local
-make ai-test
+anklume ai test
 ```
 
 ## Demarrage rapide
@@ -32,13 +32,13 @@ Executez les tests Molecule et laissez un LLM corriger les echecs :
 
 ```bash
 # Execution a blanc (defaut) : afficher les corrections proposees sans les appliquer
-make ai-test AI_MODE=local
+anklume ai test AI_MODE=local
 
 # Appliquer les corrections automatiquement
-make ai-test AI_MODE=local DRY_RUN=false
+anklume ai test AI_MODE=local DRY_RUN=false
 
 # Tester un seul role
-make ai-test-role R=base_system AI_MODE=claude-code
+anklume ai test-role R=base_system AI_MODE=claude-code
 ```
 
 ### Mode developpement
@@ -47,10 +47,10 @@ Laissez un LLM implementer une tache de maniere autonome :
 
 ```bash
 # Execution a blanc : montrer ce que le LLM ferait
-make ai-develop TASK="Add a monitoring role" AI_MODE=claude-code
+anklume ai develop TASK="Add a monitoring role" AI_MODE=claude-code
 
 # Appliquer les changements et executer les tests
-make ai-develop TASK="Add a monitoring role" AI_MODE=claude-code DRY_RUN=false
+anklume ai develop TASK="Add a monitoring role" AI_MODE=claude-code DRY_RUN=false
 ```
 
 ## Configuration
@@ -169,14 +169,14 @@ Les journaux ne sont pas commites dans git (ajouter `logs/` a `.gitignore`).
 
 | Cible | Description |
 |-------|-------------|
-| `make ai-test` | Executer les tests + correction IA (tous les roles) |
-| `make ai-test-role R=<nom>` | Test + correction IA pour un role |
-| `make ai-develop TASK="..."` | Developpement autonome |
+| `anklume ai test` | Executer les tests + correction IA (tous les roles) |
+| `anklume ai test-role R=<nom>` | Test + correction IA pour un role |
+| `anklume ai develop TASK="..."` | Developpement autonome |
 
 Surcharger les parametres IA via les variables Make :
 
 ```bash
-make ai-test AI_MODE=local DRY_RUN=false MAX_RETRIES=5
+anklume ai test AI_MODE=local DRY_RUN=false MAX_RETRIES=5
 ```
 
 ## Fonctionnement
@@ -218,7 +218,7 @@ Comportement attendu quand aucun backend IA n'est configure. Definissez
 
 ### Connexion Ollama refusee
 
-Verifiez que l'URL Ollama est accessible depuis l'endroit ou vous executez `make ai-test` :
+Verifiez que l'URL Ollama est accessible depuis l'endroit ou vous executez `anklume ai test` :
 
 ```bash
 curl http://homelab-ai:11434/api/tags

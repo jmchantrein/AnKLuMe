@@ -65,7 +65,7 @@ domains:
         ip: "10.100.1.10"
 ```
 
-Executer `make sync` avec `ai_access_policy: exclusive` cree
+Executer `anklume sync` avec `ai_access_policy: exclusive` cree
 automatiquement une politique reseau bidirectionnelle du domaine par
 defaut vers `ai-tools`.
 
@@ -87,8 +87,8 @@ Le generateur PSOT verifie :
 ### Changer l'acces IA vers un autre domaine
 
 ```bash
-make ai-switch DOMAIN=perso       # Changer l'acces + vider la VRAM
-make ai-switch DOMAIN=pro NO_FLUSH=1  # Changer sans vidage VRAM
+anklume ai switch DOMAIN=perso       # Changer l'acces + vider la VRAM
+anklume ai switch DOMAIN=pro NO_FLUSH=1  # Changer sans vidage VRAM
 ```
 
 Ou utiliser le script directement :
@@ -149,7 +149,7 @@ python3 scripts/generate.py infra.yml --dry-run 2>&1 | head
 
 Le changement utilise `ansible-playbook` en interne. Verifiez que :
 - `site.yml` est present a la racine du projet
-- Le role `incus_nftables` fonctionne : `make nftables`
+- Le role `incus_nftables` fonctionne : `anklume network rules`
 - Les bridges Incus existent : `incus network list | grep net-`
 
 ### Reset GPU non supporte

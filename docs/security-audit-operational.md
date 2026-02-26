@@ -253,13 +253,13 @@ being set to 1.
   distributions), all inter-domain traffic is silently allowed
 - The nftables rules will appear to be loaded (`nft list table inet anklume`
   shows them) but they have no effect — a false sense of security
-- There is no documented check in `make apply` or `make nftables-deploy`
+- There is no documented check in `anklume domain apply` or `anklume network deploy`
   that verifies `br_netfilter` is loaded
 - A kernel upgrade or system reconfiguration could unload the module
 
 ### Recommendations
 
-1. **Mandatory pre-flight check**: `make nftables-deploy` and `bootstrap.sh`
+1. **Mandatory pre-flight check**: `anklume network deploy` and `bootstrap.sh`
    should verify `br_netfilter` is loaded and `bridge-nf-call-iptables=1`,
    failing with a clear error if not
 2. **Persist the module**: Add `br_netfilter` to `/etc/modules-load.d/` and
@@ -275,24 +275,24 @@ being set to 1.
 
 ### Description
 
-nftables rules are generated inside the container (`make nftables`) then
-deployed on the host (`make nftables-deploy`). Between `make apply`
-(which creates new domains/bridges) and `make nftables && make nftables-deploy`
+nftables rules are generated inside the container (`anklume network rules`) then
+deployed on the host (`anklume network deploy`). Between `anklume domain apply`
+(which creates new domains/bridges) and `anklume network rules && anklume network deploy`
 (which updates isolation rules), there is a window where new bridges exist
 without isolation rules.
 
 ### Why It Matters
 
-- New domains created by `make apply` are immediately network-reachable
+- New domains created by `anklume domain apply` are immediately network-reachable
   from other domains until nftables rules are updated
-- The documentation mentions running `make nftables && make nftables-deploy`
+- The documentation mentions running `anklume network rules && anklume network deploy`
   after adding domains, but this is a manual step
-- The `make apply` target does not automatically regenerate nftables
+- The `anklume domain apply` target does not automatically regenerate nftables
 
 ### Recommendations
 
-1. **Integrate nftables into the apply workflow**: `make apply` should
-   automatically run `make nftables` after infrastructure changes
+1. **Integrate nftables into the apply workflow**: `anklume domain apply` should
+   automatically run `anklume network rules` after infrastructure changes
 2. **Default-deny on new bridges**: Consider a standing nftables rule
    that drops all inter-bridge traffic for bridges matching `net-*`
    that are not explicitly allowed, rather than enumerating known bridges
@@ -315,7 +315,7 @@ From `docs/disposable.md`:
   prefixed bridges are isolated)
 - A disposable instance in the default project shares the default bridge
   with Incus's own management traffic
-- If a user runs `make disp` without `DOMAIN=`, the untrusted workload
+- If a user runs `anklume instance disp` without `DOMAIN=`, the untrusted workload
   runs without domain isolation
 - This contradicts the principle that disposable instances are for
   untrusted workloads
@@ -323,7 +323,7 @@ From `docs/disposable.md`:
 ### Recommendations
 
 1. **Default to a dedicated disposable domain**: Create a `disposable`
-   domain in `infra.yml` and use it as the default for `make disp`
+   domain in `infra.yml` and use it as the default for `anklume instance disp`
 2. **Warn when using `default` project**: Print a warning when no
    `--domain` is specified that the instance has no network isolation
 3. **Document the security implication**: The `disposable.md` doc
@@ -337,7 +337,7 @@ From `docs/disposable.md`:
 
 ADR-045 introduces Galaxy roles installed to `roles_vendor/` from
 `requirements.yml`. These roles execute inside `anklume-instance` during
-`make apply`, with access to the Incus socket.
+`anklume domain apply`, with access to the Incus socket.
 
 ### Why It Matters
 
@@ -346,7 +346,7 @@ ADR-045 introduces Galaxy roles installed to `roles_vendor/` from
   create backdoor containers, or modify nftables rules
 - `roles_vendor/` is gitignored — the actual code running is not
   tracked in version control
-- `make init` installs the latest matching version, which could be
+- `anklume setup init` installs the latest matching version, which could be
   a compromised release published after the initial `requirements.yml`
 
 ### Recommendations
@@ -451,25 +451,25 @@ not yet deployed. With only Level 1 active:
 
 Generated Ansible files (`group_vars/`, `host_vars/`, `inventory/`) are
 the Secondary Source of Truth. Users can edit them outside managed sections.
-`make apply` executes whatever is in these files.
+`anklume domain apply` executes whatever is in these files.
 
 ### Why It Matters
 
 - An attacker who gains write access to these files (e.g., via a
   compromised editor, a malicious git merge, or a supply chain attack)
   can inject arbitrary Ansible tasks
-- The managed sections are re-generated by `make sync`, but user sections
+- The managed sections are re-generated by `anklume sync`, but user sections
   are preserved — a malicious payload in user sections would persist
 - There is no signature or checksum verification of generated files
-  before `make apply`
+  before `anklume domain apply`
 
 ### Recommendations
 
 1. **Git-based integrity**: Require a clean `git status` before
-   `make apply` (or at least warn on uncommitted changes to
+   `anklume domain apply` (or at least warn on uncommitted changes to
    generated files)
 2. **Managed section checksums**: The generator could embed a hash
-   of the managed section content that `make apply` verifies before
+   of the managed section content that `anklume domain apply` verifies before
    execution
 3. **This is acceptable for the target audience**: anklume targets
    sysadmins and power users who manage their own git repos. The risk
@@ -514,7 +514,7 @@ preserved:
    addresses provides immediate visual identification and enables
    zone-based firewall rules.
 
-9. **Ephemeral protection (ADR-042)**: `make flush` respecting
+9. **Ephemeral protection (ADR-042)**: `anklume flush` respecting
    `security.protection.delete` prevents accidental destruction of
    important instances.
 
@@ -555,7 +555,7 @@ All actionable findings are tracked in **Phase 44** of the ROADMAP.
 
 ### Short-term (next development cycle)
 
-5. Integrate nftables regeneration into `make apply` (Phase 44f)
+5. Integrate nftables regeneration into `anklume domain apply` (Phase 44f)
 6. Prevent disposable instances in default project (Phase 44g)
 7. Add warning for untrusted LXC containers (Phase 44c)
 8. Add VRAM verification step (Phase 44d)

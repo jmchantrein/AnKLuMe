@@ -44,7 +44,7 @@ Perte de connectivité internet au niveau de la VM de développement nécessitan
 Ajouter des hooks de vérification réseau :
 
 ```makefile
-# Avant make apply
+# Avant anklume domain apply
 apply: network-backup
 	@scripts/network-safety-check.sh backup
 	ansible-playbook site.yml --tags infra,provision
