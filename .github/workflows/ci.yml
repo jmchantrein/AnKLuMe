@@ -69,7 +69,7 @@ jobs:
           python-version: "3.13"
           cache: pip
       - name: Install dependencies
-        run: pip install pytest pyyaml hypothesis jinja2
+        run: pip install pytest pyyaml hypothesis jinja2 typer rich
       - name: Run pytest
         run: pytest tests/ -v
 

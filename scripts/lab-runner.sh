@@ -17,7 +17,7 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LABS_DIR="$PROJECT_DIR/labs"
 STATE_DIR="${HOME}/.anklume/labs"
 
-# shellcheck source=lab-lib.sh
+# shellcheck source=lab-lib.sh disable=SC1091
 source "$SCRIPT_DIR/lab-lib.sh"
 
 # ── Commands ─────────────────────────────────────────────
