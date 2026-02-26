@@ -527,42 +527,44 @@ preserved:
 
 | Finding | Severity | Exploitability | Impact | Status |
 |---------|----------|----------------|--------|--------|
-| FINDING-01: Incus socket = god mode | CRITICAL | Medium | Total compromise | Architectural |
-| FINDING-02: OpenClaw internet-to-infra bridge | HIGH | Medium | Arbitrary execution | Architectural |
-| FINDING-03: World-readable credentials | HIGH | Low | Token theft | Fixable |
-| FINDING-04: LXC for untrusted workloads | MEDIUM | Low-Medium | Container escape | Configurable |
-| FINDING-05: VRAM flush best-effort | MEDIUM | Low | Cross-domain data leak | By design |
-| FINDING-06: br_netfilter dependency | MEDIUM | Low | Silent isolation failure | Fixable |
-| FINDING-07: nftables time window | LOW-MEDIUM | Low | Temporary isolation gap | Fixable |
-| FINDING-08: Disposable default project | LOW-MEDIUM | Low | No isolation | Fixable |
-| FINDING-09: Galaxy roles in trust boundary | LOW-MEDIUM | Low | Supply chain | Mitigable |
-| FINDING-10: Agent Teams bypass permissions | LOW | Very Low | API key exfiltration | Mitigable |
+| FINDING-01: Incus socket = god mode | CRITICAL | Medium | Total compromise | Accepted risk (Phase 44a) |
+| FINDING-02: OpenClaw internet-to-infra bridge | HIGH | Medium | Arbitrary execution | Accepted risk (Phase 44a) |
+| FINDING-03: World-readable credentials | HIGH | Low | Token theft | Phase 44b |
+| FINDING-04: LXC for untrusted workloads | MEDIUM | Low-Medium | Container escape | Phase 44c |
+| FINDING-05: VRAM flush best-effort | MEDIUM | Low | Cross-domain data leak | Phase 44d |
+| FINDING-06: br_netfilter dependency | MEDIUM | Low | Silent isolation failure | Phase 44e |
+| FINDING-07: nftables time window | LOW-MEDIUM | Low | Temporary isolation gap | Phase 44f |
+| FINDING-08: Disposable default project | LOW-MEDIUM | Low | No isolation | Phase 44g |
+| FINDING-09: Galaxy roles in trust boundary | LOW-MEDIUM | Low | Supply chain | Phase 44h |
+| FINDING-10: Agent Teams bypass permissions | LOW | Very Low | API key exfiltration | Phase 44i |
 | FINDING-11: LLM sanitizer Level 2 not yet deployed | LOW | Low | Data leakage | Planned |
-| FINDING-12: No file integrity check | LOW | Very Low | Config injection | Acceptable |
+| FINDING-12: No file integrity check | LOW | Very Low | Config injection | Phase 44j |
 
 ---
 
 ## Recommendations Priority
 
+All actionable findings are tracked in **Phase 44** of the ROADMAP.
+
 ### Immediate (before production deployment)
 
-1. Verify `br_netfilter` in bootstrap and nftables-deploy (FINDING-06)
-2. Pin Galaxy role versions exactly (FINDING-09)
-3. Fix credential permissions with `raw.idmap` (FINDING-03)
-4. Add proxy authentication on `:9090` (FINDING-02)
+1. Verify `br_netfilter` in bootstrap and nftables-deploy (Phase 44e)
+2. Pin Galaxy role versions exactly (Phase 44h)
+3. Fix credential permissions with `raw.idmap` (Phase 44b)
+4. Document accepted risks for socket and proxy (Phase 44a)
 
 ### Short-term (next development cycle)
 
-5. Integrate nftables regeneration into `make apply` (FINDING-07)
-6. Default disposable instances to a dedicated domain (FINDING-08)
-7. Add warning for untrusted LXC containers (FINDING-04)
-8. Add VRAM verification step (FINDING-05)
+5. Integrate nftables regeneration into `make apply` (Phase 44f)
+6. Prevent disposable instances in default project (Phase 44g)
+7. Add warning for untrusted LXC containers (Phase 44c)
+8. Add VRAM verification step (Phase 44d)
 
 ### Long-term (architectural evolution)
 
 9. Scope Incus access via project-confined TLS certificates (FINDING-01)
-10. Separate OpenClaw proxy from anklume-instance (FINDING-02)
-11. Network-restrict agent sandbox to API-only egress (FINDING-10)
+10. Network-restrict agent sandbox to API-only egress (Phase 44i)
+11. Generated file integrity warning (Phase 44j)
 
 ---
 
