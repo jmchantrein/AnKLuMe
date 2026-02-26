@@ -1,14 +1,12 @@
 """Tests for the anklume CLI (Phase 43)."""
 
 import os
+import re
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-# Disable Rich color output to avoid ANSI escape codes in help text assertions
-os.environ.setdefault("NO_COLOR", "1")
 
 # Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -20,6 +18,14 @@ from typer.testing import CliRunner  # noqa: E402
 from scripts.cli import app  # noqa: E402
 
 runner = CliRunner()
+
+# Rich inserts ANSI bold/color codes that break plain-text assertions in CI.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def strip_ansi(text: str) -> str:
+    """Remove all ANSI escape sequences from text."""
+    return _ANSI_RE.sub("", text)
 
 # ── Fixture: minimal infra.yml ──────────────────────────────
 
@@ -247,8 +253,9 @@ class TestSync:
     def test_sync_help(self):
         result = runner.invoke(app, ["sync", "--help"])
         assert result.exit_code == 0
-        assert "--dry-run" in result.output
-        assert "--clean" in result.output
+        output = strip_ansi(result.output)
+        assert "--dry-run" in output
+        assert "--clean" in output
 
 
 # ── Completions ─────────────────────────────────────────────
