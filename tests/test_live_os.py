@@ -933,19 +933,12 @@ class TestMkinitcpioHooks:
         content = MKINITCPIO_TORAM_HOOK.read_text()
         assert "run_hook()" in content
 
-    def test_toram_hook_cmdline_check(self):
-        """Verify /proc/cmdline parsing in toram hook."""
+    def test_toram_hook_is_stub(self):
+        """Verify toram hook is a stub (logic moved to verity)."""
         if not MKINITCPIO_TORAM_HOOK.exists():
             pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
         content = MKINITCPIO_TORAM_HOOK.read_text()
-        assert "/proc/cmdline" in content
-
-    def test_toram_hook_tmpfs(self):
-        """Verify tmpfs mount in toram hook."""
-        if not MKINITCPIO_TORAM_HOOK.exists():
-            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
-        content = MKINITCPIO_TORAM_HOOK.read_text()
-        assert "tmpfs" in content
+        assert "return 0" in content
 
     def test_verity_install_exists(self):
         """Verify anklume-verity install hook exists."""
@@ -954,12 +947,13 @@ class TestMkinitcpioHooks:
         assert MKINITCPIO_VERITY_INSTALL.exists()
 
     def test_verity_install_add_binary(self):
-        """Verify add_binary calls for veritysetup and blkid."""
+        """Verify add_binary calls for losetup, blkid, mount."""
         if not MKINITCPIO_VERITY_INSTALL.exists():
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_INSTALL}")
         content = MKINITCPIO_VERITY_INSTALL.read_text()
-        assert "add_binary veritysetup" in content
+        assert "add_binary losetup" in content
         assert "add_binary blkid" in content
+        assert "add_binary mount" in content
 
     def test_verity_hook_exists(self):
         """Verify anklume-verity hook exists."""
@@ -974,19 +968,21 @@ class TestMkinitcpioHooks:
         content = MKINITCPIO_VERITY_HOOK.read_text()
         assert "run_hook()" in content
 
-    def test_verity_hook_veritysetup(self):
-        """Verify veritysetup activation in verity hook."""
+    def test_verity_hook_mount_handler(self):
+        """Verify mount_handler pattern in verity hook."""
         if not MKINITCPIO_VERITY_HOOK.exists():
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
         content = MKINITCPIO_VERITY_HOOK.read_text()
-        assert "veritysetup" in content
+        assert "mount_handler" in content
+        assert "anklume_mount_handler" in content
 
-    def test_verity_hook_slot_parsing(self):
-        """Verify slot parameter parsing in verity hook."""
+    def test_verity_hook_squashfs_overlay(self):
+        """Verify squashfs + overlayfs mount in verity hook."""
         if not MKINITCPIO_VERITY_HOOK.exists():
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
         content = MKINITCPIO_VERITY_HOOK.read_text()
-        assert "slot" in content.lower()
+        assert "squashfs" in content
+        assert "overlay" in content
 
 
 # ── TestISOSupport ───────────────────────────────────────────────
@@ -1081,8 +1077,8 @@ class TestGrubConfig:
         assert "anklume.toram=1" in self.content
 
     def test_direct_entry(self):
-        """Verify direct (non-toram) menu entry exists."""
-        assert re.search(r'menuentry.*direct', self.content, re.IGNORECASE)
+        """Verify direct (non-toram) submenu entry exists."""
+        assert re.search(r'submenu.*direct', self.content, re.IGNORECASE)
 
     def test_kernel_path(self):
         """Verify kernel path is /boot/vmlinuz."""
@@ -1109,7 +1105,7 @@ class TestVerityHookISO:
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
         content = MKINITCPIO_VERITY_HOOK.read_text()
         assert "anklume.boot_mode=" in content
-        assert "BOOT_MODE" in content
+        assert "anklume_boot_mode" in content
 
     def test_mkinitcpio_iso_label_search(self):
         """Verify mkinitcpio verity hook searches for ANKLUME-LIVE label."""
@@ -1118,13 +1114,13 @@ class TestVerityHookISO:
         content = MKINITCPIO_VERITY_HOOK.read_text()
         assert "ANKLUME-LIVE" in content
 
-    def test_mkinitcpio_separate_data_hash(self):
-        """Verify mkinitcpio verity hook uses separate data and hash devices."""
+    def test_mkinitcpio_toram_support(self):
+        """Verify mkinitcpio verity hook supports toram copy."""
         if not MKINITCPIO_VERITY_HOOK.exists():
             pytest.skip(f"File not found: {MKINITCPIO_VERITY_HOOK}")
         content = MKINITCPIO_VERITY_HOOK.read_text()
-        assert "DATA_LOOP" in content
-        assert "HASH_LOOP" in content
+        assert "anklume_toram" in content
+        assert "copytoram" in content
 
     def test_mkinitcpio_losetup_usage(self):
         """Verify mkinitcpio verity hook uses losetup for ISO files."""
@@ -1175,51 +1171,22 @@ class TestVerityHookISO:
 
 
 class TestToramHookISO:
-    """Verify anklume-toram hooks support ISO boot mode."""
+    """Verify anklume-toram hooks are stubs (logic in verity)."""
 
-    def test_mkinitcpio_boot_mode_parsing(self):
-        """Verify mkinitcpio toram hook parses anklume.boot_mode."""
+    def test_mkinitcpio_toram_is_stub(self):
+        """Verify mkinitcpio toram hook is a stub."""
         if not MKINITCPIO_TORAM_HOOK.exists():
             pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
         content = MKINITCPIO_TORAM_HOOK.read_text()
-        assert "anklume.boot_mode=" in content
-        assert "BOOT_MODE" in content
+        assert "return 0" in content
 
-    def test_mkinitcpio_iso_squashfs_path(self):
-        """Verify mkinitcpio toram hook searches ISO squashfs path."""
-        if not MKINITCPIO_TORAM_HOOK.exists():
-            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
-        content = MKINITCPIO_TORAM_HOOK.read_text()
-        assert "/run/anklume-iso/live/rootfs.squashfs" in content
-
-    def test_mkinitcpio_iso_fallback_locations(self):
-        """Verify mkinitcpio toram hook includes ISO mount in search."""
-        if not MKINITCPIO_TORAM_HOOK.exists():
-            pytest.skip(f"File not found: {MKINITCPIO_TORAM_HOOK}")
-        content = MKINITCPIO_TORAM_HOOK.read_text()
-        assert "/run/anklume-iso/live" in content
-
-    def test_mkinitcpio_install_has_blkid(self):
-        """Verify mkinitcpio toram install hook includes blkid."""
+    def test_mkinitcpio_install_is_stub(self):
+        """Verify mkinitcpio toram install is a stub."""
         if not MKINITCPIO_TORAM_INSTALL.exists():
             pytest.skip(f"File not found: {MKINITCPIO_TORAM_INSTALL}")
         content = MKINITCPIO_TORAM_INSTALL.read_text()
-        assert "add_binary blkid" in content
-
-    def test_initramfs_boot_mode_parsing(self):
-        """Verify initramfs-tools toram hook parses anklume.boot_mode."""
-        if not TORAM_HOOK.exists():
-            pytest.skip(f"File not found: {TORAM_HOOK}")
-        content = TORAM_HOOK.read_text()
-        assert "anklume.boot_mode=" in content
-        assert "BOOT_MODE" in content
-
-    def test_initramfs_iso_squashfs_path(self):
-        """Verify initramfs-tools toram hook searches ISO squashfs path."""
-        if not TORAM_HOOK.exists():
-            pytest.skip(f"File not found: {TORAM_HOOK}")
-        content = TORAM_HOOK.read_text()
-        assert "/run/anklume-iso/live/rootfs.squashfs" in content
+        assert "add_runscript" in content
+        assert "add_binary" not in content
 
 
 # ── TestLiveOsLibISO ─────────────────────────────────────────────
