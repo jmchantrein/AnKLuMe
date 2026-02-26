@@ -50,24 +50,24 @@ Scales linearly: add ~2 GB RAM and ~5 GB disk per student.
 
 ```bash
 cp examples/teacher-lab/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ## Lab workflow
 
 ```bash
 # Before lab: snapshot clean state
-make snapshot NAME=pre-lab
+anklume snapshot create NAME=pre-lab
 
 # After lab: reset all students
-make restore NAME=pre-lab
+anklume snapshot restore --name pre-lab
 
 # Reset a single student
-make restore-domain D=student-01 NAME=pre-lab
+anklume snapshot restore --domain student-01 NAME=pre-lab
 
 # Apply only one student domain
-make apply-limit G=student-02
+anklume domain apply student-02
 ```
 
 See [docs/lab-tp.md](../../docs/lab-tp.md) for the full lab deployment

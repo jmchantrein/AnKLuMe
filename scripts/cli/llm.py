@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from scripts.cli._helpers import run_script
+from scripts.cli._helpers import run_make, run_script
 
 app = typer.Typer(name="llm", help="LLM backend management (Ollama).")
 
@@ -38,3 +38,9 @@ def bench(
     if compare:
         args.append("COMPARE=1")
     run_script("llm-bench.sh", *args)
+
+
+@app.command()
+def dev() -> None:
+    """Interactive LLM development assistant."""
+    run_make("llm-dev")

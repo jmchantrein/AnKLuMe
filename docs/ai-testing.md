@@ -18,7 +18,7 @@ Set the mode via environment variable or config file:
 
 ```bash
 export ANKLUME_AI_MODE=local
-make ai-test
+anklume ai test
 ```
 
 ## Quick start
@@ -29,13 +29,13 @@ Run Molecule tests and let an LLM fix failures:
 
 ```bash
 # Dry-run (default): show proposed fixes without applying
-make ai-test AI_MODE=local
+anklume ai test AI_MODE=local
 
 # Apply fixes automatically
-make ai-test AI_MODE=local DRY_RUN=false
+anklume ai test AI_MODE=local DRY_RUN=false
 
 # Test a single role
-make ai-test-role R=base_system AI_MODE=claude-code
+anklume ai test-role R=base_system AI_MODE=claude-code
 ```
 
 ### Development mode
@@ -44,10 +44,10 @@ Let an LLM implement a task autonomously:
 
 ```bash
 # Dry-run: show what the LLM would do
-make ai-develop TASK="Add a monitoring role" AI_MODE=claude-code
+anklume ai develop TASK="Add a monitoring role" AI_MODE=claude-code
 
 # Apply changes and run tests
-make ai-develop TASK="Add a monitoring role" AI_MODE=claude-code DRY_RUN=false
+anklume ai develop TASK="Add a monitoring role" AI_MODE=claude-code DRY_RUN=false
 ```
 
 ## Configuration
@@ -166,14 +166,14 @@ Logs are not committed to git (add `logs/` to `.gitignore`).
 
 | Target | Description |
 |--------|-------------|
-| `make ai-test` | Run tests + AI fix (all roles) |
-| `make ai-test-role R=<name>` | Test + AI fix for one role |
-| `make ai-develop TASK="..."` | Autonomous development |
+| `anklume ai test` | Run tests + AI fix (all roles) |
+| `anklume ai test-role R=<name>` | Test + AI fix for one role |
+| `anklume ai develop TASK="..."` | Autonomous development |
 
 Override AI settings via Make variables:
 
 ```bash
-make ai-test AI_MODE=local DRY_RUN=false MAX_RETRIES=5
+anklume ai test AI_MODE=local DRY_RUN=false MAX_RETRIES=5
 ```
 
 ## How it works
@@ -215,7 +215,7 @@ to a valid backend.
 
 ### Ollama connection refused
 
-Verify the Ollama URL is reachable from where you run `make ai-test`:
+Verify the Ollama URL is reachable from where you run `anklume ai test`:
 
 ```bash
 curl http://gpu-server:11434/api/tags

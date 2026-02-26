@@ -132,7 +132,7 @@ sudo scripts/build-image.sh --output anklume-arch.iso --base arch
 sudo scripts/build-image.sh --format raw --output anklume-live.img --size 4
 
 # Or via Makefile
-make build-image OUT=anklume-live.iso BASE=arch
+anklume live build OUT=anklume-live.iso BASE=arch
 ```
 
 ### Flash to USB
@@ -221,7 +221,7 @@ Live OS uses atomic A/B updates to ensure safe OS upgrades with automatic rollba
 
 ```bash
 # Download and apply update
-make live-update URL=https://example.com/anklume-live-v1.2.img
+anklume live update URL=https://example.com/anklume-live-v1.2.img
 
 # Behind the scenes:
 # 1. Detects active slot (A or B)
@@ -236,7 +236,7 @@ make live-update URL=https://example.com/anklume-live-v1.2.img
 
 ```bash
 # Check current status
-make live-status
+anklume live status
 # Output: Active slot: A, Boot count: 0, Data pool: datapool
 
 # Trigger manual update (requires USB write access)
@@ -335,7 +335,7 @@ Add kernel parameter: `anklume.toram=1`
 ### Incus Isolation
 
 - Namespace-based container isolation (not hypervisor-level)
-- Requires nftables rules for network isolation (see `make nftables`)
+- Requires nftables rules for network isolation (see `anklume network rules`)
 - Trust domain separation ensures untrusted containers can't access admin filesystem
 
 ## Arch Linux Support
@@ -346,10 +346,10 @@ anklume Live OS can be built with Arch Linux as the base OS, providing a lightwe
 
 ```bash
 # Build Arch-based Live OS image
-make build-image OUT=anklume-arch.img BASE=arch
+anklume live build OUT=anklume-arch.img BASE=arch
 
 # Specify architecture
-make build-image OUT=anklume-arch-arm64.img BASE=arch ARCH=arm64
+anklume live build OUT=anklume-arch-arm64.img BASE=arch ARCH=arm64
 ```
 
 ### When to Choose Arch vs Debian

@@ -41,11 +41,11 @@ do not need any Tor-specific configuration.
 
 ```bash
 cp examples/tor-gateway/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 
 # Setup Tor in the gateway container
-make apply-tor I=tor-gw
+anklume domain apply-tor I=tor-gw
 
 # Verify Tor connectivity
 scripts/tor-gateway.sh verify tor-gw

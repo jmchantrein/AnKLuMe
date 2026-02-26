@@ -21,9 +21,9 @@ Copy the example `infra.yml` to the project root and deploy:
 
 ```bash
 cp examples/<name>/infra.yml infra.yml
-make sync
-make check
-make apply
+anklume sync
+anklume domain check
+anklume domain apply
 ```
 
 Each example directory contains a `README.md` with details about the
@@ -38,7 +38,7 @@ After copying, you can:
 3. Adjust IPs and subnet_ids
 4. Add custom roles to machines
 
-Run `make sync` after any change to regenerate the Ansible files.
+Run `anklume sync` after any change to regenerate the Ansible files.
 
 ## Documentation
 

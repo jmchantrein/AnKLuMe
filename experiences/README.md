@@ -46,5 +46,5 @@ recent git history.
 ## Adding entries
 
 1. Manually: edit the relevant YAML file directly
-2. Automatically: `make mine-experiences` scans git history
+2. Automatically: `anklume ai mine-experiences` scans git history
 3. After AI fixes: successful fixes are candidates for new entries

@@ -9,7 +9,7 @@ Apply the infrastructure and confirm both containers are running.
 1. Deploy the infrastructure:
 
    ```bash
-   make apply
+   anklume domain apply
    ```
 
    This creates the Incus project, network bridge, and both

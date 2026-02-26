@@ -17,7 +17,7 @@ Save the current container state as a named snapshot.
 2. Create a snapshot named `baseline`:
 
    ```bash
-   make snapshot NAME=baseline
+   anklume snapshot create NAME=baseline
    ```
 
    Or directly with Incus:
@@ -29,7 +29,7 @@ Save the current container state as a named snapshot.
 3. Verify the snapshot exists:
 
    ```bash
-   make snapshot-list
+   anklume snapshot list
    ```
 
    Or:

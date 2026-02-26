@@ -29,3 +29,9 @@ def reset(
 def plugins() -> None:
     """List available desktop plugins."""
     run_script("desktop-plugin.sh", "list")
+
+
+@app.command()
+def config() -> None:
+    """Configure desktop engine."""
+    run_script("desktop-plugin.sh", "config")

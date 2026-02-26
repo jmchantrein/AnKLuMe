@@ -214,7 +214,7 @@ overhead.
 
 **Problem**: pyan3 (the recommended call graph generator) crashes with
 Python 3.13 due to a `CallGraphVisitor.__init__()` argument conflict.
-The ROADMAP specifies pyan3 as the tool for `make call-graph`.
+The ROADMAP specifies pyan3 as the tool for `anklume dev graph --type call`.
 
 **Choice**: Implement a two-tier strategy: try pyan3 first (best output
 quality), fall back to a custom AST-based call graph generator using
@@ -456,7 +456,7 @@ dès maintenant pour préparer les évolutions futures.
 **Implementation (2026-02-25)**: Migration completed. `http.server`
 replaced by FastAPI + uvicorn. All 4 routes preserved. htmx frontend
 unchanged. `fastapi` and `uvicorn` added to `pyproject.toml` runtime deps
-and `make init`.
+and `anklume setup init`.
 
 ---
 
@@ -547,7 +547,7 @@ for common software installations.
 **Choice**: Implement a three-tier `roles_path` priority:
 `roles_custom/ > roles/ > roles_vendor/`. Galaxy roles are declared in
 `requirements.yml` (roles section) and installed to `roles_vendor/` via
-`make init`. User overrides go in `roles_custom/` (gitignored).
+`anklume setup init`. User overrides go in `roles_custom/` (gitignored).
 
 **Alternatives considered**:
 (a) Single roles directory with Galaxy roles mixed in — pollutes the
@@ -610,15 +610,15 @@ from corrupted RAM copies.
 
 ---
 
-## D-057: Phase 22 — BDD scenarios use generator directly, not `make sync`
+## D-057: Phase 22 — BDD scenarios use generator directly, not `anklume sync`
 
-**Problem**: All 17 BDD scenario features used `make sync` which requires
+**Problem**: All 17 BDD scenario features used `anklume sync` which requires
 running inside `anklume-instance` (the admin container). This meant
 15/30+ scenarios failed on the host, making them untestable during
 development.
 
 **Choice**: Updated all generator-only scenarios to call
-`python3 scripts/generate.py infra.yml` directly instead of `make sync`.
+`python3 scripts/generate.py infra.yml` directly instead of `anklume sync`.
 Scenarios that require Incus (deployment, snapshots) still use `make`
 targets and are gated behind `we are in a sandbox environment`.
 

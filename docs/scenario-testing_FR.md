@@ -10,10 +10,10 @@ Incus reelle. Les scenarios sont ecrits au format Gherkin avec
 ## Demarrage rapide
 
 ```bash
-make scenario-test          # Tous les scenarios
-make scenario-test-best     # Bonnes pratiques uniquement
-make scenario-test-bad      # Mauvaises pratiques uniquement
-make scenario-list          # Lister les scenarios disponibles
+anklume dev scenario          # Tous les scenarios
+anklume dev scenario --best     # Bonnes pratiques uniquement
+anklume dev scenario --bad      # Mauvaises pratiques uniquement
+anklume dev scenario --list          # Lister les scenarios disponibles
 ```
 
 Ou directement avec pytest :
@@ -84,7 +84,7 @@ Feature: Nom descriptif
 
   Scenario: Cas de test specifique
     Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+    When I run "anklume sync"
     Then exit code is 0
     And inventory files exist for all domains
 ```

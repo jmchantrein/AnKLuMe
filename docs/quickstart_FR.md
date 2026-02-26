@@ -54,7 +54,7 @@ cd anklume
 ## Etape 2 : Installer les dependances
 
 ```bash
-make init
+anklume setup init
 ```
 
 Cela installe les collections Ansible et les outils Python. Vous devriez
@@ -83,7 +83,7 @@ Voir [SPEC.md section 5](SPEC.md) pour la reference complete du format.
 ## Etape 4 : Generer les fichiers Ansible
 
 ```bash
-make sync
+anklume sync
 ```
 
 Sortie attendue :
@@ -98,18 +98,18 @@ Generating files for 2 domain(s)...
   Written: group_vars/lab.yml
   Written: host_vars/lab-server.yml
 
-Done. Run `make lint` to validate.
+Done. Run `anklume dev lint` to validate.
 ```
 
 Cela cree et met a jour des fichiers dans `inventory/`, `group_vars/` et
 `host_vars/`. Chaque fichier contient une section `=== MANAGED ===` qui est
-reecrite a chaque `make sync`. Vous pouvez ajouter des variables personnalisees
+reecrite a chaque `anklume sync`. Vous pouvez ajouter des variables personnalisees
 en dehors de cette section.
 
 ## Etape 5 : Previsualiser les changements
 
 ```bash
-make check
+anklume domain check
 ```
 
 Cela execute `ansible-playbook --check --diff` pour montrer ce qui changerait
@@ -119,7 +119,7 @@ infrastructure est correcte.
 ## Etape 6 : Appliquer
 
 ```bash
-make apply
+anklume domain apply
 ```
 
 Cela cree tous les reseaux, projets Incus, profils et instances definis
@@ -129,7 +129,7 @@ sont appliques (idempotent).
 
 ## Etape 7 : Verifier
 
-Apres la fin de `make apply`, verifiez votre infrastructure :
+Apres la fin de `anklume domain apply`, verifiez votre infrastructure :
 
 ```bash
 # Lister toutes les instances Incus dans tous les projets
@@ -147,26 +147,26 @@ incus exec lab-server --project lab -- bash
 Apres votre installation initiale, le flux de travail quotidien est :
 
 1. Editer `infra.yml` (ajouter des domaines, machines, profils)
-2. `make sync` pour regenerer les fichiers Ansible
-3. `make check` pour previsualiser les changements
-4. `make apply` pour converger
+2. `anklume sync` pour regenerer les fichiers Ansible
+3. `anklume domain check` pour previsualiser les changements
+4. `anklume domain apply` pour converger
 
 ## Commandes utiles
 
 | Commande | Description |
 |----------|-------------|
-| `make sync` | Generer les fichiers Ansible depuis infra.yml |
-| `make sync-dry` | Previsualiser la generation sans ecrire |
-| `make check` | Execution a blanc (--check --diff) |
-| `make apply` | Appliquer toute l'infrastructure |
-| `make apply-limit G=lab` | Appliquer un seul domaine |
-| `make snapshot` | Prendre un snapshot de toutes les instances |
-| `make lint` | Executer tous les validateurs |
-| `make help` | Lister toutes les cibles disponibles |
+| `anklume sync` | Generer les fichiers Ansible depuis infra.yml |
+| `anklume sync --dry-run` | Previsualiser la generation sans ecrire |
+| `anklume domain check` | Execution a blanc (--check --diff) |
+| `anklume domain apply` | Appliquer toute l'infrastructure |
+| `anklume domain apply lab` | Appliquer un seul domaine |
+| `anklume snapshot create` | Prendre un snapshot de toutes les instances |
+| `anklume dev lint` | Executer tous les validateurs |
+| `anklume --help` | Lister toutes les cibles disponibles |
 
 ## Depannage
 
-- **Erreurs de validation sur make sync** : Le generateur verifie toutes
+- **Erreurs de validation sur anklume sync** : Le generateur verifie toutes
   les contraintes (noms uniques, sous-reseaux uniques, IPs valides) avant
   d'ecrire. Lisez le message d'erreur pour identifier la contrainte specifique
   qui a echoue.
@@ -175,7 +175,7 @@ Apres votre installation initiale, le flux de travail quotidien est :
 - **Le container ne demarre pas apres un redemarrage** : Le repertoire
   `/var/run/incus/` peut ne pas exister. Voir ADR-019 dans
   [ARCHITECTURE.md](ARCHITECTURE.md).
-- **make apply bloque** : Verifiez qu'Incus fonctionne (`systemctl status incus`)
+- **anklume domain apply bloque** : Verifiez qu'Incus fonctionne (`systemctl status incus`)
   et que le socket est accessible (`incus list` depuis anklume-instance).
 
 ## Etapes suivantes

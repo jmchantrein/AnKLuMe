@@ -8,28 +8,28 @@ your usage patterns. Data never leaves your machine.
 - **Default: DISABLED** (opt-in model)
 - **Local-only**: data stored in `~/.anklume/telemetry/`, no network calls
 - **Inspectable**: you can `cat ~/.anklume/telemetry/usage.jsonl` at any time
-- **Deletable**: `make telemetry-clear` removes everything
+- **Deletable**: `anklume telemetry clear` removes everything
 - **Minimal**: only target name, domain, duration, and exit code are logged
 - **No PII**: no usernames, hostnames, IPs, secrets, or file contents
 
 ## Quick Start
 
 ```bash
-make telemetry-on       # Enable telemetry
-make sync               # Normal workflow — events are logged automatically
-make apply
-make telemetry-report   # View usage charts
+anklume telemetry on       # Enable telemetry
+anklume sync               # Normal workflow — events are logged automatically
+anklume domain apply
+anklume telemetry report   # View usage charts
 ```
 
 ## Makefile Targets
 
 | Target | Description |
 |--------|-------------|
-| `make telemetry-on` | Enable telemetry collection |
-| `make telemetry-off` | Disable telemetry (data preserved) |
-| `make telemetry-status` | Show state, event count, file size |
-| `make telemetry-clear` | Delete all telemetry data and state |
-| `make telemetry-report` | Terminal charts of usage patterns |
+| `anklume telemetry on` | Enable telemetry collection |
+| `anklume telemetry off` | Disable telemetry (data preserved) |
+| `anklume telemetry status` | Show state, event count, file size |
+| `anklume telemetry clear` | Delete all telemetry data and state |
+| `anklume telemetry report` | Terminal charts of usage patterns |
 
 ## What Is Logged
 
@@ -69,7 +69,7 @@ Other targets run without telemetry overhead.
 
 ## Report
 
-`make telemetry-report` produces terminal charts showing:
+`anklume telemetry report` produces terminal charts showing:
 
 1. **Target invocations** — which targets you use most
 2. **Success vs failure** — overall success rate

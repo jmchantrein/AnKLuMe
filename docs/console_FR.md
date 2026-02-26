@@ -10,9 +10,9 @@ une isolation visuelle similaire aux bordures colorées de QubesOS.
 ## Démarrage rapide
 
 ```bash
-make console              # Lancer la console tmux
-make console DRY_RUN=1    # Prévisualiser sans créer la session
-make console KILL=1       # Forcer la recréation (tuer la session existante)
+anklume console              # Lancer la console tmux
+anklume console --dry-run    # Prévisualiser sans créer la session
+anklume console --kill       # Forcer la recréation (tuer la session existante)
 ```
 
 Ou utiliser le script directement :
@@ -119,7 +119,7 @@ tombe, reconnectez-vous avec :
 tmux attach -t anklume
 ```
 
-Si la session existe déjà, `make console` s'y attache au lieu d'en créer
+Si la session existe déjà, `anklume console` s'y attache au lieu d'en créer
 une nouvelle.
 
 ## Recréation
@@ -128,7 +128,7 @@ Pour forcer la recréation de la session (par exemple, après avoir
 ajouté/supprimé des domaines) :
 
 ```bash
-make console KILL=1
+anklume console --kill
 ```
 
 Cela tue la session existante et en crée une nouvelle.
@@ -244,13 +244,13 @@ Vérifier que la machine existe et est en cours d'exécution :
 incus list --all-projects
 ```
 
-Si la machine n'existe pas encore, exécuter `make apply` pour créer
+Si la machine n'existe pas encore, exécuter `anklume domain apply` pour créer
 l'infrastructure.
 
 ### Impossible de s'attacher à la session
 
 Si `tmux attach -t anklume` échoue avec "session not found", la session
-a été tuée ou tmux a été redémarré. Exécuter `make console` pour la recréer.
+a été tuée ou tmux a été redémarré. Exécuter `anklume console` pour la recréer.
 
 ### Les étiquettes de bordure des volets ne s'affichent pas
 
@@ -270,7 +270,7 @@ Sur les anciennes versions de tmux, la console fonctionne mais les
 
 ```bash
 # Créer et s'attacher à la console
-make console
+anklume console
 
 # Détacher
 Ctrl-a d
@@ -282,7 +282,7 @@ tmux attach -t anklume
 ### Prévisualisation en mode dry-run
 
 ```bash
-make console DRY_RUN=1
+anklume console --dry-run
 ```
 
 Sortie :
@@ -313,7 +313,7 @@ python3 scripts/console.py --no-attach
 ## Dépendances
 
 - Python 3.11+
-- `pip install libtmux` (installé via `make init`)
+- `pip install libtmux` (installé via `anklume setup init`)
 - tmux >= 3.0 (pour les étiquettes de bordure des volets)
 
 ## Modèle de sécurité

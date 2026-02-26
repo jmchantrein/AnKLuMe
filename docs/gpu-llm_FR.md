@@ -107,13 +107,13 @@ open_webui_ollama_url: "http://10.100.3.10:11434"
 
 ```bash
 # Generer les fichiers Ansible
-make sync
+anklume sync
 
 # Tout appliquer (ou juste les roles LLM)
-make apply
+anklume domain apply
 
 # Ou appliquer uniquement les roles lies au LLM
-make apply-llm
+anklume domain apply --tags llm
 ```
 
 ## Verification

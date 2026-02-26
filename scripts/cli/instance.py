@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from scripts.cli._completions import complete_domain, complete_instance
-from scripts.cli._helpers import PROJECT_ROOT, console, load_infra_safe, run_cmd, run_script
+from scripts.cli._helpers import PROJECT_ROOT, console, load_infra_safe, run_cmd, run_make, run_script
 
 app = typer.Typer(name="instance", help="Manage instances (containers and VMs).")
 
@@ -78,6 +78,29 @@ def info(
         cmd.extend(["--project", project])
     cmd.append(name)
     run_cmd(cmd, check=False)
+
+
+@app.command()
+def disp(
+    domain: Annotated[str, typer.Argument(help="Domain for the disposable container", autocompletion=complete_domain)],
+) -> None:
+    """Create a disposable container in a domain."""
+    run_make("disp", f"D={domain}")
+
+
+@app.command("clipboard")
+def clipboard(
+    direction: Annotated[str, typer.Argument(help="Direction: 'to' or 'from'")],
+    instance: Annotated[str, typer.Argument(help="Instance name", autocompletion=complete_instance)],
+) -> None:
+    """Copy clipboard to/from an instance."""
+    if direction == "to":
+        run_make("clipboard-to", f"I={instance}")
+    elif direction == "from":
+        run_make("clipboard-from", f"I={instance}")
+    else:
+        console.print(f"[red]Invalid direction:[/red] {direction}. Use 'to' or 'from'.")
+        raise typer.Exit(1)
 
 
 def _find_project(infra: dict, instance_name: str) -> str | None:

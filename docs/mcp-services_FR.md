@@ -65,19 +65,19 @@ domains:
 ### 2. Generer et appliquer
 
 ```bash
-make sync    # Valide les declarations de services, genere host_vars
-make apply   # Cree l'infrastructure
+anklume sync    # Valide les declarations de services, genere host_vars
+anklume domain apply   # Cree l'infrastructure
 ```
 
 ### 3. Utiliser le client
 
 ```bash
 # Lister les outils sur une instance
-make mcp-list I=vault-signer
+anklume mcp list I=vault-signer
 
 # Appeler un outil
-make mcp-call I=vault-signer TOOL=clipboard_get
-make mcp-call I=vault-signer TOOL=clipboard_set ARGS='{"content": "bonjour"}'
+anklume mcp call I=vault-signer TOOL=clipboard_get
+anklume mcp call I=vault-signer TOOL=clipboard_set ARGS='{"content": "bonjour"}'
 ```
 
 ## Moteur de politique
@@ -142,8 +142,8 @@ par ligne. Cela correspond naturellement a :
 
 | Cible | Description |
 |-------|-------------|
-| `make mcp-list I=<instance>` | Lister les outils MCP sur une instance |
-| `make mcp-call I=<instance> TOOL=<nom>` | Appeler un outil MCP |
+| `anklume mcp list I=<instance>` | Lister les outils MCP sur une instance |
+| `anklume mcp call I=<instance> TOOL=<nom>` | Appeler un outil MCP |
 
 ## Deploiement du serveur
 
@@ -173,7 +173,7 @@ incus list --all-projects | grep <instance>
 Verifier les outils disponibles :
 
 ```bash
-make mcp-list I=<instance>
+anklume mcp list I=<instance>
 ```
 
 ### La politique refuse l'acces

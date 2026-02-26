@@ -59,19 +59,19 @@ domains:
 ### 2. Generate and apply
 
 ```bash
-make sync    # Validates service declarations, generates host_vars
-make apply   # Creates infrastructure
+anklume sync    # Validates service declarations, generates host_vars
+anklume domain apply   # Creates infrastructure
 ```
 
 ### 3. Use the client
 
 ```bash
 # List tools on an instance
-make mcp-list I=vault-signer
+anklume mcp list I=vault-signer
 
 # Call a tool
-make mcp-call I=vault-signer TOOL=clipboard_get
-make mcp-call I=vault-signer TOOL=clipboard_set ARGS='{"content": "hello"}'
+anklume mcp call I=vault-signer TOOL=clipboard_get
+anklume mcp call I=vault-signer TOOL=clipboard_set ARGS='{"content": "hello"}'
 ```
 
 ## Policy engine
@@ -135,8 +135,8 @@ This maps naturally to:
 
 | Target | Description |
 |--------|-------------|
-| `make mcp-list I=<instance>` | List MCP tools on an instance |
-| `make mcp-call I=<instance> TOOL=<name>` | Call an MCP tool |
+| `anklume mcp list I=<instance>` | List MCP tools on an instance |
+| `anklume mcp call I=<instance> TOOL=<name>` | Call an MCP tool |
 
 ## Server deployment
 
@@ -187,7 +187,7 @@ incus exec <instance> --project <project> -- ls /opt/anklume/mcp-server.py
 Check available tools:
 
 ```bash
-make mcp-list I=<instance>
+anklume mcp list I=<instance>
 ```
 
 ### Policy denies access

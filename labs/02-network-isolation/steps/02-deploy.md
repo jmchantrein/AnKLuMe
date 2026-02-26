@@ -9,7 +9,7 @@ Create all Incus resources and start the containers.
 1. Apply the full infrastructure:
 
    ```bash
-   make apply
+   anklume domain apply
    ```
 
 2. List containers in both projects:

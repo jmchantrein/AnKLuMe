@@ -34,8 +34,8 @@ ai-tools domain (net-ai-tools, 10.100.4.0/24)
 
 ```bash
 cp examples/ai-tools/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ## Configuration

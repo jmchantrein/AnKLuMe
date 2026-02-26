@@ -9,7 +9,7 @@ Remove snapshots and lab resources.
 1. Delete the `baseline` snapshot:
 
    ```bash
-   make snapshot-delete NAME=baseline
+   anklume snapshot create-delete NAME=baseline
    ```
 
    Or directly:
@@ -27,17 +27,17 @@ Remove snapshots and lab resources.
 3. Remove the lab infrastructure:
 
    ```bash
-   make flush FORCE=true
+   anklume flush --force
    cp infra.yml.bak infra.yml 2>/dev/null || true
-   make sync
+   anklume sync
    ```
 
 ## What you learned
 
-- How to create named snapshots (`make snapshot NAME=...`)
-- How to list snapshots (`make snapshot-list`)
-- How to restore from a snapshot (`make restore NAME=...`)
-- How to delete snapshots (`make snapshot-delete NAME=...`)
+- How to create named snapshots (`anklume snapshot create NAME=...`)
+- How to list snapshots (`anklume snapshot list`)
+- How to restore from a snapshot (`anklume snapshot restore --name ...`)
+- How to delete snapshots (`anklume snapshot create-delete NAME=...`)
 - Snapshots enable fearless experimentation
 
 ## Next lab

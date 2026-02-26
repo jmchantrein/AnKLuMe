@@ -6,10 +6,10 @@ set -euo pipefail
 echo "=== Step 01: Create two domains ==="
 cp infra.yml infra.yml.bak 2>/dev/null || true
 cp labs/02-network-isolation/infra.yml infra.yml
-make sync
+anklume sync
 
 echo "=== Step 02: Deploy ==="
-make apply
+anklume domain apply
 incus list --project lab-office
 incus list --project lab-dmz
 
@@ -28,8 +28,8 @@ else
 fi
 
 echo "=== Cleanup ==="
-make flush FORCE=true
+anklume flush --force
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 
 echo "Lab 02 complete."

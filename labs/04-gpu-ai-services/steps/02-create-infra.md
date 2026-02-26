@@ -40,7 +40,7 @@ profile and an Ollama server container.
 4. Generate the Ansible files:
 
    ```bash
-   make sync
+   anklume sync
    ```
 
 5. Inspect the generated files:

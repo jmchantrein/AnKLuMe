@@ -78,7 +78,7 @@ applied on the host.
 ### Step 1: Generate rules (inside anklume container)
 
 ```bash
-make nftables
+anklume network rules
 ```
 
 This runs the `incus_nftables` Ansible role, which:
@@ -93,7 +93,7 @@ reviewed before deployment.
 ### Step 2: Deploy rules (on the host)
 
 ```bash
-make nftables-deploy
+anklume network deploy
 ```
 
 This runs `scripts/deploy-nftables.sh` **on the host** (not inside the
@@ -183,7 +183,7 @@ rm /etc/nftables.d/anklume-isolation.nft  # Remove installed file
 ### Regenerating after adding a domain
 
 ```bash
-make sync && make apply-infra    # Create new domain resources
-make nftables                    # Regenerate rules (inside anklume)
-make nftables-deploy             # Deploy updated rules (on host)
+anklume sync && anklume domain apply --tags infra    # Create new domain resources
+anklume network rules                    # Regenerate rules (inside anklume)
+anklume network deploy             # Deploy updated rules (on host)
 ```

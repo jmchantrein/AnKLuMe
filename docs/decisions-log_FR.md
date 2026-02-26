@@ -46,7 +46,7 @@ restent valides a mesure que le generateur evolue.
 
 ### D-003 : Violations ansible-lint preexistantes
 
-**Probleme** : `make lint` echoue a cause de violations preexistantes dans
+**Probleme** : `anklume dev lint` echoue a cause de violations preexistantes dans
 ollama_server, open_webui et incus_snapshots (command-instead-of-module,
 risky-shell-pipe, var-naming[read-only]). Ce ne sont pas des problemes de la Phase 7.
 
@@ -117,9 +117,9 @@ modifie pas l'hote). Cependant, les regles nftables doivent etre appliquees sur
 le noyau de l'hote, pas dans un container.
 
 **Decision** : Decouper en deux etapes :
-1. `make nftables` -- s'execute dans le container admin, genere les regles vers
+1. `anklume network rules` -- s'execute dans le container admin, genere les regles vers
    `/opt/anklume/nftables-isolation.nft`
-2. `make nftables-deploy` -- execute `scripts/deploy-nftables.sh` sur l'hote,
+2. `anklume network deploy` -- execute `scripts/deploy-nftables.sh` sur l'hote,
    recupere les regles depuis le container admin via `incus file pull`,
    valide la syntaxe, installe dans `/etc/nftables.d/`, et applique
 
@@ -240,7 +240,7 @@ capture l'acces GPU direct (`gpu: true`) et indirect (via profil).
 
 ### D-016 : get_warnings() comme fonction separee
 
-**Contexte** : Les avertissements (non fatals) ne doivent pas bloquer `make sync`
+**Contexte** : Les avertissements (non fatals) ne doivent pas bloquer `anklume sync`
 mais doivent etre visibles pour l'utilisateur. Changer le type de retour de
 `validate()` casserait la compatibilite descendante avec les tests existants.
 
@@ -306,7 +306,7 @@ nouvelles cartes reseau.
 ### D-020 : Validation de firewall_mode dans le generateur PSOT
 
 **Contexte** : infra.yml supporte `global.firewall_mode: host|vm`. Les valeurs
-invalides doivent etre detectees tot par `make sync`, pas au moment du deploiement.
+invalides doivent etre detectees tot par `anklume sync`, pas au moment du deploiement.
 
 **Decision** : Ajouter la validation de `firewall_mode` a `validate()` dans
 generate.py. Valeurs valides : `host` (defaut) et `vm`. Les valeurs invalides

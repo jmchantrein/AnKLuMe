@@ -7,10 +7,10 @@ in Gherkin format using `pytest-bdd`.
 ## Quick start
 
 ```bash
-make scenario-test          # Run all scenarios
-make scenario-test-best     # Best practices only
-make scenario-test-bad      # Bad practices only
-make scenario-list          # List available scenarios
+anklume dev scenario          # Run all scenarios
+anklume dev scenario --best     # Best practices only
+anklume dev scenario --bad      # Bad practices only
+anklume dev scenario --list          # List available scenarios
 ```
 
 Or run directly with pytest:
@@ -80,7 +80,7 @@ Feature: Descriptive name
 
   Scenario: Specific test case
     Given infra.yml from "student-sysadmin"
-    When I run "make sync"
+    When I run "anklume sync"
     Then exit code is 0
     And inventory files exist for all domains
 ```

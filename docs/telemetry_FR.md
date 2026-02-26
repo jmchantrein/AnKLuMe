@@ -11,28 +11,28 @@ jamais votre machine.
 - **Par defaut : DESACTIVEE** (modele opt-in)
 - **Locale uniquement** : donnees dans `~/.anklume/telemetry/`, aucun appel reseau
 - **Inspectable** : vous pouvez `cat ~/.anklume/telemetry/usage.jsonl` a tout moment
-- **Supprimable** : `make telemetry-clear` efface tout
+- **Supprimable** : `anklume telemetry clear` efface tout
 - **Minimale** : seuls le nom de la cible, le domaine, la duree et le code de sortie sont enregistres
 - **Pas de donnees personnelles** : aucun nom d'utilisateur, nom d'hote, IP, secret ou contenu de fichier
 
 ## Demarrage rapide
 
 ```bash
-make telemetry-on       # Activer la telemetry
-make sync               # Utilisation normale — les evenements sont enregistres
-make apply
-make telemetry-report   # Afficher les graphiques d'utilisation
+anklume telemetry on       # Activer la telemetry
+anklume sync               # Utilisation normale — les evenements sont enregistres
+anklume domain apply
+anklume telemetry report   # Afficher les graphiques d'utilisation
 ```
 
 ## Cibles Makefile
 
 | Cible | Description |
 |-------|-------------|
-| `make telemetry-on` | Activer la collecte de telemetry |
-| `make telemetry-off` | Desactiver la telemetry (donnees conservees) |
-| `make telemetry-status` | Afficher l'etat, le nombre d'evenements, la taille du fichier |
-| `make telemetry-clear` | Supprimer toutes les donnees de telemetry |
-| `make telemetry-report` | Graphiques en terminal des habitudes d'utilisation |
+| `anklume telemetry on` | Activer la collecte de telemetry |
+| `anklume telemetry off` | Desactiver la telemetry (donnees conservees) |
+| `anklume telemetry status` | Afficher l'etat, le nombre d'evenements, la taille du fichier |
+| `anklume telemetry clear` | Supprimer toutes les donnees de telemetry |
+| `anklume telemetry report` | Graphiques en terminal des habitudes d'utilisation |
 
 ## Ce qui est enregistre
 
@@ -72,7 +72,7 @@ Les autres cibles s'executent sans surcharge de telemetry.
 
 ## Rapport
 
-`make telemetry-report` produit des graphiques en terminal montrant :
+`anklume telemetry report` produit des graphiques en terminal montrant :
 
 1. **Invocations par cible** — quelles cibles vous utilisez le plus
 2. **Succes vs echec** — taux de succes global

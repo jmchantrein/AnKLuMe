@@ -31,7 +31,7 @@ levels and examine its network topology.
    ```bash
    cp infra.yml infra.yml.bak 2>/dev/null || true
    cp labs/05-security-audit/infra.yml infra.yml
-   make sync && make apply
+   anklume sync && anklume domain apply
    ```
 
 3. List all Incus projects:

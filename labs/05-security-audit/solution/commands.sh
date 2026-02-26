@@ -7,7 +7,7 @@ set -euo pipefail
 echo "=== Step 01: Inspect the topology ==="
 cp infra.yml infra.yml.bak 2>/dev/null || true
 cp labs/05-security-audit/infra.yml infra.yml
-make sync && make apply
+anklume sync && anklume domain apply
 
 incus project list
 incus network list
@@ -38,7 +38,7 @@ incus exec dev-server --project corp-dev -- \
   ping -c 2 -W 2 "$OFFICE_IP" || echo "Expected: cross-domain blocked"
 
 echo "=== Step 03: Examine nftables rules ==="
-make nftables
+anklume network rules
 cat /tmp/anklume-nftables.conf
 grep -c "drop" /tmp/anklume-nftables.conf
 
@@ -54,8 +54,8 @@ network_policies:
     protocol: tcp
 POLICY
 
-make sync
-make nftables
+anklume sync
+anklume network rules
 grep "accept" /tmp/anklume-nftables.conf
 # Verify no reverse rule
 grep "net-corp-dmz.*net-corp-dev.*accept" /tmp/anklume-nftables.conf || \
@@ -103,6 +103,6 @@ for proj in corp-office corp-dev corp-dmz corp-sandbox; do
   incus project delete "$proj" 2>/dev/null || true
 done
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 
 echo "Lab 05 complete."

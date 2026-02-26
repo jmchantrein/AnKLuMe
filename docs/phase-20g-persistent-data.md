@@ -5,7 +5,7 @@ Implementation plan for per-machine persistent host bind mounts
 
 ## Context
 
-`make flush` destroys everything indiscriminately, including instances
+`anklume flush` destroys everything indiscriminately, including instances
 with `ephemeral: false` (protected). `storage_volumes` (Incus pool
 volumes) are destroyed with the project. There is no mechanism for
 persistent data like Docker bind mounts. No command exists to remove
@@ -23,15 +23,15 @@ individual instances.
 - Never delete `/srv/anklume/data/` or `/srv/anklume/shares/`
 - Counter `skipped` + final summary message
 
-### B) `make instance-remove` — targeted removal
+### B) `anklume instance remove` — targeted removal
 
 New script `scripts/instance-remove.sh` (~80 lines):
 
 ```
-make instance-remove DOMAIN=pro SCOPE=ephemeral  # ephemeral in domain
-make instance-remove DOMAIN=pro SCOPE=all         # entire domain
-make instance-remove I=pro-dev                     # single instance
-make instance-remove I=pro-dev FORCE=true          # bypass protection
+anklume instance remove DOMAIN=pro SCOPE=ephemeral  # ephemeral in domain
+anklume instance remove DOMAIN=pro SCOPE=all         # entire domain
+anklume instance remove pro-dev                     # single instance
+anklume instance remove pro-dev FORCE=true          # bypass protection
 ```
 
 Logic: find Incus project via `incus list --all-projects`, check
@@ -63,7 +63,7 @@ Mechanism (identical to shared_volumes):
 - Injected device: `pd-<name>` in `instance_devices`
   (prefix `pd-` like `sv-` for shared)
 - Generation: merge pd-* + sv-* + user devices in host_vars
-- Host dirs: `scripts/create-data-dirs.py` + `make data-dirs`
+- Host dirs: `scripts/create-data-dirs.py` + `anklume setup data-dirs`
 - The `incus_instances` role already handles arbitrary disk devices
   → no change needed
 
@@ -116,7 +116,7 @@ Mechanism (identical to shared_volumes):
 5. flush.sh: ephemeral protection
 6. instance-remove.sh + create-data-dirs.py
 7. Makefile: targets
-8. `make lint && make test` → commit
+8. `anklume dev lint && anklume dev test` → commit
 
 ## Verification
 

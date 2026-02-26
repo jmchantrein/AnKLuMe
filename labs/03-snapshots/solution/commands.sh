@@ -6,8 +6,8 @@ set -euo pipefail
 echo "=== Step 01: Setup ==="
 cp infra.yml infra.yml.bak 2>/dev/null || true
 cp labs/03-snapshots/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 
 echo "=== Step 02: Create snapshot ==="
 incus exec snap-server --project lab-snap -- \
@@ -26,8 +26,8 @@ incus exec snap-server --project lab-snap -- cat /root/marker.txt
 
 echo "=== Step 05: Cleanup ==="
 incus snapshot delete snap-server baseline --project lab-snap
-make flush FORCE=true
+anklume flush --force
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 
 echo "Lab 03 complete."

@@ -37,28 +37,28 @@ calmly orchestrated by you, Ansible, Incus and Molecule.
   at a high level (domains, machines, networks, profiles).
 - **Secondary Source of Truth**: Generated Ansible files (inventory/, group_vars/,
   host_vars/) — enriched by the user outside of managed sections.
-- Flow: `infra.yml` → `make sync` → Ansible files → `make apply` → Incus state.
+- Flow: `infra.yml` → `anklume sync` → Ansible files → `anklume domain apply` → Incus state.
 - Users may freely edit generated files outside `=== MANAGED ===` sections.
 - Both `infra.yml` AND the Ansible files should be committed to git.
 
 ## Commands
 
 ```bash
-make sync          # Generate/update Ansible files from infra.yml
-make sync-dry      # Preview changes without writing
-make lint          # All validators (ansible-lint, yamllint, shellcheck, ruff)
-make check         # Dry-run (ansible-playbook --check --diff)
-make apply         # Apply full infrastructure
-make apply-limit G=<group>  # Apply a single domain
-make test          # Run Molecule + pytest
-make shares        # Create host directories for shared_volumes
-make snapshot      # Snapshot all instances
-make nftables      # Generate nftables isolation rules
-make nftables-deploy  # Deploy rules on host (run FROM host)
-make flush         # Destroy all anklume infrastructure (dev mode)
-make upgrade       # Safe framework update with conflict detection
-make import-infra  # Generate infra.yml from existing Incus state
-make help          # List all commands
+anklume sync                    # Generate/update Ansible files from infra.yml
+anklume sync --dry-run          # Preview changes without writing
+anklume dev lint                # All validators (ansible-lint, yamllint, shellcheck, ruff)
+anklume domain check            # Dry-run (ansible-playbook --check --diff)
+anklume domain apply            # Apply full infrastructure
+anklume domain apply <group>    # Apply a single domain
+anklume dev test                # Run Molecule + pytest
+anklume setup shares            # Create host directories for shared_volumes
+anklume snapshot create         # Snapshot all instances
+anklume network rules           # Generate nftables isolation rules
+anklume network deploy          # Deploy rules on host (run FROM host)
+anklume flush                   # Destroy all anklume infrastructure (dev mode)
+anklume upgrade                 # Safe framework update with conflict detection
+anklume setup import            # Generate infra.yml from existing Incus state
+anklume --help                  # List all commands
 ```
 
 ## Ansible code conventions
@@ -73,7 +73,7 @@ make help          # List all commands
 
 ## Quality gates
 
-No file escapes validation. `make lint` chains all validators (0 violations):
+No file escapes validation. `anklume dev lint` chains all validators (0 violations):
 
 | Tool | Scope | Config |
 |------|-------|--------|

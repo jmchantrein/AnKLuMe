@@ -57,7 +57,7 @@ acceleration is being used.
    incus network delete net-ai-tools
    incus project delete ai-tools
    cp infra.yml.bak infra.yml 2>/dev/null || true
-   make sync
+   anklume sync
    ```
 
 ## What you learned

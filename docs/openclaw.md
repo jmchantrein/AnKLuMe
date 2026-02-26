@@ -167,7 +167,7 @@ PR creation without creating additional containers.
 
 All agent operational knowledge is stored as Jinja2 templates in the
 anklume repository (`roles/openclaw_server/templates/`). Every
-`make apply` deploys these templates to the agent's workspace,
+`anklume domain apply` deploys these templates to the agent's workspace,
 **overwriting** the previous versions. The git repository is the
 single source of truth.
 
@@ -186,7 +186,7 @@ single source of truth.
 **Operational files** (AGENTS.md, TOOLS.md, USER.md, IDENTITY.md) are
 never modified directly. To change them, the agent follows the standard
 development workflow: edit the template, test, commit, push, PR, merge,
-then `make apply` deploys the change.
+then `anklume domain apply` deploys the change.
 
 **SOUL.md** (personality) is the only file the agent modifies directly.
 It is `.gitignored` globally and never committed to the repository.
@@ -214,10 +214,10 @@ by contributing through the standard git workflow:
 Ada on Telegram → identifies an improvement
   → clones/updates the repo in her openclaw container
   → edits a template in roles/openclaw_server/templates/
-  → runs tests (make lint, pytest tests/test_proxy.py)
+  → runs tests (anklume dev lint, pytest tests/test_proxy.py)
   → commits to a feature branch, pushes, creates a PR
   → jmc reviews and merges
-  → make apply deploys the updated template to Ada's workspace
+  → anklume domain apply deploys the updated template to Ada's workspace
 ```
 
 This creates a virtuous feedback loop: the AI assistant improves the
@@ -238,7 +238,7 @@ and is the only workspace file that does not go through the PR workflow.
   no access to other domains (pro, perso, etc.)
 - **Git workflow**: all operational changes go through branches and PRs
 - **Human gate**: jmc reviews every PR before it reaches production
-- **Template overwrite**: `make apply` always restores the authoritative
+- **Template overwrite**: `anklume domain apply` always restores the authoritative
   version of operational files — no drift
 - **SOUL.md is private**: personality never leaves the container
 
@@ -332,7 +332,7 @@ isolation while still enabling web access through the bridge.
 **Native OpenClaw**: `openclaw update` updates itself.
 
 **With proxy**: the `self_upgrade` tool can check and apply anklume
-framework updates, re-sync configuration (`make sync`), and
+framework updates, re-sync configuration (`anklume sync`), and
 re-provision the openclaw container — all from a Telegram message.
 
 ### 10. Persistent multi-turn sessions

@@ -11,12 +11,12 @@ bordures colorees de QubesOS.
 ## Demarrage rapide
 
 ```bash
-make console                    # Console tmux avec panneaux colores
-make domain-exec I=pro-dev TERMINAL=1  # Terminal colore par domaine
-make clipboard-to I=pro-dev     # Presse-papier hote -> conteneur
-make clipboard-from I=pro-dev   # Presse-papier conteneur -> hote
-make desktop-config             # Generer les configs Sway/foot/.desktop
-make dashboard                  # Dashboard web sur http://localhost:8888
+anklume console                    # Console tmux avec panneaux colores
+anklume domain exec pro-dev --terminal  # Terminal colore par domaine
+anklume instance clipboard to pro-dev     # Presse-papier hote -> conteneur
+anklume instance clipboard from pro-dev   # Presse-papier conteneur -> hote
+anklume desktop config             # Generer les configs Sway/foot/.desktop
+anklume dashboard                  # Dashboard web sur http://localhost:8888
 ```
 
 ## Console tmux (Phase 19a)
@@ -25,9 +25,9 @@ La console tmux genere automatiquement une session depuis `infra.yml`
 avec des panneaux colores par domaine :
 
 ```bash
-make console          # Creer et attacher
-make console KILL=1   # Recreer la session
-make console DRY_RUN=1  # Previsualiser sans creer
+anklume console          # Creer et attacher
+anklume console --kill   # Recreer la session
+anklume console --dry-run  # Previsualiser sans creer
 ```
 
 Les couleurs sont definies **cote serveur** via `select-pane -P 'bg=...'`
@@ -52,11 +52,11 @@ de synchronisation automatique entre domaines.
 
 ```bash
 # Presse-papier hote -> conteneur
-make clipboard-to I=pro-dev
+anklume instance clipboard to pro-dev
 scripts/clipboard.sh copy-to pro-dev --project pro
 
 # Presse-papier conteneur -> hote
-make clipboard-from I=pro-dev
+anklume instance clipboard from pro-dev
 scripts/clipboard.sh copy-from pro-dev --project pro
 ```
 
@@ -80,10 +80,10 @@ Lance des commandes dans les conteneurs avec le contexte du domaine :
 
 ```bash
 # Shell interactif dans le conteneur
-make domain-exec I=pro-dev
+anklume domain exec pro-dev
 
 # Fenetre terminal coloree
-make domain-exec I=pro-dev TERMINAL=1
+anklume domain exec pro-dev --terminal
 
 # Executer une commande specifique
 scripts/domain-exec.sh pro-dev -- htop
@@ -114,7 +114,7 @@ Avec `--terminal`, le wrapper ouvre une nouvelle fenetre terminal avec :
 Generer des extraits de configuration pour les environnements de bureau :
 
 ```bash
-make desktop-config             # Genere toutes les configurations
+anklume desktop config             # Genere toutes les configurations
 python3 scripts/desktop_config.py --sway    # Sway/i3 uniquement
 python3 scripts/desktop_config.py --foot    # Terminal foot uniquement
 python3 scripts/desktop_config.py --desktop # Entrees .desktop uniquement
@@ -168,9 +168,9 @@ correspondante.
 Statut de l'infrastructure en direct dans un navigateur :
 
 ```bash
-make dashboard              # http://localhost:8888
-make dashboard PORT=9090    # Port personnalise
-make dashboard HOST=0.0.0.0 # Ecouter sur toutes les interfaces
+anklume dashboard              # http://localhost:8888
+anklume dashboard --port 9090    # Port personnalise
+anklume dashboard --host 0.0.0.0 # Ecouter sur toutes les interfaces
 ```
 
 ### Fonctionnalites

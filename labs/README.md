@@ -45,12 +45,12 @@ steps:
 ## Make targets
 
 ```bash
-make lab-list              # List available labs
-make lab-start L=01        # Start lab 01, display first step
-make lab-check L=01        # Validate current step
-make lab-hint  L=01        # Show hint for current step
-make lab-reset L=01        # Reset lab to initial state
-make lab-solution L=01     # Show solution (marks as assisted)
+anklume lab list              # List available labs
+anklume lab start 01        # Start lab 01, display first step
+anklume lab check 01        # Validate current step
+anklume lab hint 01        # Show hint for current step
+anklume lab reset 01        # Reset lab to initial state
+anklume lab solution 01     # Show solution (marks as assisted)
 ```
 
 ## Progress tracking
@@ -73,4 +73,4 @@ completed_steps:
 3. Create a lab-specific `infra.yml`
 4. Write ordered step files in `steps/`
 5. Add reference commands in `solution/commands.sh`
-6. Run `make lab-list` to verify detection
+6. Run `anklume lab list` to verify detection

@@ -75,10 +75,10 @@ domains:
 ### 2. Deploy
 
 ```bash
-make sync          # Generate Ansible files
-make apply         # Full infrastructure + provisioning
+anklume sync          # Generate Ansible files
+anklume domain apply         # Full infrastructure + provisioning
 # or:
-make apply-stt     # STT role only
+anklume domain apply --tags stt     # STT role only
 ```
 
 ### 3. Configure Open WebUI
@@ -234,7 +234,7 @@ stt_server_model: "small"
 stt_server_quantization: "int8"
 
 # Re-provision
-make apply-stt
+anklume domain apply --tags stt
 ```
 
 ### Service not starting

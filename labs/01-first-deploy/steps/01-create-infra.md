@@ -27,7 +27,7 @@ Generate the Ansible file tree from the lab's `infra.yml`.
 3. Generate the Ansible files:
 
    ```bash
-   make sync
+   anklume sync
    ```
 
 4. Inspect the generated files:

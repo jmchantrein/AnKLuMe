@@ -75,14 +75,14 @@ network_policies:
 ### 2. Deployer l'infrastructure
 
 ```bash
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 ### 3. Configurer Tor dans le conteneur passerelle
 
 ```bash
-make apply-tor I=tor-gw
+anklume domain apply-tor I=tor-gw
 ```
 
 Cela installe Tor, le configure en proxy transparent, cree les regles
@@ -124,7 +124,7 @@ scripts/tor-gateway.sh verify <instance> [--project PROJET]
 
 | Cible | Description |
 |-------|-------------|
-| `make apply-tor I=<instance>` | Configurer le proxy transparent Tor |
+| `anklume domain apply-tor I=<instance>` | Configurer le proxy transparent Tor |
 
 Accepte un parametre optionnel `PROJECT=<projet>`.
 

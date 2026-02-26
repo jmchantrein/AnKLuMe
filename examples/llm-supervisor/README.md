@@ -50,8 +50,8 @@ VRAM for both models concurrently.
 
 ```bash
 cp examples/llm-supervisor/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 Configure each Ollama instance with a different model by adding to

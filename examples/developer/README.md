@@ -46,8 +46,8 @@ Incus-in-Incus support:
 
 ```bash
 cp examples/developer/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 ```
 
 After deployment, enter the test runner and install Incus inside:

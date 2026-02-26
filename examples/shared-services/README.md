@@ -45,11 +45,11 @@ IPP without direct LAN access.
 
 ```bash
 cp examples/shared-services/infra.yml infra.yml
-make sync
-make apply
+anklume sync
+anklume domain apply
 
 # Setup CUPS in the print container
-make apply-print I=shared-print
+anklume domain apply-print I=shared-print
 
 # Add a USB printer
 scripts/cups-setup.sh add-usb shared-print --vendor 04b8 --product 0005
@@ -67,7 +67,7 @@ scripts/cups-setup.sh status shared-print
 # Install CUPS client
 incus exec pro-dev --project pro -- apt install -y cups-client
 
-# Add remote printer (use the container's IP from `make sync` output)
+# Add remote printer (use the container's IP from `anklume sync` output)
 incus exec pro-dev --project pro -- \
     lpadmin -p remote-printer -v ipp://shared-print:631/printers/MyPrinter -E
 

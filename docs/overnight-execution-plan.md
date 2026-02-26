@@ -83,7 +83,7 @@ Post-merge fixes: llm_sanitizer meta/molecule, SAN->LS prefix rename.
 
 ### Phase 31: Live OS
 **Reason**: Needs Incus/KVM VM for boot testing, UEFI, encrypted
-ZFS/BTRFS pool creation. Testable locally via `make live-os-test-vm`.
+ZFS/BTRFS pool creation. Testable locally via `anklume live test`.
 **Status**: Arch Linux base support checked, 11 of 12 criteria remaining.
 
 ## Final summary

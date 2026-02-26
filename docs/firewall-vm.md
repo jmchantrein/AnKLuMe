@@ -57,8 +57,8 @@ domains:
 ```
 
 ```bash
-make sync    # Auto-creates anklume-firewall (.253) in anklume domain
-make apply   # Creates infrastructure + provisions the firewall VM
+anklume sync    # Auto-creates anklume-firewall (.253) in anklume domain
+anklume domain apply   # Creates infrastructure + provisions the firewall VM
 ```
 
 The generator prints an informational message when auto-creating:
@@ -115,8 +115,8 @@ domains:
 ### 3. Deploy
 
 ```bash
-make sync          # Generate Ansible files
-make apply         # Create infrastructure + provision
+anklume sync          # Generate Ansible files
+anklume domain apply         # Create infrastructure + provision
 ```
 
 The `incus_firewall_vm` role automatically:

@@ -32,8 +32,8 @@ cross-domain traffic blocked.
 3. Regenerate Ansible files and nftables rules:
 
    ```bash
-   make sync
-   make nftables
+   anklume sync
+   anklume network rules
    ```
 
 4. Examine the updated nftables rules:
@@ -64,7 +64,7 @@ cross-domain traffic blocked.
 
    This should return no matches.
 
-6. If you deploy the rules (`make nftables-deploy` on the host),
+6. If you deploy the rules (`anklume network deploy` on the host),
    you can test the policy live:
 
    ```bash

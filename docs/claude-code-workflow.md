@@ -39,14 +39,14 @@ context on a specific task, load the relevant doc:
 
 3. **Implement**: Write code until tests pass.
 
-4. **Validate**: Run `make lint` (chains all validators).
+4. **Validate**: Run `anklume dev lint` (chains all validators).
 
 5. **Review**: Invoke the reviewer agent:
    ```
    @.claude/agents/reviewer.md Review the changes in roles/incus_networks/
    ```
 
-6. **Commit**: Only when `make lint && make test` pass.
+6. **Commit**: Only when `anklume dev lint && anklume dev test` pass.
 
 ## Local LLM delegation
 
@@ -87,7 +87,7 @@ It provides the reconciliation pattern template and common Incus commands.
 
 - **Keep context focused**: Load only what is relevant to the current task.
 - **Use subagents for distinct tasks**: Avoid context pollution.
-- **Run `make lint` frequently**: Catch issues early.
+- **Run `anklume dev lint` frequently**: Catch issues early.
 - **Check ROADMAP.md**: Know what phase you are in.
 - **Local mode is default**: Use `mcp-ollama-coder` tools for code
   generation and review to save API tokens.

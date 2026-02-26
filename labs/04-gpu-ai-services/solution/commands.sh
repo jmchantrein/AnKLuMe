@@ -11,12 +11,12 @@ incus info --resources | grep -A 5 "GPU"
 echo "=== Step 02: Create the infrastructure ==="
 cp infra.yml infra.yml.bak 2>/dev/null || true
 cp labs/04-gpu-ai-services/infra.yml infra.yml
-make sync
+anklume sync
 cat group_vars/ai-tools.yml
 cat host_vars/gpu-server.yml
 
 echo "=== Step 03: Deploy the infrastructure ==="
-make apply
+anklume domain apply
 incus list --project ai-tools
 
 echo "=== Step 04: Verify Ollama and GPU acceleration ==="
@@ -38,6 +38,6 @@ incus delete gpu-server --project ai-tools --force
 incus network delete net-ai-tools
 incus project delete ai-tools
 cp infra.yml.bak infra.yml 2>/dev/null || true
-make sync
+anklume sync
 
 echo "Lab 04 complete."

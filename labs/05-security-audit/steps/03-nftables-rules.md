@@ -10,7 +10,7 @@ isolation and learn to read the rule structure.
 1. Generate the nftables rules from your current infrastructure:
 
    ```bash
-   make nftables
+   anklume network rules
    ```
 
    This produces the rules file. Examine the output path shown
@@ -23,7 +23,7 @@ isolation and learn to read the rule structure.
    ```
 
    If the file is at a different path, use the path shown by
-   `make nftables`.
+   `anklume network rules`.
 
 3. Understand the rule structure:
 

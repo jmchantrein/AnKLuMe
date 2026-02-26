@@ -36,7 +36,7 @@ supervision humaine au niveau de la fusion des PRs.
 
 ### Prerequis
 
-1. Container runner (Phase 12) : `make runner-create`
+1. Container runner (Phase 12) : `anklume dev runner create`
 2. Claude Code installe dans le runner : `make agent-runner-setup`
 3. Cle API Anthropic : `export ANTHROPIC_API_KEY=sk-ant-...`
 
@@ -46,10 +46,10 @@ Corriger les tests Molecule en echec de maniere autonome :
 
 ```bash
 # Corriger tous les roles
-make agent-fix
+anklume ai agent-fix
 
 # Corriger un role specifique
-make agent-fix R=base_system
+anklume ai agent-fix R=base_system
 ```
 
 ### Mode developpement
@@ -57,7 +57,7 @@ make agent-fix R=base_system
 Implementer une fonctionnalite de maniere autonome :
 
 ```bash
-make agent-develop TASK="Add monitoring role with Prometheus node exporter"
+anklume ai agent-develop TASK="Add monitoring role with Prometheus node exporter"
 ```
 
 ## Installation
@@ -65,7 +65,7 @@ make agent-develop TASK="Add monitoring role with Prometheus node exporter"
 ### 1. Creer le container runner
 
 ```bash
-make runner-create     # Cree le bac a sable Incus-in-Incus
+anklume dev runner create     # Cree le bac a sable Incus-in-Incus
 ```
 
 ### 2. Installer Claude Code dans le runner
@@ -89,7 +89,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## Modes operationnels
 
-### Mode correction (`make agent-fix`)
+### Mode correction (`anklume ai agent-fix`)
 
 ```
 1. Lancer Claude Code dans le container runner
@@ -101,7 +101,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 7. Commiter les corrections, creer optionnellement une PR
 ```
 
-### Mode developpement (`make agent-develop TASK="..."`)
+### Mode developpement (`anklume ai agent-develop TASK="..."`)
 
 ```
 1. Lancer Claude Code avec la description de la tache
@@ -187,7 +187,7 @@ et la Phase 15 pour les taches de developpement complexes.
 ### Runner introuvable
 
 ```bash
-make runner-create     # Creer le container bac a sable
+anklume dev runner create     # Creer le container bac a sable
 ```
 
 ### Claude Code non installe

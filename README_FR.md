@@ -65,14 +65,14 @@ La philosophie [QubesOS](https://www.qubes-os.org/), mais :
 ## Comment ca marche
 
 ```
-infra.yml          ->    make sync    ->    Fichiers Ansible  ->    make apply    ->    Etat Incus
+infra.yml          ->    anklume sync    ->    Fichiers Ansible  ->    anklume domain apply    ->    Etat Incus
 (vous decrivez)         (generation)      (vous enrichissez)     (convergence)      (infra active)
 ```
 
 1. **Decrivez** votre infrastructure dans `infra.yml` (Source de Verite Primaire)
-2. **Generez** l'arborescence Ansible : `make sync`
+2. **Generez** l'arborescence Ansible : `anklume sync`
 3. **Enrichissez** les fichiers generes avec vos variables personnalisees (Source de Verite Secondaire)
-4. **Appliquez** : `make apply` — reseaux, projets, profils, instances, provisioning
+4. **Appliquez** : `anklume domain apply` — reseaux, projets, profils, instances, provisioning
 
 ## Prerequis
 
@@ -96,16 +96,16 @@ git clone https://github.com/jmchantrein/anklume.git
 cd anklume
 
 # Installer les dependances Ansible
-make init
+anklume setup init
 
 # Configuration guidee interactive (recommandee pour les nouveaux utilisateurs)
-make guide
+anklume guide
 
 # Ou configuration manuelle :
 cp infra.yml.example infra.yml   # Editez infra.yml selon vos besoins
-make sync                        # Generer les fichiers Ansible
-make check                       # Previsualiser les changements (dry-run)
-make apply                       # Appliquer l'infrastructure
+anklume sync                        # Generer les fichiers Ansible
+anklume domain check                       # Previsualiser les changements (dry-run)
+anklume domain apply                       # Appliquer l'infrastructure
 ```
 
 Voir le [guide de demarrage rapide](docs/quickstart.md) pour plus de details.
@@ -164,10 +164,10 @@ le socket Incus — pas besoin de SSH.
 | | Images gold avec derivation CoW |
 | | Instances jetables (ephemeres) |
 | | Sauvegarde/restauration chiffree |
-| | Reinitialisation (`make flush && make sync && make apply`) |
-| | Mise a jour securisee du framework (`make upgrade`) |
-| | Import d'etat Incus existant (`make import-infra`) |
-| **Bureau** | Console tmux coloree style QubesOS (`make console`) |
+| | Reinitialisation (`anklume flush && anklume sync && anklume domain apply`) |
+| | Mise a jour securisee du framework (`anklume upgrade`) |
+| | Import d'etat Incus existant (`anklume setup import`) |
+| **Bureau** | Console tmux coloree style QubesOS (`anklume console`) |
 | | Partage de presse-papiers (hote <-> container) |
 | | Generateur de regles Sway/i3 |
 | | Tableau de bord web lecture seule |
@@ -266,21 +266,21 @@ Configurations `infra.yml` pretes a l'emploi :
 
 | Commande | Description |
 |----------|-------------|
-| `make guide` | Tutoriel interactif d'integration |
-| `make sync` | Generer les fichiers Ansible depuis infra.yml |
-| `make sync-dry` | Previsualiser les changements sans ecrire |
-| `make lint` | Lancer tous les validateurs (ansible-lint, yamllint, shellcheck, ruff) |
-| `make check` | Dry-run (--check --diff) |
-| `make apply` | Appliquer toute l'infrastructure |
-| `make apply-limit G=<domaine>` | Appliquer un seul domaine |
-| `make console` | Lancer la session tmux coloree |
-| `make nftables` | Generer les regles d'isolation nftables |
-| `make nftables-deploy` | Deployer les regles sur l'hote |
-| `make snap I=<nom>` | Creer un snapshot |
-| `make flush` | Detruire toute l'infrastructure anklume |
-| `make upgrade` | Mise a jour securisee du framework |
-| `make import-infra` | Generer infra.yml depuis l'etat Incus existant |
-| `make help` | Lister toutes les commandes disponibles |
+| `anklume guide` | Tutoriel interactif d'integration |
+| `anklume sync` | Generer les fichiers Ansible depuis infra.yml |
+| `anklume sync --dry-run` | Previsualiser les changements sans ecrire |
+| `anklume dev lint` | Lancer tous les validateurs (ansible-lint, yamllint, shellcheck, ruff) |
+| `anklume domain check` | Dry-run (--check --diff) |
+| `anklume domain apply` | Appliquer toute l'infrastructure |
+| `anklume domain apply <domaine>` | Appliquer un seul domaine |
+| `anklume console` | Lancer la session tmux coloree |
+| `anklume network rules` | Generer les regles d'isolation nftables |
+| `anklume network deploy` | Deployer les regles sur l'hote |
+| `anklume snapshot create <nom>` | Creer un snapshot |
+| `anklume flush` | Detruire toute l'infrastructure anklume |
+| `anklume upgrade` | Mise a jour securisee du framework |
+| `anklume setup import` | Generer infra.yml depuis l'etat Incus existant |
+| `anklume --help` | Lister toutes les commandes disponibles |
 
 ## Stack technique
 

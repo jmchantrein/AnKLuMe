@@ -75,7 +75,7 @@ doivent etre appliquees sur l'hote.
 ### Etape 1 : Generer les regles (dans le container anklume)
 
 ```bash
-make nftables
+anklume network rules
 ```
 
 Cela execute le role Ansible `incus_nftables`, qui :
@@ -90,7 +90,7 @@ examine avant le deploiement.
 ### Etape 2 : Deployer les regles (sur l'hote)
 
 ```bash
-make nftables-deploy
+anklume network deploy
 ```
 
 Cela execute `scripts/deploy-nftables.sh` **sur l'hote** (pas dans le
@@ -180,7 +180,7 @@ rm /etc/nftables.d/anklume-isolation.nft  # Supprimer le fichier installe
 ### Regenerer apres l'ajout d'un domaine
 
 ```bash
-make sync && make apply-infra    # Creer les ressources du nouveau domaine
-make nftables                    # Regenerer les regles (dans anklume)
-make nftables-deploy             # Deployer les regles mises a jour (sur l'hote)
+anklume sync && anklume domain apply --tags infra    # Creer les ressources du nouveau domaine
+anklume network rules                    # Regenerer les regles (dans anklume)
+anklume network deploy             # Deployer les regles mises a jour (sur l'hote)
 ```
