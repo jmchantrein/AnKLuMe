@@ -1,0 +1,49 @@
+---
+# Intent categories for CLI decision tree.
+# Maps user goals to command groups and top-level commands.
+# Commands/groups absent from this file are auto-categorized as "other".
+
+deploy:
+  label: "Deploy & Configure"
+  icon: "rocket"
+  groups: [domain, network, setup]
+  commands: [sync, upgrade]
+
+manage:
+  label: "Manage Resources"
+  icon: "box"
+  groups: [instance, snapshot, backup, golden]
+  commands: [flush]
+
+interact:
+  label: "Interact with Instances"
+  icon: "terminal"
+  groups: [portal, app, desktop]
+  commands: [console, dashboard]
+
+ai:
+  label: "AI & LLM"
+  icon: "brain"
+  groups: [ai, llm, mcp]
+
+develop:
+  label: "Develop & Test"
+  icon: "wrench"
+  groups: [dev, docs]
+
+observe:
+  label: "Observe & Diagnose"
+  icon: "eye"
+  groups: [telemetry]
+  commands: [doctor]
+
+learn:
+  label: "Learn & Onboard"
+  icon: "book"
+  groups: [lab, mode]
+  commands: [guide]
+
+build:
+  label: "Build & Distribute"
+  icon: "package"
+  groups: [live]
