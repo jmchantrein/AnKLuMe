@@ -151,6 +151,39 @@ def graph(
     run_make(target)
 
 
+@app.command("cli-tree")
+def cli_tree(
+    format_: Annotated[
+        str, typer.Option("--format", "-f", help="Output format: mermaid, json, intent")
+    ] = "mermaid",
+    hidden: Annotated[
+        bool, typer.Option("--hidden", help="Include hidden (dev-only) commands")
+    ] = False,
+) -> None:
+    """Generate the CLI decision tree."""
+    from scripts.cli import app as root_app
+    from scripts.cli._cli_tree import (
+        introspect_app,
+        render_intent,
+        render_json,
+        render_mermaid,
+    )
+
+    tree = introspect_app(root_app)
+    renderers = {
+        "mermaid": lambda: render_mermaid(tree, show_hidden=hidden),
+        "json": lambda: render_json(tree, show_hidden=hidden),
+        "intent": lambda: render_intent(tree, show_hidden=hidden),
+    }
+    renderer = renderers.get(format_)
+    if not renderer:
+        from scripts.cli._helpers import console
+
+        console.print(f"[red]Unknown format:[/red] {format_}. Use: mermaid, json, intent")
+        raise typer.Exit(1)
+    print(renderer())
+
+
 @app.command("runner")
 def runner(
     action: Annotated[str, typer.Argument(help="Action: create or destroy")],
