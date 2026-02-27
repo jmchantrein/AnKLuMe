@@ -32,6 +32,7 @@ IMAGE_SIZE_GB=4
 DESKTOP="all"
 MIRROR=""
 NO_VERITY=false
+LIVE_USER="jmc"
 CACHE_ROOTFS=""
 WORK_DIR=""
 LOOP_DEVICE=""
@@ -223,25 +224,57 @@ format_partitions() {
     ok "Partitions formatted"
 }
 
+# ── Create live user with sudo (shared between Debian and Arch) ──
+create_live_user() {
+    local rootfs="$1"
+    local user="$LIVE_USER"
+    local home="/home/$user"
+
+    # Create user with home directory and bash shell
+    chroot "$rootfs" useradd -m -s /bin/bash -G wheel,sudo,video,audio,input "$user" 2>/dev/null \
+        || chroot "$rootfs" useradd -m -s /bin/bash -G wheel,video,audio "$user" 2>/dev/null \
+        || true
+    # Set password (same as root: anklume)
+    echo "$user:anklume" | chroot "$rootfs" chpasswd 2>/dev/null || {
+        local pw_hash
+        pw_hash=$(openssl passwd -6 "anklume")
+        sed -i "s|^${user}:[^:]*:|${user}:${pw_hash}:|" "$rootfs/etc/shadow"
+    }
+    # Passwordless sudo
+    mkdir -p "$rootfs/etc/sudoers.d"
+    echo "$user ALL=(ALL) NOPASSWD: ALL" > "$rootfs/etc/sudoers.d/90-$user"
+    chmod 440 "$rootfs/etc/sudoers.d/90-$user"
+
+    # Add anklume to PATH via symlink (make -C /opt/anklume wrapper)
+    cat > "$rootfs/usr/local/bin/anklume" << 'ANKLUME_BIN'
+#!/bin/sh
+exec make -C /opt/anklume "$@"
+ANKLUME_BIN
+    chmod +x "$rootfs/usr/local/bin/anklume"
+
+    info "  User '$user' created with sudo (password: anklume)"
+}
+
 # ── Install desktop configs (shared between Debian and Arch) ──
 install_desktop_configs() {
     local rootfs="$1"
     local desktop_dir="$PROJECT_ROOT/host/boot/desktop"
+    local user_home="/home/$LIVE_USER"
 
-    # Auto-login on tty1 (all modes — console uses it too)
+    # Auto-login on tty1 as live user (not root)
     mkdir -p "$rootfs/etc/systemd/system/getty@tty1.service.d"
-    cat > "$rootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
+    cat > "$rootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf" << AUTOLOGIN
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+ExecStart=-/sbin/agetty --autologin $LIVE_USER --noclear %I \$TERM
 AUTOLOGIN
 
     # bash_profile (DE dispatcher)
-    cp "$desktop_dir/bash_profile" "$rootfs/root/.bash_profile"
+    cp "$desktop_dir/bash_profile" "$rootfs/$user_home/.bash_profile"
 
     # foot terminal config (shared)
-    mkdir -p "$rootfs/root/.config/foot"
-    cp "$desktop_dir/foot.ini" "$rootfs/root/.config/foot/foot.ini"
+    mkdir -p "$rootfs/$user_home/.config/foot"
+    cp "$desktop_dir/foot.ini" "$rootfs/$user_home/.config/foot/foot.ini"
 
     # Splash script and quotes
     cp "$desktop_dir/anklume-splash.sh" "$rootfs/opt/anklume/host/boot/desktop/anklume-splash.sh" 2>/dev/null || true
@@ -252,30 +285,30 @@ AUTOLOGIN
 
     # sway config
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
-        mkdir -p "$rootfs/root/.config/sway"
-        cp "$desktop_dir/sway-config" "$rootfs/root/.config/sway/config"
+        mkdir -p "$rootfs/$user_home/.config/sway"
+        cp "$desktop_dir/sway-config" "$rootfs/$user_home/.config/sway/config"
         # Create empty domains conf for include directive
-        touch "$rootfs/root/.config/sway/anklume-domains.conf"
+        touch "$rootfs/$user_home/.config/sway/anklume-domains.conf"
     fi
 
     # labwc config
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
-        mkdir -p "$rootfs/root/.config/labwc"
-        cp "$desktop_dir/labwc-rc.xml" "$rootfs/root/.config/labwc/rc.xml"
-        cp "$desktop_dir/labwc-menu.xml" "$rootfs/root/.config/labwc/menu.xml"
-        cp "$desktop_dir/labwc-autostart" "$rootfs/root/.config/labwc/autostart"
-        chmod +x "$rootfs/root/.config/labwc/autostart"
-        cp "$desktop_dir/labwc-environment" "$rootfs/root/.config/labwc/environment"
+        mkdir -p "$rootfs/$user_home/.config/labwc"
+        cp "$desktop_dir/labwc-rc.xml" "$rootfs/$user_home/.config/labwc/rc.xml"
+        cp "$desktop_dir/labwc-menu.xml" "$rootfs/$user_home/.config/labwc/menu.xml"
+        cp "$desktop_dir/labwc-autostart" "$rootfs/$user_home/.config/labwc/autostart"
+        chmod +x "$rootfs/$user_home/.config/labwc/autostart"
+        cp "$desktop_dir/labwc-environment" "$rootfs/$user_home/.config/labwc/environment"
         # waybar config
-        mkdir -p "$rootfs/root/.config/waybar"
-        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/root/.config/waybar/config"
-        cp "$desktop_dir/waybar-style.css" "$rootfs/root/.config/waybar/style.css"
+        mkdir -p "$rootfs/$user_home/.config/waybar"
+        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/$user_home/.config/waybar/config"
+        cp "$desktop_dir/waybar-style.css" "$rootfs/$user_home/.config/waybar/style.css"
     fi
 
     # KDE Plasma keyboard layout (Wayland ignores /etc/default/keyboard)
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
-        mkdir -p "$rootfs/root/.config"
-        cat > "$rootfs/root/.config/kxkbrc" << 'KXKB'
+        mkdir -p "$rootfs/$user_home/.config"
+        cat > "$rootfs/$user_home/.config/kxkbrc" << 'KXKB'
 [Layout]
 DisplayNames=
 LayoutList=fr
@@ -284,7 +317,10 @@ VariantList=
 KXKB
     fi
 
-    info "  Desktop configs installed (DESKTOP=$DESKTOP)"
+    # Fix ownership (files were created as root during build)
+    chroot "$rootfs" chown -R "$LIVE_USER:$LIVE_USER" "$user_home" 2>/dev/null || true
+
+    info "  Desktop configs installed (DESKTOP=$DESKTOP, user=$LIVE_USER)"
 }
 
 # ── Bootstrap rootfs (Debian) ──
@@ -599,7 +635,8 @@ KBD
     ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" 2>/dev/null || true
     info "  anklume services enabled"
 
-    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    # Create live user and desktop configs
+    create_live_user "$ROOTFS_DIR"
     mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
     install_desktop_configs "$ROOTFS_DIR"
 
@@ -983,7 +1020,8 @@ AGENT
     chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
     info "  anklume services enabled"
 
-    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    # Create live user and desktop configs
+    create_live_user "$ROOTFS_DIR"
     mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
     install_desktop_configs "$ROOTFS_DIR"
 
