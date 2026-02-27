@@ -624,7 +624,11 @@ import-infra: ## Generate infra.yml from existing Incus state
 
 # ── Getting Started ──────────────────────────────────────
 guide: ## Interactive step-by-step onboarding tutorial
-	scripts/guide.sh $(if $(STEP),--step $(STEP)) $(if $(AUTO),--auto)
+	@if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
+		python3 scripts/welcome.py --tui; \
+	else \
+		scripts/guide.sh $(if $(STEP),--step $(STEP)) $(if $(AUTO),--auto); \
+	fi
 
 quickstart: ## Copy example infra.yml and generate Ansible files
 	@test ! -f infra.yml || { echo "infra.yml already exists. Remove it first."; exit 1; }
