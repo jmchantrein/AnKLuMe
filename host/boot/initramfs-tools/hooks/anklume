@@ -22,6 +22,8 @@ esac
 # Binaries needed at boot time
 copy_exec /sbin/losetup /sbin
 copy_exec /sbin/blkid /sbin
+copy_exec /bin/dd /bin
+copy_exec /bin/cp /bin
 
 # Kernel modules for live ISO boot
 manual_add_modules loop
