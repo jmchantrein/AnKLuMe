@@ -11,6 +11,14 @@ anklume = "scripts.cli:app"
 [project.optional-dependencies]
 test = ["pytest", "pyyaml", "hypothesis", "behave"]
 docs = ["mkdocs-material", "mkdocs-static-i18n>=1.2"]
+live-test = [
+    "vncdotool>=1.2",
+    "opencv-python-headless>=4.8",
+    "pytesseract>=0.3.10",
+    "pexpect>=4.9",
+    "pillow>=10.0",
+    "pixelmatch>=0.3",
+]
 
 [tool.ruff]
 line-length = 120
