@@ -404,6 +404,7 @@ def _finish(args: argparse.Namespace) -> None:
                 ["xdg-open", report_path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                start_new_session=True,
             )
 
 
