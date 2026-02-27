@@ -599,7 +599,7 @@ KBD
         kver=$(basename "$kdir")
         [ -d "$kdir/kernel" ] || continue
         info "    Regenerating initramfs for kernel $kver"
-        chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+        env -u TMPDIR chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
             update-initramfs -u -k "$kver" 2>&1 | tail -5 || warn "update-initramfs failed for $kver"
     done
     info "  Initramfs regenerated with anklume hooks"
@@ -1001,11 +1001,12 @@ PRESET
     fi
 
     # Generate initramfs with explicit kernel version
+    # Unset TMPDIR: host's TMPDIR (e.g. /home/user/tmp) doesn't exist in chroot
     if [ -n "$kver" ]; then
-        if ! chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
+        if ! env -u TMPDIR chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
             warn "mkinitcpio with custom hooks failed, trying without"
             # Restore default hooks and retry
-            chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -S anklume-verity,anklume-toram \
+            env -u TMPDIR chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -S anklume-verity,anklume-toram \
                 -g /boot/initramfs-linux.img 2>&1 || warn "mkinitcpio fallback also failed"
         fi
     fi
