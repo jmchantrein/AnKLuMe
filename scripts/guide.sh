@@ -201,7 +201,7 @@ step_0_environment() {
             echo "  Run bootstrap.sh first to install Incus and create"
             echo "  the admin container:"
             echo ""
-            echo -e "    ${CYAN}bash bootstrap.sh${RESET}"
+            echo -e "    ${CYAN}sudo bash ${SCRIPT_DIR}/bootstrap.sh${RESET}"
             echo ""
             if [[ "$AUTO" == "true" ]]; then
                 exit 1
@@ -216,7 +216,7 @@ step_0_environment() {
             echo "  The admin container does not exist or is stopped."
             echo "  Run bootstrap.sh to create it:"
             echo ""
-            echo -e "    ${CYAN}bash bootstrap.sh${RESET}"
+            echo -e "    ${CYAN}sudo bash ${SCRIPT_DIR}/bootstrap.sh${RESET}"
             echo ""
             echo "  Or start it if it already exists:"
             echo ""

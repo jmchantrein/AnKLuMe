@@ -1,0 +1,25 @@
+"Le logiciel libre est une question de liberte, pas de prix." — Richard Stallman
+"La simplicite est la sophistication supreme." — Leonard de Vinci
+"L'art de la programmation est l'art d'organiser la complexite." — Edsger W. Dijkstra
+"D'abord, resoudre le probleme. Ensuite, ecrire le code." — John Johnson
+"La perfection est atteinte non quand il n'y a plus rien a ajouter, mais quand il n'y a plus rien a retirer." — Antoine de Saint-Exupery
+"On ne peut pas resoudre un probleme avec le meme mode de pensee que celui qui l'a cree." — Albert Einstein
+"La meilleure facon de predire l'avenir est de l'inventer." — Alan Kay
+"La vie privee n'est pas quelque chose auquel j'ai simplement droit, c'est un prerequis absolu." — Marlon Brando
+"Dire qu'on se fiche du droit a la vie privee parce qu'on n'a rien a cacher, c'est comme dire qu'on se fiche de la liberte d'expression parce qu'on n'a rien a dire." — Edward Snowden
+"Toute technologie suffisamment avancee est indiscernable de la magie." — Arthur C. Clarke
+"L'informatique n'est plus une affaire d'ordinateurs. C'est une affaire de vie." — Nicholas Negroponte
+"Fais que ca marche, fais que ce soit bien, fais que ce soit rapide." — Kent Beck
+"Les programmes doivent etre ecrits pour que les humains les lisent, et seulement accessoirement pour que les machines les executent." — Harold Abelson
+"Nous ne pouvons voir qu'a une courte distance, mais nous voyons la quantite de choses qui restent a faire." — Alan Turing
+"Les gens pensent que l'informatique est un art de genies, mais la realite est l'inverse : beaucoup de gens construisant sur le travail des autres." — Donald Knuth
+"Avec suffisamment d'yeux, tous les bugs sont superficiels." — Linus Torvalds
+"La liberte ne vaut pas la peine d'etre vecue si elle ne comprend pas la liberte de faire des erreurs." — Mahatma Gandhi
+"La fonction d'un bon logiciel est de faire paraitre simple ce qui est complexe." — Grady Booch
+"Un ordinateur vous permet de faire plus d'erreurs plus vite que toute autre invention." — Mitch Ratcliffe
+"Le code, c'est comme l'humour : quand il faut l'expliquer, c'est mauvais." — Cory House
+"Avant qu'un logiciel soit reutilisable, il faut d'abord qu'il soit utilisable." — Ralph Johnson
+"La puissance du Web reside dans son universalite. L'acces par tous est un aspect essentiel." — Tim Berners-Lee
+"L'optimisation prematuree est la source de tous les maux." — Donald Knuth
+"Les conteneurs ne sont pas une frontiere de securite." — Jessie Frazelle
+"Le seul systeme vraiment securise est celui qui est eteint, coule dans du beton et scelle dans une salle blindee." — Gene Spafford

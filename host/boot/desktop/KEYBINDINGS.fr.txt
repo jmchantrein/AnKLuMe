@@ -1,0 +1,48 @@
+anklume Desktop — Raccourcis clavier
+=====================================
+
+Communs (sway, labwc, KDE Plasma) :
+
+  Super + Entree          Ouvrir un terminal
+  Super + d               Lanceur d'applications (fuzzel / KRunner)
+  Super + f               Plein ecran
+  Super + 1-9             Changer de bureau virtuel
+  Super + Maj + 1-9       Deplacer la fenetre vers un bureau
+  Alt + Maj               Basculer FR (AZERTY) / US (QWERTY)
+
+sway :
+
+  Super + Fleches            Naviguer entre fenetres
+  Super + Maj + Fleches      Deplacer une fenetre
+  Super + h                  Diviser horizontalement
+  Super + v                  Diviser verticalement
+  Super + s                  Disposition empilee
+  Super + w                  Disposition onglets
+  Super + e                  Alterner horizontal/vertical
+  Super + Maj + Espace       Basculer flottant
+  Super + r                  Mode redimensionnement (Fleches, puis Echap)
+  Super + Maj + q            Fermer la fenetre
+  Super + Maj + e            Quitter sway
+
+labwc :
+
+  Super + Gauche/Droite      Fenetre en demi-ecran
+  Super + Haut               Maximiser
+  Super + Bas                Restaurer
+  Alt + F4                   Fermer la fenetre
+  Super + Maj + e            Quitter labwc
+  Clic droit sur le bureau   Menu applications
+
+KDE Plasma :
+
+  Super                      Menu demarrer / KRunner
+  Alt + F4                   Fermer la fenetre
+  Meta + Gauche/Droite       Fenetre en demi-ecran
+  Meta + Haut                Maximiser
+  Ctrl + F8                  Vue d'ensemble des bureaux
+
+Commandes rapides :
+
+  anklume guide            Lancer l'assistant de demarrage
+  anklume console          Ouvrir la console tmux par domaine
+  anklume --help           Afficher toutes les commandes
