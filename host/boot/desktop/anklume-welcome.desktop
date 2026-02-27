@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=anklume Guide
+Name[fr]=Guide anklume
+Comment=First-boot setup wizard
+Comment[fr]=Assistant de premier demarrage
+Exec=sh -c 'test ! -f ~/.anklume/welcome-done && konsole -e python3 /opt/anklume/scripts/welcome.py --tui || true'
+Terminal=false
+X-KDE-autostart-phase=2

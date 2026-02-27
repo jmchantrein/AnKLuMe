@@ -252,7 +252,12 @@ exec make -C /opt/anklume "$@"
 ANKLUME_BIN
     chmod +x "$rootfs/usr/local/bin/anklume"
 
-    info "  User '$user' created with sudo (password: anklume)"
+    # Set anklume CLI mode to student (French help by default)
+    mkdir -p "$rootfs/$home/.anklume"
+    echo "student" > "$rootfs/$home/.anklume/mode"
+    chroot "$rootfs" chown -R "$user:$user" "$home/.anklume" 2>/dev/null || true
+
+    info "  User '$user' created with sudo (password: anklume, mode: student/fr)"
 }
 
 # ── Install desktop configs (shared between Debian and Arch) ──
@@ -276,12 +281,20 @@ AUTOLOGIN
     mkdir -p "$rootfs/$user_home/.config/foot"
     cp "$desktop_dir/foot.ini" "$rootfs/$user_home/.config/foot/foot.ini"
 
-    # Splash script and quotes
+    # Splash script and quotes (English + French)
     cp "$desktop_dir/anklume-splash.sh" "$rootfs/opt/anklume/host/boot/desktop/anklume-splash.sh" 2>/dev/null || true
     cp "$desktop_dir/quotes.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.txt" 2>/dev/null || true
+    cp "$desktop_dir/quotes.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.fr.txt" 2>/dev/null || true
 
-    # Keybindings reference
+    # Keybindings reference (English + French)
     cp "$desktop_dir/KEYBINDINGS.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.txt" 2>/dev/null || true
+    cp "$desktop_dir/KEYBINDINGS.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.fr.txt" 2>/dev/null || true
+
+    # KDE autostart: welcome guide on first boot
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        mkdir -p "$rootfs/$user_home/.config/autostart"
+        cp "$desktop_dir/anklume-welcome.desktop" "$rootfs/$user_home/.config/autostart/anklume-welcome.desktop" 2>/dev/null || true
+    fi
 
     # sway config
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
@@ -566,9 +579,9 @@ FSTAB
     # Configure locale and timezone
     chroot "$ROOTFS_DIR" locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" locale-gen fr_FR.UTF-8 >/dev/null 2>&1 || true
-    # Write locale directly (update-locale can fail silently in chroot)
+    # Default to French locale (AZERTY keyboard configured in vconsole.conf)
     mkdir -p "$ROOTFS_DIR/etc/default"
-    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/default/locale"
+    echo "LANG=fr_FR.UTF-8" > "$ROOTFS_DIR/etc/default/locale"
     echo "Etc/UTC" > "$ROOTFS_DIR/etc/timezone"
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
@@ -917,12 +930,12 @@ FSTAB
     echo "root:anklume" | chroot "$ROOTFS_DIR" chpasswd 2>/dev/null || true
     info "  Root password set (anklume)"
 
-    # Configure locale
+    # Configure locale (default to French — AZERTY keyboard in vconsole.conf)
     sed -i 's/#en_US.UTF-8/en_US.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
     sed -i 's/#fr_FR.UTF-8/fr_FR.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
     chroot "$ROOTFS_DIR" locale-gen >/dev/null 2>&1 || true
-    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/locale.conf"
-    info "  Locale configured"
+    echo "LANG=fr_FR.UTF-8" > "$ROOTFS_DIR/etc/locale.conf"
+    info "  Locale configured (fr_FR.UTF-8)"
 
     # Configure timezone
     ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
