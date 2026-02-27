@@ -22,9 +22,9 @@ if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
         esac
     done
 
-    # Skip desktop if user opted out (touch /root/.anklume-console)
-    if [ -f /root/.anklume-console ]; then
-        echo "[anklume] Console mode (/root/.anklume-console exists). Remove to restore desktop."
+    # Skip desktop if user opted out (touch ~/.anklume-console)
+    if [ -f "$HOME/.anklume-console" ]; then
+        echo "[anklume] Console mode (~/.anklume-console exists). Remove to restore desktop."
         ANKLUME_DE=""
     fi
 
