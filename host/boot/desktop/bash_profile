@@ -5,13 +5,20 @@
 
 # Auto-detect locale from keyboard layout
 # Fixes foot "'C' is not a UTF-8 locale" warning
-if [ -z "$LANG" ] || [ "$LANG" = "C" ]; then
+if [ -z "$LANG" ] || [ "$LANG" = "C" ] || [ "$LANG" = "en_US.UTF-8" ]; then
     if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
         export LANG=fr_FR.UTF-8
-    else
-        export LANG=en_US.UTF-8
     fi
 fi
+
+# Ensure console keyboard layout is loaded (loadkeys for TTY)
+_current_tty="$(tty 2>/dev/null || echo "")"
+if [ "${_current_tty#/dev/tty}" != "$_current_tty" ] && command -v loadkeys >/dev/null 2>&1; then
+    if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
+        loadkeys fr 2>/dev/null || true
+    fi
+fi
+unset _current_tty
 
 if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
     # Parse anklume.desktop=<de> from kernel cmdline
@@ -22,9 +29,22 @@ if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
         esac
     done
 
+    # Skip desktop if user opted out (touch ~/.anklume-console)
+    if [ -f "$HOME/.anklume-console" ]; then
+        echo "[anklume] Console mode (~/.anklume-console exists). Remove to restore desktop."
+        ANKLUME_DE=""
+    fi
+
     # Splash: show ASCII art + random quote on every desktop boot
     if [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
         /opt/anklume/host/boot/desktop/anklume-splash.sh
+    fi
+
+    # Keyboard layout for Wayland (auto-detect from vconsole.conf)
+    if [ -z "$XKB_DEFAULT_LAYOUT" ]; then
+        if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
+            export XKB_DEFAULT_LAYOUT=fr
+        fi
     fi
 
     # NVIDIA: use Vulkan renderer for proprietary driver compatibility

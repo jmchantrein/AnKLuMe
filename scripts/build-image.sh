@@ -32,6 +32,7 @@ IMAGE_SIZE_GB=4
 DESKTOP="all"
 MIRROR=""
 NO_VERITY=false
+LIVE_USER="anklume"
 CACHE_ROOTFS=""
 WORK_DIR=""
 LOOP_DEVICE=""
@@ -223,56 +224,116 @@ format_partitions() {
     ok "Partitions formatted"
 }
 
+# ── Create live user with sudo (shared between Debian and Arch) ──
+create_live_user() {
+    local rootfs="$1"
+    local user="$LIVE_USER"
+    local home="/home/$user"
+
+    # Create user with home directory and bash shell
+    chroot "$rootfs" useradd -m -s /bin/bash -G wheel,sudo,video,audio,input "$user" 2>/dev/null \
+        || chroot "$rootfs" useradd -m -s /bin/bash -G wheel,video,audio "$user" 2>/dev/null \
+        || true
+    # Set password (same as root: anklume)
+    echo "$user:anklume" | chroot "$rootfs" chpasswd 2>/dev/null || {
+        local pw_hash
+        pw_hash=$(openssl passwd -6 "anklume")
+        sed -i "s|^${user}:[^:]*:|${user}:${pw_hash}:|" "$rootfs/etc/shadow"
+    }
+    # Passwordless sudo
+    mkdir -p "$rootfs/etc/sudoers.d"
+    echo "$user ALL=(ALL) NOPASSWD: ALL" > "$rootfs/etc/sudoers.d/90-$user"
+    chmod 440 "$rootfs/etc/sudoers.d/90-$user"
+
+    # Add anklume to PATH via symlink (make -C /opt/anklume wrapper)
+    cat > "$rootfs/usr/local/bin/anklume" << 'ANKLUME_BIN'
+#!/bin/sh
+exec make -C /opt/anklume "$@"
+ANKLUME_BIN
+    chmod +x "$rootfs/usr/local/bin/anklume"
+
+    # Set anklume CLI mode to student (French help by default)
+    mkdir -p "$rootfs/$home/.anklume"
+    echo "student" > "$rootfs/$home/.anklume/mode"
+    chroot "$rootfs" chown -R "$user:$user" "$home/.anklume" 2>/dev/null || true
+
+    info "  User '$user' created with sudo (password: anklume, mode: student/fr)"
+}
+
 # ── Install desktop configs (shared between Debian and Arch) ──
 install_desktop_configs() {
     local rootfs="$1"
     local desktop_dir="$PROJECT_ROOT/host/boot/desktop"
+    local user_home="/home/$LIVE_USER"
 
-    # Auto-login on tty1 (all modes — console uses it too)
+    # Auto-login on tty1 as live user (not root)
     mkdir -p "$rootfs/etc/systemd/system/getty@tty1.service.d"
-    cat > "$rootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'AUTOLOGIN'
+    cat > "$rootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf" << AUTOLOGIN
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+ExecStart=-/sbin/agetty --autologin $LIVE_USER --noclear %I \$TERM
 AUTOLOGIN
 
     # bash_profile (DE dispatcher)
-    cp "$desktop_dir/bash_profile" "$rootfs/root/.bash_profile"
+    cp "$desktop_dir/bash_profile" "$rootfs/$user_home/.bash_profile"
 
     # foot terminal config (shared)
-    mkdir -p "$rootfs/root/.config/foot"
-    cp "$desktop_dir/foot.ini" "$rootfs/root/.config/foot/foot.ini"
+    mkdir -p "$rootfs/$user_home/.config/foot"
+    cp "$desktop_dir/foot.ini" "$rootfs/$user_home/.config/foot/foot.ini"
 
-    # Splash script and quotes
+    # Splash script and quotes (English + French)
     cp "$desktop_dir/anklume-splash.sh" "$rootfs/opt/anklume/host/boot/desktop/anklume-splash.sh" 2>/dev/null || true
     cp "$desktop_dir/quotes.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.txt" 2>/dev/null || true
+    cp "$desktop_dir/quotes.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.fr.txt" 2>/dev/null || true
 
-    # Keybindings reference
+    # Keybindings reference (English + French)
     cp "$desktop_dir/KEYBINDINGS.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.txt" 2>/dev/null || true
+    cp "$desktop_dir/KEYBINDINGS.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.fr.txt" 2>/dev/null || true
+
+    # KDE autostart: welcome guide on first boot
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        mkdir -p "$rootfs/$user_home/.config/autostart"
+        cp "$desktop_dir/anklume-welcome.desktop" "$rootfs/$user_home/.config/autostart/anklume-welcome.desktop" 2>/dev/null || true
+    fi
 
     # sway config
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
-        mkdir -p "$rootfs/root/.config/sway"
-        cp "$desktop_dir/sway-config" "$rootfs/root/.config/sway/config"
+        mkdir -p "$rootfs/$user_home/.config/sway"
+        cp "$desktop_dir/sway-config" "$rootfs/$user_home/.config/sway/config"
         # Create empty domains conf for include directive
-        touch "$rootfs/root/.config/sway/anklume-domains.conf"
+        touch "$rootfs/$user_home/.config/sway/anklume-domains.conf"
     fi
 
     # labwc config
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
-        mkdir -p "$rootfs/root/.config/labwc"
-        cp "$desktop_dir/labwc-rc.xml" "$rootfs/root/.config/labwc/rc.xml"
-        cp "$desktop_dir/labwc-menu.xml" "$rootfs/root/.config/labwc/menu.xml"
-        cp "$desktop_dir/labwc-autostart" "$rootfs/root/.config/labwc/autostart"
-        chmod +x "$rootfs/root/.config/labwc/autostart"
-        cp "$desktop_dir/labwc-environment" "$rootfs/root/.config/labwc/environment"
+        mkdir -p "$rootfs/$user_home/.config/labwc"
+        cp "$desktop_dir/labwc-rc.xml" "$rootfs/$user_home/.config/labwc/rc.xml"
+        cp "$desktop_dir/labwc-menu.xml" "$rootfs/$user_home/.config/labwc/menu.xml"
+        cp "$desktop_dir/labwc-autostart" "$rootfs/$user_home/.config/labwc/autostart"
+        chmod +x "$rootfs/$user_home/.config/labwc/autostart"
+        cp "$desktop_dir/labwc-environment" "$rootfs/$user_home/.config/labwc/environment"
         # waybar config
-        mkdir -p "$rootfs/root/.config/waybar"
-        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/root/.config/waybar/config"
-        cp "$desktop_dir/waybar-style.css" "$rootfs/root/.config/waybar/style.css"
+        mkdir -p "$rootfs/$user_home/.config/waybar"
+        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/$user_home/.config/waybar/config"
+        cp "$desktop_dir/waybar-style.css" "$rootfs/$user_home/.config/waybar/style.css"
     fi
 
-    info "  Desktop configs installed (DESKTOP=$DESKTOP)"
+    # KDE Plasma keyboard layout (Wayland ignores /etc/default/keyboard)
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        mkdir -p "$rootfs/$user_home/.config"
+        cat > "$rootfs/$user_home/.config/kxkbrc" << 'KXKB'
+[Layout]
+DisplayNames=
+LayoutList=fr
+Use=true
+VariantList=
+KXKB
+    fi
+
+    # Fix ownership (files were created as root during build)
+    chroot "$rootfs" chown -R "$LIVE_USER:$LIVE_USER" "$user_home" 2>/dev/null || true
+
+    info "  Desktop configs installed (DESKTOP=$DESKTOP, user=$LIVE_USER)"
 }
 
 # ── Bootstrap rootfs (Debian) ──
@@ -518,9 +579,9 @@ FSTAB
     # Configure locale and timezone
     chroot "$ROOTFS_DIR" locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" locale-gen fr_FR.UTF-8 >/dev/null 2>&1 || true
-    # Write locale directly (update-locale can fail silently in chroot)
+    # Default to French locale (AZERTY keyboard configured in vconsole.conf)
     mkdir -p "$ROOTFS_DIR/etc/default"
-    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/default/locale"
+    echo "LANG=fr_FR.UTF-8" > "$ROOTFS_DIR/etc/default/locale"
     echo "Etc/UTC" > "$ROOTFS_DIR/etc/timezone"
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
@@ -587,7 +648,8 @@ KBD
     ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/incus-agent.service" 2>/dev/null || true
     info "  anklume services enabled"
 
-    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    # Create live user and desktop configs
+    create_live_user "$ROOTFS_DIR"
     mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
     install_desktop_configs "$ROOTFS_DIR"
 
@@ -599,7 +661,7 @@ KBD
         kver=$(basename "$kdir")
         [ -d "$kdir/kernel" ] || continue
         info "    Regenerating initramfs for kernel $kver"
-        chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+        env -u TMPDIR chroot "$ROOTFS_DIR" env PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
             update-initramfs -u -k "$kver" 2>&1 | tail -5 || warn "update-initramfs failed for $kver"
     done
     info "  Initramfs regenerated with anklume hooks"
@@ -868,12 +930,12 @@ FSTAB
     echo "root:anklume" | chroot "$ROOTFS_DIR" chpasswd 2>/dev/null || true
     info "  Root password set (anklume)"
 
-    # Configure locale
+    # Configure locale (default to French — AZERTY keyboard in vconsole.conf)
     sed -i 's/#en_US.UTF-8/en_US.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
     sed -i 's/#fr_FR.UTF-8/fr_FR.UTF-8/' "$ROOTFS_DIR/etc/locale.gen"
     chroot "$ROOTFS_DIR" locale-gen >/dev/null 2>&1 || true
-    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/locale.conf"
-    info "  Locale configured"
+    echo "LANG=fr_FR.UTF-8" > "$ROOTFS_DIR/etc/locale.conf"
+    info "  Locale configured (fr_FR.UTF-8)"
 
     # Configure timezone
     ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
@@ -971,7 +1033,8 @@ AGENT
     chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
     info "  anklume services enabled"
 
-    # Desktop environment configs (bash_profile, foot, sway/labwc/kde configs)
+    # Create live user and desktop configs
+    create_live_user "$ROOTFS_DIR"
     mkdir -p "$ROOTFS_DIR/opt/anklume/host/boot/desktop"
     install_desktop_configs "$ROOTFS_DIR"
 
@@ -1001,11 +1064,12 @@ PRESET
     fi
 
     # Generate initramfs with explicit kernel version
+    # Unset TMPDIR: host's TMPDIR (e.g. /home/user/tmp) doesn't exist in chroot
     if [ -n "$kver" ]; then
-        if ! chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
+        if ! env -u TMPDIR chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
             warn "mkinitcpio with custom hooks failed, trying without"
             # Restore default hooks and retry
-            chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -S anklume-verity,anklume-toram \
+            env -u TMPDIR chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -S anklume-verity,anklume-toram \
                 -g /boot/initramfs-linux.img 2>&1 || warn "mkinitcpio fallback also failed"
         fi
     fi
