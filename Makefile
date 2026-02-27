@@ -142,6 +142,11 @@ export-remove: ## Remove exported app (I=<instance> APP=<app>)
 build-image: ## Build bootable anklume live OS image (OUT=output.img DESKTOP=all|sway|labwc|kde|minimal)
 	scripts/build-image.sh $(if $(OUT),--output $(OUT)) $(if $(BASE),--base $(BASE)) $(if $(ARCH),--arch $(ARCH)) $(if $(DESKTOP),--desktop $(DESKTOP))
 
+build-images: ## Build both Debian and Arch ISOs into images/ (overwrites existing)
+	@mkdir -p images
+	scripts/build-image.sh --base debian --output images/anklume-live-debian.iso $(if $(DESKTOP),--desktop $(DESKTOP))
+	scripts/build-image.sh --base arch --output images/anklume-live-arch.iso $(if $(DESKTOP),--desktop $(DESKTOP))
+
 live-update: ## Download and apply A/B update (URL=<image-url>)
 	@test -n "$(URL)" || { echo "ERROR: URL required. Usage: make live-update URL=<image-url>"; exit 1; }
 	scripts/live-update.sh --url $(URL)
@@ -767,7 +772,7 @@ help-all: ## Show all available targets
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
-        build-image welcome live-update live-status live-os-test-vm live-os-test-vm-clean \
+        build-image build-images welcome live-update live-status live-os-test-vm live-os-test-vm-clean \
         flush upgrade install-update-notifier import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \
