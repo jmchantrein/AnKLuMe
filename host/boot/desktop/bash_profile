@@ -22,9 +22,22 @@ if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
         esac
     done
 
+    # Skip desktop if user opted out (touch /root/.anklume-console)
+    if [ -f /root/.anklume-console ]; then
+        echo "[anklume] Console mode (/root/.anklume-console exists). Remove to restore desktop."
+        ANKLUME_DE=""
+    fi
+
     # Splash: show ASCII art + random quote on every desktop boot
     if [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
         /opt/anklume/host/boot/desktop/anklume-splash.sh
+    fi
+
+    # Keyboard layout for Wayland (auto-detect from vconsole.conf)
+    if [ -z "$XKB_DEFAULT_LAYOUT" ]; then
+        if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
+            export XKB_DEFAULT_LAYOUT=fr
+        fi
     fi
 
     # NVIDIA: use Vulkan renderer for proprietary driver compatibility

@@ -272,6 +272,18 @@ AUTOLOGIN
         cp "$desktop_dir/waybar-style.css" "$rootfs/root/.config/waybar/style.css"
     fi
 
+    # KDE Plasma keyboard layout (Wayland ignores /etc/default/keyboard)
+    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+        mkdir -p "$rootfs/root/.config"
+        cat > "$rootfs/root/.config/kxkbrc" << 'KXKB'
+[Layout]
+DisplayNames=
+LayoutList=fr
+Use=true
+VariantList=
+KXKB
+    fi
+
     info "  Desktop configs installed (DESKTOP=$DESKTOP)"
 }
 
