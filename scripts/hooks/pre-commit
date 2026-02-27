@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook — Prevent accidental commit of personal infrastructure data.
+# pre-commit hook — Prevent accidental commit of problematic files.
 # Installed by `make install-hooks`. Bypass with `git commit --no-verify`.
 set -e
 
@@ -10,7 +10,7 @@ fi
 
 errors=""
 
-# 1. Check for user-specific files in staging area
+# 1. Check for user-specific files and build artifacts in staging area
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 for file in $staged; do
     case "$file" in
@@ -20,10 +20,38 @@ for file in $staged; do
         inventory/*.yml|group_vars/*.yml|host_vars/*.yml)
             errors="${errors}\n    - ${file} (generated user-specific file)"
             ;;
+        tests/live-iso/screenshots/*)
+            errors="${errors}\n    - ${file} (test output — should be gitignored, not committed)"
+            ;;
+        temp.txt|*.iso|*.iso.sha256)
+            errors="${errors}\n    - ${file} (temporary/build artifact)"
+            ;;
     esac
 done
 
-# 2. Check for private IPs in non-exempt staged files
+# 2. Reject black/empty reference images in tests/live-iso/references/
+for file in $staged; do
+    case "$file" in
+        tests/live-iso/references/*.png)
+            # Use Python+Pillow to check % of non-black pixels (threshold: 1%)
+            # Terminal screens: ~1.4%, desktops: ~100%, black screens: <0.2%
+            pct=$(python3 -c "
+from PIL import Image
+img = Image.open('$file').convert('L')
+px = img.tobytes()
+nz = sum(1 for p in px if p > 5)
+print(int(nz * 1000 / len(px)))
+" 2>/dev/null) || pct="error"
+            if [ "$pct" = "error" ]; then
+                errors="${errors}\n    - ${file} (could not validate image — is Pillow installed?)"
+            elif [ "$pct" -lt 10 ] 2>/dev/null; then
+                errors="${errors}\n    - ${file} (black/near-black screen — not a valid reference, ${pct}‰ non-black)"
+            fi
+            ;;
+    esac
+done
+
+# 3. Check for private IPs in non-exempt staged files
 for file in $staged; do
     # Exempt: examples, docs, tests, READMEs, markdown, spec files
     case "$file" in
@@ -37,10 +65,12 @@ for file in $staged; do
         continue
     fi
 
-    # Search staged content for private IPs
+    # Search staged content for private IPs, excluding project convention IPs.
+    # 10.100.0.0/16 is the project's convention address range (base_subnet).
     ip_match=$(git diff --cached -p -- "$file" \
         | grep '^+' | grep -v '^+++' \
         | grep -oE '(192\.168\.[0-9]+\.[0-9]+|10\.[0-9]+\.[0-9]+\.[0-9]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)' \
+        | grep -v '^10\.100\.' \
         | head -1) || true
 
     if [ -n "$ip_match" ]; then
@@ -49,13 +79,12 @@ for file in $staged; do
 done
 
 if [ -n "$errors" ]; then
-    printf '[anklume] BLOCKED: Staged files contain personal infrastructure data.\n\n'
+    printf '[AnKLuMe] BLOCKED: Staged files failed pre-commit checks.\n\n'
     printf '  Detected:'
     printf '%b\n' "$errors"
-    printf '\n  These files belong to YOUR infrastructure, not the framework repo.\n\n'
+    printf '\n  Fix the issues above before committing.\n\n'
     printf '  If you know what you are doing:\n'
     printf '    git commit --no-verify\n\n'
-    printf '  See CONTRIBUTING.md for details.\n'
     exit 1
 fi
 

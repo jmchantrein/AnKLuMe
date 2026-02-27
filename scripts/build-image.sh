@@ -11,6 +11,7 @@
 #   --desktop DE      Desktop environment: all, sway, labwc, kde, minimal (default: all)
 #   --mirror URL      APT mirror URL
 #   --no-verity       Skip dm-verity setup
+#   --cache-rootfs DIR  Cache rootfs tarball for faster rebuilds
 #   --help            Show this help
 
 set -euo pipefail
@@ -31,6 +32,7 @@ IMAGE_SIZE_GB=4
 DESKTOP="all"
 MIRROR=""
 NO_VERITY=false
+CACHE_ROOTFS=""
 WORK_DIR=""
 LOOP_DEVICE=""
 MOUNTED_PATHS=()
@@ -81,11 +83,13 @@ usage() {
     echo "                    all=sway+labwc+kde, sway, labwc, kde, minimal=console only"
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
+    echo "  --cache-rootfs DIR  Cache rootfs tarball (skip bootstrap on rebuild)"
     echo "  --help            Show this help"
     echo ""
     echo "Examples:"
     echo "  $(basename "$0") --output anklume.iso --base arch"
     echo "  $(basename "$0") --output anklume.iso --desktop sway"
+    echo "  $(basename "$0") --cache-rootfs /home/user/iso-cache  # fast rebuild"
     echo "  $(basename "$0") --format raw --output anklume.img --size 6"
     exit 0
 }
@@ -326,6 +330,19 @@ bootstrap_rootfs_debian() {
     # Ensure DNS resolution works inside chroot
     cp /etc/resolv.conf "$ROOTFS_DIR/etc/resolv.conf" 2>/dev/null || true
 
+    # Chroot hardening: prevent services from starting + tolerate postinst failures
+    # 1. policy-rc.d: blocks invoke-rc.d calls (standard Debian chroot practice)
+    # 2. Fake apparmor_parser: apparmor's postinst calls it directly (not via invoke-rc.d)
+    # 3. || true on apt-get: some postinst scripts (dictionaries-common exit 25) are
+    #    unavoidable in chroot; dpkg --configure -a cleans up after
+    # Ref: https://bugs.debian.org/921667 (apparmor in chroot)
+    printf '#!/bin/sh\nexit 101\n' > "$ROOTFS_DIR/usr/sbin/policy-rc.d"
+    chmod +x "$ROOTFS_DIR/usr/sbin/policy-rc.d"
+    # Divert apparmor_parser so postinst gets a no-op (real binary installs alongside)
+    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --add /sbin/apparmor_parser 2>/dev/null || true
+    printf '#!/bin/sh\nexit 0\n' > "$ROOTFS_DIR/sbin/apparmor_parser"
+    chmod +x "$ROOTFS_DIR/sbin/apparmor_parser"
+
     # Install additional packages via chroot (all anklume runtime + dev deps)
     local packages="nftables cryptsetup btrfs-progs squashfs-tools"
     packages="$packages firmware-linux-free"
@@ -350,7 +367,13 @@ bootstrap_rootfs_debian() {
     chroot "$ROOTFS_DIR" apt-get update -qq
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
-        apt-get install -y -qq $packages 2>&1 | tail -5
+        apt-get install -y -qq $packages 2>&1 | tail -5 || true
+    # Fix half-configured packages from postinst failures in chroot
+    # --force-all: mark packages as configured even if postinst fails (apparmor needs
+    # securityfs, dictionaries-common exit 25 — both work fine at actual boot time)
+    local chroot_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
+        dpkg --configure -a --force-all 2>&1 | tail -5 || true
     info "  System packages installed (apt: incus, ansible, desktop=$DESKTOP, lint/test tools)"
 
     # Install Python packages not available in Debian system repos
@@ -415,7 +438,9 @@ NVSRC
     # Step 1: Install DKMS, backports kernel + headers (newer = better hw support + NVIDIA compat)
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         apt-get install -y -qq -t trixie-backports \
-        dkms linux-image-amd64 linux-headers-amd64 2>&1 | tail -5
+        dkms linux-image-amd64 linux-headers-amd64 2>&1 | tail -5 || true
+    chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
+        dpkg --configure -a --force-all 2>&1 | tail -3 || true
     # Detect the kernel that has matching headers (build symlink present)
     deb_kernel=""
     for kdir in "$ROOTFS_DIR"/lib/modules/*/; do
@@ -493,7 +518,9 @@ FSTAB
     # Configure locale and timezone
     chroot "$ROOTFS_DIR" locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" locale-gen fr_FR.UTF-8 >/dev/null 2>&1 || true
-    chroot "$ROOTFS_DIR" update-locale LANG=en_US.UTF-8 >/dev/null 2>&1 || true
+    # Write locale directly (update-locale can fail silently in chroot)
+    mkdir -p "$ROOTFS_DIR/etc/default"
+    echo "LANG=en_US.UTF-8" > "$ROOTFS_DIR/etc/default/locale"
     echo "Etc/UTC" > "$ROOTFS_DIR/etc/timezone"
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
@@ -702,6 +729,11 @@ INJECT_PYEOF
             info "  Initramfs has kernel modules (OK)"
         fi
     fi
+
+    # Remove chroot-only files and restore diverted binaries before creating squashfs
+    rm -f "$ROOTFS_DIR/usr/sbin/policy-rc.d"
+    rm -f "$ROOTFS_DIR/sbin/apparmor_parser"
+    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --remove /sbin/apparmor_parser 2>/dev/null || true
 
     # Unmount pseudo-filesystems before creating squashfs
     umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
@@ -1003,6 +1035,22 @@ PRESET
 
 # ── Dispatch bootstrap_rootfs ──
 bootstrap_rootfs() {
+    local cache_file=""
+    if [ -n "$CACHE_ROOTFS" ]; then
+        mkdir -p "$CACHE_ROOTFS"
+        cache_file="$CACHE_ROOTFS/rootfs-${BASE}-${DESKTOP}.tar"
+    fi
+
+    # Restore from cache if available
+    if [ -n "$cache_file" ] && [ -f "$cache_file" ]; then
+        info "Restoring rootfs from cache: $cache_file"
+        ROOTFS_DIR="$WORK_DIR/rootfs"
+        mkdir -p "$ROOTFS_DIR"
+        tar -xf "$cache_file" -C "$ROOTFS_DIR"
+        ok "Rootfs restored from cache ($(du -sh "$cache_file" | cut -f1))"
+        return
+    fi
+
     case "$BASE" in
         debian|stable)
             bootstrap_rootfs_debian
@@ -1015,6 +1063,13 @@ bootstrap_rootfs() {
             exit 1
             ;;
     esac
+
+    # Save to cache for next build
+    if [ -n "$cache_file" ]; then
+        info "Saving rootfs cache: $cache_file"
+        tar -cf "$cache_file" -C "$ROOTFS_DIR" .
+        ok "Rootfs cached ($(du -sh "$cache_file" | cut -f1))"
+    fi
 }
 
 # ── Create squashfs ──
@@ -1556,6 +1611,7 @@ main() {
             --desktop)    DESKTOP="$2"; shift 2 ;;
             --mirror)     MIRROR="$2"; shift 2 ;;
             --no-verity)  NO_VERITY=true; shift ;;
+            --cache-rootfs) CACHE_ROOTFS="$2"; shift 2 ;;
             --help|-h)    usage ;;
             *)            err "Unknown option: $1"; usage ;;
         esac
