@@ -1,0 +1,1442 @@
+{
+  "name": "anklume",
+  "help": "Declarative infrastructure compartmentalization framework.",
+  "commands": [
+    {
+      "name": "console",
+      "help": "Launch tmux console with domain-colored panes.",
+      "hidden": false,
+      "params": []
+    },
+    {
+      "name": "dashboard",
+      "help": "Open web dashboard.",
+      "hidden": false,
+      "params": []
+    },
+    {
+      "name": "doctor",
+      "help": "Diagnose infrastructure health.",
+      "hidden": false,
+      "params": []
+    },
+    {
+      "name": "flush",
+      "help": "Destroy all anklume infrastructure.",
+      "hidden": false,
+      "params": [
+        {
+          "name": "force",
+          "kind": "option",
+          "required": false,
+          "is_flag": true,
+          "help": "Force destruction",
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "guide",
+      "help": "Interactive onboarding guide.",
+      "hidden": false,
+      "params": []
+    },
+    {
+      "name": "sync",
+      "help": "Generate/update Ansible files from infra.yml.",
+      "hidden": false,
+      "params": [
+        {
+          "name": "dry_run",
+          "kind": "option",
+          "required": false,
+          "is_flag": true,
+          "help": "Preview without writing",
+          "default": false
+        },
+        {
+          "name": "clean",
+          "kind": "option",
+          "required": false,
+          "is_flag": true,
+          "help": "Remove orphan files",
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "upgrade",
+      "help": "Safe framework update with conflict detection.",
+      "hidden": false,
+      "params": []
+    }
+  ],
+  "groups": [
+    {
+      "name": "ai",
+      "help": "AI tools, agents, and LLM operations.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "agent-develop",
+          "help": "Start agent development session.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "agent-fix",
+          "help": "Run agent auto-fix cycle.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "agent-setup",
+          "help": "Setup agent runner infrastructure.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "claude",
+          "help": "Launch Claude Code session on host.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "resume",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Resume previous session",
+              "default": false
+            },
+            {
+              "name": "audit",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Run in audit mode",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "develop",
+          "help": "AI-assisted development session.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "improve",
+          "help": "AI-assisted code improvement.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "mine-experiences",
+          "help": "Mine agent experiences for improvement.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "switch",
+          "help": "Switch exclusive AI access to a domain.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Domain to grant AI access"
+            }
+          ]
+        },
+        {
+          "name": "test",
+          "help": "AI-assisted testing.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "role",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Test a specific role"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "app",
+      "help": "Export container applications to host desktop.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "export",
+          "help": "Export a container app as a host .desktop entry.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            },
+            {
+              "name": "application",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Application name (e.g. firefox)"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List exported apps.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Instance (all if omitted)"
+            }
+          ]
+        },
+        {
+          "name": "remove",
+          "help": "Remove an exported app.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            },
+            {
+              "name": "application",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Application name to remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "backup",
+      "help": "Instance backup and restore.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "create",
+          "help": "Create a full backup of an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance to backup"
+            }
+          ]
+        },
+        {
+          "name": "restore",
+          "help": "Restore an instance from backup.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance to restore"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "help": "Desktop integration (Sway/Hyprland/i3 theming).",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "apply",
+          "help": "Apply desktop configuration from infra.yml.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "engine",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Desktop engine",
+              "default": "sway"
+            }
+          ]
+        },
+        {
+          "name": "config",
+          "help": "Configure desktop engine.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "plugins",
+          "help": "List available desktop plugins.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "reset",
+          "help": "Reset desktop configuration to defaults.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "engine",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Desktop engine",
+              "default": "sway"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dev",
+      "help": "Development, testing, and code quality tools.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "audit",
+          "help": "Produce a code audit report.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "json_",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Output as JSON",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "chain-test",
+          "help": "Run chained integration tests.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "target",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Test a specific target"
+            },
+            {
+              "name": "dry_run",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Preview without executing",
+              "default": false
+            },
+            {
+              "name": "json_",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Output as JSON",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "cli-tree",
+          "help": "Generate the CLI decision tree.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "format_",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Output format: mermaid, json, intent",
+              "default": "mermaid"
+            },
+            {
+              "name": "hidden",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Include hidden (dev-only) commands",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "graph",
+          "help": "Generate code analysis graphs.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "type_",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Graph type: call, dep, code, dead",
+              "default": "call"
+            }
+          ]
+        },
+        {
+          "name": "lint",
+          "help": "Run linters (all by default).",
+          "hidden": false,
+          "params": [
+            {
+              "name": "yaml_",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "YAML only",
+              "default": false
+            },
+            {
+              "name": "ansible",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Ansible only",
+              "default": false
+            },
+            {
+              "name": "shell",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Shell only",
+              "default": false
+            },
+            {
+              "name": "python",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Python only",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "matrix",
+          "help": "Show behavior matrix coverage.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "generate",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Generate tests for uncovered cells",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "runner",
+          "help": "Manage the test runner VM.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "action",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Action: create or destroy"
+            }
+          ]
+        },
+        {
+          "name": "scenario",
+          "help": "Run end-to-end scenarios.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "best",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Best-practice scenarios only",
+              "default": false
+            },
+            {
+              "name": "bad",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Bad-practice scenarios only",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "smoke",
+          "help": "Run real-world smoke test.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "syntax",
+          "help": "Check playbook syntax (ansible-playbook --syntax-check).",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "test",
+          "help": "Run tests (pytest + Molecule).",
+          "hidden": false,
+          "params": [
+            {
+              "name": "generator",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Run generator tests only",
+              "default": false
+            },
+            {
+              "name": "roles",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Run Molecule role tests",
+              "default": false
+            },
+            {
+              "name": "role",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Test a specific role"
+            },
+            {
+              "name": "sandboxed",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Run tests in sandbox VM",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "test-report",
+          "help": "Generate detailed test report.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "test-summary",
+          "help": "Show test execution summary.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "quick",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Quick summary",
+              "default": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "docs",
+      "help": "Documentation (MkDocs Material).",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "build",
+          "help": "Build documentation site.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "serve",
+          "help": "Serve documentation locally with live reload.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "domain",
+      "help": "Manage infrastructure domains.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "apply",
+          "help": "Apply infrastructure for a domain (or all).",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Domain to apply (all if omitted)"
+            },
+            {
+              "name": "all_",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Apply all domains",
+              "default": false
+            },
+            {
+              "name": "tags",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Ansible tags (infra, provision, llm, stt, ai, openclaw, base, images, code-sandbox)"
+            }
+          ]
+        },
+        {
+          "name": "check",
+          "help": "Dry-run: preview changes without applying.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Domain to check (all if omitted)"
+            }
+          ]
+        },
+        {
+          "name": "exec",
+          "help": "Execute a command in all instances of a domain.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Domain name"
+            },
+            {
+              "name": "command",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Command to execute"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List all domains from infra.yml.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "status",
+          "help": "Show running status of instances in a domain.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Domain to check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "golden",
+      "help": "Pre-built golden image management.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "create",
+          "help": "Create a golden image from an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Source instance name"
+            }
+          ]
+        },
+        {
+          "name": "derive",
+          "help": "Create a new instance from a golden image.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "image",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Golden image name"
+            },
+            {
+              "name": "name",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "New instance name"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List available golden images.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "publish",
+          "help": "Publish a golden image to a remote.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "image",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Golden image to publish"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "instance",
+      "help": "Manage instances (containers and VMs).",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "clipboard",
+          "help": "Copy clipboard to/from an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "direction",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Direction: 'to' or 'from'"
+            },
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            }
+          ]
+        },
+        {
+          "name": "disp",
+          "help": "Create a disposable container in a domain.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Domain for the disposable container"
+            }
+          ]
+        },
+        {
+          "name": "exec",
+          "help": "Execute a command in an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "name",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            },
+            {
+              "name": "command",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Command to execute"
+            }
+          ]
+        },
+        {
+          "name": "info",
+          "help": "Show detailed info for an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "name",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List running instances.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "domain",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Filter by domain"
+            }
+          ]
+        },
+        {
+          "name": "remove",
+          "help": "Remove an instance.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "name",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lab",
+      "help": "Educational labs and guided exercises.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "check",
+          "help": "Validate current step of a lab.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "lab",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Lab ID"
+            }
+          ]
+        },
+        {
+          "name": "hint",
+          "help": "Show hint for the current step.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "lab",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Lab ID"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List available labs.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "reset",
+          "help": "Reset lab progress.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "lab",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Lab ID"
+            }
+          ]
+        },
+        {
+          "name": "solution",
+          "help": "Show solution (marks lab as assisted).",
+          "hidden": false,
+          "params": [
+            {
+              "name": "lab",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Lab ID"
+            }
+          ]
+        },
+        {
+          "name": "start",
+          "help": "Start a lab, display first step.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "lab",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Lab ID (e.g. 01)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "live",
+      "help": "Live OS / USB boot image management.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "build",
+          "help": "Build a live ISO image.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "debian",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Build Debian-based image",
+              "default": false
+            },
+            {
+              "name": "arch",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Build Arch-based image",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "status",
+          "help": "Show live image build status.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "test",
+          "help": "Test live image in a VM.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "clean",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Clean test artifacts first",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "update",
+          "help": "Update an existing live image.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "llm",
+      "help": "LLM backend management (Ollama).",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "bench",
+          "help": "Benchmark LLM inference speed.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "model",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Model to benchmark"
+            },
+            {
+              "name": "compare",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Compare multiple models",
+              "default": false
+            }
+          ]
+        },
+        {
+          "name": "dev",
+          "help": "Interactive LLM development assistant.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "status",
+          "help": "Show active LLM backend, model, and VRAM usage.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "switch",
+          "help": "Switch LLM model.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "model",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Model to switch to"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mcp",
+      "help": "MCP (Model Context Protocol) services.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "call",
+          "help": "Call an MCP tool.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "tool",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "MCP tool name to call"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List available MCP tools.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "mode",
+      "help": "Switch CLI mode.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "dev",
+          "help": "Developer mode (all targets visible).",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "student",
+          "help": "Student mode (bilingual help).",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "user",
+          "help": "Standard mode (default).",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "network",
+      "help": "Network isolation and nftables rules.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "deploy",
+          "help": "Deploy nftables rules on the host. Must run FROM the host.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "rules",
+          "help": "Generate nftables isolation rules (preview).",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "status",
+          "help": "Check network health and bridge status.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "portal",
+      "help": "File transfer between host and instances.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "copy",
+          "help": "Copy files between host and instances.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "src",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Source (instance:path or local path)"
+            },
+            {
+              "name": "dst",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Destination (instance:path or local path)"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List configured file portals.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "open",
+          "help": "Open a file from a container on the host.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance name"
+            },
+            {
+              "name": "path",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "File path inside the instance"
+            }
+          ]
+        },
+        {
+          "name": "pull",
+          "help": "Pull a file from a container to the host.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Source instance"
+            },
+            {
+              "name": "src",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Source path in instance"
+            },
+            {
+              "name": "dst",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Destination path on host"
+            }
+          ]
+        },
+        {
+          "name": "push",
+          "help": "Push a file from the host to a container.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Target instance"
+            },
+            {
+              "name": "src",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Source path on host"
+            },
+            {
+              "name": "dst",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Destination path in instance"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "setup",
+      "help": "Setup, initialization, and configuration.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "data-dirs",
+          "help": "Create host directories for persistent data.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "export-images",
+          "help": "Export images for nested anklume instances.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "hooks",
+          "help": "Install git hooks.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "import",
+          "help": "Generate infra.yml from existing Incus state.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "init",
+          "help": "Install dependencies and Galaxy roles.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "quickstart",
+          "help": "Guided first-time setup.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "shares",
+          "help": "Create host directories for shared volumes.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "update-notifier",
+          "help": "Install update checker.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    },
+    {
+      "name": "snapshot",
+      "help": "Manage instance snapshots.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "create",
+          "help": "Create a snapshot.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Instance to snapshot (all if omitted)"
+            },
+            {
+              "name": "name",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Snapshot name"
+            },
+            {
+              "name": "domain",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Snapshot entire domain"
+            }
+          ]
+        },
+        {
+          "name": "delete",
+          "help": "Delete a snapshot.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance"
+            },
+            {
+              "name": "name",
+              "kind": "option",
+              "required": true,
+              "is_flag": false,
+              "help": "Snapshot name to delete"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "help": "List snapshots.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": false,
+              "is_flag": false,
+              "help": "Instance (all if omitted)"
+            }
+          ]
+        },
+        {
+          "name": "restore",
+          "help": "Restore an instance from a snapshot.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "instance",
+              "kind": "argument",
+              "required": true,
+              "is_flag": false,
+              "help": "Instance to restore"
+            },
+            {
+              "name": "name",
+              "kind": "option",
+              "required": true,
+              "is_flag": false,
+              "help": "Snapshot name to restore"
+            }
+          ]
+        },
+        {
+          "name": "rollback",
+          "help": "Restore the latest pre-apply snapshot.",
+          "hidden": false,
+          "params": [
+            {
+              "name": "timestamp",
+              "kind": "option",
+              "required": false,
+              "is_flag": false,
+              "help": "Specific pre-apply timestamp"
+            },
+            {
+              "name": "list_",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "List available rollback points",
+              "default": false
+            },
+            {
+              "name": "cleanup",
+              "kind": "option",
+              "required": false,
+              "is_flag": true,
+              "help": "Clean up old rollback snapshots",
+              "default": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "telemetry",
+      "help": "Anonymous usage telemetry.",
+      "hidden": false,
+      "commands": [
+        {
+          "name": "clear",
+          "help": "Clear collected telemetry data.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "off",
+          "help": "Disable telemetry collection.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "on",
+          "help": "Enable telemetry collection.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "report",
+          "help": "Show telemetry report.",
+          "hidden": false,
+          "params": []
+        },
+        {
+          "name": "status",
+          "help": "Show telemetry status.",
+          "hidden": false,
+          "params": []
+        }
+      ]
+    }
+  ]
+}
