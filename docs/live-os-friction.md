@@ -470,14 +470,31 @@ transforms the live OS from "blank screen + error messages" to
 
 | ID | Status | Notes |
 |----|--------|-------|
+| F-04 | FIXED | Single default GRUB entry + Advanced submenu (16 → 1+6) |
+| F-05 | FIXED | GPU auto-detected at boot (NVIDIA loads if present) |
+| F-06 | FIXED | Default entry is toram, no jargon in label |
 | F-07 | FIXED | `LIVE_USER=anklume`, configurable at build time |
+| F-08 | FIXED | `/etc/motd` with user/password/commands on every login |
+| F-10 | FIXED | Auto-open foot terminal on first sway launch |
 | F-11 | FIXED | Keyboard selection in welcome wizard + `anklume.keymap` kernel param |
 | F-12 | FIXED | All sway workspace bindings use `--to-code` |
+| F-13 | FIXED | `for_window [app_id=anklume-welcome]` floating/centered/focused |
+| F-14 | FIXED | Choice labels rewritten with descriptions |
 | F-15 | FIXED | Explore mode auto-provisions: Incus init + infra.yml + sync + apply |
 | F-16 | FIXED | `dir` backend option in first-boot.sh (no extra disk needed) |
+| F-17 | N/A | Eliminated by F-16 fix (dir backend available) |
+| F-18 | N/A | Eliminated by F-16 fix (dir backend available) |
 | F-19 | FIXED | `initialize_incus()` with preseed in first-boot.sh |
 | F-20 | FIXED | `pool.conf` written to `/mnt/anklume-persist/pool.conf` on live OS |
+| F-21 | FIXED | Service uses tty2, skipped when SDDM present (wizard handles it) |
 | F-22 | FIXED | `is_live_os()` bypass in Makefile and CLI `require_container()` |
+| F-23 | N/A | Eliminated by F-22 fix |
+| F-24 | N/A | Eliminated by F-15 fix (explore auto-deploys) |
+| F-25 | N/A | Eliminated by F-15 fix (explore copies infra.yml) |
+| F-26 | N/A | Eliminated by F-19 fix (Incus fully initialized) |
+| F-30 | N/A | Eliminated by F-15 fix |
+| F-31 | FIXED | Labs tour step + `next_labs` in next steps |
+| F-33 | FIXED | Explicit data loss warning in explore mode and choice descriptions |
 
 All critical path blockers (F-15, F-19, F-22) are resolved.
 L4 QEMU validation: boot → graphical.target, no auth failures.

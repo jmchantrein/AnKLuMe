@@ -1,8 +1,12 @@
 [Unit]
 Description=anklume First Boot Wizard
 ConditionPathExists=!/mnt/anklume-persist/pool.conf
+# Only run in non-graphical mode (tty-only boot).
+# On graphical desktops, the welcome wizard handles first-boot.
+ConditionPathExists=!/usr/bin/sddm
 After=local-fs.target network-online.target
 Wants=network-online.target
+Conflicts=getty@tty2.service
 
 [Service]
 Type=oneshot
@@ -10,7 +14,7 @@ ExecStart=/opt/anklume/scripts/first-boot.sh
 StandardInput=tty
 StandardOutput=journal+console
 StandardError=journal+console
-TTYPath=/dev/tty1
+TTYPath=/dev/tty2
 
 [Install]
 WantedBy=multi-user.target

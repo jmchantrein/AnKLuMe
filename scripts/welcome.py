@@ -200,6 +200,8 @@ def show_next_steps(s: dict, lang: str) -> None:
     print(f"  {s['next_guide']}")
     print(f"  {s['next_help']}")
     print(f"  {s['next_console']}")
+    if "next_labs" in s:
+        print(f"  {s['next_labs']}")
 
 # ── TUI (rich) ──
 def tui_main() -> None:
@@ -231,7 +233,9 @@ def tui_main() -> None:
         c.print(f"[green]{s['returning']}[/green]\n")
     else:
         c.print(f"  [bold]1.[/bold] {s['opt_persist']}")
+        c.print(f"     [dim]{s.get('opt_persist_desc', '')}[/dim]")
         c.print(f"  [bold]2.[/bold] {s['opt_explore']}")
+        c.print(f"     [dim]{s.get('opt_explore_desc', '')}[/dim]")
         c.print(f"  [bold]3.[/bold] {s['opt_skip']}\n")
         choice = Prompt.ask(f"[cyan]{s['choice']}[/cyan]", choices=["1", "2", "3"])
         if choice == "1":
@@ -241,6 +245,8 @@ def tui_main() -> None:
         elif choice == "2":
             c.print(f"\n[bold cyan]{s['explore_title']}[/bold cyan]\n")
             do_explore(s)
+            if "explore_warn" in s:
+                c.print(f"\n[bold yellow]{s['explore_warn']}[/bold yellow]\n")
         elif choice == "3":
             mark_done()
             c.print(f"\n[dim]{s['next_guide']}[/dim]\n")
@@ -270,7 +276,12 @@ def plain_main() -> None:
         print(f"  {s['returning']}\n")
     else:
         print(f"  1. {s['opt_persist']}")
+        if "opt_persist_desc" in s:
+            print(f"     {s['opt_persist_desc']}")
         print(f"  2. {s['opt_explore']}")
+        if "opt_explore_desc" in s:
+            for line in s["opt_explore_desc"].splitlines():
+                print(f"     {line}")
         print(f"  3. {s['opt_skip']}\n")
         while True:
             choice = input(f"  {s['choice']} [1-3]: ").strip()
@@ -283,6 +294,8 @@ def plain_main() -> None:
         elif choice == "2":
             print(f"\n  {s['explore_title']}\n")
             do_explore(s)
+            if "explore_warn" in s:
+                print(f"\n  {s['explore_warn']}\n")
         elif choice == "3":
             mark_done()
             return print(f"\n  {s['next_guide']}\n")

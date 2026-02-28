@@ -1077,8 +1077,8 @@ class TestGrubConfig:
         assert "anklume.toram=1" in self.content
 
     def test_direct_entry(self):
-        """Verify direct (non-toram) submenu entry exists."""
-        assert re.search(r'submenu.*direct', self.content, re.IGNORECASE)
+        """Verify direct (non-toram) boot entry exists in advanced submenu."""
+        assert re.search(r'boot from media', self.content, re.IGNORECASE)
 
     def test_kernel_path(self):
         """Verify kernel path is /boot/vmlinuz."""

@@ -582,6 +582,24 @@ NVSRC
 FSTAB
     info "  Hostname and fstab configured"
 
+    # Display login credentials on TTY (motd)
+    cat > "$ROOTFS_DIR/etc/motd" << 'MOTD'
+
+  ╔══════════════════════════════════════════════════╗
+  ║  anklume Live OS                                ║
+  ║                                                 ║
+  ║  User: anklume    Password: anklume             ║
+  ║  Root password:   anklume                       ║
+  ║                                                 ║
+  ║  Getting started:                               ║
+  ║    anklume --help     All commands               ║
+  ║    anklume console    Domain console             ║
+  ║    anklume lab list   Guided exercises           ║
+  ╚══════════════════════════════════════════════════╝
+
+MOTD
+    info "  Login motd configured"
+
     # Set root password for live system — use openssl to generate hash directly
     # (chpasswd in chroot can fail silently due to PAM config)
     local pw_hash
@@ -1424,71 +1442,25 @@ search --no-floppy --label ANKLUME-LIVE --set=root
 terminal_input at_keyboard console
 keymap /boot/grub/fr.gkb
 
-menuentry "anklume Live OS — $base_label (KDE Plasma + GPU)" {
+menuentry "anklume Live — $base_label" {
     linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
-menuentry "anklume Live OS — $base_label (KDE Plasma)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-    initrd /boot/initrd.img
-}
-menuentry "anklume Live OS — $base_label (Console + GPU)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-    initrd /boot/initrd.img
-}
-menuentry "anklume Live OS — $base_label (Console)" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-    initrd /boot/initrd.img
-}
-submenu "More Desktops (sway, labwc)" {
-    menuentry "anklume Live OS — $base_label (sway Desktop + GPU)" {
+submenu "Options avancees / Advanced options" {
+    menuentry "anklume Live — $base_label (KDE, no NVIDIA)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        initrd /boot/initrd.img
+    }
+    menuentry "anklume Live — $base_label (sway)" {
         linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
-    menuentry "anklume Live OS — $base_label (sway Desktop)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+    menuentry "anklume Live — $base_label (Console)" {
+        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
-    menuentry "anklume Live OS — $base_label (labwc Desktop + GPU)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (labwc Desktop)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-}
-submenu "Advanced (direct boot from media)" {
-    menuentry "anklume Live OS — $base_label (KDE Plasma + GPU)" {
+    menuentry "anklume Live — $base_label (boot from media, KDE)" {
         linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (KDE Plasma)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (sway Desktop + GPU)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (sway Desktop)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=sway anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (labwc Desktop + GPU)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (labwc Desktop)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=labwc anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (Console + GPU)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
-    menuentry "anklume Live OS — $base_label (Console)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
 }

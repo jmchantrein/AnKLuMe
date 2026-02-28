@@ -11,9 +11,14 @@ STRINGS = {
         "start": "Commencer",
         "situation_title": "SITUATION",
         "returning": "Disque de donnees trouve — bienvenue !",
-        "opt_persist": "Configurer la persistance (recommande)",
-        "opt_explore": "Explorer sans persistance (donnees perdues au redemarrage)",
-        "opt_skip": "Passer (expert)",
+        "opt_persist": "Sauvegarder mon travail (necessite un disque ou une partition)",
+        "opt_persist_desc": "Vos conteneurs et fichiers survivront aux redemarrages.",
+        "opt_explore": "Juste essayer (tout disparait a l'extinction)",
+        "opt_explore_desc": (
+            "ATTENTION : TOUT sera efface a l'arret — fichiers, conteneurs, config.\n"
+            "Sauvegardez vos fichiers importants sur une cle USB."
+        ),
+        "opt_skip": "Je sais ce que je fais — passer",
         "persist_title": "PERSISTANCE",
         "persist_explain": (
             "La persistance chiffre un disque avec LUKS.\n"
@@ -31,6 +36,10 @@ STRINGS = {
         "explore_sync": "Generation des fichiers Ansible...",
         "explore_apply": "Deploiement de l'infrastructure (cela peut prendre quelques minutes)...",
         "explore_done": "Environnement pret ! Les donnees seront perdues au redemarrage.",
+        "explore_warn": (
+            "Rappel : TOUT sera efface a l'arret.\n"
+            "Sauvegardez vos fichiers importants sur une cle USB."
+        ),
         "keyboard_title": "CLAVIER",
         "keyboard_choice": "Disposition",
         "keyboard_set": "Clavier configure :",
@@ -51,12 +60,18 @@ STRINGS = {
                 "Reseaux, projets Incus, conteneurs : tout est cree\n"
                 "d'apres votre description dans infra.yml.",
             ),
+            (
+                "Apprendre en pratiquant",
+                "'anklume lab list' affiche les exercices guides.\n"
+                "Commencez avec 'anklume lab start 01'.",
+            ),
         ],
         "next_title": "PROCHAINES ETAPES",
         "next_keys_label": "Raccourcis essentiels",
         "next_guide": "'anklume guide' pour revenir ici",
         "next_help": "'anklume --help' pour toutes les commandes",
         "next_console": "'anklume console' pour la console par domaine",
+        "next_labs": "'anklume lab list' pour les exercices guides",
         "finish": "Terminer",
         "choice": "Choix",
         "continue": "Appuyez sur Entree pour continuer...",
@@ -73,9 +88,14 @@ STRINGS = {
         "start": "Get Started",
         "situation_title": "SITUATION",
         "returning": "Data disk found — welcome back!",
-        "opt_persist": "Configure persistence (recommended)",
-        "opt_explore": "Explore without persistence (data lost on reboot)",
-        "opt_skip": "Skip (expert)",
+        "opt_persist": "Save my work (needs a disk or partition)",
+        "opt_persist_desc": "Your containers and files will survive reboots.",
+        "opt_explore": "Just try it (everything disappears on shutdown)",
+        "opt_explore_desc": (
+            "WARNING: EVERYTHING will be erased on shutdown — files, containers, config.\n"
+            "Save important files to a USB drive."
+        ),
+        "opt_skip": "I know what I'm doing — skip",
         "persist_title": "PERSISTENCE",
         "persist_explain": (
             "Persistence encrypts a disk with LUKS.\n"
@@ -93,6 +113,10 @@ STRINGS = {
         "explore_sync": "Generating Ansible files...",
         "explore_apply": "Deploying infrastructure (this may take a few minutes)...",
         "explore_done": "Environment ready! Data will be lost on reboot.",
+        "explore_warn": (
+            "Reminder: EVERYTHING will be erased on shutdown.\n"
+            "Save important files to a USB drive."
+        ),
         "keyboard_title": "KEYBOARD",
         "keyboard_choice": "Layout",
         "keyboard_set": "Keyboard configured:",
@@ -113,12 +137,18 @@ STRINGS = {
                 "Networks, Incus projects, containers: all created\n"
                 "from your description in infra.yml.",
             ),
+            (
+                "Learn by doing",
+                "'anklume lab list' shows guided exercises.\n"
+                "Start with 'anklume lab start 01'.",
+            ),
         ],
         "next_title": "NEXT STEPS",
         "next_keys_label": "Essential shortcuts",
         "next_guide": "'anklume guide' to return here",
         "next_help": "'anklume --help' for all commands",
         "next_console": "'anklume console' for the domain console",
+        "next_labs": "'anklume lab list' for guided exercises",
         "finish": "Finish",
         "choice": "Choice",
         "continue": "Press Enter to continue...",
