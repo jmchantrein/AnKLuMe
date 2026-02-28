@@ -257,15 +257,15 @@ choose_backend() {
     fi
 
     info "Select storage backend:"
-    echo "  [1] ZFS (recommended: snapshots, compression, copy-on-write)"
+    echo "  [1] ZFS (recommended: snapshots, compression, copy-on-write) [default]"
     echo "  [2] BTRFS (subvolume-based, simpler)"
     echo "  [3] dir (no dedicated disk needed — uses a directory on existing filesystem)"
     echo ""
 
     local selection
     while true; do
-        read -r -p "Choose backend [1-3]: " selection
-        case "$selection" in
+        read -r -p "Choose backend [1-3, default=1]: " selection
+        case "${selection:-1}" in
             1)
                 BACKEND="zfs"
                 success "Backend selected: ZFS"
@@ -464,7 +464,7 @@ initialize_incus() {
     modprobe bridge 2>/dev/null || true
     modprobe br_netfilter 2>/dev/null || true
 
-    # Try preseed (creates incusbr0 + default profile)
+    # Try preseed (creates incusbr0 + default storage pool + default profile)
     if cat <<PRESEED | incus admin init --preseed 2>/dev/null
 config: {}
 networks:
@@ -474,6 +474,11 @@ networks:
     description: Default network
     name: incusbr0
     type: bridge
+storage_pools:
+  - config: {}
+    description: Default storage pool
+    driver: dir
+    name: default
 profiles:
   - config: {}
     description: Default profile

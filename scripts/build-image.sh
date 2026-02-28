@@ -478,7 +478,7 @@ bootstrap_rootfs_debian() {
     chmod +x "$ROOTFS_DIR/sbin/apparmor_parser"
 
     # Install additional packages via chroot (all anklume runtime + dev deps)
-    local packages="nftables cryptsetup btrfs-progs squashfs-tools"
+    local packages="nftables cryptsetup btrfs-progs zfsutils-linux squashfs-tools"
     packages="$packages firmware-linux-free"
     packages="$packages ansible git make sudo nano tmux rsync"
     packages="$packages iproute2 dmidecode lsof htop file"

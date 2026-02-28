@@ -1,6 +1,6 @@
 #!/bin/bash
-# anklume-splash.sh — Display ASCII art header + random quote
-# Called from bash_profile on every desktop boot
+# anklume-splash.sh — Display ASCII art header + random quote + startde hint
+# Called from bash_profile on login (terminal-first mode)
 # Bilingual: auto-detects French from $LANG
 
 QUOTES_DIR="/opt/anklume/host/boot/desktop"
@@ -45,26 +45,11 @@ if [ -f "$QUOTES_FILE" ]; then
     fi
 fi
 
-# Bilingual guide message
+# Bilingual hints
 if [ "$SPLASH_LANG" = "fr" ]; then
-    printf '\n\033[0;36m  Lancez \033[1manklume guide\033[0;36m pour commencer\033[0m\n\n'
+    printf '\n\033[0;36m  Lancez \033[1manklume guide\033[0;36m pour commencer\033[0m\n'
+    printf '\033[0;33m  Tapez \033[1mstartde\033[0;33m pour lancer le bureau graphique\033[0m\n\n'
 else
-    printf '\n\033[0;36m  Run \033[1manklume guide\033[0;36m to start the setup wizard\033[0m\n\n'
-fi
-
-# Offer brief window to stay in console mode
-if [ "$SPLASH_LANG" = "fr" ]; then
-    printf '\033[0;33m  Appuyez sur [c] dans 5s pour rester en console...\033[0m\n'
-else
-    printf '\033[0;33m  Press [c] within 5s to stay in console mode...\033[0m\n'
-fi
-
-if read -r -t 5 -n 1 key 2>/dev/null && [ "$key" = "c" ]; then
-    touch "$HOME/.anklume-console"
-    if [ "$SPLASH_LANG" = "fr" ]; then
-        printf '\n\033[0;32m  Mode console actif. Tapez "rm ~/.anklume-console" pour restaurer le bureau.\033[0m\n'
-    else
-        printf '\n\033[0;32m  Console mode active. Type "rm ~/.anklume-console" to restore desktop.\033[0m\n'
-    fi
-    exit 0
+    printf '\n\033[0;36m  Run \033[1manklume guide\033[0;36m to start the setup wizard\033[0m\n'
+    printf '\033[0;33m  Type \033[1mstartde\033[0;33m to launch the desktop environment\033[0m\n\n'
 fi

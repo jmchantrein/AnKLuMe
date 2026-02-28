@@ -152,9 +152,38 @@ def do_explore(s: dict) -> None:
         # Load bridge kernel modules (needed for incusbr0 in live environment)
         subprocess.run(["modprobe", "bridge"], capture_output=True, check=False)
         subprocess.run(["modprobe", "br_netfilter"], capture_output=True, check=False)
+        # Preseed with storage_pools (--minimal omits it, causing profile errors)
+        preseed = (
+            "config: {}\n"
+            "networks:\n"
+            "  - config:\n"
+            "      ipv4.address: auto\n"
+            "      ipv6.address: none\n"
+            "    description: Default network\n"
+            "    name: incusbr0\n"
+            "    type: bridge\n"
+            "storage_pools:\n"
+            "  - config: {}\n"
+            "    description: Default storage pool\n"
+            "    driver: dir\n"
+            "    name: default\n"
+            "profiles:\n"
+            "  - config: {}\n"
+            "    description: Default profile\n"
+            "    devices:\n"
+            "      eth0:\n"
+            "        name: eth0\n"
+            "        network: incusbr0\n"
+            "        type: nic\n"
+            "      root:\n"
+            "        path: /\n"
+            "        pool: default\n"
+            "        type: disk\n"
+            "    name: default\n"
+        )
         subprocess.run(
-            ["incus", "admin", "init", "--minimal"],
-            timeout=60, check=False,
+            ["incus", "admin", "init", "--preseed"],
+            input=preseed, text=True, timeout=60, check=False,
         )
 
     # Step 2: Copy starter infra.yml if not present

@@ -163,6 +163,9 @@ live-status: ## Show live OS status (active slot, boot count, data pool)
 welcome: ## Launch welcome guide (--tui default, WEB=1 for browser)
 	python3 scripts/welcome.py $(if $(WEB),--web --port $(or $(PORT),8080))
 
+iso-test: ## E2E test suite for live ISO in QEMU (~310 tests) (IMAGE=file PHASE=N)
+	python3 scripts/live-os-test-qemu.py $(or $(IMAGE),images/anklume-debian-kde.iso) $(if $(PHASE),--phase $(PHASE)) $(if $(JSON),--json)
+
 live-os-test-vm: ## Boot live OS image in Incus VM for testing (IMAGE=file)
 	scripts/live-os-test-vm.sh $(if $(IMAGE),--image $(IMAGE)) $(if $(BASE),--base $(BASE)) --keep
 
@@ -790,7 +793,7 @@ help-all: ## Show all available targets
         mine-experiences ai-improve \
         agent-runner-setup agent-fix agent-develop \
         apply-code-sandbox apply-openclaw \
-        build-image build-images welcome live-update live-status live-os-test-vm live-os-test-vm-clean \
+        build-image build-images welcome live-update live-status iso-test live-os-test-vm live-os-test-vm-clean \
         flush upgrade install-update-notifier import-infra \
         matrix-coverage matrix-generate \
         telemetry-on telemetry-off telemetry-status telemetry-clear telemetry-report \

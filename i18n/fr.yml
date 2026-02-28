@@ -105,6 +105,7 @@ build-images: "Construire les images Debian et Arch dans images/ (ecrase, utilis
 welcome: "Lancer le guide de bienvenue (--tui par defaut, WEB=1 pour le navigateur)"
 live-update: "Telecharger et appliquer une mise a jour A/B"
 live-status: "Afficher l'etat du live OS (slot actif, demarrage, pool)"
+iso-test: "Suite de tests E2E pour ISO live dans QEMU (~310 tests)"
 live-os-test-vm: "Demarrer l'image live OS dans une VM Incus pour test"
 live-os-test-vm-clean: "Detruire la VM de test live OS"
 

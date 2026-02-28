@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# anklume: auto-start desktop environment from kernel cmdline
+# anklume: terminal-first boot with optional desktop via `startde`
 # Parsed parameter: anklume.desktop=<sway|labwc|kde|1>
 # Only activates on tty1 with no existing Wayland session
 
@@ -28,53 +28,20 @@ if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
             anklume.desktop=*) ANKLUME_DE="${param#anklume.desktop=}" ;;
         esac
     done
+    export ANKLUME_DE
 
-    # Detect logout: if desktop already ran, stay in console
-    if [ -f "$HOME/.anklume-desktop-ran" ]; then
-        echo "[anklume] Desktop session ended. Type 'startplasma-wayland' to restart."
-        rm -f "$HOME/.anklume-desktop-ran"
-        ANKLUME_DE=""
-    fi
+    # Define startde function — launches the desktop environment
+    startde() {
+        if [ -x /opt/anklume/host/boot/desktop/start-desktop.sh ]; then
+            /opt/anklume/host/boot/desktop/start-desktop.sh
+        else
+            echo "start-desktop.sh not found"
+        fi
+    }
+    export -f startde
 
-    # Splash: show ASCII art + random quote + console interrupt (5s)
+    # Splash: show ASCII art + random quote + startde hint
     if [ -n "$ANKLUME_DE" ] && [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
         /opt/anklume/host/boot/desktop/anklume-splash.sh
     fi
-
-    # Skip desktop if user opted for console (sentinel from splash or manual)
-    if [ -f "$HOME/.anklume-console" ]; then
-        echo "[anklume] Console mode (~/.anklume-console exists). Remove to restore desktop."
-        ANKLUME_DE=""
-    fi
-
-    # Keyboard layout for Wayland (auto-detect from vconsole.conf)
-    if [ -z "$XKB_DEFAULT_LAYOUT" ]; then
-        if grep -q '^KEYMAP=fr' /etc/vconsole.conf 2>/dev/null; then
-            export XKB_DEFAULT_LAYOUT=fr
-        fi
-    fi
-
-    # NVIDIA: use Vulkan renderer for proprietary driver compatibility
-    if lsmod | grep -q '^nvidia '; then
-        export WLR_RENDERER=vulkan
-    fi
-
-    export XDG_SESSION_TYPE=wayland
-
-    case "$ANKLUME_DE" in
-        sway|1)
-            touch "$HOME/.anklume-desktop-ran"
-            exec sway 2>/dev/null
-            ;;
-        labwc)
-            touch "$HOME/.anklume-desktop-ran"
-            exec labwc 2>/dev/null
-            ;;
-        kde)
-            # KDE Plasma manages its own renderer
-            unset WLR_RENDERER
-            touch "$HOME/.anklume-desktop-ran"
-            exec startplasma-wayland 2>/dev/null
-            ;;
-    esac
 fi
