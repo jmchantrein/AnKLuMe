@@ -3539,7 +3539,7 @@ whether `incus restart` should clean up old veths automatically.
 
 ---
 
-## Phase 44: Test Infrastructure Consolidation and Hardening
+## Phase 44: Test Infrastructure Consolidation and Hardening ✅ COMPLETE
 
 **Goal**: Consolidate the five testing layers (pytest, Gherkin/behave,
 behavioral chains, behavior matrix, Hypothesis) into a coherent,
@@ -3639,16 +3639,16 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Update `i18n/fr.yml` with French translations for new targets
 
 **Validation criteria**:
-- [ ] `anklume dev scenario` passes (skips gracefully when tools absent)
-- [ ] `anklume dev chain-test` passes (runs all 14 behavioral chains)
-- [ ] `anklume dev chain-test --dry-run` shows plan without executing
-- [ ] `anklume dev chain-test-one CHAIN=bootstrap-to-first-deploy` runs a single chain
-- [ ] Gherkin scenarios skip (not fail) when yamllint/shellcheck absent
-- [ ] `scripts/test-summary.sh` produces combined report
-- [ ] Hypothesis tests cover all optional infra.yml fields
-- [ ] Matrix coverage is computed and reported
-- [ ] `docs/scenario-testing.md` updated with chain documentation
-- [ ] `i18n/fr.yml` updated with new target translations
+- [x] `anklume dev scenario` passes (skips gracefully when tools absent)
+- [x] `anklume dev chain-test` passes (runs all 14 behavioral chains)
+- [x] `anklume dev chain-test --dry-run` shows plan without executing
+- [x] `anklume dev chain-test-one CHAIN=bootstrap-to-first-deploy` runs a single chain
+- [x] Gherkin scenarios skip (not fail) when yamllint/shellcheck absent
+- [x] `scripts/test-summary.sh` produces combined report
+- [x] Hypothesis tests cover all optional infra.yml fields
+- [x] Matrix coverage is computed and reported (95% — above 90% goal)
+- [x] `docs/scenario-testing.md` updated with chain documentation
+- [x] `i18n/fr.yml` updated with new target translations
 
 ---
 
@@ -3700,12 +3700,12 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 41: Official Roles and External Role Integration
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
-- Phase 44: Test Infrastructure Consolidation and Hardening (in progress)
+- Phase 44: Test Infrastructure Consolidation and Hardening ✅
 - Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) (planned)
 - Phase 46: Security Hardening (from operational audit) ✅
 
 **In progress**:
-- Phase 44: Test Infrastructure Consolidation and Hardening
+- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
 
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
@@ -3723,7 +3723,7 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 
-**Phase 44 in progress. Phases 45-46 planned.** All prior phases (1-43) implemented. Remaining unchecked criteria are deployment-dependent
+**Phases 44 and 46 complete. Phase 45 is the last remaining phase.** All prior phases (1-44, 46) implemented. Remaining unchecked criteria are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.
