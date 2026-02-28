@@ -12,6 +12,7 @@
 #   --mirror URL      APT mirror URL
 #   --no-verity       Skip dm-verity setup
 #   --cache-rootfs DIR  Cache rootfs tarball for faster rebuilds
+#   --install-deps    Install build dependencies on host and exit
 #   --help            Show this help
 
 set -euo pipefail
@@ -86,6 +87,7 @@ usage() {
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
     echo "  --cache-rootfs DIR  Cache rootfs tarball (skip bootstrap on rebuild)"
+    echo "  --install-deps    Install build dependencies on host and exit"
     echo "  --help            Show this help"
     echo ""
     echo "Examples:"
@@ -153,6 +155,40 @@ check_dependencies() {
     fi
 
     ok "All dependencies available"
+}
+
+# ── Install build dependencies ──
+install_build_deps() {
+    check_root
+    info "Installing build dependencies..."
+
+    if command -v apt-get &>/dev/null; then
+        # Debian/Ubuntu
+        local pkgs=(
+            debootstrap squashfs-tools cryptsetup-bin
+            xorriso grub-pc-bin grub-efi-amd64-bin grub-common
+            mtools dosfstools gdisk
+            curl jq rsync
+        )
+        apt-get update
+        apt-get install -y "${pkgs[@]}"
+        ok "Debian build dependencies installed"
+    elif command -v pacman &>/dev/null; then
+        # Arch Linux
+        local pkgs=(
+            arch-install-scripts squashfs-tools cryptsetup
+            libisoburn grub mtools dosfstools gptfdisk
+            curl jq rsync
+        )
+        pacman -S --needed --noconfirm "${pkgs[@]}"
+        ok "Arch build dependencies installed"
+    else
+        err "Unsupported host distribution (need apt-get or pacman)"
+        exit 1
+    fi
+
+    info "Optional: install qemu-system-x86 + edk2-ovmf for QEMU testing"
+    exit 0
 }
 
 # ── Create disk image and setup loop device ──
@@ -1657,6 +1693,7 @@ main() {
             --mirror)     MIRROR="$2"; shift 2 ;;
             --no-verity)  NO_VERITY=true; shift ;;
             --cache-rootfs) CACHE_ROOTFS="$2"; shift 2 ;;
+            --install-deps) install_build_deps ;;
             --help|-h)    usage ;;
             *)            err "Unknown option: $1"; usage ;;
         esac

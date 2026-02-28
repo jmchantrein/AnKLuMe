@@ -99,12 +99,15 @@ client.unfocused #1a1a2e #1a1a2e #6272a4 #1a1a2e
 # ── Window rules ──
 # Welcome wizard: floating, centered, focused
 for_window [app_id="anklume-welcome"] floating enable, resize set 800 600, move position center
+# Keybinding cheat sheet: floating, centered (smaller)
+for_window [app_id="anklume-cheatsheet"] floating enable, resize set 600 450, move position center
 
 # ── Startup ──
 # Welcome guide on first boot (floating terminal with app_id)
 exec_always {
     if [ ! -f ~/.anklume/welcome-done ]; then
         foot --app-id anklume-welcome -e python3 /opt/anklume/scripts/welcome.py --tui &
+        foot --app-id anklume-cheatsheet -e bash /opt/anklume/host/boot/desktop/anklume-cheatsheet.sh &
         foot &
     fi
 }

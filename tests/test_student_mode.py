@@ -200,27 +200,30 @@ class TestHelpOutputByMode:
         # Matrix: SM-003
         assert HELP_I18N_SCRIPT.exists()
 
-    def test_student_help_shows_french(self):
-        # Matrix: SM-003
+    def test_student_help_shows_quick_start(self):
+        # Matrix: SM-003 — F-32: student mode shows Quick Start section
         result = subprocess.run(
             ["python3", str(HELP_I18N_SCRIPT), "student", "fr"],
             capture_output=True, text=True, timeout=10,
             cwd=str(PROJECT_ROOT),
         )
         assert result.returncode == 0
-        # Student mode should show French category names
-        assert "POUR COMMENCER" in result.stdout
-        assert "WORKFLOW PRINCIPAL" in result.stdout
+        assert "QUICK START" in result.stdout
+        assert "DEMARRAGE RAPIDE" in result.stdout
+        # Quick start has the 4 essential commands
+        assert "sync" in result.stdout
+        assert "apply" in result.stdout
+        assert "console" in result.stdout
+        assert "lab-start" in result.stdout
 
-    def test_student_help_shows_fr_descriptions(self):
+    def test_student_help_shows_useful_commands(self):
         # Matrix: SM-003
         result = subprocess.run(
             ["python3", str(HELP_I18N_SCRIPT), "student", "fr"],
             capture_output=True, text=True, timeout=10,
             cwd=str(PROJECT_ROOT),
         )
-        # Should contain a French description for sync
-        assert "Generer" in result.stdout or "generer" in result.stdout
+        assert "COMMANDES UTILES" in result.stdout
 
     def test_dev_help_shows_all_targets(self):
         # Matrix: SM-003
@@ -389,7 +392,7 @@ class TestMakeModeTargets:
             env=env, timeout=15,
         )
         assert result.returncode == 0
-        assert "POUR COMMENCER" in result.stdout
+        assert "QUICK START" in result.stdout
 
 
 # ── Shell quality ────────────────────────────────────────

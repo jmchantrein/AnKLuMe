@@ -126,20 +126,21 @@ def dashboard() -> None:
 
 _mode = get_mode()
 
+# Essential groups (always visible)
 app.add_typer(domain_app)
-app.add_typer(instance_app)
-app.add_typer(snapshot_app)
-app.add_typer(network_app)
-app.add_typer(portal_app)
-app.add_typer(appexport_app)
-app.add_typer(desktop_app)
-app.add_typer(llm_app)
 app.add_typer(lab_app)
-app.add_typer(setup_app)
-app.add_typer(backup_app)
 app.add_typer(mode_app)
-app.add_typer(ai_app)
-app.add_typer(docs_app)
+
+# Standard groups (hidden in student mode for simplicity)
+_standard = (
+    instance_app, snapshot_app, network_app, portal_app,
+    appexport_app, desktop_app, llm_app, setup_app,
+    backup_app, ai_app, docs_app,
+)
+for _grp in _standard:
+    if _mode == "student":
+        _grp.info.hidden = True
+    app.add_typer(_grp)
 
 # dev-only groups: hidden in user/student mode
 if _mode == "dev":

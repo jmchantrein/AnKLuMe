@@ -193,15 +193,23 @@ The guide offers:
 
 ### Flash to USB
 
-```bash
-# Identify USB device (e.g., /dev/sdX)
-lsblk
+**Recommended: Ventoy** (safest, reusable):
+1. Install [Ventoy](https://www.ventoy.net/) on a USB drive (one-time setup)
+2. Copy the `.iso` file to the USB drive — done
+3. Boot from USB, select anklume from the Ventoy menu
 
-# Write ISO or raw image (WARNING: destructive)
+**Alternative: graphical tools** (guided, hard to pick wrong disk):
+- [GNOME Disks](https://apps.gnome.org/DiskUtility/) (Linux): open ISO → "Restore Disk Image..."
+- [balenaEtcher](https://etcher.balena.io/) (Linux/macOS/Windows): select ISO → select USB → flash
+
+**Advanced: dd** (fast, no GUI needed, **can destroy data**):
+```bash
+# Identify USB device CAREFULLY (e.g., /dev/sdX — NOT your main disk!)
+lsblk -d -o NAME,SIZE,MODEL
+
+# Write ISO (WARNING: this overwrites the ENTIRE target device)
 sudo dd if=anklume-live.iso of=/dev/sdX bs=4M status=progress
 sudo sync
-
-# Or use Ventoy: simply copy the .iso file to a Ventoy USB
 ```
 
 ### Build Process (ISO format)

@@ -38,57 +38,38 @@ def extract_documented_targets(content):
 
 
 def print_help_student(translations):
-    """Print the categorized help with French translations."""
+    """Print student-friendly help with prominent quick start."""
     content = MAKEFILE.read_text()
     documented = extract_documented_targets(content)
 
-    # Reuse the same category structure as the Makefile help target
-    categories = [
-        ("GETTING STARTED", "POUR COMMENCER", [
-            "guide", "quickstart", "init",
-        ]),
-        ("CORE WORKFLOW", "WORKFLOW PRINCIPAL", [
-            "sync", "sync-dry", "apply", "apply-limit", "check", "nftables", "doctor",
-        ]),
-        ("SNAPSHOTS", "INSTANTANES", [
-            "snapshot", "restore", "rollback", "rollback-list",
-        ]),
-        ("AI / LLM", "IA / LLM", [
-            "apply-ai", "llm-switch", "llm-status", "llm-bench", "llm-dev",
-            "ai-switch", "claude-host",
-        ]),
-        ("CONSOLE", "CONSOLE", [
-            "console", "dashboard",
-        ]),
-        ("INSTANCE MANAGEMENT", "GESTION DES INSTANCES", [
-            "disp", "backup", "instance-remove", "file-copy",
-        ]),
-        ("LIFECYCLE", "CYCLE DE VIE", [
-            "upgrade", "flush", "import-infra",
-        ]),
-        ("EDUCATION", "EDUCATION", [
-            "lab-list", "lab-start", "lab-check",
-        ]),
-        ("DEVELOPMENT", "DEVELOPPEMENT", [
-            "lint", "test", "smoke",
+    # Quick start: the 4 commands every student needs
+    quick_start = [
+        ("sync", "Generate infrastructure files / Generer les fichiers"),
+        ("apply", "Deploy infrastructure / Deployer l'infrastructure"),
+        ("console", "Open domain console / Console par domaine"),
+        ("lab-start", "Start a guided lab / Lancer un exercice guide"),
+    ]
+
+    # Additional useful commands, grouped
+    more_commands = [
+        ("USEFUL COMMANDS", "COMMANDES UTILES", [
+            "guide", "lab-list", "lab-check", "doctor",
+            "snapshot", "restore", "disp", "flush",
         ]),
     ]
 
     print()
     print("  \033[1manklume\033[0m — Infrastructure Compartmentalization")
     print()
+    print("  \033[1;32mQUICK START / DEMARRAGE RAPIDE\033[0m")
+    for target, desc in quick_start:
+        fr_desc = translations.get(target, "")
+        display = fr_desc if fr_desc else desc
+        print(f"    \033[1;36mmake {target:<18}\033[0m {display}")
+    print()
 
-    colors = {
-        "GETTING STARTED": "32", "CORE WORKFLOW": "36",
-        "SNAPSHOTS": "33", "AI / LLM": "35",
-        "CONSOLE": "34", "INSTANCE MANAGEMENT": "36",
-        "LIFECYCLE": "31", "EDUCATION": "33",
-        "DEVELOPMENT": "32",
-    }
-
-    for en_name, fr_name, targets in categories:
-        color = colors.get(en_name, "0")
-        print(f"  \033[1;{color}m{en_name} / {fr_name}\033[0m")
+    for en_name, fr_name, targets in more_commands:
+        print(f"  \033[1;33m{en_name} / {fr_name}\033[0m")
         for target in targets:
             en_desc = documented.get(target, "")
             fr_desc = translations.get(target, "")
@@ -99,7 +80,7 @@ def print_help_student(translations):
                 print(f"    \033[36m{display_target:<22}\033[0m {en_desc}")
         print()
 
-    print("  Run \033[36mmake help-all\033[0m for all targets.")
+    print("  \033[2mAll commands: make mode-user && make help\033[0m")
     print("  Mode: \033[33mstudent\033[0m"
           " | Change: \033[36mmake mode-user\033[0m")
     print()

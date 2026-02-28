@@ -129,6 +129,15 @@ def do_keyboard(s: dict) -> None:
     print(f"  {s['keyboard_set']} {label}")
 
 
+def get_tmpfs_free_mb() -> int:
+    """Return free space in MB on the overlay tmpfs (or root if not tmpfs)."""
+    try:
+        st = os.statvfs("/")
+        return (st.f_bavail * st.f_frsize) // (1024 * 1024)
+    except OSError:
+        return 0
+
+
 def do_explore(s: dict) -> None:
     """Auto-provision minimal infrastructure for explore mode (no persistence)."""
     print(f"  {s['explore_init']}")
@@ -166,6 +175,11 @@ def do_explore(s: dict) -> None:
         )
 
     print(f"  {s['explore_done']}")
+
+    # Show available space warning (tmpfs is limited)
+    free_mb = get_tmpfs_free_mb()
+    if free_mb > 0 and "explore_space" in s:
+        print(f"  {s['explore_space'].format(free_mb=free_mb)}")
 
 
 def do_persistence(s: dict) -> None:

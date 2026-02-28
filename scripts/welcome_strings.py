@@ -36,6 +36,7 @@ STRINGS = {
         "explore_sync": "Generation des fichiers Ansible...",
         "explore_apply": "Deploiement de l'infrastructure (cela peut prendre quelques minutes)...",
         "explore_done": "Environnement pret ! Les donnees seront perdues au redemarrage.",
+        "explore_space": "Espace disponible : {free_mb} Mo (limite par la RAM)",
         "explore_warn": (
             "Rappel : TOUT sera efface a l'arret.\n"
             "Sauvegardez vos fichiers importants sur une cle USB."
@@ -113,6 +114,7 @@ STRINGS = {
         "explore_sync": "Generating Ansible files...",
         "explore_apply": "Deploying infrastructure (this may take a few minutes)...",
         "explore_done": "Environment ready! Data will be lost on reboot.",
+        "explore_space": "Available space: {free_mb} MB (limited by RAM)",
         "explore_warn": (
             "Reminder: EVERYTHING will be erased on shutdown.\n"
             "Save important files to a USB drive."

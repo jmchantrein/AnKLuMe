@@ -42,6 +42,8 @@ MKINITCPIO_VERITY_INSTALL = _MKINITCPIO / "install" / "anklume-verity"
 MKINITCPIO_VERITY_HOOK = _MKINITCPIO / "hooks" / "anklume-verity"
 GRUB_CONFIG = Path(__file__).resolve().parent.parent / "host" / "boot" / "grub" / "grub.cfg"
 TEST_VM_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "live-os-test-vm.sh"
+SWAY_CONFIG = Path(__file__).resolve().parent.parent / "host" / "boot" / "desktop" / "sway-config"
+CHEATSHEET = Path(__file__).resolve().parent.parent / "host" / "boot" / "desktop" / "anklume-cheatsheet.sh"
 
 
 # ── Fixtures ───────────────────────────────────────────────────────
@@ -297,6 +299,16 @@ class TestBuildImageStructure:
     def test_systemd_boot_config(self):
         """Verify systemd-boot configuration."""
         assert "systemd-boot" in self.content or "loader" in self.content
+
+    def test_install_deps_flag(self):
+        """F-02: --install-deps flag exists for installing build dependencies."""
+        assert "--install-deps" in self.content
+
+    def test_install_deps_function(self):
+        """F-02: install_build_deps function handles Debian and Arch."""
+        assert "install_build_deps" in self.content
+        assert "apt-get" in self.content
+        assert "pacman" in self.content
 
 
 # ── TestFirstBootStructure ────────────────────────────────────────
@@ -1250,6 +1262,70 @@ class TestVMTestScriptISO:
     def test_iso_device_readonly(self):
         """Verify ISO CD-ROM device is marked readonly."""
         assert "readonly=true" in self.content
+
+
+# ── TestDesktopConfig ─────────────────────────────────────────────
+
+
+class TestDesktopConfig:
+    """Verify sway and desktop configuration for student UX."""
+
+    @classmethod
+    def setup_class(cls):
+        """Cache file content for test class."""
+        if not SWAY_CONFIG.exists():
+            pytest.skip(f"File not found: {SWAY_CONFIG}")
+        cls.sway = SWAY_CONFIG.read_text()
+        cls.cheatsheet = CHEATSHEET.read_text() if CHEATSHEET.exists() else ""
+
+    def test_sway_to_code_bindings(self):
+        """F-12: All workspace bindings use --to-code."""
+        workspace_lines = [
+            ln for ln in self.sway.splitlines()
+            if "workspace number" in ln or "move container to workspace" in ln
+        ]
+        assert len(workspace_lines) >= 9
+        for line in workspace_lines:
+            assert "--to-code" in line, f"Missing --to-code: {line}"
+
+    def test_welcome_wizard_window_rule(self):
+        """F-13: Welcome wizard has floating/centered sway rule."""
+        assert 'app_id="anklume-welcome"' in self.sway
+        assert "floating enable" in self.sway
+
+    def test_welcome_wizard_app_id(self):
+        """F-13: foot uses --app-id for welcome wizard."""
+        assert "--app-id anklume-welcome" in self.sway
+
+    def test_cheatsheet_exists(self):
+        """F-09: Keybinding cheat sheet script exists."""
+        assert CHEATSHEET.exists()
+
+    def test_cheatsheet_executable(self):
+        """F-09: Cheat sheet script is executable."""
+        assert CHEATSHEET.stat().st_mode & stat.S_IXUSR
+
+    def test_cheatsheet_window_rule(self):
+        """F-09: Cheat sheet has floating/centered sway rule."""
+        assert 'app_id="anklume-cheatsheet"' in self.sway
+
+    def test_cheatsheet_launched_on_first_boot(self):
+        """F-09: Cheat sheet launched alongside welcome wizard."""
+        assert "anklume-cheatsheet" in self.sway
+        assert "--app-id anklume-cheatsheet" in self.sway
+
+    def test_cheatsheet_shows_essential_keys(self):
+        """F-09: Cheat sheet shows Super+Enter, Super+d, etc."""
+        assert "Super + Enter" in self.cheatsheet
+        assert "Super + d" in self.cheatsheet
+        assert "Super + Shift + q" in self.cheatsheet
+
+    def test_auto_terminal_on_first_boot(self):
+        """F-10: Auto-open foot terminal on first sway launch."""
+        # Must have a bare 'foot &' (not the welcome/cheatsheet ones)
+        lines = self.sway.splitlines()
+        bare_foot = [ln for ln in lines if ln.strip() == "foot &"]
+        assert len(bare_foot) >= 1
 
 
 if __name__ == "__main__":
