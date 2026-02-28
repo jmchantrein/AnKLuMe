@@ -4,8 +4,9 @@ ConditionPathExists=!/mnt/anklume-persist/pool.conf
 # Only run in non-graphical mode (tty-only boot).
 # On graphical desktops, the welcome wizard handles first-boot.
 ConditionPathExists=!/usr/bin/sddm
-After=local-fs.target network-online.target
+After=local-fs.target network-online.target incus.service
 Wants=network-online.target
+Requires=incus.service
 Conflicts=getty@tty2.service
 
 [Service]

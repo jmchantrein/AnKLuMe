@@ -708,6 +708,9 @@ KBD
         info "  Systemd services installed"
     fi
 
+    # Enable Incus daemon (required for anklume)
+    chroot "$ROOTFS_DIR" systemctl enable incus.service >/dev/null 2>&1 || true
+    info "  Incus daemon enabled"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
@@ -1088,6 +1091,9 @@ AGENT
     # Create vconsole.conf — French AZERTY keyboard layout
     echo "KEYMAP=$KEYMAP" > "$ROOTFS_DIR/etc/vconsole.conf"
 
+    # Enable Incus daemon (required for anklume)
+    chroot "$ROOTFS_DIR" systemctl enable incus.service >/dev/null 2>&1 || true
+    info "  Incus daemon enabled"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
