@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=anklume
+Name[fr]=anklume
+Comment=Infrastructure compartmentalization framework
+Comment[fr]=Framework de compartimentalisation d'infrastructure
+Exec=konsole -e anklume --help
+Icon=utilities-terminal
+Terminal=false
+Categories=System;
+Keywords=container;isolation;incus;ansible;

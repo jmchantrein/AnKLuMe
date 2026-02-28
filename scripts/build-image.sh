@@ -306,10 +306,10 @@ create_live_user() {
     echo "$user ALL=(ALL) NOPASSWD: ALL" > "$rootfs/etc/sudoers.d/90-$user"
     chmod 440 "$rootfs/etc/sudoers.d/90-$user"
 
-    # Add anklume to PATH via symlink (make -C /opt/anklume wrapper)
+    # Add anklume CLI to PATH (Python Typer CLI)
     cat > "$rootfs/usr/local/bin/anklume" << 'ANKLUME_BIN'
 #!/bin/sh
-exec make -C /opt/anklume "$@"
+exec python3 /opt/anklume/bin/anklume "$@"
 ANKLUME_BIN
     chmod +x "$rootfs/usr/local/bin/anklume"
 
@@ -355,6 +355,18 @@ AUTOLOGIN
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
         mkdir -p "$rootfs/$user_home/.config/autostart"
         cp "$desktop_dir/anklume-welcome.desktop" "$rootfs/$user_home/.config/autostart/anklume-welcome.desktop" 2>/dev/null || true
+        # Suppress KDE plasma-welcome wizard and KWallet popup
+        if [ -f "$desktop_dir/plasma-welcomerc" ]; then
+            cp "$desktop_dir/plasma-welcomerc" "$rootfs/$user_home/.config/plasma-welcomerc"
+            cp "$desktop_dir/kwalletrc" "$rootfs/$user_home/.config/kwalletrc"
+        fi
+        # Install anklume .desktop entry in app menu and on desktop
+        if [ -f "$desktop_dir/anklume.desktop" ]; then
+            mkdir -p "$rootfs/usr/share/applications"
+            cp "$desktop_dir/anklume.desktop" "$rootfs/usr/share/applications/anklume.desktop"
+            mkdir -p "$rootfs/$user_home/Desktop"
+            cp "$desktop_dir/anklume.desktop" "$rootfs/$user_home/Desktop/anklume.desktop"
+        fi
     fi
 
     # sway config
@@ -481,7 +493,7 @@ bootstrap_rootfs_debian() {
         packages="$packages labwc waybar fuzzel"
     fi
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
-        packages="$packages plasma-desktop kwin-wayland dolphin"
+        packages="$packages plasma-desktop kwin-wayland dolphin konsole"
     fi
     # Dev/lint/test tools
     packages="$packages ansible-lint yamllint shellcheck"
@@ -610,13 +622,19 @@ NVSRC
 
     # Configure system
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
+    # Ensure /etc/hosts resolves hostname (fixes sudo warnings)
+    cat > "$ROOTFS_DIR/etc/hosts" << 'HOSTS'
+127.0.0.1	localhost
+127.0.1.1	anklume
+::1		localhost ip6-localhost ip6-loopback
+HOSTS
 
     # Minimal fstab for live overlay — root is already mounted by initramfs
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
 # anklume Live OS — root is overlay (squashfs ro + tmpfs rw)
 # No entries needed; systemd auto-mounts /proc /sys /dev /run
 FSTAB
-    info "  Hostname and fstab configured"
+    info "  Hostname, hosts and fstab configured"
 
     # Display login credentials on TTY (motd)
     cat > "$ROOTFS_DIR/etc/motd" << 'MOTD'
@@ -976,7 +994,7 @@ PACCONF
     # Using chroot pacman (vanilla Arch inside rootfs) to install them
     local extra_pkgs="nvidia-open-dkms nvidia-utils python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff"
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
-        extra_pkgs="$extra_pkgs plasma-desktop dolphin"
+        extra_pkgs="$extra_pkgs plasma-desktop dolphin konsole"
     fi
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" pacman -Sy --noconfirm \
@@ -990,7 +1008,13 @@ PACCONF
 
     # Configure hostname
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
-    info "  Hostname configured"
+    # Ensure /etc/hosts resolves hostname (fixes sudo warnings)
+    cat > "$ROOTFS_DIR/etc/hosts" << 'HOSTS'
+127.0.0.1	localhost
+127.0.1.1	anklume
+::1		localhost ip6-localhost ip6-loopback
+HOSTS
+    info "  Hostname and hosts configured"
 
     # Minimal fstab for live overlay — root is already mounted by initramfs
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'

@@ -432,11 +432,40 @@ setup_dir_pool() {
 
 initialize_incus() {
     info "Initializing Incus daemon..."
+
+    # Pre-flight: ensure daemon is running
+    if ! systemctl is-active incus.service >/dev/null 2>&1; then
+        info "Starting Incus daemon..."
+        systemctl start incus.service || true
+        sleep 2
+    fi
+
+    # Pre-flight: wait for daemon readiness (up to 15s)
+    local wait_count=0
+    while [ $wait_count -lt 15 ]; do
+        if incus info >/dev/null 2>&1; then
+            break
+        fi
+        wait_count=$((wait_count + 1))
+        sleep 1
+    done
+    if [ $wait_count -eq 15 ]; then
+        warn "Incus daemon not responding after 15 seconds"
+        return 1
+    fi
+
+    # Already initialized?
     if incus profile show default 2>/dev/null | grep -q "eth0"; then
         info "Incus already initialized, skipping"
         return 0
     fi
-    cat <<PRESEED | incus admin init --preseed
+
+    # Load bridge kernel modules (needed for incusbr0)
+    modprobe bridge 2>/dev/null || true
+    modprobe br_netfilter 2>/dev/null || true
+
+    # Try preseed (creates incusbr0 + default profile)
+    if cat <<PRESEED | incus admin init --preseed 2>/dev/null
 config: {}
 networks:
   - config:
@@ -459,7 +488,19 @@ profiles:
         type: disk
     name: default
 PRESEED
-    success "Incus daemon initialized with default network and profile"
+    then
+        success "Incus daemon initialized with default network and profile"
+        return 0
+    fi
+
+    # Fallback: minimal init (no bridge)
+    warn "Preseed failed, trying minimal initialization..."
+    if incus admin init --minimal 2>/dev/null; then
+        success "Incus initialized with minimal config"
+    else
+        warn "Incus initialization failed — manual setup may be needed"
+        warn "Try: incus admin init --minimal"
+    fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -149,6 +149,9 @@ def do_explore(s: dict) -> None:
     )
     if r.returncode != 0 or "eth0" not in r.stdout:
         print(f"  {s['explore_incus']}")
+        # Load bridge kernel modules (needed for incusbr0 in live environment)
+        subprocess.run(["modprobe", "bridge"], capture_output=True, check=False)
+        subprocess.run(["modprobe", "br_netfilter"], capture_output=True, check=False)
         subprocess.run(
             ["incus", "admin", "init", "--minimal"],
             timeout=60, check=False,
@@ -241,6 +244,7 @@ def tui_main() -> None:
     input(f"\n  [{s['start']}] ")
     # Page 1b: Keyboard layout (live OS only)
     do_keyboard(s)
+    c.clear()
     # Page 2: Situation
     c.print(f"\n[bold cyan]{s['situation_title']}[/bold cyan]\n")
     if POOL_CONF.exists():
@@ -251,7 +255,10 @@ def tui_main() -> None:
         c.print(f"  [bold]2.[/bold] {s['opt_explore']}")
         c.print(f"     [dim]{s.get('opt_explore_desc', '')}[/dim]")
         c.print(f"  [bold]3.[/bold] {s['opt_skip']}\n")
-        choice = Prompt.ask(f"[cyan]{s['choice']}[/cyan]", choices=["1", "2", "3"])
+        default = "2" if is_live_os() else "1"
+        choice = Prompt.ask(
+            f"[cyan]{s['choice']}[/cyan]", choices=["1", "2", "3"], default=default,
+        )
         if choice == "1":
             c.print(f"\n[bold cyan]{s['persist_title']}[/bold cyan]")
             c.print(f"{s['persist_explain']}\n")
@@ -266,6 +273,7 @@ def tui_main() -> None:
             c.print(f"\n[dim]{s['next_guide']}[/dim]\n")
             return
     # Page 4-5: Tour + Next steps
+    c.clear()
     c.print(f"\n[bold cyan]{s['tour_title']}[/bold cyan]\n")
     show_tour(s)
     input(f"  [{s['continue']}] ")
@@ -285,10 +293,12 @@ def plain_main() -> None:
     input(f"  [{s['start']}] ")
     # Keyboard layout (live OS only)
     do_keyboard(s)
+    print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n  {s['situation_title']}\n")
     if POOL_CONF.exists():
         print(f"  {s['returning']}\n")
     else:
+        default = "2" if is_live_os() else "1"
         print(f"  1. {s['opt_persist']}")
         if "opt_persist_desc" in s:
             print(f"     {s['opt_persist_desc']}")
@@ -298,7 +308,8 @@ def plain_main() -> None:
                 print(f"     {line}")
         print(f"  3. {s['opt_skip']}\n")
         while True:
-            choice = input(f"  {s['choice']} [1-3]: ").strip()
+            raw = input(f"  {s['choice']} [1-3, default={default}]: ").strip()
+            choice = raw if raw else default
             if choice in ("1", "2", "3"):
                 break
             print("  (1-3)")
@@ -313,9 +324,11 @@ def plain_main() -> None:
         elif choice == "3":
             mark_done()
             return print(f"\n  {s['next_guide']}\n")
+    print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n  {s['tour_title']}\n")
     show_tour(s)
     input(f"  [{s['continue']}] ")
+    print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n  {s['next_title']}\n")
     show_next_steps(s, lang)
     input(f"\n  [{s['finish']}] ")

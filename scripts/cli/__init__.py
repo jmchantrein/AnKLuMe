@@ -5,8 +5,11 @@ from typing import Annotated
 import typer
 
 from scripts.cli._helpers import (
+    PROJECT_ROOT,
     console,
     get_mode,
+    is_live_os,
+    run_cmd,
     run_make,
     run_script,
 )
@@ -101,7 +104,10 @@ def upgrade() -> None:
 @app.command()
 def guide() -> None:
     """Interactive onboarding guide."""
-    run_script("guide.sh")
+    if is_live_os():
+        run_cmd(["python3", str(PROJECT_ROOT / "scripts" / "welcome.py")])
+    else:
+        run_script("guide.sh")
 
 
 @app.command()
