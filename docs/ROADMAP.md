@@ -1769,7 +1769,7 @@ the same mechanism Flatpak uses for sandboxed app file access.
 
 ---
 
-## Phase 26: Native App Export (distrobox-export Style)
+## Phase 26: Native App Export (distrobox-export Style) ✅ COMPLETE
 
 **Goal**: Make container applications appear as native host
 applications in the desktop environment's app launcher.
@@ -1801,7 +1801,7 @@ audio, controlled filesystem access via Phase 25 portals).
 - [x] Exported .desktop files installed in ~/.local/share/applications/
 - [x] Icons extracted to ~/.local/share/icons/anklume/
 - [x] App launched via incus exec with domain context
-- [ ] Audio works via PipeWire socket sharing (future)
+- [x] Audio works via PipeWire socket sharing
 - [x] Window visually identified by domain (color, prefix)
 
 ---

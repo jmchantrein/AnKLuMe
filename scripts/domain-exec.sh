@@ -155,6 +155,51 @@ trust_to_hex() {
 
 BG_COLOR=$(trust_to_hex "$TRUST_LEVEL")
 
+# ── PipeWire audio forwarding ──────────────────────────────
+
+AUDIO_ENV=()
+
+setup_audio() {
+    local host_uid
+    host_uid=$(id -u "${SUDO_USER:-$USER}" 2>/dev/null || echo 1000)
+    local runtime="/run/user/${host_uid}"
+    local pw_sock="${runtime}/pipewire-0"
+
+    # Only set up audio if host PipeWire socket exists
+    [[ -S "$pw_sock" ]] || return 0
+
+    local project_args=()
+    if [[ -n "$PROJECT" ]]; then
+        project_args=("--project" "$PROJECT")
+    fi
+
+    # Add proxy devices idempotently (ignore errors if already present)
+    local devices=(
+        "anklume-pw:${runtime}/pipewire-0:/tmp/pipewire-0"
+    )
+    # PulseAudio compat socket (for PA-only apps)
+    if [[ -S "${runtime}/pulse/native" ]]; then
+        devices+=("anklume-pa:${runtime}/pulse/native:/tmp/pulse-native")
+    fi
+
+    for entry in "${devices[@]}"; do
+        IFS=: read -r dev_name host_path container_path <<< "$entry"
+        incus config device add "${project_args[@]}" "$INSTANCE" "$dev_name" proxy \
+            bind=container \
+            "connect=unix:${host_path}" \
+            "listen=unix:${container_path}" \
+            uid=0 gid=0 mode=0777 2>/dev/null || true
+    done
+
+    # Set environment variables for the container
+    AUDIO_ENV=(
+        "PIPEWIRE_REMOTE=/tmp/pipewire-0"
+        "PULSE_SERVER=unix:/tmp/pulse-native"
+    )
+}
+
+setup_audio
+
 # ── Build incus exec command ─────────────────────────────
 
 build_exec_cmd() {
@@ -168,6 +213,7 @@ build_exec_cmd() {
         "ANKLUME_DOMAIN=$DOMAIN"
         "ANKLUME_TRUST_LEVEL=$TRUST_LEVEL"
         "ANKLUME_INSTANCE=$INSTANCE"
+        "${AUDIO_ENV[@]}"
     )
     if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
         exec_cmd+=("${CMD_ARGS[@]}")

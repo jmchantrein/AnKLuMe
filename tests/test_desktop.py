@@ -217,3 +217,37 @@ class TestDomainExec:
             capture_output=True, text=True,
         )
         assert result.returncode != 0
+
+
+# ── PipeWire audio forwarding tests ───────────────────────────────
+
+
+class TestDomainExecAudio:
+    """Verify domain-exec.sh sets up PipeWire audio forwarding."""
+
+    @classmethod
+    def setup_class(cls):
+        cls.content = (SCRIPTS_DIR / "domain-exec.sh").read_text()
+
+    def test_pipewire_socket_detection(self):
+        """Script checks for host PipeWire socket."""
+        assert "pipewire-0" in self.content
+
+    def test_proxy_device_setup(self):
+        """Script adds Incus proxy devices for PipeWire."""
+        assert "proxy" in self.content
+        assert "anklume-pw" in self.content
+
+    def test_pulseaudio_compat(self):
+        """Script forwards PulseAudio compat socket for PA-only apps."""
+        assert "pulse" in self.content
+        assert "anklume-pa" in self.content
+
+    def test_pipewire_env_vars(self):
+        """Script sets PIPEWIRE_REMOTE and PULSE_SERVER env vars."""
+        assert "PIPEWIRE_REMOTE" in self.content
+        assert "PULSE_SERVER" in self.content
+
+    def test_audio_idempotent(self):
+        """Proxy device add is idempotent (ignores errors if exists)."""
+        assert "2>/dev/null || true" in self.content
