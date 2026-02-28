@@ -1212,7 +1212,7 @@ class TestInitramfsBootScript:
     """Verify the initramfs-tools boot script (scripts/anklume)."""
 
     def test_no_dd_status_progress(self):
-        """BusyBox dd does not support status=progress."""
+        """klibc/BusyBox dd does not support status=progress."""
         if not INITRAMFS_BOOT_SCRIPT.exists():
             pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
         for line in INITRAMFS_BOOT_SCRIPT.read_text().splitlines():
@@ -1220,17 +1220,42 @@ class TestInitramfsBootScript:
             if stripped.startswith("#"):
                 continue
             assert "status=progress" not in line, (
-                f"BusyBox dd incompatible: {line.strip()}"
+                f"klibc dd incompatible: {line.strip()}"
+            )
+
+    def test_no_dd_suffix_bs(self):
+        """klibc dd does not support bs=NM suffixes (use numeric)."""
+        if not INITRAMFS_BOOT_SCRIPT.exists():
+            pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
+        suffix_re = re.compile(r"\bbs=\d+[KMG]")
+        for line in INITRAMFS_BOOT_SCRIPT.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            assert not suffix_re.search(line), (
+                f"klibc dd incompatible suffix: {stripped}"
+            )
+
+    def test_no_missing_klibc_tools(self):
+        """klibc initramfs has no stat/awk/wc/sed/cut; script must not use them."""
+        if not INITRAMFS_BOOT_SCRIPT.exists():
+            pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
+        forbidden = re.compile(r"\b(stat\s+-|awk\s|sed\s|wc\s|cut\s)")
+        for line in INITRAMFS_BOOT_SCRIPT.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            assert not forbidden.search(stripped), (
+                f"klibc missing tool used: {stripped}"
             )
 
     def test_toram_fallback_chain(self):
-        """Toram uses dd > cp > cat fallback chain."""
+        """Toram uses cp > dd > cat waterfall (all tried on failure)."""
         if not INITRAMFS_BOOT_SCRIPT.exists():
             pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
         content = INITRAMFS_BOOT_SCRIPT.read_text()
         assert "command -v dd" in content
         assert "command -v cp" in content
-        # cat is the last fallback
         assert "cat" in content
 
     def test_overlay_mount(self):

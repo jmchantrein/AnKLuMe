@@ -87,31 +87,29 @@ mountroot()
 
     # ── 2. Optional: copy squashfs to RAM ──
     if [ "$anklume_toram" = "1" ]; then
-        sqsize=$(stat -c '%s' "$squashfs" 2>/dev/null || echo 0)
-        sqsize_mb=$((sqsize / 1048576))
-        log_begin_msg "anklume: Copying squashfs to RAM (${sqsize_mb} MB)"
+        log_begin_msg "anklume: Copying squashfs to RAM"
         mkdir -p /run/anklume/copytoram
         mount -t tmpfs -o "size=75%,mode=0755" copytoram /run/anklume/copytoram
-        # dd > cp > cat (fallback chain)
-        # BusyBox dd does not support status=progress, try without it
+        # Waterfall: try cp first (most compatible), then dd, then cat
+        # klibc dd may not support bs=NM suffixes; cp is safer
         copy_ok=false
-        if command -v dd >/dev/null 2>&1; then
-            if dd if="$squashfs" of="/run/anklume/copytoram/rootfs.squashfs" \
-                bs=1M 2>/dev/null; then
-                copy_ok=true
-            fi
-        elif command -v cp >/dev/null 2>&1; then
+        if ! $copy_ok && command -v cp >/dev/null 2>&1; then
             if cp -- "$squashfs" /run/anklume/copytoram/rootfs.squashfs; then
                 copy_ok=true
             fi
-        else
-            if cat "$squashfs" > /run/anklume/copytoram/rootfs.squashfs; then
+        fi
+        if ! $copy_ok && command -v dd >/dev/null 2>&1; then
+            if dd if="$squashfs" of="/run/anklume/copytoram/rootfs.squashfs" \
+                bs=1048576 2>/dev/null; then
                 copy_ok=true
             fi
         fi
+        if ! $copy_ok; then
+            cat "$squashfs" > /run/anklume/copytoram/rootfs.squashfs && copy_ok=true
+        fi
         if $copy_ok; then
             squashfs="/run/anklume/copytoram/rootfs.squashfs"
-            log_success_msg "anklume: Squashfs copied to RAM (${sqsize_mb} MB)"
+            log_success_msg "anklume: Squashfs copied to RAM"
             # Release the ISO device
             umount /run/anklume/bootmnt
             log_success_msg "anklume: ISO device released (running from RAM)"
