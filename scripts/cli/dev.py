@@ -298,6 +298,28 @@ def _infer_llm_deps(tree: dict) -> list[dict[str, str]]:
         return []
 
 
+@app.command("bdd-stubs")
+def bdd_stubs(
+    write: Annotated[bool, typer.Option("--write", help="Write stubs to file")] = False,
+) -> None:
+    """Detect missing BDD step definitions and generate stubs."""
+    args = ["python3", str(PROJECT_ROOT / "scripts" / "generate-bdd-stubs.py")]
+    if write:
+        args.append("--write")
+    run_cmd(args, cwd=str(PROJECT_ROOT))
+
+
+@app.command("generate-scenarios")
+def generate_scenarios(
+    write: Annotated[bool, typer.Option("--write", help="Write generated feature files")] = False,
+) -> None:
+    """Generate BDD scenarios from the CLI dependency graph."""
+    args = ["python3", str(PROJECT_ROOT / "scripts" / "generate-dep-scenarios.py")]
+    if write:
+        args.append("--write")
+    run_cmd(args, cwd=str(PROJECT_ROOT))
+
+
 @app.command("runner")
 def runner(
     action: Annotated[str, typer.Argument(help="Action: create or destroy")],

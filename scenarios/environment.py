@@ -66,11 +66,15 @@ def before_scenario(context, scenario):
 def after_scenario(context, scenario):
     """Per-scenario teardown: restore project state from session backup.
 
-    Cleans up any temporary stash directories and restores protected
-    files/dirs to their pre-scenario state.
+    Cleans up any temporary stash directories, vision temp dirs, and
+    restores protected files/dirs to their pre-scenario state.
     """
     stash = PROJECT_DIR / ".scenario-stash-inventory"
     if stash.exists():
         shutil.rmtree(stash)
+    # Clean up legacy vision temp dirs if any step left one behind
+    vision_tmpdir = getattr(context, "vision_tmpdir", None)
+    if vision_tmpdir and os.path.isdir(vision_tmpdir):
+        shutil.rmtree(vision_tmpdir, ignore_errors=True)
     if SESSION_BACKUP_DIR.exists():
         _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
