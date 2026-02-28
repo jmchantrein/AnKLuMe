@@ -1,0 +1,100 @@
+graph LR
+    backup__create["backup.create"]
+    backup__restore["backup.restore"]
+    console["console"]
+    desktop__apply["desktop.apply"]
+    doctor["doctor"]
+    domain__apply["domain.apply"]
+    domain__check["domain.check"]
+    domain__exec["domain.exec"]
+    domain__list["domain.list"]
+    domain__status["domain.status"]
+    golden__create["golden.create"]
+    golden__derive["golden.derive"]
+    golden__publish["golden.publish"]
+    instance__clipboard["instance.clipboard"]
+    instance__disp["instance.disp"]
+    instance__exec["instance.exec"]
+    instance__info["instance.info"]
+    instance__list["instance.list"]
+    instance__remove["instance.remove"]
+    lab__check["lab.check"]
+    lab__hint["lab.hint"]
+    lab__reset["lab.reset"]
+    lab__solution["lab.solution"]
+    lab__start["lab.start"]
+    live__build["live.build"]
+    live__test["live.test"]
+    live__update["live.update"]
+    network__deploy["network.deploy"]
+    network__rules["network.rules"]
+    setup__data_dirs["setup.data-dirs"]
+    setup__import["setup.import"]
+    setup__init["setup.init"]
+    setup__quickstart["setup.quickstart"]
+    setup__shares["setup.shares"]
+    snapshot__create["snapshot.create"]
+    snapshot__delete["snapshot.delete"]
+    snapshot__list["snapshot.list"]
+    snapshot__restore["snapshot.restore"]
+    snapshot__rollback["snapshot.rollback"]
+    sync["sync"]
+    backup__create -->|backup archive| backup__restore
+    desktop__apply -->|desktop config| console
+    domain__apply -->|incus state| backup__create
+    domain__apply -->|incus state| console
+    domain__apply -->|incus state| doctor
+    domain__apply -->|incus state| domain__exec
+    domain__apply -->|incus state| domain__status
+    domain__apply -->|incus state| golden__create
+    domain__apply -->|incus state| instance__clipboard
+    domain__apply -->|incus state| instance__disp
+    domain__apply -->|incus state| instance__exec
+    domain__apply -->|incus state| instance__info
+    domain__apply -->|incus state| instance__list
+    domain__apply -->|incus state| instance__remove
+    domain__apply -->|incus state| snapshot__create
+    domain__apply -->|incus state| snapshot__delete
+    domain__apply -->|incus state| snapshot__list
+    domain__apply -->|incus state| snapshot__restore
+    domain__apply -->|incus state| snapshot__rollback
+    golden__create -->|golden images| golden__derive
+    golden__create -->|golden images| golden__publish
+    lab__check -->|lab progress| lab__hint
+    lab__check -->|lab progress| lab__reset
+    lab__check -->|lab progress| lab__solution
+    lab__start -->|lab progress| lab__check
+    lab__start -->|lab progress| lab__hint
+    lab__start -->|lab progress| lab__reset
+    lab__start -->|lab progress| lab__solution
+    live__build -->|iso image| live__test
+    live__build -->|iso image| live__update
+    network__rules -->|nftables rules| network__deploy
+    setup__data_dirs -->|host dirs| domain__apply
+    setup__import -->|infra config| console
+    setup__import -->|infra config| desktop__apply
+    setup__import -->|infra config| domain__list
+    setup__import -->|infra config| domain__status
+    setup__import -->|infra config| network__rules
+    setup__import -->|infra config| sync
+    setup__init -->|galaxy deps| domain__apply
+    setup__init -->|galaxy deps| domain__check
+    setup__quickstart -->|infra config| console
+    setup__quickstart -->|infra config| desktop__apply
+    setup__quickstart -->|infra config| domain__list
+    setup__quickstart -->|infra config| domain__status
+    setup__quickstart -->|infra config| network__rules
+    setup__quickstart -->|infra config| sync
+    setup__shares -->|host dirs| domain__apply
+    snapshot__create -->|incus snapshots| snapshot__delete
+    snapshot__create -->|incus snapshots| snapshot__restore
+    snapshot__create -->|incus snapshots| snapshot__rollback
+    sync -->|ansible files| domain__apply
+    sync -->|ansible files| domain__check
+    sync -->|ansible files| domain__exec
+    sync -->|ansible files| domain__status
+    sync -->|ansible files| snapshot__create
+    sync -->|ansible files| snapshot__delete
+    sync -->|ansible files| snapshot__list
+    sync -->|ansible files| snapshot__restore
+    sync -->|ansible files| snapshot__rollback

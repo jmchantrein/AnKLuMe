@@ -1,0 +1,102 @@
+---
+# Resource flow model for CLI dependency graph.
+# Each resource lists commands that produce and consume it.
+# The dependency resolver uses: if C consumes R and P produces R, then C depends on P.
+
+resources:
+  infra_config:
+    description: "Primary source of truth (infra.yml)"
+    producers: [setup.quickstart, setup.import]
+    consumers:
+      - sync
+      - domain.list
+      - domain.status
+      - network.rules
+      - desktop.apply
+      - console
+
+  ansible_files:
+    description: "Generated Ansible files (inventory/, group_vars/, host_vars/)"
+    producers: [sync]
+    consumers:
+      - domain.apply
+      - domain.check
+      - domain.status
+      - domain.exec
+      - snapshot.create
+      - snapshot.restore
+      - snapshot.list
+      - snapshot.delete
+      - snapshot.rollback
+
+  galaxy_deps:
+    description: "Galaxy roles and collections (roles_vendor/)"
+    producers: [setup.init]
+    consumers: [domain.apply, domain.check]
+
+  incus_state:
+    description: "Incus projects, networks, profiles, instances"
+    producers: [domain.apply]
+    consumers:
+      - instance.list
+      - instance.exec
+      - instance.info
+      - instance.remove
+      - instance.disp
+      - instance.clipboard
+      - domain.exec
+      - domain.status
+      - snapshot.create
+      - snapshot.restore
+      - snapshot.list
+      - snapshot.delete
+      - snapshot.rollback
+      - backup.create
+      - golden.create
+      - console
+      - doctor
+
+  incus_snapshots:
+    description: "Instance snapshots"
+    producers: [snapshot.create]
+    consumers: [snapshot.restore, snapshot.rollback, snapshot.delete]
+
+  nftables_rules:
+    description: "Host nftables isolation rules (anklume table)"
+    producers: [network.rules]
+    consumers: [network.deploy]
+
+  host_dirs:
+    description: "Host directories (/srv/anklume/shares, /srv/anklume/data)"
+    producers: [setup.shares, setup.data-dirs]
+    consumers: [domain.apply]
+
+  desktop_config:
+    description: "Sway/Hyprland/i3 desktop configuration"
+    producers: [desktop.apply]
+    consumers: [console]
+
+  golden_images:
+    description: "Incus golden images"
+    producers: [golden.create]
+    consumers: [golden.derive, golden.publish]
+
+  iso_image:
+    description: "Live OS ISO image (images/*.iso)"
+    producers: [live.build]
+    consumers: [live.test, live.update]
+
+  lab_progress:
+    description: "Lab progress files (~/.anklume/labs/)"
+    producers: [lab.start, lab.check]
+    consumers: [lab.check, lab.hint, lab.solution, lab.reset]
+
+  cli_mode:
+    description: "CLI mode setting (~/.anklume/mode)"
+    producers: [mode.dev, mode.student, mode.user]
+    consumers: []
+
+  backup_archive:
+    description: "Instance backup archives"
+    producers: [backup.create]
+    consumers: [backup.restore]

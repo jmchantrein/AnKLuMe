@@ -1,0 +1,564 @@
+{
+  "backup.create": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "backup.restore"
+    ]
+  },
+  "backup.restore": {
+    "depends_on": [
+      {
+        "command": "backup.create",
+        "resource": "backup_archive",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "console": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      },
+      {
+        "command": "desktop.apply",
+        "resource": "desktop_config",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "desktop.apply": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "console"
+    ]
+  },
+  "doctor": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "domain.apply": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.init",
+        "resource": "galaxy_deps",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.shares",
+        "resource": "host_dirs",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.data-dirs",
+        "resource": "host_dirs",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "backup.create",
+      "console",
+      "doctor",
+      "domain.exec",
+      "domain.status",
+      "golden.create",
+      "instance.clipboard",
+      "instance.disp",
+      "instance.exec",
+      "instance.info",
+      "instance.list",
+      "instance.remove",
+      "snapshot.create",
+      "snapshot.delete",
+      "snapshot.list",
+      "snapshot.restore",
+      "snapshot.rollback"
+    ]
+  },
+  "domain.check": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.init",
+        "resource": "galaxy_deps",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "domain.exec": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "domain.list": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "domain.status": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "golden.create": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "golden.derive",
+      "golden.publish"
+    ]
+  },
+  "golden.derive": {
+    "depends_on": [
+      {
+        "command": "golden.create",
+        "resource": "golden_images",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "golden.publish": {
+    "depends_on": [
+      {
+        "command": "golden.create",
+        "resource": "golden_images",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.clipboard": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.disp": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.exec": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.info": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.list": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "instance.remove": {
+    "depends_on": [
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "lab.check": {
+    "depends_on": [
+      {
+        "command": "lab.start",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "lab.hint",
+      "lab.reset",
+      "lab.solution"
+    ]
+  },
+  "lab.hint": {
+    "depends_on": [
+      {
+        "command": "lab.start",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      },
+      {
+        "command": "lab.check",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "lab.reset": {
+    "depends_on": [
+      {
+        "command": "lab.start",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      },
+      {
+        "command": "lab.check",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "lab.solution": {
+    "depends_on": [
+      {
+        "command": "lab.start",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      },
+      {
+        "command": "lab.check",
+        "resource": "lab_progress",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "lab.start": {
+    "depends_on": [],
+    "dependents": [
+      "lab.check",
+      "lab.hint",
+      "lab.reset",
+      "lab.solution"
+    ]
+  },
+  "live.build": {
+    "depends_on": [],
+    "dependents": [
+      "live.test",
+      "live.update"
+    ]
+  },
+  "live.test": {
+    "depends_on": [
+      {
+        "command": "live.build",
+        "resource": "iso_image",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "live.update": {
+    "depends_on": [
+      {
+        "command": "live.build",
+        "resource": "iso_image",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "network.deploy": {
+    "depends_on": [
+      {
+        "command": "network.rules",
+        "resource": "nftables_rules",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "network.rules": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "network.deploy"
+    ]
+  },
+  "setup.data-dirs": {
+    "depends_on": [],
+    "dependents": [
+      "domain.apply"
+    ]
+  },
+  "setup.import": {
+    "depends_on": [],
+    "dependents": [
+      "console",
+      "desktop.apply",
+      "domain.list",
+      "domain.status",
+      "network.rules",
+      "sync"
+    ]
+  },
+  "setup.init": {
+    "depends_on": [],
+    "dependents": [
+      "domain.apply",
+      "domain.check"
+    ]
+  },
+  "setup.quickstart": {
+    "depends_on": [],
+    "dependents": [
+      "console",
+      "desktop.apply",
+      "domain.list",
+      "domain.status",
+      "network.rules",
+      "sync"
+    ]
+  },
+  "setup.shares": {
+    "depends_on": [],
+    "dependents": [
+      "domain.apply"
+    ]
+  },
+  "snapshot.create": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "snapshot.delete",
+      "snapshot.restore",
+      "snapshot.rollback"
+    ]
+  },
+  "snapshot.delete": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      },
+      {
+        "command": "snapshot.create",
+        "resource": "incus_snapshots",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "snapshot.list": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "snapshot.restore": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      },
+      {
+        "command": "snapshot.create",
+        "resource": "incus_snapshots",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "snapshot.rollback": {
+    "depends_on": [
+      {
+        "command": "sync",
+        "resource": "ansible_files",
+        "source": "deterministic"
+      },
+      {
+        "command": "domain.apply",
+        "resource": "incus_state",
+        "source": "deterministic"
+      },
+      {
+        "command": "snapshot.create",
+        "resource": "incus_snapshots",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": []
+  },
+  "sync": {
+    "depends_on": [
+      {
+        "command": "setup.quickstart",
+        "resource": "infra_config",
+        "source": "deterministic"
+      },
+      {
+        "command": "setup.import",
+        "resource": "infra_config",
+        "source": "deterministic"
+      }
+    ],
+    "dependents": [
+      "domain.apply",
+      "domain.check",
+      "domain.exec",
+      "domain.status",
+      "snapshot.create",
+      "snapshot.delete",
+      "snapshot.list",
+      "snapshot.restore",
+      "snapshot.rollback"
+    ]
+  }
+}

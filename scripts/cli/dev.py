@@ -154,10 +154,13 @@ def graph(
 @app.command("cli-tree")
 def cli_tree(
     format_: Annotated[
-        str, typer.Option("--format", "-f", help="Output format: mermaid, json, intent")
+        str, typer.Option("--format", "-f", help="Output format: mermaid, json, intent, deps")
     ] = "mermaid",
     hidden: Annotated[
         bool, typer.Option("--hidden", help="Include hidden (dev-only) commands")
+    ] = False,
+    llm: Annotated[
+        bool, typer.Option("--llm", help="Enrich deps with LLM-inferred edges")
     ] = False,
 ) -> None:
     """Generate the CLI decision tree."""
@@ -170,6 +173,11 @@ def cli_tree(
     )
 
     tree = introspect_app(root_app)
+
+    if format_ == "deps":
+        _render_deps(tree, use_llm=llm)
+        return
+
     renderers = {
         "mermaid": lambda: render_mermaid(tree, show_hidden=hidden),
         "json": lambda: render_json(tree, show_hidden=hidden),
@@ -179,9 +187,115 @@ def cli_tree(
     if not renderer:
         from scripts.cli._helpers import console
 
-        console.print(f"[red]Unknown format:[/red] {format_}. Use: mermaid, json, intent")
+        console.print(f"[red]Unknown format:[/red] {format_}. Use: mermaid, json, intent, deps")
         raise typer.Exit(1)
     print(renderer())
+
+
+def _render_deps(tree: dict, *, use_llm: bool = False) -> None:
+    """Build and print the dependency graph (Mermaid + JSON)."""
+    from scripts.cli._cli_deps import (
+        build_dep_graph,
+        merge_llm_deps,
+        render_deps_json,
+        render_deps_mermaid,
+    )
+    from scripts.cli._helpers import console
+
+    graph = build_dep_graph(tree)
+
+    if use_llm:
+        llm_edges = _infer_llm_deps(tree)
+        if llm_edges:
+            merge_llm_deps(graph, llm_edges)
+            console.print(f"[dim]Merged {len(llm_edges)} LLM-inferred edges[/dim]\n")
+
+    console.print("[bold]Dependency graph (Mermaid):[/bold]\n")
+    print(render_deps_mermaid(graph))
+    console.print("\n[bold]Dependency graph (JSON):[/bold]\n")
+    print(render_deps_json(graph))
+
+
+def _infer_llm_deps(tree: dict) -> list[dict[str, str]]:
+    """Call local LLM to infer semantic dependencies."""
+    import yaml as _yaml
+
+    from scripts.cli._helpers import console
+
+    # Build a summary of commands for the LLM
+    cmds: list[str] = []
+    for cmd in tree.get("commands", []):
+        cmds.append(f"- {cmd['name']}: {cmd.get('help', '')}")
+    for group in tree.get("groups", []):
+        for sub in group.get("commands", []):
+            cmds.append(f"- {group['name']}.{sub['name']}: {sub.get('help', '')}")
+    cmd_list = "\n".join(cmds)
+
+    prompt = (
+        "Given these CLI commands and descriptions, infer prerequisite "
+        "relationships that are semantically obvious but NOT captured by "
+        "file I/O. For example: 'setup.init should run before domain.apply "
+        "to ensure dependencies are installed'.\n\n"
+        "Output ONLY a YAML list of edges:\n"
+        "- from: <producer command>\n"
+        "  to: <consumer command>\n"
+        "  reason: <short description>\n\n"
+        f"Commands:\n{cmd_list}\n\n"
+        "Rules:\n"
+        "- Only include edges NOT already obvious from resource flow\n"
+        "- Use dotted names for subcommands (e.g., setup.init)\n"
+        "- Keep reason under 40 characters\n"
+        "- Maximum 10 edges\n"
+    )
+
+    try:
+        import subprocess
+
+        from scripts.cli._helpers import PROJECT_ROOT  # noqa: F811
+
+        result = subprocess.run(
+            [
+                "ollama", "run", "qwen2.5-coder:32b",
+                "--nowordwrap", prompt,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(PROJECT_ROOT),
+        )
+        if result.returncode != 0:
+            console.print("[yellow]LLM inference failed, skipping[/yellow]")
+            return []
+
+        # Extract YAML from response
+        raw = result.stdout.strip()
+        # Strip markdown fences if present
+        if "```" in raw:
+            parts = raw.split("```")
+            for part in parts[1:]:
+                cleaned = part.strip()
+                if cleaned.startswith("yaml"):
+                    cleaned = cleaned[4:].strip()
+                if cleaned.startswith("- from:"):
+                    raw = cleaned
+                    break
+
+        edges = _yaml.safe_load(raw)
+        if not isinstance(edges, list):
+            return []
+        # Validate structure
+        valid = []
+        for edge in edges:
+            if isinstance(edge, dict) and "from" in edge and "to" in edge:
+                valid.append({
+                    "from": str(edge["from"]),
+                    "to": str(edge["to"]),
+                    "reason": str(edge.get("reason", "LLM-inferred")),
+                })
+        return valid[:10]
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as exc:
+        console.print(f"[yellow]LLM inference skipped: {exc}[/yellow]")
+        return []
 
 
 @app.command("runner")
