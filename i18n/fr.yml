@@ -101,6 +101,8 @@ apply-print: "Configurer le service d'impression CUPS dans un conteneur"
 
 # ── Live OS ──────────────────────────────────────────────
 build-image: "Construire une image live OS anklume demarrable"
+build-images: "Construire les images Debian et Arch dans images/ (ecrase, utilise le cache)"
+welcome: "Lancer le guide de bienvenue (--tui par defaut, WEB=1 pour le navigateur)"
 live-update: "Telecharger et appliquer une mise a jour A/B"
 live-status: "Afficher l'etat du live OS (slot actif, demarrage, pool)"
 live-os-test-vm: "Demarrer l'image live OS dans une VM Incus pour test"

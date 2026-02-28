@@ -216,7 +216,7 @@ Ada on Telegram → identifies an improvement
   → edits a template in roles/openclaw_server/templates/
   → runs tests (anklume dev lint, pytest tests/test_proxy.py)
   → commits to a feature branch, pushes, creates a PR
-  → anklume reviews and merges
+  → maintainer reviews and merges
   → anklume domain apply deploys the updated template to Ada's workspace
 ```
 
@@ -237,7 +237,7 @@ and is the only workspace file that does not go through the PR workflow.
 - **Sandbox isolation**: Ada runs in a dedicated LXC container with
   no access to other domains (pro, perso, etc.)
 - **Git workflow**: all operational changes go through branches and PRs
-- **Human gate**: anklume reviews every PR before it reaches production
+- **Human gate**: maintainer reviews every PR before it reaches production
 - **Template overwrite**: `anklume domain apply` always restores the authoritative
   version of operational files — no drift
 - **SOUL.md is private**: personality never leaves the container
@@ -396,7 +396,7 @@ Role variables (`roles/openclaw_server/defaults/main.yml`):
 | `openclaw_server_ollama_port` | `11434` | Ollama port |
 | `openclaw_server_agent_name` | `Ada` | Agent display name |
 | `openclaw_server_agent_emoji` | lobster | Agent emoji |
-| `openclaw_server_user_name` | `anklume` | User name |
+| `openclaw_server_user_name` | `""` | User name (set in host_vars) |
 | `openclaw_server_user_timezone` | `Europe/Paris` | User timezone |
 | `openclaw_server_user_languages` | `French (primary), English (technical)` | User languages |
 

@@ -41,7 +41,7 @@ openclaw_server_agent_emoji: ""
 
 # --- User profile ---
 
-openclaw_server_user_name: "anklume"
+openclaw_server_user_name: ""
 openclaw_server_user_timezone: "Europe/Paris"
 openclaw_server_user_languages: "French (primary), English (technical)"
 

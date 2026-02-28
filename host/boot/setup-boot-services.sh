@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-boot-services.sh — Configuration unique pour que tout fonctionne au boot
 #
-# À lancer UNE FOIS avec : sudo bash /home/anklume/claude/setup-boot-services.sh
+# À lancer UNE FOIS avec : sudo bash setup-boot-services.sh
 #
 # Ce script configure :
 #   1. Module uinput chargé au boot (pour ydotool)

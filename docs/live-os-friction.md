@@ -86,13 +86,13 @@ requires: F-04 unfixed
 
 ## Phase 3 — First Login / Desktop
 
-### F-07 | MINEUR | Hardcoded username `anklume`
+### F-07 | MINEUR | Hardcoded developer username
 
-Build script creates user `anklume`. This is clearly a developer name,
-not a generic student account.
+Build script used a developer-specific username instead of a generic
+student account.
 
-**Solution**: Use `anklume` or `student` as username. Or make it
-configurable at build time (`--user`).
+**Solution**: Use `anklume` as default username. Configurable at build
+time via `LIVE_USER` variable.
 
 ### F-08 | MAJEUR | Password not communicated anywhere
 

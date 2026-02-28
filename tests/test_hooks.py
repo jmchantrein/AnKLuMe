@@ -126,7 +126,7 @@ class TestPreCommitHook:
         )
 
     def test_blocks_ten_dot_ips(self, tmp_path):
-        """Hook blocks 10.x.x.x private IPs in non-exempt files."""
+        """Hook blocks 10.x.x.x private IPs (outside 10.100.*) in non-exempt files."""
         repo = tmp_path / "repo"
         repo.mkdir()
         self._init_git_repo(repo)
@@ -136,7 +136,7 @@ class TestPreCommitHook:
         shutil.copy2(PRE_COMMIT_HOOK, hooks_dir / "pre-commit")
 
         bad_file = repo / "server.py"
-        bad_file.write_text('HOST = "10.100.1.5"\n')
+        bad_file.write_text('HOST = "10.50.1.5"\n')
         subprocess.run(
             ["git", "-C", str(repo), "add", "server.py"],
             capture_output=True, check=True,
@@ -147,7 +147,7 @@ class TestPreCommitHook:
             capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0, (
-            "Hook should have blocked commit with private IP 10.100.1.5"
+            "Hook should have blocked commit with private IP 10.50.1.5"
         )
 
     def test_allows_anklume_convention_ips_in_exempt_files(self, tmp_path):

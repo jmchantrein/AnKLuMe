@@ -201,7 +201,7 @@ Ada sur Telegram → identifie une amelioration
   → edite un template dans roles/openclaw_server/templates/
   → lance les tests (anklume dev lint, pytest tests/test_proxy.py)
   → commit sur une branche feature, pousse, cree une PR
-  → anklume revoit et merge
+  → le mainteneur revoit et merge
   → anklume domain apply deploie le template mis a jour dans le workspace d'Ada
 ```
 
@@ -224,7 +224,7 @@ le workflow PR.
   acces aux autres domaines (pro, perso, etc.)
 - **Workflow git** : tous les changements operationnels passent par des
   branches et des PR
-- **Controle humain** : anklume revoit chaque PR avant la mise en production
+- **Controle humain** : le mainteneur revoit chaque PR avant la mise en production
 - **Ecrasement par template** : `anklume domain apply` restaure toujours la version
   autoritaire des fichiers operationnels — pas de derive possible
 - **SOUL.md est prive** : la personnalite ne quitte jamais le conteneur
