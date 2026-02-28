@@ -109,9 +109,9 @@ clipboard-from: ## Copy container clipboard TO host (I=<instance> [PROJECT=<p>])
 	@test -n "$(I)" || { echo "ERROR: I required. Usage: make clipboard-from I=<instance>"; exit 1; }
 	scripts/clipboard.sh copy-from $(I) $(if $(PROJECT),--project $(PROJECT))
 
-domain-exec: ## Open terminal to instance with domain colors (I=<instance>)
+domain-exec: ## Open terminal to instance with domain colors (I=<instance> [GUI=1])
 	@test -n "$(I)" || { echo "ERROR: I required. Usage: make domain-exec I=<instance>"; exit 1; }
-	scripts/domain-exec.sh $(I) $(if $(PROJECT),--project $(PROJECT)) $(if $(TERMINAL),--terminal)
+	scripts/domain-exec.sh $(I) $(if $(PROJECT),--project $(PROJECT)) $(if $(TERMINAL),--terminal) $(if $(GUI),--gui)
 
 desktop-config: ## Generate desktop environment config from infra.yml
 	python3 scripts/desktop_config.py $(if $(SWAY),--sway) $(if $(FOOT),--foot) $(if $(DESKTOP),--desktop)

@@ -227,7 +227,8 @@ class TestDomainExecAudio:
 
     @classmethod
     def setup_class(cls):
-        cls.content = (SCRIPTS_DIR / "domain-exec.sh").read_text()
+        # Audio setup lives in domain-lib.sh (sourced by domain-exec.sh)
+        cls.content = (SCRIPTS_DIR / "domain-lib.sh").read_text()
 
     def test_pipewire_socket_detection(self):
         """Script checks for host PipeWire socket."""
@@ -251,3 +252,72 @@ class TestDomainExecAudio:
     def test_audio_idempotent(self):
         """Proxy device add is idempotent (ignores errors if exists)."""
         assert "2>/dev/null || true" in self.content
+
+
+# ── GUI display forwarding tests ─────────────────────────────
+
+
+class TestDomainExecDisplay:
+    """Verify domain-exec.sh sets up Wayland/X11/GPU display forwarding."""
+
+    @classmethod
+    def setup_class(cls):
+        # Display setup lives in domain-lib.sh (sourced by domain-exec.sh)
+        cls.content = (SCRIPTS_DIR / "domain-lib.sh").read_text()
+
+    def test_wayland_socket_detection(self):
+        # Matrix: GF-001
+        assert "wayland-0" in self.content
+
+    def test_proxy_device_setup_wayland(self):
+        # Matrix: GF-002
+        assert "anklume-wl" in self.content
+
+    def test_x11_socket_forwarding(self):
+        # Matrix: GF-003
+        assert "anklume-x11" in self.content
+        assert ".X11-unix" in self.content
+
+    def test_gpu_device_setup(self):
+        # Matrix: GF-004
+        assert "anklume-gpu" in self.content
+
+    def test_display_env_vars(self):
+        # Matrix: GF-005
+        assert "WAYLAND_DISPLAY" in self.content
+        assert "XDG_RUNTIME_DIR" in self.content
+        assert "DISPLAY" in self.content
+
+    def test_gui_flag_in_usage(self):
+        """--gui flag is documented in domain-exec.sh usage()."""
+        exec_content = (SCRIPTS_DIR / "domain-exec.sh").read_text()
+        assert "--gui" in exec_content
+
+    def test_security_warning_untrusted(self):
+        # Matrix: GF-006
+        assert "untrusted" in self.content
+        assert "disposable" in self.content
+
+
+# ── domain-lib.sh shared library tests ───────────────────────
+
+
+class TestDomainLib:
+    """Verify domain-lib.sh exists and is sourced by both scripts."""
+
+    def test_library_exists(self):
+        lib_path = SCRIPTS_DIR / "domain-lib.sh"
+        assert lib_path.exists(), "scripts/domain-lib.sh must exist"
+
+    def test_library_sourced_by_domain_exec(self):
+        content = (SCRIPTS_DIR / "domain-exec.sh").read_text()
+        assert "domain-lib.sh" in content
+
+    def test_library_sourced_by_export_app(self):
+        content = (SCRIPTS_DIR / "export-app.sh").read_text()
+        assert "domain-lib.sh" in content
+
+    def test_library_not_directly_executable(self):
+        """Library has a source guard preventing direct execution."""
+        content = (SCRIPTS_DIR / "domain-lib.sh").read_text()
+        assert "BASH_SOURCE" in content

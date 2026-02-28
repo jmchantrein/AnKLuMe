@@ -18,6 +18,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=domain-lib.sh
+source "$SCRIPT_DIR/domain-lib.sh"
+
 DESKTOP_DIR="${HOME}/.local/share/applications"
 ICON_DIR="${HOME}/.local/share/icons/anklume"
 
@@ -25,18 +28,6 @@ ACTION=""
 INSTANCE=""
 APP=""
 PROJECT=""
-
-# ── Helper functions ─────────────────────────────────────
-
-info()  { echo -e "\033[0;34m[INFO]\033[0m $*"; }
-ok()    { echo -e "\033[0;32m[ OK ]\033[0m $*"; }
-warn()  { echo -e "\033[1;33m[WARN]\033[0m $*"; }
-err()   { echo -e "\033[0;31m[ERR ]\033[0m $*" >&2; }
-
-die() {
-    err "$@"
-    exit 1
-}
 
 # ── Argument parsing ─────────────────────────────────────
 
@@ -88,7 +79,6 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            # Positional: if no instance yet, treat as instance; else as app
             if [[ -z "$INSTANCE" ]]; then
                 INSTANCE="$1"
             elif [[ -z "$APP" ]]; then
@@ -103,54 +93,6 @@ if [[ -z "$ACTION" ]]; then
     usage >&2
     exit 1
 fi
-
-# ── Resolve domain and project from infra.yml ───────────
-
-resolve_context() {
-    python3 - "$1" "$PROJECT_DIR" <<'PYEOF'
-import json, subprocess, sys, yaml
-from pathlib import Path
-
-instance_name = sys.argv[1]
-project_dir = Path(sys.argv[2])
-
-# Try to resolve project from Incus
-project = ""
-result = subprocess.run(
-    ["incus", "list", "--all-projects", "--format", "json"],
-    capture_output=True, text=True
-)
-if result.returncode == 0:
-    for inst in json.loads(result.stdout):
-        if inst.get("name") == instance_name:
-            project = inst.get("project", "default")
-            break
-
-# Try to resolve domain from infra.yml
-domain = project  # domain name == project name in anklume
-trust_level = "trusted"
-
-infra_path = project_dir / "infra.yml"
-if infra_path.exists():
-    with open(infra_path) as f:
-        infra = yaml.safe_load(f) or {}
-    for dname, dconfig in infra.get("domains", {}).items():
-        machines = dconfig.get("machines", {})
-        if instance_name in machines:
-            domain = dname
-            trust_level = dconfig.get("trust_level", "")
-            if not trust_level:
-                if "admin" in dname.lower():
-                    trust_level = "admin"
-                elif dconfig.get("ephemeral", False):
-                    trust_level = "disposable"
-                else:
-                    trust_level = "trusted"
-            break
-
-print(f"{domain}\t{trust_level}\t{project}")
-PYEOF
-}
 
 # ── Incus helpers ────────────────────────────────────────
 
@@ -176,31 +118,36 @@ incus_file_pull() {
 
 cmd_export() {
     if [[ -z "$INSTANCE" ]]; then
-        die "I=<instance> is required for export. See --help."
+        domlib_err "I=<instance> is required for export. See --help."
+        exit 1
     fi
     if [[ -z "$APP" ]]; then
-        die "APP=<app> is required for export. See --help."
+        domlib_err "APP=<app> is required for export. See --help."
+        exit 1
     fi
 
     # Resolve domain context
     local domain="unknown" _trust_level="trusted" resolved_project=""
-    if IFS=$'\t' read -r domain _trust_level resolved_project < <(resolve_context "$INSTANCE"); then
+    if IFS=$'\t' read -r domain _trust_level resolved_project \
+        < <(resolve_context "$INSTANCE" "$PROJECT_DIR"); then
         if [[ -z "$PROJECT" && -n "$resolved_project" ]]; then
             PROJECT="$resolved_project"
         fi
     fi
 
-    info "Exporting '$APP' from instance '$INSTANCE' (domain: $domain)..."
+    domlib_info "Exporting '$APP' from instance '$INSTANCE' (domain: $domain)..."
 
     # Step 1: Find .desktop file in container
     local desktop_path
-    desktop_path=$(incus_exec find /usr/share/applications -name "*${APP}*.desktop" -print -quit 2>/dev/null) || true
+    desktop_path=$(incus_exec find /usr/share/applications \
+        -name "*${APP}*.desktop" -print -quit 2>/dev/null) || true
 
     if [[ -z "$desktop_path" ]]; then
-        die "No .desktop file matching '*${APP}*' found in $INSTANCE:/usr/share/applications/"
+        domlib_err "No .desktop file matching '*${APP}*' found in $INSTANCE:/usr/share/applications/"
+        exit 1
     fi
 
-    info "Found desktop file: $desktop_path"
+    domlib_info "Found desktop file: $desktop_path"
 
     # Step 2: Pull .desktop content from container
     local tmp_desktop
@@ -209,7 +156,7 @@ cmd_export() {
     trap "rm -f '$tmp_desktop'" EXIT
 
     incus_file_pull "${INSTANCE}${desktop_path}" "$tmp_desktop" 2>/dev/null \
-        || die "Failed to pull $desktop_path from $INSTANCE"
+        || { domlib_err "Failed to pull $desktop_path from $INSTANCE"; exit 1; }
 
     # Step 3: Parse Exec= and Icon= lines
     local orig_exec orig_icon app_name
@@ -218,11 +165,12 @@ cmd_export() {
     app_name=$(grep -m1 '^Name=' "$tmp_desktop" | sed 's/^Name=//')
 
     if [[ -z "$orig_exec" ]]; then
-        die "No Exec= line found in $desktop_path"
+        domlib_err "No Exec= line found in $desktop_path"
+        exit 1
     fi
 
-    info "Original Exec: $orig_exec"
-    info "Original Icon: $orig_icon"
+    domlib_info "Original Exec: $orig_exec"
+    domlib_info "Original Icon: $orig_icon"
 
     # Step 4: Extract icon from container
     local host_icon=""
@@ -236,12 +184,12 @@ cmd_export() {
     safe_app=$(echo "$APP" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]-' '-' | sed 's/-$//')
     local desktop_file="${DESKTOP_DIR}/anklume-${domain}-${safe_app}.desktop"
 
-    # Build the wrapper Exec line using domain-exec.sh
+    # Build the wrapper Exec line using domain-exec.sh --gui
     local wrapper_exec="${SCRIPT_DIR}/domain-exec.sh ${INSTANCE}"
     if [[ -n "$PROJECT" ]]; then
         wrapper_exec+=" --project ${PROJECT}"
     fi
-    wrapper_exec+=" -- ${orig_exec}"
+    wrapper_exec+=" --gui -- ${orig_exec}"
 
     # Write the new .desktop file
     {
@@ -270,7 +218,7 @@ cmd_export() {
         update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
     fi
 
-    ok "Exported '${APP}' from ${INSTANCE} -> ${desktop_file}"
+    echo -e "\033[0;32m[ OK ]\033[0m Exported '${APP}' from ${INSTANCE} -> ${desktop_file}"
 }
 
 # ── Extract icon from container ──────────────────────────
@@ -286,7 +234,7 @@ extract_icon() {
         local ext="${icon_name##*.}"
         local dest="${ICON_DIR}/anklume-${domain}-${APP}.${ext}"
         if incus_file_pull "${INSTANCE}${icon_name}" "$dest" 2>/dev/null; then
-            info "Extracted icon: $dest"
+            domlib_info "Extracted icon: $dest"
             echo "$dest"
             return
         fi
@@ -308,27 +256,27 @@ extract_icon() {
             local ext="${found##*.}"
             local dest="${ICON_DIR}/anklume-${domain}-${APP}.${ext}"
             if incus_file_pull "${INSTANCE}${found}" "$dest" 2>/dev/null; then
-                info "Extracted icon: $dest"
+                domlib_info "Extracted icon: $dest"
                 echo "$dest"
                 return
             fi
         fi
     done
 
-    warn "Could not extract icon '$icon_name' from container"
+    domlib_warn "Could not extract icon '$icon_name' from container"
 }
 
 # ── List command ─────────────────────────────────────────
 
 cmd_list() {
     if [[ -n "$INSTANCE" ]]; then
-        # List available apps in a container
-        info "Available .desktop apps in '$INSTANCE':"
+        domlib_info "Available .desktop apps in '$INSTANCE':"
 
         # Resolve project if needed
         if [[ -z "$PROJECT" ]]; then
             local domain _trust_level resolved_project
-            if IFS=$'\t' read -r domain _trust_level resolved_project < <(resolve_context "$INSTANCE"); then
+            if IFS=$'\t' read -r domain _trust_level resolved_project \
+                < <(resolve_context "$INSTANCE" "$PROJECT_DIR"); then
                 if [[ -n "$resolved_project" ]]; then
                     PROJECT="$resolved_project"
                 fi
@@ -344,7 +292,7 @@ cmd_list() {
     fi
 
     # List exported apps on the host
-    info "Exported anklume apps:"
+    domlib_info "Exported anklume apps:"
     local count=0
     for f in "${DESKTOP_DIR}"/anklume-*.desktop; do
         [[ -f "$f" ]] || continue
@@ -359,10 +307,10 @@ cmd_list() {
     done
 
     if [[ $count -eq 0 ]]; then
-        info "No exported apps found."
-        info "Export an app with: $0 export I=<instance> APP=<app>"
+        domlib_info "No exported apps found."
+        domlib_info "Export an app with: $0 export I=<instance> APP=<app>"
     else
-        ok "$count exported app(s)"
+        echo -e "\033[0;32m[ OK ]\033[0m $count exported app(s)"
     fi
 }
 
@@ -370,10 +318,12 @@ cmd_list() {
 
 cmd_remove() {
     if [[ -z "$INSTANCE" ]]; then
-        die "I=<instance> is required for remove. See --help."
+        domlib_err "I=<instance> is required for remove. See --help."
+        exit 1
     fi
     if [[ -z "$APP" ]]; then
-        die "APP=<app> is required for remove. See --help."
+        domlib_err "APP=<app> is required for remove. See --help."
+        exit 1
     fi
 
     local safe_app
@@ -381,35 +331,31 @@ cmd_remove() {
 
     local removed=0
 
-    # Remove matching .desktop files
     for f in "${DESKTOP_DIR}"/anklume-*-"${safe_app}".desktop; do
         [[ -f "$f" ]] || continue
-        # Verify instance matches
         local inst
         inst=$(grep -m1 '^X-anklume-Instance=' "$f" 2>/dev/null | sed 's/^X-anklume-Instance=//' || true)
         if [[ "$inst" == "$INSTANCE" ]]; then
             rm -f "$f"
-            info "Removed desktop file: $(basename "$f")"
+            domlib_info "Removed desktop file: $(basename "$f")"
             removed=$((removed + 1))
         fi
     done
 
-    # Remove matching icon files
     for f in "${ICON_DIR}"/anklume-*-"${safe_app}".*; do
         [[ -f "$f" ]] || continue
         rm -f "$f"
-        info "Removed icon: $(basename "$f")"
+        domlib_info "Removed icon: $(basename "$f")"
     done
 
-    # Update desktop database
     if command -v update-desktop-database &>/dev/null; then
         update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
     fi
 
     if [[ $removed -eq 0 ]]; then
-        warn "No exported app '${APP}' found for instance '${INSTANCE}'"
+        domlib_warn "No exported app '${APP}' found for instance '${INSTANCE}'"
     else
-        ok "Removed ${removed} export(s) for '${APP}' from '${INSTANCE}'"
+        echo -e "\033[0;32m[ OK ]\033[0m Removed ${removed} export(s) for '${APP}' from '${INSTANCE}'"
     fi
 }
 
@@ -420,7 +366,7 @@ case "$ACTION" in
     list)   cmd_list   ;;
     remove) cmd_remove ;;
     *)
-        err "Unknown action: $ACTION"
+        domlib_err "Unknown action: $ACTION"
         usage >&2
         exit 1
         ;;

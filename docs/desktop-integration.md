@@ -205,3 +205,92 @@ All desktop integration tools share the same trust level → color mapping:
 | disposable | `#cc33cc` | `#1a0a1a` | Ephemeral sandboxes |
 
 Colors are configurable via `trust_level` in `infra.yml` (see SPEC.md).
+
+## GUI App Forwarding
+
+Launch graphical applications from containers on the host display.
+Uses the same proxy device pattern as audio forwarding — Wayland/X11
+sockets and GPU access are forwarded into the container via Incus
+proxy devices.
+
+### How it works
+
+```mermaid
+flowchart LR
+    subgraph Host["Host (Wayland compositor)"]
+        WL["wayland-0 socket"]
+        X11["X11 socket (Xwayland)"]
+        GPU["GPU device"]
+    end
+    subgraph Container["Container (pro-dev)"]
+        APP["Firefox / VS Code / GIMP"]
+    end
+
+    WL -->|"anklume-wl proxy"| APP
+    X11 -->|"anklume-x11 proxy"| APP
+    GPU -->|"anklume-gpu device"| APP
+```
+
+| Resource | Host path | Container path | Device name |
+|----------|-----------|----------------|-------------|
+| Wayland socket | `/run/user/$UID/wayland-0` | `/tmp/wayland-0` | `anklume-wl` |
+| X11 socket | `/tmp/.X11-unix/X0` | `/tmp/.X11-unix/X0` | `anklume-x11` |
+| GPU | N/A (Incus gpu type) | N/A | `anklume-gpu` |
+
+### Usage
+
+```bash
+# Launch a GUI app in a container
+scripts/domain-exec.sh pro-dev --gui -- firefox
+
+# Interactive shell with display forwarding
+scripts/domain-exec.sh pro-dev --gui
+
+# Via Makefile
+make domain-exec I=pro-dev GUI=1
+make domain-exec I=pro-dev GUI=1 -- firefox
+```
+
+Exported apps automatically include `--gui`:
+
+```bash
+make export-app I=pro-dev APP=firefox   # .desktop Exec uses --gui
+```
+
+### Environment variables
+
+When `--gui` is active, these are set inside the container:
+
+| Variable | Value |
+|----------|-------|
+| `WAYLAND_DISPLAY` | `wayland-0` |
+| `XDG_RUNTIME_DIR` | `/tmp` |
+| `DISPLAY` | `:0` |
+| `GDK_BACKEND` | `wayland,x11` |
+| `QT_QPA_PLATFORM` | `wayland;xcb` |
+
+### Security model
+
+GUI forwarding grants the container access to the host display
+server and GPU. This is the same trade-off as QubesOS GUI
+virtualization — apps render on the trusted display, but a
+compromised app could potentially read other windows or keylog.
+
+- **admin / trusted / semi-trusted**: forwarding proceeds silently
+  (same trust model as QubesOS for these levels)
+- **untrusted / disposable**: a warning is printed to stderr before
+  proceeding. The user must acknowledge the risk.
+
+`--gui` is opt-in (not automatic) because display forwarding
+adds meaningful attack surface compared to audio-only forwarding.
+
+### Known limitations
+
+- **Window borders**: Sway domain-colored borders work for
+  `--terminal` windows (title matching). GUI app windows use their
+  own `app_id`, so domain coloring depends on the app's title
+  containing the domain name.
+- **GPU sharing**: Only one container should use the GPU at a time
+  for VRAM isolation (see ADR-018). Multiple `--gui` sessions
+  sharing the GPU is possible but not recommended for untrusted
+  domains.

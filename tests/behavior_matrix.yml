@@ -1159,3 +1159,31 @@ capabilities:
         action: "Sway plugin apply.sh generates working config from JSON"
         expected: "apply.sh --dry-run with domain config produces valid Sway snippets"
         deterministic: true
+
+  gui_forwarding:
+    description: "GUI app forwarding via Wayland/X11/GPU proxy devices (Phase 19b)"
+    depth_1:
+      - id: GF-001
+        action: "domain-exec.sh detects host Wayland socket"
+        expected: "Script references wayland-0 socket path"
+        deterministic: true
+      - id: GF-002
+        action: "domain-exec.sh sets up Wayland proxy device"
+        expected: "anklume-wl proxy device created for Wayland socket"
+        deterministic: true
+      - id: GF-003
+        action: "domain-exec.sh sets up X11 proxy device"
+        expected: "anklume-x11 proxy device for .X11-unix socket"
+        deterministic: true
+      - id: GF-004
+        action: "domain-exec.sh adds GPU device to container"
+        expected: "anklume-gpu gpu device added"
+        deterministic: true
+      - id: GF-005
+        action: "domain-exec.sh sets display environment variables"
+        expected: "WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DISPLAY set"
+        deterministic: true
+      - id: GF-006
+        action: "domain-exec.sh warns on untrusted/disposable GUI"
+        expected: "Security warning on stderr for untrusted and disposable domains"
+        deterministic: true

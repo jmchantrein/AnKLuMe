@@ -2,19 +2,12 @@
 # domain-exec.sh — Launch commands in containers with domain context
 #
 # Usage:
-#   scripts/domain-exec.sh INSTANCE [--] [COMMAND...]
-#   scripts/domain-exec.sh INSTANCE --project PROJECT [--] [COMMAND...]
-#   scripts/domain-exec.sh INSTANCE --terminal [--] [COMMAND...]
+#   scripts/domain-exec.sh INSTANCE [OPTIONS] [--] [COMMAND...]
 #
-# Wrapper around `incus exec` that:
-# 1. Resolves the instance's domain and trust level
-# 2. Sets ANKLUME_* environment variables inside the container
-# 3. Optionally opens a terminal with domain-colored background
-#
-# Environment variables set inside the container:
-#   ANKLUME_DOMAIN      — domain name
-#   ANKLUME_TRUST_LEVEL — trust level (admin, trusted, etc.)
-#   ANKLUME_INSTANCE    — instance name
+# Options:
+#   --project PROJECT  Incus project (auto-detected if omitted)
+#   --terminal         Open a new terminal window with domain colors
+#   --gui              Forward Wayland/X11 display and GPU into container
 #
 # Phase 21: Desktop Integration
 
@@ -23,9 +16,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=domain-lib.sh
+source "$SCRIPT_DIR/domain-lib.sh"
+
 INSTANCE=""
 PROJECT=""
 TERMINAL=false
+GUI=false
 CMD_ARGS=()
 
 # ── Argument parsing ─────────────────────────────────────
@@ -36,6 +33,7 @@ usage() {
     echo "Options:"
     echo "  --project PROJECT  Incus project (auto-detected if omitted)"
     echo "  --terminal         Open a new terminal window with domain colors"
+    echo "  --gui              Forward Wayland/X11 display and GPU into container"
     echo ""
     echo "If no COMMAND is given, opens an interactive bash shell."
     echo ""
@@ -43,7 +41,7 @@ usage() {
     echo "  $0 pro-dev                          # Interactive shell"
     echo "  $0 pro-dev -- htop                  # Run htop in container"
     echo "  $0 pro-dev --terminal               # Colored terminal window"
-    echo "  $0 pro-dev --terminal -- firefox     # Firefox in colored terminal"
+    echo "  $0 pro-dev --gui -- firefox          # GUI app on host display"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +52,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --terminal)
             TERMINAL=true
+            shift
+            ;;
+        --gui)
+            GUI=true
             shift
             ;;
         --help|-h)
@@ -88,117 +90,30 @@ fi
 
 # ── Resolve domain and trust level ───────────────────────
 
-resolve_context() {
-    python3 - "$INSTANCE" "$PROJECT_DIR" <<'PYEOF'
-import json, subprocess, sys, yaml
-from pathlib import Path
-
-instance_name = sys.argv[1]
-project_dir = Path(sys.argv[2])
-
-# Try to resolve project from Incus
-project = ""
-result = subprocess.run(
-    ["incus", "list", "--all-projects", "--format", "json"],
-    capture_output=True, text=True
-)
-if result.returncode == 0:
-    for inst in json.loads(result.stdout):
-        if inst.get("name") == instance_name:
-            project = inst.get("project", "default")
-            break
-
-# Try to resolve trust level from infra.yml
-domain = project  # domain name == project name in anklume
-trust_level = "trusted"
-
-infra_path = project_dir / "infra.yml"
-if infra_path.exists():
-    with open(infra_path) as f:
-        infra = yaml.safe_load(f) or {}
-    for dname, dconfig in infra.get("domains", {}).items():
-        machines = dconfig.get("machines", {})
-        if instance_name in machines:
-            domain = dname
-            trust_level = dconfig.get("trust_level", "")
-            if not trust_level:
-                if "admin" in dname.lower():
-                    trust_level = "admin"
-                elif dconfig.get("ephemeral", False):
-                    trust_level = "disposable"
-                else:
-                    trust_level = "trusted"
-            break
-
-print(f"{domain}\t{trust_level}\t{project}")
-PYEOF
-}
-
-IFS=$'\t' read -r DOMAIN TRUST_LEVEL RESOLVED_PROJECT < <(resolve_context)
+IFS=$'\t' read -r DOMAIN TRUST_LEVEL RESOLVED_PROJECT \
+    < <(resolve_context "$INSTANCE" "$PROJECT_DIR")
 
 if [[ -z "$PROJECT" && -n "$RESOLVED_PROJECT" ]]; then
     PROJECT="$RESOLVED_PROJECT"
 fi
 
-# ── Color mapping ────────────────────────────────────────
-
-trust_to_hex() {
-    case "$1" in
-        admin)       echo "#00005f" ;;
-        trusted)     echo "#005f00" ;;
-        semi-trusted) echo "#5f5f00" ;;
-        untrusted)   echo "#5f0000" ;;
-        disposable)  echo "#5f005f" ;;
-        *)           echo "#1a1a1a" ;;
-    esac
-}
-
 BG_COLOR=$(trust_to_hex "$TRUST_LEVEL")
 
-# ── PipeWire audio forwarding ──────────────────────────────
+# Shared project args for setup_audio/setup_display (from domain-lib.sh)
+# shellcheck disable=SC2034  # Used by setup_audio/setup_display in domain-lib.sh
+DOMLIB_PROJECT_ARGS=()
+if [[ -n "$PROJECT" ]]; then
+    # shellcheck disable=SC2034
+    DOMLIB_PROJECT_ARGS=("--project" "$PROJECT")
+fi
 
-AUDIO_ENV=()
-
-setup_audio() {
-    local host_uid
-    host_uid=$(id -u "${SUDO_USER:-$USER}" 2>/dev/null || echo 1000)
-    local runtime="/run/user/${host_uid}"
-    local pw_sock="${runtime}/pipewire-0"
-
-    # Only set up audio if host PipeWire socket exists
-    [[ -S "$pw_sock" ]] || return 0
-
-    local project_args=()
-    if [[ -n "$PROJECT" ]]; then
-        project_args=("--project" "$PROJECT")
-    fi
-
-    # Add proxy devices idempotently (ignore errors if already present)
-    local devices=(
-        "anklume-pw:${runtime}/pipewire-0:/tmp/pipewire-0"
-    )
-    # PulseAudio compat socket (for PA-only apps)
-    if [[ -S "${runtime}/pulse/native" ]]; then
-        devices+=("anklume-pa:${runtime}/pulse/native:/tmp/pulse-native")
-    fi
-
-    for entry in "${devices[@]}"; do
-        IFS=: read -r dev_name host_path container_path <<< "$entry"
-        incus config device add "${project_args[@]}" "$INSTANCE" "$dev_name" proxy \
-            bind=container \
-            "connect=unix:${host_path}" \
-            "listen=unix:${container_path}" \
-            uid=0 gid=0 mode=0777 2>/dev/null || true
-    done
-
-    # Set environment variables for the container
-    AUDIO_ENV=(
-        "PIPEWIRE_REMOTE=/tmp/pipewire-0"
-        "PULSE_SERVER=unix:/tmp/pulse-native"
-    )
-}
+# ── Device forwarding ────────────────────────────────────
 
 setup_audio
+
+if [[ "$GUI" == "true" ]]; then
+    setup_display
+fi
 
 # ── Build incus exec command ─────────────────────────────
 
@@ -207,13 +122,12 @@ build_exec_cmd() {
     if [[ -n "$PROJECT" ]]; then
         exec_cmd+=("--project" "$PROJECT")
     fi
-    exec_cmd+=("$INSTANCE")
-    exec_cmd+=("--")
-    exec_cmd+=("env"
+    exec_cmd+=("$INSTANCE" "--" "env"
         "ANKLUME_DOMAIN=$DOMAIN"
         "ANKLUME_TRUST_LEVEL=$TRUST_LEVEL"
         "ANKLUME_INSTANCE=$INSTANCE"
         "${AUDIO_ENV[@]}"
+        "${DISPLAY_ENV[@]}"
     )
     if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
         exec_cmd+=("${CMD_ARGS[@]}")
@@ -230,7 +144,6 @@ EXEC_CMD=$(build_exec_cmd)
 if [[ "$TERMINAL" == "true" ]]; then
     TITLE="[${DOMAIN}] ${INSTANCE}"
 
-    # Try foot (Wayland-native), then alacritty, then xterm
     if command -v foot &>/dev/null; then
         exec foot \
             --title "$TITLE" \
