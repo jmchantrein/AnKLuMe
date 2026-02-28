@@ -496,7 +496,7 @@ transforms the live OS from "blank screen + error messages" to
 | F-31 | FIXED | Labs tour step + `next_labs` in next steps |
 | F-33 | FIXED | Explicit data loss warning in explore mode and choice descriptions |
 | F-34 | FIXED | Available space (MB) shown after explore provisioning |
-| F-01 | OPEN | Needs CI pipeline for GitHub Releases |
+| F-01 | FIXED | GitHub Actions workflow: tag-triggered ISO build + GitHub Releases |
 | F-02 | FIXED | `build-image.sh --install-deps` installs all build dependencies |
 | F-03 | FIXED | Ventoy, GNOME Disks, balenaEtcher documented as safer alternatives |
 | F-09 | FIXED | Keybinding cheat sheet overlay on first sway boot |
@@ -506,5 +506,5 @@ transforms the live OS from "blank screen + error messages" to
 | F-32 | FIXED | Student mode: Quick Start (4 commands) + simplified command groups |
 
 All critical path blockers (F-15, F-19, F-22) are resolved.
-33/34 friction points addressed (FIXED or N/A). Only F-01 remains (CI for pre-built ISOs).
+34/34 friction points addressed (FIXED or N/A).
 L4 QEMU validation: boot → graphical.target, no auth failures.

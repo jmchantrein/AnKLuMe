@@ -1,0 +1,144 @@
+---
+name: Build & Release ISO
+
+"on":
+  workflow_dispatch:
+    inputs:
+      desktop:
+        description: "Desktop environment"
+        required: true
+        default: "kde"
+        type: choice
+        options:
+          - kde
+          - sway
+          - all
+          - minimal
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "release-iso-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  resolve-matrix:
+    name: Resolve build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      desktops: ${{ steps.set.outputs.desktops }}
+    steps:
+      - name: Set desktop matrix
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo 'desktops=["${{ github.event.inputs.desktop }}"]' \
+              >> "$GITHUB_OUTPUT"
+          else
+            echo 'desktops=["kde","sway"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build-iso:
+    name: "Build ISO (${{ matrix.desktop }})"
+    needs: resolve-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        desktop: ${{ fromJSON(needs.resolve-matrix.outputs.desktops) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo bash scripts/build-image.sh --install-deps
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build ISO
+        run: |
+          sudo bash scripts/build-image.sh \
+            --base debian \
+            --desktop "${{ matrix.desktop }}" \
+            --output "anklume-debian-${{ matrix.desktop }}.iso" \
+            --no-verity
+        env:
+          TMPDIR: /tmp
+
+      - name: Generate checksums
+        run: |
+          sha256sum anklume-debian-${{ matrix.desktop }}.iso \
+            > anklume-debian-${{ matrix.desktop }}.iso.sha256
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "anklume-debian-${{ matrix.desktop }}"
+          path: |
+            anklume-debian-${{ matrix.desktop }}.iso
+            anklume-debian-${{ matrix.desktop }}.iso.sha256
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-iso
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all ISO artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Collect release files
+        run: |
+          mkdir -p release/
+          find artifacts/ -name '*.iso' -o -name '*.sha256' | while read -r f; do
+            cp "$f" release/
+          done
+          ls -lh release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "anklume ${{ github.ref_name }}"
+          body: |
+            ## anklume Live OS — ${{ github.ref_name }}
+
+            Pre-built bootable ISO images for anklume.
+
+            ### Available images
+
+            | Image | Desktop | Description |
+            |-------|---------|-------------|
+            | `anklume-debian-kde.iso` | KDE Plasma | Full desktop (recommended) |
+            | `anklume-debian-sway.iso` | Sway | Lightweight tiling WM |
+
+            ### Quick start
+
+            1. Download an ISO and its `.sha256` checksum
+            2. Verify: `sha256sum -c anklume-debian-kde.iso.sha256`
+            3. Flash to USB with [Ventoy](https://ventoy.net/) (recommended) or `dd`
+            4. Boot from USB
+
+            See [documentation](https://jmchantrein.github.io/AnKLuMe/) for details.
+          files: release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}
