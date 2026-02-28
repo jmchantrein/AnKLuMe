@@ -11,16 +11,32 @@ app = typer.Typer(name="live", help="Live OS / USB boot image management.")
 
 @app.command()
 def build(
-    debian: Annotated[bool, typer.Option("--debian", help="Build Debian-based image")] = False,
-    arch: Annotated[bool, typer.Option("--arch", help="Build Arch-based image")] = False,
+    debian: Annotated[
+        bool, typer.Option("--debian", help="Build Debian-based image only")
+    ] = False,
+    arch: Annotated[
+        bool, typer.Option("--arch", help="Build Arch-based image only")
+    ] = False,
+    desktop: Annotated[
+        str, typer.Option(help="Desktop environment")
+    ] = "kde",
 ) -> None:
-    """Build a live ISO image."""
-    if arch:
-        run_make("build-image", "DISTRO=arch")
+    """Build live ISO images (both Debian+Arch by default)."""
+    if debian and arch:
+        # Both flags = build both (same as no flag)
+        run_make("build-images", f"DESKTOP={desktop}")
     elif debian:
-        run_make("build-image", "DISTRO=debian")
+        run_make(
+            "build-image",
+            f"BASE=debian DESKTOP={desktop} OUT=images/anklume-debian-{desktop}.iso",
+        )
+    elif arch:
+        run_make(
+            "build-image",
+            f"BASE=arch DESKTOP={desktop} OUT=images/anklume-arch-{desktop}.iso",
+        )
     else:
-        run_make("build-image")
+        run_make("build-images", f"DESKTOP={desktop}")
 
 
 @app.command()
@@ -37,7 +53,9 @@ def status() -> None:
 
 @app.command()
 def test(
-    clean: Annotated[bool, typer.Option("--clean", help="Clean test artifacts first")] = False,
+    clean: Annotated[
+        bool, typer.Option("--clean", help="Clean test artifacts first")
+    ] = False,
 ) -> None:
     """Test live image in a VM."""
     if clean:
