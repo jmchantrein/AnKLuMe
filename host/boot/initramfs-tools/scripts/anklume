@@ -92,11 +92,12 @@ mountroot()
         log_begin_msg "anklume: Copying squashfs to RAM (${sqsize_mb} MB)"
         mkdir -p /run/anklume/copytoram
         mount -t tmpfs -o "size=75%,mode=0755" copytoram /run/anklume/copytoram
-        # dd with progress > cp > cat (fallback chain)
+        # dd > cp > cat (fallback chain)
+        # BusyBox dd does not support status=progress, try without it
         copy_ok=false
         if command -v dd >/dev/null 2>&1; then
             if dd if="$squashfs" of="/run/anklume/copytoram/rootfs.squashfs" \
-                bs=1M status=progress; then
+                bs=1M 2>/dev/null; then
                 copy_ok=true
             fi
         elif command -v cp >/dev/null 2>&1; then

@@ -44,6 +44,10 @@ GRUB_CONFIG = Path(__file__).resolve().parent.parent / "host" / "boot" / "grub" 
 TEST_VM_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "live-os-test-vm.sh"
 SWAY_CONFIG = Path(__file__).resolve().parent.parent / "host" / "boot" / "desktop" / "sway-config"
 CHEATSHEET = Path(__file__).resolve().parent.parent / "host" / "boot" / "desktop" / "anklume-cheatsheet.sh"
+INITRAMFS_BOOT_SCRIPT = (
+    Path(__file__).resolve().parent.parent
+    / "host" / "boot" / "initramfs-tools" / "scripts" / "anklume"
+)
 
 
 # ── Fixtures ───────────────────────────────────────────────────────
@@ -1199,6 +1203,44 @@ class TestToramHookISO:
         content = MKINITCPIO_TORAM_INSTALL.read_text()
         assert "add_runscript" in content
         assert "add_binary" not in content
+
+
+# ── TestInitramfsBootScript ──────────────────────────────────────
+
+
+class TestInitramfsBootScript:
+    """Verify the initramfs-tools boot script (scripts/anklume)."""
+
+    def test_no_dd_status_progress(self):
+        """BusyBox dd does not support status=progress."""
+        if not INITRAMFS_BOOT_SCRIPT.exists():
+            pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
+        for line in INITRAMFS_BOOT_SCRIPT.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            assert "status=progress" not in line, (
+                f"BusyBox dd incompatible: {line.strip()}"
+            )
+
+    def test_toram_fallback_chain(self):
+        """Toram uses dd > cp > cat fallback chain."""
+        if not INITRAMFS_BOOT_SCRIPT.exists():
+            pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
+        content = INITRAMFS_BOOT_SCRIPT.read_text()
+        assert "command -v dd" in content
+        assert "command -v cp" in content
+        # cat is the last fallback
+        assert "cat" in content
+
+    def test_overlay_mount(self):
+        """Boot script creates overlayfs root."""
+        if not INITRAMFS_BOOT_SCRIPT.exists():
+            pytest.skip(f"File not found: {INITRAMFS_BOOT_SCRIPT}")
+        content = INITRAMFS_BOOT_SCRIPT.read_text()
+        assert "overlay" in content
+        assert "lowerdir" in content
+        assert "upperdir" in content
 
 
 # ── TestLiveOsLibISO ─────────────────────────────────────────────
