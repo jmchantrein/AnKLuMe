@@ -24,6 +24,16 @@ STRINGS = {
         "persist_confirm": "Lancer la configuration maintenant ?",
         "persist_running": "Lancement de first-boot.sh...",
         "persist_skip": "Passe. Lancez manuellement : sudo /opt/anklume/scripts/first-boot.sh",
+        "explore_title": "MODE EXPLORATION",
+        "explore_init": "Preparation de l'environnement d'exploration...",
+        "explore_incus": "Initialisation d'Incus...",
+        "explore_infra": "Configuration de l'infrastructure par defaut...",
+        "explore_sync": "Generation des fichiers Ansible...",
+        "explore_apply": "Deploiement de l'infrastructure (cela peut prendre quelques minutes)...",
+        "explore_done": "Environnement pret ! Les donnees seront perdues au redemarrage.",
+        "keyboard_title": "CLAVIER",
+        "keyboard_choice": "Disposition",
+        "keyboard_set": "Clavier configure :",
         "tour_title": "DECOUVERTE",
         "tour_steps": [
             (
@@ -76,6 +86,16 @@ STRINGS = {
         "persist_confirm": "Run setup now?",
         "persist_running": "Running first-boot.sh...",
         "persist_skip": "Skipped. Run manually: sudo /opt/anklume/scripts/first-boot.sh",
+        "explore_title": "EXPLORE MODE",
+        "explore_init": "Preparing explore environment...",
+        "explore_incus": "Initializing Incus...",
+        "explore_infra": "Setting up default infrastructure...",
+        "explore_sync": "Generating Ansible files...",
+        "explore_apply": "Deploying infrastructure (this may take a few minutes)...",
+        "explore_done": "Environment ready! Data will be lost on reboot.",
+        "keyboard_title": "KEYBOARD",
+        "keyboard_choice": "Layout",
+        "keyboard_set": "Keyboard configured:",
         "tour_title": "TOUR",
         "tour_steps": [
             (

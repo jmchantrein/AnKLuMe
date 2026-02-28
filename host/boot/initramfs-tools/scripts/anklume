@@ -11,10 +11,12 @@ mountroot()
     # Parse kernel cmdline
     anklume_boot_mode=""
     anklume_toram=""
+    anklume_keymap=""
     for param in $(cat /proc/cmdline); do
         case "$param" in
             anklume.boot_mode=*) anklume_boot_mode="${param#anklume.boot_mode=}" ;;
             anklume.toram=*)     anklume_toram="${param#anklume.toram=}" ;;
+            anklume.keymap=*)    anklume_keymap="${param#anklume.keymap=}" ;;
         esac
     done
 
@@ -159,6 +161,18 @@ mountroot()
     # Create /dev/null — needed by many init scripts
     if [ ! -c "${rootmnt}/dev/null" ]; then
         mknod -m 666 "${rootmnt}/dev/null" c 1 3 2>/dev/null || true
+    fi
+
+    # ── 7. Apply keyboard layout if specified ──
+    if [ -n "$anklume_keymap" ]; then
+        echo "KEYMAP=${anklume_keymap}" > "${rootmnt}/etc/vconsole.conf"
+        cat > "${rootmnt}/etc/default/keyboard" <<KBDEOF
+XKBMODEL="pc105"
+XKBLAYOUT="${anklume_keymap}"
+XKBVARIANT=""
+XKBOPTIONS=""
+KBDEOF
+        log_success_msg "anklume: Keyboard layout set to ${anklume_keymap}"
     fi
 
     log_success_msg "anklume: Boot setup complete, switching to real root"

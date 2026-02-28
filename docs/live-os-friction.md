@@ -463,3 +463,21 @@ experience on live OS:
 Fixing these three eliminates 8 downstream friction points and
 transforms the live OS from "blank screen + error messages" to
 "boot → desktop → working containers in 2 minutes."
+
+---
+
+## Implementation Status
+
+| ID | Status | Notes |
+|----|--------|-------|
+| F-07 | FIXED | `LIVE_USER=anklume`, configurable at build time |
+| F-11 | FIXED | Keyboard selection in welcome wizard + `anklume.keymap` kernel param |
+| F-12 | FIXED | All sway workspace bindings use `--to-code` |
+| F-15 | FIXED | Explore mode auto-provisions: Incus init + infra.yml + sync + apply |
+| F-16 | FIXED | `dir` backend option in first-boot.sh (no extra disk needed) |
+| F-19 | FIXED | `initialize_incus()` with preseed in first-boot.sh |
+| F-20 | FIXED | `pool.conf` written to `/mnt/anklume-persist/pool.conf` on live OS |
+| F-22 | FIXED | `is_live_os()` bypass in Makefile and CLI `require_container()` |
+
+All critical path blockers (F-15, F-19, F-22) are resolved.
+L4 QEMU validation: boot → graphical.target, no auth failures.

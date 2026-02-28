@@ -12,19 +12,23 @@ ANKLUME_LANG ?= $(if $(filter student,$(ANKLUME_MODE)),fr,)
 # Detection: systemd-detect-virt returns "none" on the host.
 define require_container
 	@if [ "$$(systemd-detect-virt 2>/dev/null)" = "none" ]; then \
-		echo "" >&2; \
-		echo "  ERROR: This command must be run inside anklume-instance." >&2; \
-		echo "" >&2; \
-		echo "  You are on the host. anklume commands run from the admin container." >&2; \
-		echo "  Enter the container first:" >&2; \
-		echo "" >&2; \
-		echo "    incus exec anklume-instance -- bash" >&2; \
-		echo "    cd /root/anklume" >&2; \
-		echo "    make $(1)" >&2; \
-		echo "" >&2; \
-		echo "  Or run the interactive guide: make guide" >&2; \
-		echo "" >&2; \
-		exit 1; \
+		if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
+			: ; \
+		else \
+			echo "" >&2; \
+			echo "  ERROR: This command must be run inside anklume-instance." >&2; \
+			echo "" >&2; \
+			echo "  You are on the host. anklume commands run from the admin container." >&2; \
+			echo "  Enter the container first:" >&2; \
+			echo "" >&2; \
+			echo "    incus exec anklume-instance -- bash" >&2; \
+			echo "    cd /root/anklume" >&2; \
+			echo "    make $(1)" >&2; \
+			echo "" >&2; \
+			echo "  Or run the interactive guide: make guide" >&2; \
+			echo "" >&2; \
+			exit 1; \
+		fi; \
 	fi
 endef
 

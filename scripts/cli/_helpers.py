@@ -71,8 +71,18 @@ def run_make(target: str, *args: str) -> subprocess.CompletedProcess:
     return run_cmd(["make", "-C", str(PROJECT_ROOT), target, *args])
 
 
+def is_live_os() -> bool:
+    """Detect if running on anklume Live OS (boot=anklume in kernel cmdline)."""
+    try:
+        return "boot=anklume" in Path("/proc/cmdline").read_text()
+    except OSError:
+        return False
+
+
 def require_container():
-    """Exit if not running inside a container."""
+    """Exit if not running inside a container (bypassed on Live OS)."""
+    if is_live_os():
+        return
     try:
         result = subprocess.run(
             ["systemd-detect-virt", "--container"],

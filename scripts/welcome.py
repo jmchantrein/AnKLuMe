@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import random
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,6 +17,8 @@ POOL_CONF = Path("/mnt/anklume-persist/pool.conf")
 FIRST_BOOT = Path("/opt/anklume/scripts/first-boot.sh")
 BASE = Path("/opt/anklume/host/boot/desktop")
 BASE_DEV = Path(__file__).resolve().parent.parent / "host/boot/desktop"
+# Project root for explore mode
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BANNER = (
     "     _    _  _ _  ___    _   _ __  __ ___\n"
     "    / \\  | \\| | |/ / |  | | | |  \\/  | __|\n"
@@ -73,6 +77,97 @@ def has_extra_disks() -> tuple[bool, str]:
             if ln.strip() and not ln.strip().startswith("loop")]
     return len(real) > 1, r.stdout.strip()
 
+KEYBOARD_LAYOUTS = [
+    ("fr", "Francais (AZERTY)"),
+    ("us", "English (QWERTY)"),
+    ("de", "Deutsch (QWERTZ)"),
+    ("es", "Espanol"),
+    ("it", "Italiano"),
+    ("pt", "Portugues"),
+    ("gb", "English UK"),
+]
+
+
+def is_live_os() -> bool:
+    """Detect if running on anklume Live OS."""
+    try:
+        return "boot=anklume" in Path("/proc/cmdline").read_text()
+    except OSError:
+        return False
+
+
+def do_keyboard(s: dict) -> None:
+    """Let the user choose a keyboard layout."""
+    if not is_live_os():
+        return  # Only relevant on live OS
+
+    print(f"  {s['keyboard_title']}\n")
+    for i, (code, label) in enumerate(KEYBOARD_LAYOUTS, 1):
+        marker = " *" if code == "fr" else ""
+        print(f"  [{i}] {label} ({code}){marker}")
+    print()
+
+    while True:
+        choice = input(f"  {s['keyboard_choice']} [1-{len(KEYBOARD_LAYOUTS)}]: ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(KEYBOARD_LAYOUTS):
+            break
+        print(f"  (1-{len(KEYBOARD_LAYOUTS)})")
+
+    code = KEYBOARD_LAYOUTS[int(choice) - 1][0]
+    label = KEYBOARD_LAYOUTS[int(choice) - 1][1]
+
+    # Apply keyboard layout
+    subprocess.run(["loadkeys", code], check=False, capture_output=True)
+    # Update vconsole.conf for persistence within this session
+    with contextlib.suppress(OSError):
+        Path("/etc/vconsole.conf").write_text(f"KEYMAP={code}\n")
+    # Update /etc/default/keyboard for Wayland compositors
+    with contextlib.suppress(OSError):
+        Path("/etc/default/keyboard").write_text(
+            f'XKBMODEL="pc105"\nXKBLAYOUT="{code}"\nXKBVARIANT=""\nXKBOPTIONS=""\n'
+        )
+    print(f"  {s['keyboard_set']} {label}")
+
+
+def do_explore(s: dict) -> None:
+    """Auto-provision minimal infrastructure for explore mode (no persistence)."""
+    print(f"  {s['explore_init']}")
+
+    # Step 1: Initialize Incus if not already done
+    r = subprocess.run(
+        ["incus", "profile", "show", "default"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if r.returncode != 0 or "eth0" not in r.stdout:
+        print(f"  {s['explore_incus']}")
+        subprocess.run(
+            ["incus", "admin", "init", "--minimal"],
+            timeout=60, check=False,
+        )
+
+    # Step 2: Copy starter infra.yml if not present
+    infra_dst = PROJECT_ROOT / "infra.yml"
+    infra_example = PROJECT_ROOT / "infra.yml.example"
+    if not infra_dst.exists() and infra_example.exists():
+        shutil.copy2(infra_example, infra_dst)
+        print(f"  {s['explore_infra']}")
+
+    # Step 3: Generate and apply infrastructure
+    if infra_dst.exists():
+        print(f"  {s['explore_sync']}")
+        subprocess.run(
+            ["python3", str(PROJECT_ROOT / "scripts" / "generate.py"), str(infra_dst)],
+            cwd=str(PROJECT_ROOT), timeout=60, check=False,
+        )
+        print(f"  {s['explore_apply']}")
+        subprocess.run(
+            ["ansible-playbook", "site.yml"],
+            cwd=str(PROJECT_ROOT), timeout=300, check=False,
+        )
+
+    print(f"  {s['explore_done']}")
+
+
 def do_persistence(s: dict) -> None:
     fb = FIRST_BOOT if FIRST_BOOT.exists() else Path("scripts/first-boot.sh")
     if not fb.exists():
@@ -128,6 +223,8 @@ def tui_main() -> None:
     c.print(f"\n[bold cyan]{s['welcome_title']}[/bold cyan]\n")
     c.print(s["welcome_what"])
     input(f"\n  [{s['start']}] ")
+    # Page 1b: Keyboard layout (live OS only)
+    do_keyboard(s)
     # Page 2: Situation
     c.print(f"\n[bold cyan]{s['situation_title']}[/bold cyan]\n")
     if POOL_CONF.exists():
@@ -141,6 +238,9 @@ def tui_main() -> None:
             c.print(f"\n[bold cyan]{s['persist_title']}[/bold cyan]")
             c.print(f"{s['persist_explain']}\n")
             do_persistence(s)
+        elif choice == "2":
+            c.print(f"\n[bold cyan]{s['explore_title']}[/bold cyan]\n")
+            do_explore(s)
         elif choice == "3":
             mark_done()
             c.print(f"\n[dim]{s['next_guide']}[/dim]\n")
@@ -163,6 +263,8 @@ def plain_main() -> None:
         print(f"  {quote}\n")
     print(f"  {s['welcome_title']}\n\n  {s['welcome_what']}\n")
     input(f"  [{s['start']}] ")
+    # Keyboard layout (live OS only)
+    do_keyboard(s)
     print(f"\n  {s['situation_title']}\n")
     if POOL_CONF.exists():
         print(f"  {s['returning']}\n")
@@ -178,6 +280,9 @@ def plain_main() -> None:
         if choice == "1":
             print(f"\n  {s['persist_title']}\n  {s['persist_explain']}\n")
             do_persistence(s)
+        elif choice == "2":
+            print(f"\n  {s['explore_title']}\n")
+            do_explore(s)
         elif choice == "3":
             mark_done()
             return print(f"\n  {s['next_guide']}\n")

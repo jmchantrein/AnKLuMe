@@ -258,12 +258,13 @@ choose_backend() {
 
     info "Select storage backend:"
     echo "  [1] ZFS (recommended: snapshots, compression, copy-on-write)"
-    echo "  [2] BTRFS (subvolume-based, simpler, no snapshots)"
+    echo "  [2] BTRFS (subvolume-based, simpler)"
+    echo "  [3] dir (no dedicated disk needed — uses a directory on existing filesystem)"
     echo ""
 
     local selection
     while true; do
-        read -r -p "Choose backend [1-2]: " selection
+        read -r -p "Choose backend [1-3]: " selection
         case "$selection" in
             1)
                 BACKEND="zfs"
@@ -273,6 +274,11 @@ choose_backend() {
             2)
                 BACKEND="btrfs"
                 success "Backend selected: BTRFS"
+                return 0
+                ;;
+            3)
+                BACKEND="dir"
+                success "Backend selected: dir (directory-based)"
                 return 0
                 ;;
             *)
@@ -418,6 +424,44 @@ setup_btrfs_pool() {
     POOL_MOUNT_POINT="/mnt/${POOL_NAME}"
 }
 
+setup_dir_pool() {
+    info "Setting up directory-based pool: $POOL_NAME"
+    POOL_MOUNT_POINT="/var/lib/incus/storage-pools/${POOL_NAME}"
+    success "Directory pool — no disk formatting needed"
+}
+
+initialize_incus() {
+    info "Initializing Incus daemon..."
+    if incus profile show default 2>/dev/null | grep -q "eth0"; then
+        info "Incus already initialized, skipping"
+        return 0
+    fi
+    cat <<PRESEED | incus admin init --preseed
+config: {}
+networks:
+  - config:
+      ipv4.address: auto
+      ipv6.address: none
+    description: Default network
+    name: incusbr0
+    type: bridge
+profiles:
+  - config: {}
+    description: Default profile
+    devices:
+      eth0:
+        name: eth0
+        network: incusbr0
+        type: nic
+      root:
+        path: /
+        pool: default
+        type: disk
+    name: default
+PRESEED
+    success "Incus daemon initialized with default network and profile"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # INCUS STORAGE CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
@@ -455,6 +499,12 @@ configure_incus_storage() {
             incus_source="$POOL_MOUNT_POINT"
             info "Creating Incus BTRFS storage pool..."
             if ! incus storage create "$POOL_NAME" btrfs source="$incus_source" || true; then
+                warn "Could not create pool (may already exist)"
+            fi
+            ;;
+        dir)
+            info "Creating Incus directory storage pool..."
+            if ! incus storage create "$POOL_NAME" dir 2>/dev/null; then
                 warn "Could not create pool (may already exist)"
             fi
             ;;
@@ -644,47 +694,60 @@ main() {
         esac
     done
 
-    # Validation
-    if [[ -z "$DISK" ]]; then
-        select_disk
-    fi
-
-    if [[ ! -b "$DISK" ]]; then
-        die "Invalid disk device: $DISK (not a block device)"
-    fi
+    # Initialize Incus daemon if not already done
+    initialize_incus
 
     choose_backend
 
-    # Safety warnings
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║  ⚠️  WARNING: DESTRUCTIVE OPERATION ⚠️                     ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo ""
-    echo "This script will:"
-    echo "  1. DESTROY all data on $DISK"
-    echo "  2. Create a $BACKEND pool: $POOL_NAME"
-    if [[ -z "$LUKS_PASSWORD" ]]; then
-        echo "  3. Optionally encrypt with LUKS"
-    else
-        echo "  3. Encrypt with LUKS"
-    fi
-    echo "  4. Configure Incus storage"
-    echo "  5. Copy anklume framework"
-    echo "  6. Bootstrap initial container"
-    echo ""
-    echo "Target disk: $DISK"
-    echo "Backend: $BACKEND"
-    echo "Repository: $ANKLUME_REPO"
-    echo ""
+    # Disk selection (not needed for dir backend)
+    if [[ "$BACKEND" != "dir" ]]; then
+        if [[ -z "$DISK" ]]; then
+            select_disk
+        fi
 
-    if ! prompt_yes_no "Proceed with setup?"; then
-        echo "Cancelled by user"
-        exit 0
+        if [[ ! -b "$DISK" ]]; then
+            die "Invalid disk device: $DISK (not a block device)"
+        fi
+    fi
+
+    # Safety warnings
+    if [[ "$BACKEND" != "dir" ]]; then
+        echo ""
+        echo "╔════════════════════════════════════════════════════════════╗"
+        echo "║  WARNING: DESTRUCTIVE OPERATION                          ║"
+        echo "╚════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "This script will:"
+        echo "  1. DESTROY all data on $DISK"
+        echo "  2. Create a $BACKEND pool: $POOL_NAME"
+        if [[ -z "$LUKS_PASSWORD" ]]; then
+            echo "  3. Optionally encrypt with LUKS"
+        else
+            echo "  3. Encrypt with LUKS"
+        fi
+        echo "  4. Configure Incus storage"
+        echo "  5. Copy anklume framework"
+        echo "  6. Bootstrap initial container"
+        echo ""
+        echo "Target disk: $DISK"
+        echo "Backend: $BACKEND"
+        echo "Repository: $ANKLUME_REPO"
+        echo ""
+
+        if ! prompt_yes_no "Proceed with setup?"; then
+            echo "Cancelled by user"
+            exit 0
+        fi
+    else
+        info "Using directory backend (no disk formatting needed)"
+        info "Backend: $BACKEND"
+        info "Repository: $ANKLUME_REPO"
     fi
 
     # Execute setup
-    setup_luks
+    if [[ "$BACKEND" != "dir" ]]; then
+        setup_luks
+    fi
 
     case "$BACKEND" in
         zfs)
@@ -693,10 +756,20 @@ main() {
         btrfs)
             setup_btrfs_pool
             ;;
+        dir)
+            setup_dir_pool
+            ;;
     esac
 
     configure_incus_storage
-    write_pool_conf "$POOL_CONF_FILE"
+
+    # Write pool.conf — on live OS use persist mount, otherwise local
+    local pool_conf_path="$POOL_CONF_FILE"
+    if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then
+        pool_conf_path="/mnt/anklume-persist/pool.conf"
+        mkdir -p /mnt/anklume-persist 2>/dev/null || true
+    fi
+    write_pool_conf "$pool_conf_path"
     copy_framework
     bootstrap_incus
 

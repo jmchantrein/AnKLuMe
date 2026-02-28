@@ -33,6 +33,7 @@ DESKTOP="all"
 MIRROR=""
 NO_VERITY=false
 LIVE_USER="anklume"
+KEYMAP="${KEYMAP:-fr}"
 CACHE_ROOTFS=""
 WORK_DIR=""
 LOOP_DEVICE=""
@@ -230,16 +231,40 @@ create_live_user() {
     local user="$LIVE_USER"
     local home="/home/$user"
 
+    # Ensure required groups exist (Debian may not have wheel, Arch may not have sudo)
+    for grp in wheel sudo video audio input; do
+        chroot "$rootfs" groupadd -f "$grp" 2>/dev/null || true
+    done
     # Create user with home directory and bash shell
-    chroot "$rootfs" useradd -m -s /bin/bash -G wheel,sudo,video,audio,input "$user" 2>/dev/null \
-        || chroot "$rootfs" useradd -m -s /bin/bash -G wheel,video,audio "$user" 2>/dev/null \
+    chroot "$rootfs" useradd -m -s /bin/bash -G sudo,video,audio,input "$user" 2>/dev/null \
+        || chroot "$rootfs" useradd -m -s /bin/bash -G video,audio "$user" 2>/dev/null \
+        || chroot "$rootfs" useradd -m -s /bin/bash "$user" 2>/dev/null \
         || true
+    # Verify user was created
+    if ! chroot "$rootfs" id "$user" >/dev/null 2>&1; then
+        warn "Failed to create user $user — creating manually"
+        echo "${user}:x:1000:1000::/home/${user}:/bin/bash" >> "$rootfs/etc/passwd"
+        echo "${user}:x:1000:" >> "$rootfs/etc/group"
+        # Shadow entry required for PAM authentication (including autologin)
+        echo "${user}:!:19781:0:99999:7:::" >> "$rootfs/etc/shadow"
+        mkdir -p "$rootfs/home/$user"
+        chroot "$rootfs" chown -R 1000:1000 "/home/$user" 2>/dev/null || true
+    fi
+    # Ensure shadow entry exists (useradd sometimes skips it in chroot)
+    if ! grep -q "^${user}:" "$rootfs/etc/shadow" 2>/dev/null; then
+        echo "${user}:!:19781:0:99999:7:::" >> "$rootfs/etc/shadow"
+    fi
     # Set password (same as root: anklume)
+    local pw_hash
+    pw_hash=$(openssl passwd -6 "anklume")
     echo "$user:anklume" | chroot "$rootfs" chpasswd 2>/dev/null || {
-        local pw_hash
-        pw_hash=$(openssl passwd -6 "anklume")
         sed -i "s|^${user}:[^:]*:|${user}:${pw_hash}:|" "$rootfs/etc/shadow"
     }
+    # Final verification: ensure shadow has a real hash, not locked (!)
+    if grep -q "^${user}:!" "$rootfs/etc/shadow" 2>/dev/null; then
+        warn "Shadow still locked — forcing password hash"
+        sed -i "s|^${user}:[^:]*:|${user}:${pw_hash}:|" "$rootfs/etc/shadow"
+    fi
     # Passwordless sudo
     mkdir -p "$rootfs/etc/sudoers.d"
     echo "$user ALL=(ALL) NOPASSWD: ALL" > "$rootfs/etc/sudoers.d/90-$user"
@@ -321,10 +346,10 @@ AUTOLOGIN
     # KDE Plasma keyboard layout (Wayland ignores /etc/default/keyboard)
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
         mkdir -p "$rootfs/$user_home/.config"
-        cat > "$rootfs/$user_home/.config/kxkbrc" << 'KXKB'
+        cat > "$rootfs/$user_home/.config/kxkbrc" << KXKB
 [Layout]
 DisplayNames=
-LayoutList=fr
+LayoutList=$KEYMAP
 Use=true
 VariantList=
 KXKB
@@ -586,21 +611,12 @@ FSTAB
     chroot "$ROOTFS_DIR" dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
     info "  Locale and timezone configured"
 
-    # Copy entire anklume framework (git repo) into rootfs
+    # Copy entire anklume framework into rootfs (rsync includes working tree changes)
     mkdir -p "$ROOTFS_DIR/opt/anklume"
-    # Use git archive to get a clean copy without .git and gitignored files
-    if command -v git &>/dev/null && [ -d "$PROJECT_ROOT/.git" ]; then
-        # Allow git archive from a repo owned by a different user (running as root)
-        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
-        git -C "$PROJECT_ROOT" archive HEAD | tar -x -C "$ROOTFS_DIR/opt/anklume/"
-    else
-        # Fallback: copy essential dirs
-        for d in scripts roles roles_custom Makefile site.yml snapshot.yml \
-                 ansible.cfg inventory group_vars host_vars pyproject.toml \
-                 infra.yml requirements.yml; do
-            [ -e "$PROJECT_ROOT/$d" ] && cp -r "$PROJECT_ROOT/$d" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
-        done
-    fi
+    rsync -a --exclude='.git' --exclude='images/' --exclude='iso-cache/' \
+        --exclude='.venv' --exclude='__pycache__' --exclude='*.iso' \
+        --exclude='pretty.output' --exclude='temp.txt' \
+        "$PROJECT_ROOT/" "$ROOTFS_DIR/opt/anklume/"
     info "  anklume framework files copied"
 
     # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
@@ -618,18 +634,18 @@ FSTAB
 
     # (hooks and modules already installed before NVIDIA section above)
 
-    # Create vconsole.conf — French AZERTY keyboard layout
-    echo "KEYMAP=fr" > "$ROOTFS_DIR/etc/vconsole.conf"
+    # Create vconsole.conf — keyboard layout
+    echo "KEYMAP=$KEYMAP" > "$ROOTFS_DIR/etc/vconsole.conf"
     # Also configure console-setup for Debian (vconsole.conf is Arch-style)
     mkdir -p "$ROOTFS_DIR/etc/default"
-    cat > "$ROOTFS_DIR/etc/default/keyboard" << 'KBD'
+    cat > "$ROOTFS_DIR/etc/default/keyboard" << KBD
 XKBMODEL="pc105"
-XKBLAYOUT="fr"
+XKBLAYOUT="$KEYMAP"
 XKBVARIANT=""
 XKBOPTIONS=""
 BACKSPACE="guess"
 KBD
-    info "  Keyboard configured (fr)"
+    info "  Keyboard configured ($KEYMAP)"
 
     # Copy systemd services
     if [ -d "$PROJECT_ROOT/host/boot/systemd" ]; then
@@ -941,19 +957,12 @@ FSTAB
     ln -sf /usr/share/zoneinfo/UTC "$ROOTFS_DIR/etc/localtime"
     info "  Timezone configured"
 
-    # Copy entire anklume framework (git repo) into rootfs
+    # Copy entire anklume framework into rootfs (rsync includes working tree changes)
     mkdir -p "$ROOTFS_DIR/opt/anklume"
-    if command -v git &>/dev/null && [ -d "$PROJECT_ROOT/.git" ]; then
-        # Allow git archive from a repo owned by a different user (running as root)
-        git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
-        git -C "$PROJECT_ROOT" archive HEAD | tar -x -C "$ROOTFS_DIR/opt/anklume/"
-    else
-        for d in scripts roles roles_custom Makefile site.yml snapshot.yml \
-                 ansible.cfg inventory group_vars host_vars pyproject.toml \
-                 infra.yml requirements.yml; do
-            [ -e "$PROJECT_ROOT/$d" ] && cp -r "$PROJECT_ROOT/$d" "$ROOTFS_DIR/opt/anklume/" 2>/dev/null || true
-        done
-    fi
+    rsync -a --exclude='.git' --exclude='images/' --exclude='iso-cache/' \
+        --exclude='.venv' --exclude='__pycache__' --exclude='*.iso' \
+        --exclude='pretty.output' --exclude='temp.txt' \
+        "$PROJECT_ROOT/" "$ROOTFS_DIR/opt/anklume/"
     info "  anklume framework files copied"
 
     # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
@@ -1023,7 +1032,7 @@ AGENT
     info "  Incus agent service installed"
 
     # Create vconsole.conf — French AZERTY keyboard layout
-    echo "KEYMAP=fr" > "$ROOTFS_DIR/etc/vconsole.conf"
+    echo "KEYMAP=$KEYMAP" > "$ROOTFS_DIR/etc/vconsole.conf"
 
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
