@@ -1603,7 +1603,7 @@ c) **Host Makefile wrapper** (future):
 
 ---
 
-## Phase 23b: Sandboxed AI Coding Environment
+## Phase 23b: Sandboxed AI Coding Environment ✅ COMPLETE
 
 **Goal**: From bootstrap, offer a ready-to-use, isolated environment
 for AI coding assistants (Claude Code, Gemini CLI, Aider, etc.) with
@@ -1678,7 +1678,7 @@ c) **Host-side wrapper**:
 - [x] Bootstrap detects GPU and recommends appropriate models
 - [x] Models downloaded automatically (with user confirmation)
 - [x] `anklume code .` launches Claude Code in sandboxed container
-- [ ] AI coder container can reach Ollama but not other domains
+- [x] AI coder container can reach Ollama but not other domains
 - [x] Works without GPU (API-only mode, no model download)
 
 ---

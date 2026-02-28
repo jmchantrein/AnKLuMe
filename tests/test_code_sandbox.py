@@ -496,6 +496,56 @@ class TestInfraYmlAiCoder:
         assert ai_coder_pos > ai_tools_pos
 
 
+# ── Network isolation ────────────────────────────────────
+
+
+class TestAiCoderNetworkIsolation:
+    """Verify ai-coder can reach Ollama but not other domains.
+
+    ai-coder is in the ai-tools domain (same L2 bridge as gpu-server/Ollama).
+    No network_policy grants ai-coder access to other domains.
+    Phase 8 nftables blocks all inter-bridge forwarding by default.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        import yaml
+
+        cls.infra = yaml.safe_load(INFRA_YML.read_text())
+
+    def test_ai_coder_same_domain_as_ollama(self):
+        """ai-coder and gpu-server (Ollama) share the ai-tools domain/bridge."""
+        machines = self.infra["domains"]["ai-tools"]["machines"]
+        assert "ai-coder" in machines, "ai-coder must be in ai-tools domain"
+        assert "gpu-server" in machines, "gpu-server must be in ai-tools domain"
+
+    def test_no_network_policy_from_ai_coder(self):
+        """No network_policy originates from ai-coder to another domain."""
+        policies = self.infra.get("network_policies", [])
+        for policy in policies:
+            assert policy.get("from") != "ai-coder", (
+                f"ai-coder should not have outbound network_policy: {policy}"
+            )
+
+    def test_no_network_policy_to_non_ai_tools(self):
+        """No network_policy connects ai-coder to domains outside ai-tools."""
+        policies = self.infra.get("network_policies", [])
+        for policy in policies:
+            if policy.get("from") == "ai-coder" or policy.get("to") == "ai-coder":
+                # If any policy involves ai-coder, it must stay within ai-tools
+                other = (
+                    policy.get("to")
+                    if policy.get("from") == "ai-coder"
+                    else policy.get("from")
+                )
+                ai_tools_machines = set(
+                    self.infra["domains"]["ai-tools"]["machines"].keys()
+                )
+                assert other == "ai-tools" or other in ai_tools_machines, (
+                    f"ai-coder policy must not reach outside ai-tools: {policy}"
+                )
+
+
 # ── Makefile target ──────────────────────────────────────
 
 
