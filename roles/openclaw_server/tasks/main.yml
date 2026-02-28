@@ -162,6 +162,19 @@
   ansible.builtin.include_tasks:
     file: heartbeat.yml
 
+# -- Webchat channel (Phase 28b) -------------------------------------------
+
+- name: OpenclawServer | Enable webchat channel
+  ansible.builtin.command:
+    argv:
+      - openclaw
+      - config
+      - set
+      - gateway.channels.webchat.enabled
+      - "{{ openclaw_server_webchat_enabled | string | lower }}"
+  changed_when: true
+  when: openclaw_server_webchat_enabled
+
 - name: OpenclawServer | Deploy systemd service
   ansible.builtin.template:
     src: openclaw.service.j2

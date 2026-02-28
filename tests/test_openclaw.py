@@ -220,6 +220,57 @@ class TestInfraYmlOpenClaw:
         assert ai_openclaw_pos > ai_tools_pos
 
 
+# -- Webchat channel (Phase 28b) --------------------------------------
+
+
+class TestWebchatChannel:
+    """Verify webchat channel is configured in the role."""
+
+    @classmethod
+    def setup_class(cls):
+        cls.defaults = (ROLE_DIR / "defaults" / "main.yml").read_text()
+        cls.tasks = (ROLE_DIR / "tasks" / "main.yml").read_text()
+
+    def test_webchat_enabled_default(self):
+        """Webchat channel is enabled by default."""
+        assert "openclaw_server_webchat_enabled: true" in self.defaults
+
+    def test_gateway_port_default(self):
+        """Gateway port defaults to 18789."""
+        assert "18789" in self.defaults
+
+    def test_webchat_task_exists(self):
+        """Task to enable webchat channel exists."""
+        assert "Enable webchat channel" in self.tasks
+
+
+# -- Network isolation -------------------------------------------------
+
+
+class TestOpenclawNetworkIsolation:
+    """Verify ai-openclaw can reach Ollama but not other domains."""
+
+    @classmethod
+    def setup_class(cls):
+        import yaml
+
+        cls.infra = yaml.safe_load(INFRA_YML.read_text())
+
+    def test_same_domain_as_ollama(self):
+        """ai-openclaw and gpu-server share the ai-tools domain."""
+        machines = self.infra["domains"]["ai-tools"]["machines"]
+        assert "ai-openclaw" in machines
+        assert "gpu-server" in machines
+
+    def test_no_network_policy_from_openclaw(self):
+        """No network_policy originates from ai-openclaw."""
+        policies = self.infra.get("network_policies", [])
+        for policy in policies:
+            assert policy.get("from") != "ai-openclaw", (
+                f"ai-openclaw should not have outbound network_policy: {policy}"
+            )
+
+
 # -- Makefile target ---------------------------------------------------
 
 

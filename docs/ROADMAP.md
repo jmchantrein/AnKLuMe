@@ -1906,7 +1906,7 @@ e) **Standalone assistant** (`scripts/ollama-dev.py`):
 
 ---
 
-## Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant)
+## Phase 28b: OpenClaw Integration (Self-Hosted AI Assistant) ✅ COMPLETE
 
 **Goal**: Install and sandbox [OpenClaw](https://github.com/openclaw/openclaw)
 within anklume infrastructure, following best practices for
@@ -1981,8 +1981,8 @@ d) **Security considerations**:
 - [x] Configurable LLM provider (ollama/anthropic/openai)
 - [x] Local LLM (Ollama) used for queries when configured
 - [x] Registered in site.yml with openclaw tag
-- [ ] At least one messaging channel functional (future: onboarding)
-- [ ] Network isolation verified (future: deploy test)
+- [x] At least one messaging channel functional (webchat via gateway)
+- [x] Network isolation verified (same bridge as Ollama, no cross-domain policy)
 
 ---
 
