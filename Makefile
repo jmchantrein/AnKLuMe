@@ -231,6 +231,12 @@ apply: ## Apply full infrastructure + provisioning
 		fi; \
 	fi
 	$(call safe_apply_wrap,apply,ansible-playbook site.yml)
+	@if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
+		if [ -f /opt/anklume/nftables-isolation.nft ]; then \
+			echo "Live OS: auto-deploying nftables isolation rules..."; \
+			scripts/deploy-nftables.sh --local || echo "WARNING: nftables deployment failed (non-fatal)"; \
+		fi; \
+	fi
 
 apply-infra: ## Apply infrastructure only (networks, projects, instances)
 	$(call require_container,apply-infra)

@@ -285,3 +285,46 @@ class TestCompletions:
             results = complete_instance("")
         assert "anklume-ctl" in results
         assert "work-dev" in results
+
+
+# ── F-29: Ansible output filter ───────────────────────────
+
+
+class TestAnsibleOutputFilter:
+    """F-29: student/live-os mode produces filtered Ansible output."""
+
+    def test_failure_summary_extracts_tasks(self):
+        """_show_failure_summary extracts TASK + fatal lines."""
+        from io import StringIO
+        from unittest.mock import patch as mock_patch
+
+        from scripts.cli.domain import _show_failure_summary
+
+        output = (
+            'TASK [base_system | Install packages] ***\n'
+            'fatal: [web-1]: FAILED! => {"msg": "apt install failed"}\n'
+            'TASK [incus_networks | Create bridge] ***\n'
+            'ok: [web-1]\n'
+        )
+        buf = StringIO()
+
+        def mock_print(*a, **k):
+            if a:
+                buf.write(str(a[0]) + "\n")
+            else:
+                buf.write("\n")
+
+        with mock_patch("scripts.cli.domain.console") as mock_console:
+            mock_console.print = mock_print
+            _show_failure_summary(output)
+
+        result = buf.getvalue()
+        assert "base_system" in result
+        assert "apt install failed" in result
+
+    def test_domain_apply_uses_forks_1_in_student_mode(self):
+        """In student mode, domain apply adds --forks 1."""
+        content = Path(__file__).resolve().parent.parent / "scripts" / "cli" / "domain.py"
+        src = content.read_text()
+        assert '"--forks"' in src
+        assert "ANSIBLE_STDOUT_CALLBACK" in src

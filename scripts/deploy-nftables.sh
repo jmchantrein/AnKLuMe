@@ -5,7 +5,7 @@
 # It pulls the generated rules from the admin container,
 # validates the syntax, copies to /etc/nftables.d/, and reloads nftables.
 #
-# Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
+# Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME] [--local [FILE]]
 # Default source: anklume-instance
 # Default project: admin (searches all projects if not found)
 set -euo pipefail
@@ -15,6 +15,8 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # ── Defaults ─────────────────────────────────────────────────
 
 DRY_RUN=false
+LOCAL_MODE=false
+LOCAL_FILE=""
 SOURCE_CONTAINER="anklume-instance"
 SOURCE_PATH="/opt/anklume/nftables-isolation.nft"
 DEST_DIR="/etc/nftables.d"
@@ -24,7 +26,7 @@ DEST_FILE="${DEST_DIR}/anklume-isolation.nft"
 
 usage() {
     cat <<'USAGE'
-Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME]
+Usage: deploy-nftables.sh [--dry-run] [--source CONTAINER_NAME] [--local [FILE]]
 
 Pulls nftables isolation rules from the anklume container, validates
 syntax, copies to /etc/nftables.d/, and reloads nftables.
@@ -32,6 +34,8 @@ syntax, copies to /etc/nftables.d/, and reloads nftables.
 Options:
   --dry-run             Validate only, do not install or reload
   --source CONTAINER    Source container name (default: anklume-instance)
+  --local [FILE]        Read rules from local file instead of container
+                        (default: /opt/anklume/nftables-isolation.nft)
   -h, --help            Show this help
 
 This script must be run ON THE HOST as root (or with sudo).
@@ -49,6 +53,17 @@ while [[ $# -gt 0 ]]; do
             SOURCE_CONTAINER="$2"
             shift 2
             ;;
+        --local)
+            LOCAL_MODE=true
+            # Optional file argument (next arg, if not a flag)
+            if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
+                LOCAL_FILE="$2"
+                shift 2
+            else
+                LOCAL_FILE="$SOURCE_PATH"
+                shift
+            fi
+            ;;
         -h|--help)
             usage
             exit 0
@@ -58,12 +73,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# ── Pre-flight: verify Incus daemon is accessible ──────────
-
-if ! incus project list --format csv >/dev/null 2>&1; then
-    die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
-fi
 
 # ── Find container project ──────────────────────────────────
 
@@ -124,21 +133,32 @@ check_br_netfilter
 
 echo "=== anklume nftables deployment ==="
 
-# Find container project
-echo "Looking for container '${SOURCE_CONTAINER}'..."
-PROJECT=$(find_project "$SOURCE_CONTAINER")
-echo "Found in project: ${PROJECT}"
-
-# Pull the rules file from the container
 TMPFILE=$(mktemp /tmp/anklume-nft-XXXXXX.nft)
 # shellcheck disable=SC2064
 trap "rm -f '$TMPFILE'" EXIT
 
-echo "Pulling rules from ${SOURCE_CONTAINER}:${SOURCE_PATH}..."
-incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJECT" \
-    || die "Failed to pull ${SOURCE_PATH} from ${SOURCE_CONTAINER}. Did you run 'make nftables' first?"
+if [[ "$LOCAL_MODE" == "true" ]]; then
+    # Local mode: read rules from local file (live OS or direct host usage)
+    echo "Reading rules from local file: ${LOCAL_FILE}..."
+    [[ -f "$LOCAL_FILE" ]] || die "Rules file not found: ${LOCAL_FILE}. Run 'anklume network rules' first."
+    cp "$LOCAL_FILE" "$TMPFILE"
+    echo "Rules file loaded ($(wc -l < "$TMPFILE") lines)"
+else
+    # Container mode: pull from anklume-instance
+    # Pre-flight: verify Incus daemon is accessible
+    if ! incus project list --format csv >/dev/null 2>&1; then
+        die "Cannot connect to the Incus daemon. Check that incus is installed and you have socket access."
+    fi
 
-echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
+    echo "Looking for container '${SOURCE_CONTAINER}'..."
+    PROJECT=$(find_project "$SOURCE_CONTAINER")
+    echo "Found in project: ${PROJECT}"
+
+    echo "Pulling rules from ${SOURCE_CONTAINER}:${SOURCE_PATH}..."
+    incus file pull "${SOURCE_CONTAINER}/${SOURCE_PATH}" "$TMPFILE" --project "$PROJECT" \
+        || die "Failed to pull ${SOURCE_PATH} from ${SOURCE_CONTAINER}. Did you run 'make nftables' first?"
+    echo "Rules file retrieved ($(wc -l < "$TMPFILE") lines)"
+fi
 
 # Validate content — ensure rules only modify the expected anklume table
 # If this check blocks a legitimate use case, review the validation logic in

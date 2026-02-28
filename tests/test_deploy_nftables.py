@@ -579,3 +579,114 @@ exit 0
             for line in tmpfile_tracker.read_text().splitlines():
                 tmpf = Path(line.strip())
                 assert not tmpf.exists(), f"Temp file {tmpf} should have been cleaned up by trap"
+
+
+# ── Local mode (F-27) ─────────────────────────────────────
+
+
+class TestDeployLocalMode:
+    """F-27: --local flag reads rules from local file instead of container."""
+
+    def test_local_flag_in_script(self):
+        """Verify --local flag is documented in deploy-nftables.sh."""
+        content = DEPLOY_SH.read_text()
+        assert "--local" in content
+
+    def test_local_mode_reads_local_file(self, tmp_path):
+        """--local reads rules from a local file, no container needed."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmds.log"
+
+        rules_file = tmp_path / "test-rules.nft"
+        rules_file.write_text(
+            "table inet anklume {\n"
+            "    chain isolation {\n"
+            "        type filter hook forward priority -1; policy accept;\n"
+            "        drop\n"
+            "    }\n"
+            "}\n"
+        )
+
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text(
+            f"#!/usr/bin/env bash\necho \"nft $@\" >> \"{log_file}\"\nexit 0\n"
+        )
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["mkdir", "cp", "chmod", "wc", "cat", "mktemp"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        patched_deploy = tmp_path / "deploy_patched.sh"
+        original = DEPLOY_SH.read_text()
+        patched_dest = tmp_path / "nftables.d"
+        patched_dest.mkdir()
+        patched = original.replace('/etc/nftables.d', str(patched_dest))
+        patched_deploy.write_text(patched)
+        patched_deploy.chmod(patched_deploy.stat().st_mode | stat.S_IEXEC)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+
+        result = run_deploy(
+            ["--local", str(rules_file)], env, script=patched_deploy,
+        )
+        assert result.returncode == 0
+        assert "deployed successfully" in result.stdout
+        cmds = read_log(log_file)
+        assert not any("incus" in c for c in cmds)
+
+    def test_local_mode_file_not_found(self, tmp_path):
+        """--local with missing file gives clear error."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text("#!/usr/bin/env bash\nexit 0\n")
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["mktemp"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy(["--local", "/nonexistent/rules.nft"], env)
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+    def test_local_mode_dry_run(self, tmp_path):
+        """--local --dry-run validates without installing."""
+        mock_bin = tmp_path / "bin"
+        mock_bin.mkdir()
+        log_file = tmp_path / "cmds.log"
+
+        rules_file = tmp_path / "test-rules.nft"
+        rules_file.write_text(
+            "table inet anklume { chain isolation { } }\n",
+        )
+
+        mock_nft = mock_bin / "nft"
+        mock_nft.write_text(
+            f"#!/usr/bin/env bash\necho \"nft $@\" >> \"{log_file}\"\nexit 0\n"
+        )
+        mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
+
+        for cmd in ["mktemp", "wc", "cat"]:
+            p = mock_bin / cmd
+            real = f"/usr/bin/{cmd}"
+            if not p.exists() and os.path.exists(real):
+                p.symlink_to(real)
+
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        result = run_deploy(
+            ["--local", str(rules_file), "--dry-run"], env,
+        )
+        assert result.returncode == 0
+        assert "dry run" in result.stdout.lower()

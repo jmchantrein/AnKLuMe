@@ -1,12 +1,16 @@
 """anklume domain — manage infrastructure domains."""
 
+import os
+import re
+import subprocess
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.table import Table
 
 from scripts.cli._completions import complete_domain
-from scripts.cli._helpers import PROJECT_ROOT, console, load_infra_safe, run_cmd, run_make
+from scripts.cli._helpers import PROJECT_ROOT, console, get_mode, is_live_os, load_infra_safe, run_cmd, run_make
 
 app = typer.Typer(name="domain", help="Manage infrastructure domains.")
 
@@ -67,7 +71,63 @@ def apply(
         cmd.extend(["--limit", domain])
     if tags:
         cmd.extend(["--tags", tags])
-    run_cmd(cmd)
+
+    student_mode = is_live_os() or get_mode() == "student"
+
+    if student_mode:
+        # Sequential execution + cleaner output for students
+        cmd.extend(["--forks", "1"])
+        env = os.environ.copy()
+        env["ANSIBLE_STDOUT_CALLBACK"] = "yaml"
+        result = subprocess.run(
+            cmd, cwd=str(PROJECT_ROOT), env=env,
+            capture_output=True, text=True,
+        )
+        # Show output (real-time not possible with capture, but cleaner)
+        if result.stdout:
+            print(result.stdout)
+        if result.returncode != 0:
+            _show_failure_summary(result.stdout + result.stderr)
+            raise typer.Exit(result.returncode)
+    else:
+        run_cmd(cmd)
+
+    # On live OS, auto-deploy nftables rules after apply
+    nft_rules = Path("/opt/anklume/nftables-isolation.nft")
+    if is_live_os() and nft_rules.exists():
+        console.print("[dim]Live OS: auto-deploying nftables rules...[/dim]")
+        deploy = PROJECT_ROOT / "scripts" / "deploy-nftables.sh"
+        run_cmd([str(deploy), "--local"], check=False)
+
+
+def _show_failure_summary(output: str) -> None:
+    """Extract and display failed tasks from Ansible output."""
+    console.print("\n[bold red]Some tasks failed.[/bold red]\n")
+
+    # Extract TASK lines followed by fatal/failed
+    failed_tasks = []
+    lines = output.splitlines()
+    current_task = ""
+    for line in lines:
+        task_match = re.match(r"^TASK \[(.+)\]", line)
+        if task_match:
+            current_task = task_match.group(1)
+        elif "fatal:" in line.lower() or "failed:" in line.lower():
+            # Extract the error message
+            msg_match = re.search(r'"msg":\s*"(.+?)"', line)
+            msg = msg_match.group(1) if msg_match else line.strip()[:120]
+            failed_tasks.append((current_task, msg))
+
+    if failed_tasks:
+        console.print("[bold]Failed tasks:[/bold]")
+        for task_name, msg in failed_tasks[:10]:
+            console.print(f"  [red]x[/red] {task_name}")
+            console.print(f"    [dim]{msg}[/dim]")
+        if len(failed_tasks) > 10:
+            console.print(f"  ... and {len(failed_tasks) - 10} more")
+        console.print()
+
+    console.print("[dim]Run with ANKLUME_MODE=user for full Ansible output.[/dim]")
 
 
 @app.command()

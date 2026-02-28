@@ -500,11 +500,11 @@ transforms the live OS from "blank screen + error messages" to
 | F-02 | FIXED | `build-image.sh --install-deps` installs all build dependencies |
 | F-03 | FIXED | Ventoy, GNOME Disks, balenaEtcher documented as safer alternatives |
 | F-09 | FIXED | Keybinding cheat sheet overlay on first sway boot |
-| F-27 | OPEN | nftables auto-deploy needs post-apply hook |
+| F-27 | FIXED | Auto-deploy nftables after `domain apply` on live OS (`--local` flag) |
 | F-28 | N/A | Explore mode shows containers are ready; labs guide access |
-| F-29 | OPEN | Ansible output filtering for student-friendly errors |
+| F-29 | FIXED | Student/live-os mode: `--forks 1`, YAML callback, failure summary |
 | F-32 | FIXED | Student mode: Quick Start (4 commands) + simplified command groups |
 
 All critical path blockers (F-15, F-19, F-22) are resolved.
-32/34 friction points addressed (FIXED or N/A). 2 remain OPEN (F-01, F-27, F-29).
+33/34 friction points addressed (FIXED or N/A). Only F-01 remains (CI for pre-built ISOs).
 L4 QEMU validation: boot → graphical.target, no auth failures.
