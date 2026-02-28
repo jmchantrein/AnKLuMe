@@ -3234,7 +3234,7 @@ d) **ADR-046**: Document CLI design decision (Typer over Go/Rust,
 
 ---
 
-## Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+## Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) ✅ COMPLETE
 
 **Goal**: Replace raw GitHub Markdown browsing with a modern,
 searchable, bilingual documentation site auto-deployed to GitHub
@@ -3334,18 +3334,18 @@ g) **Makefile / CLI integration**:
    - `anklume docs build-deploy` / `anklume docs deploy` — manual deploy
 
 **Validation criteria**:
-- [ ] `mkdocs build --strict` passes with zero warnings
-- [ ] Site deployed to GitHub Pages and accessible
-- [ ] All 77+ docs visible in navigation sidebar
-- [ ] French toggle switches all pages to French translations
-- [ ] Search finds content in both EN and FR
-- [ ] Mermaid diagrams render correctly on GitHub AND in built site
-- [ ] ASCII art diagrams replaced in SPEC.md and ARCHITECTURE.md
-- [ ] CI auto-deploys on push to main
-- [ ] PR builds validate docs without deploying
-- [ ] Source `.md` files remain LLM-readable (no compiled-only content)
-- [ ] `site/` in `.gitignore`
-- [ ] `anklume dev lint` still passes (yamllint on mkdocs.yml)
+- [x] `mkdocs build --strict` passes with zero warnings
+- [x] Site deployed to GitHub Pages and accessible
+- [x] All 77+ docs visible in navigation sidebar
+- [x] French toggle switches all pages to French translations
+- [x] Search finds content in both EN and FR
+- [x] Mermaid diagrams render correctly on GitHub AND in built site
+- [x] ASCII art diagrams replaced in SPEC.md and ARCHITECTURE.md
+- [x] CI auto-deploys on push to main (`.github/workflows/docs.yml`)
+- [x] PR builds validate docs without deploying
+- [x] Source `.md` files remain LLM-readable (no compiled-only content)
+- [x] `site/` in `.gitignore`
+- [x] `anklume dev lint` still passes (yamllint on mkdocs.yml)
 
 ---
 
@@ -3701,11 +3701,10 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 - Phase 44: Test Infrastructure Consolidation and Hardening ✅
-- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) (planned)
+- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) ✅
 - Phase 46: Security Hardening (from operational audit) ✅
 
-**In progress**:
-- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+**All phases complete!**
 
 **Recently completed**:
 - Phase 20g: Data Persistence and Flush Protection
@@ -3723,7 +3722,7 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 42: Desktop Environment Plugin System
 - Phase 43: Docker-Style CLI (Typer)
 
-**Phases 44 and 46 complete. Phase 45 is the last remaining phase.** All prior phases (1-44, 46) implemented. Remaining unchecked criteria are deployment-dependent
+**All 46 phases complete.** All phases (1-46) implemented. Remaining unchecked criteria are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.
