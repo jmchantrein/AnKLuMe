@@ -212,3 +212,95 @@ niveau de confiance -> couleur :
 
 Les couleurs sont configurables via `trust_level` dans `infra.yml`
 (voir SPEC.md).
+
+## Transfert d'affichage GUI
+
+Lance des applications graphiques depuis les conteneurs sur l'affichage
+hote. Utilise le meme patron de proxy device que le transfert audio --
+les sockets Wayland/X11 et l'acces GPU sont transferes dans le conteneur
+via des proxy devices Incus.
+
+### Fonctionnement
+
+```mermaid
+flowchart LR
+    subgraph Hote["Hote (compositeur Wayland)"]
+        WL["socket wayland-0"]
+        X11["socket X11 (Xwayland)"]
+        GPU["Peripherique GPU"]
+    end
+    subgraph Conteneur["Conteneur (pro-dev)"]
+        APP["Firefox / VS Code / GIMP"]
+    end
+
+    WL -->|"proxy anklume-wl"| APP
+    X11 -->|"proxy anklume-x11"| APP
+    GPU -->|"device anklume-gpu"| APP
+```
+
+| Ressource | Chemin hote | Chemin conteneur | Nom du device |
+|-----------|-------------|------------------|---------------|
+| Socket Wayland | `/run/user/$UID/wayland-0` | `/tmp/wayland-0` | `anklume-wl` |
+| Socket X11 | `/tmp/.X11-unix/X0` | `/tmp/.X11-unix/X0` | `anklume-x11` |
+| GPU | N/A (type gpu Incus) | N/A | `anklume-gpu` |
+
+### Utilisation
+
+```bash
+# Lancer une application GUI dans un conteneur
+scripts/domain-exec.sh pro-dev --gui -- firefox
+
+# Shell interactif avec transfert d'affichage
+scripts/domain-exec.sh pro-dev --gui
+
+# Via le Makefile
+make domain-exec I=pro-dev GUI=1
+make domain-exec I=pro-dev GUI=1 -- firefox
+```
+
+Les applications exportees incluent automatiquement `--gui` :
+
+```bash
+make export-app I=pro-dev APP=firefox   # Exec du .desktop utilise --gui
+```
+
+### Variables d'environnement
+
+Quand `--gui` est actif, ces variables sont definies dans le conteneur :
+
+| Variable | Valeur |
+|----------|--------|
+| `WAYLAND_DISPLAY` | `wayland-0` |
+| `XDG_RUNTIME_DIR` | `/tmp` |
+| `DISPLAY` | `:0` |
+| `GDK_BACKEND` | `wayland,x11` |
+| `QT_QPA_PLATFORM` | `wayland;xcb` |
+
+### Modele de securite
+
+Le transfert GUI donne au conteneur acces au serveur d'affichage hote
+et au GPU. C'est le meme compromis que la virtualisation GUI de
+QubesOS -- les applications s'affichent sur l'ecran de confiance, mais
+une application compromise pourrait potentiellement lire d'autres
+fenetres ou capturer les frappes clavier.
+
+- **admin / trusted / semi-trusted** : le transfert est silencieux
+  (meme modele de confiance que QubesOS pour ces niveaux)
+- **untrusted / disposable** : un avertissement est affiche sur stderr
+  avant de continuer. L'utilisateur doit reconnaaitre le risque.
+
+`--gui` est opt-in (pas automatique) car le transfert d'affichage
+ajoute une surface d'attaque significative comparee au seul transfert
+audio.
+
+### Limitations connues
+
+- **Bordures de fenetres** : les bordures colorees Sway fonctionnent
+  pour les fenetres `--terminal` (correspondance par titre). Les
+  fenetres d'applications GUI utilisent leur propre `app_id`, donc
+  la coloration depend du titre de l'application contenant le nom
+  du domaine.
+- **Partage GPU** : un seul conteneur devrait utiliser le GPU a la
+  fois pour l'isolation VRAM (voir ADR-018). Plusieurs sessions
+  `--gui` partageant le GPU sont possibles mais deconseillees pour
+  les domaines non fiables.

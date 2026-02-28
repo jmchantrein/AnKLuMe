@@ -3515,14 +3515,14 @@ across `~/.anklume/mode`, `~/.anklume/telemetry/`, etc.
 as part of the container provisioning step, since `anklume console`
 (Phase 19a) depends on them.
 
-### GUI app forwarding priority (Phase 26 enhancement)
+### GUI app forwarding priority (Phase 26 enhancement) -- DONE
 
-VS Code running inside containers with display forwarding to the
-host is a high-priority user need. Current Phase 26 exports
-`.desktop` files that launch apps via `incus exec`, but GUI
-forwarding (Wayland socket sharing or X11 forwarding) needs
-real-world validation with complex apps like VS Code, Firefox.
-PipeWire audio socket sharing is also pending.
+Implemented: `--gui` flag on `domain-exec.sh` forwards Wayland
+socket, X11 socket (Xwayland), and GPU into containers via Incus
+proxy devices. PipeWire audio forwarding also implemented (commit
+681d15a). Shared functions extracted to `scripts/domain-lib.sh`.
+Exported apps automatically include `--gui`. Remaining: real-world
+validation with complex apps (VS Code, Firefox).
 
 ### Orphan veth pair cleanup (Incus upstream investigation)
 
@@ -3731,8 +3731,8 @@ real-world deployment.
 (Phases 35-40).
 
 **Deferred enhancements**: See "Deferred Enhancements" section above (NER
-sanitization, Level 4 network pipeline, veth cleanup, GUI app forwarding,
-tmux bootstrap, PipeWire audio).
+sanitization, Level 4 network pipeline, veth cleanup, tmux bootstrap).
+GUI app forwarding and PipeWire audio are now implemented.
 
 **Deployed infrastructure** (Phase 34 addressing convention):
 

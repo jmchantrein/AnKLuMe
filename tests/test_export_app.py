@@ -66,20 +66,21 @@ class TestExportAppStructure:
         assert "remove" in self.content
         assert "cmd_remove" in self.content or "remove)" in self.content
 
-    def test_info_helper(self):
-        assert re.search(r'^info\(\)', self.content, re.MULTILINE)
+    def test_logging_helpers(self):
+        """Script uses logging helpers (from domain-lib.sh or local)."""
+        assert "domlib_info" in self.content or "info " in self.content
 
-    def test_ok_helper(self):
-        assert re.search(r'^ok\(\)', self.content, re.MULTILINE)
+    def test_warning_helper(self):
+        """Script has warning output capability."""
+        assert "domlib_warn" in self.content or "warn " in self.content
 
-    def test_warn_helper(self):
-        assert re.search(r'^warn\(\)', self.content, re.MULTILINE)
+    def test_error_helper(self):
+        """Script has error output capability."""
+        assert "domlib_err" in self.content or "err " in self.content
 
-    def test_err_helper(self):
-        assert re.search(r'^err\(\)', self.content, re.MULTILINE)
-
-    def test_die_function(self):
-        assert re.search(r'^die\(\)', self.content, re.MULTILINE)
+    def test_sources_domain_lib(self):
+        """Script sources the shared domain library."""
+        assert "domain-lib.sh" in self.content
 
     def test_uses_incus_exec(self):
         """Script uses incus exec to run commands in container."""

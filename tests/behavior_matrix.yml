@@ -1187,3 +1187,13 @@ capabilities:
         action: "domain-exec.sh warns on untrusted/disposable GUI"
         expected: "Security warning on stderr for untrusted and disposable domains"
         deterministic: true
+    depth_2:
+      - id: GF-2-001
+        action: "GUI forwarding with audio forwarding simultaneously"
+        expected: "Both AUDIO_ENV and DISPLAY_ENV passed to incus exec"
+        deterministic: true
+    depth_3:
+      - id: GF-3-001
+        action: "GUI app export with --gui and domain-colored terminal"
+        expected: "Exported .desktop Exec line includes --gui, domain-exec.sh handles both display and audio"
+        deterministic: true
