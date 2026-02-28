@@ -1492,7 +1492,7 @@ def check_isolation(sandbox):
 
 ---
 
-## Phase 23: Host Bootstrap and Thin Host Layer
+## Phase 23: Host Bootstrap and Thin Host Layer ✅ COMPLETE
 
 **Goal**: Zero-prerequisite installation from a bare Linux host.
 Formalize the host/container separation with a `host/` directory
@@ -1582,7 +1582,7 @@ c) **Host Makefile wrapper** (future):
 
 **Validation criteria**:
 - [x] `bootstrap.sh` runs on Arch (CachyOS) from a fresh host
-- [ ] `bootstrap.sh` runs on Debian 13 (Trixie) from a fresh host
+- [x] `bootstrap.sh` runs on Debian 13 (Trixie) from a fresh host
 - [x] After bootstrap, `anklume domain apply` works without manual intervention
 - [x] Bind mount allows editing on host, running in container
 - [x] STT scripts functional from `host/stt/` location
@@ -1727,7 +1727,7 @@ c) **Makefile targets**:
 
 ---
 
-## Phase 25: XDG Desktop Portal for Cross-Domain File Access
+## Phase 25: XDG Desktop Portal for Cross-Domain File Access ✅ COMPLETE
 
 **Goal**: Replace manual `incus file push/pull` with a native file
 chooser dialog for controlled file sharing between domains.

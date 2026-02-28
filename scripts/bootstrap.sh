@@ -671,24 +671,19 @@ EOF
             echo "Installing Incus..."
             case "$PKG_MANAGER" in
                 apt)
-                    # Add Zabbly repository for latest Incus
-                    if [ ! -f /etc/apt/keyrings/zabbly.asc ]; then
-                        mkdir -p /etc/apt/keyrings
-                        curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
-                        local codename
-                        # shellcheck source=/dev/null
-                        codename=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
-                        tee /etc/apt/sources.list.d/zabbly-incus-stable.sources >/dev/null <<ZABBLY
-Enabled: yes
-Types: deb
-URIs: https://pkgs.zabbly.com/incus/stable
-Suites: ${codename}
-Components: main
-Architectures: amd64
-Signed-By: /etc/apt/keyrings/zabbly.asc
-ZABBLY
+                    local codename
+                    # shellcheck source=/dev/null
+                    codename=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
+                    # Trixie+ has Incus in official repos; older releases use backports
+                    if apt-cache show incus >/dev/null 2>&1; then
+                        info "Incus available in Debian repos"
+                        apt-get update && apt-get install -y incus
+                    else
+                        info "Adding Debian backports for Incus"
+                        echo "deb http://deb.debian.org/debian ${codename}-backports main" \
+                            > /etc/apt/sources.list.d/backports.list
+                        apt-get update && apt-get install -y -t "${codename}-backports" incus
                     fi
-                    apt-get update && apt-get install -y incus
                     ;;
                 pacman)
                     pacman -Sy --noconfirm incus
