@@ -18,6 +18,15 @@ openclaw_server_ollama_api_key: "ollama-local"
 # Enable and start the systemd service
 openclaw_server_enabled: true
 
+# --- Credential security (FINDING-03) ---
+
+# Host-side credential file must be 0600. The container accesses it
+# via disk device + raw.idmap (maps host UID to container root).
+# Example device: source=~/.anklume/secrets/git-credentials
+#                 path=/run/secrets/git-credentials
+# Container config: raw.idmap: "both 1000 0"  (host UID 1000 -> root)
+openclaw_server_credential_host_uid: 1000
+
 # --- Proxy location (anklume-instance) ---
 
 openclaw_server_proxy_ip: "10.100.0.134"

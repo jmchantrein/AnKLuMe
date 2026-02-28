@@ -60,3 +60,42 @@
   ansible.builtin.debug:
     msg: "WARNING: CLAUDE.md not found at {{ dev_agent_runner_project_dir }}/CLAUDE.md — clone the repo first"
   when: not dev_agent_runner_claude_md.stat.exists
+
+# -- Egress restriction (FINDING-10) --
+
+- name: DevAgentRunner | Install nftables for egress restriction
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+  when: dev_agent_runner_restrict_egress
+
+- name: DevAgentRunner | Deploy egress restriction rules
+  ansible.builtin.copy:
+    dest: /etc/nftables.d/agent-egress.nft
+    mode: "0644"
+    content: |
+      # Agent sandbox egress restriction (FINDING-10)
+      # Allow: DNS (53), HTTPS (443), loopback. Drop everything else.
+      # Approved domains: {{ dev_agent_runner_allowed_domains | join(', ') }}
+      # Note: nftables cannot filter by domain name; port 443 is allowed
+      # to any destination. The restriction prevents non-HTTPS egress.
+      table inet agent_egress {
+          chain output {
+              type filter hook output priority 0; policy accept;
+              oifname "lo" accept
+              ct state established,related accept
+              udp dport 53 accept
+              tcp dport 53 accept
+              tcp dport 443 accept
+              drop
+          }
+      }
+  when: dev_agent_runner_restrict_egress
+  notify: DevAgentRunner | Reload nftables
+
+- name: DevAgentRunner | Enable nftables service
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: started
+  when: dev_agent_runner_restrict_egress

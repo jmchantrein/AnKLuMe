@@ -233,6 +233,8 @@ apply: ## Apply full infrastructure + provisioning
 		fi; \
 	fi
 	$(call safe_apply_wrap,apply,ansible-playbook site.yml)
+	@echo "Regenerating nftables isolation rules..."
+	@ansible-playbook site.yml --tags nftables 2>/dev/null || echo "WARNING: nftables generation failed (non-fatal)"
 	@if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
 		if [ -f /opt/anklume/nftables-isolation.nft ]; then \
 			echo "Live OS: auto-deploying nftables isolation rules..."; \

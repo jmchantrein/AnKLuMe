@@ -82,37 +82,11 @@
       - "{{ _openclaw_memory_search }}"
   changed_when: true
 
-# -- Git identity and credentials ------------------------------------------
+# -- Git identity and credentials (FINDING-03) --------------------------------
 
-- name: OpenclawServer | Configure git identity
-  community.general.git_config:
-    name: "{{ item.key }}"
-    value: "{{ item.value }}"
-    scope: global
-  loop:
-    - { key: "user.name", value: "{{ openclaw_server_agent_name }}" }
-    - { key: "user.email", value: "{{ openclaw_server_agent_name | lower }}@anklume.local" }
-
-- name: OpenclawServer | Check for mounted secrets
-  ansible.builtin.stat:
-    path: /run/secrets/git-credentials
-  register: _openclaw_git_creds
-
-- name: OpenclawServer | Configure git credential helper
-  community.general.git_config:
-    name: credential.helper
-    value: "store --file /run/secrets/git-credentials"
-    scope: global
-  when: _openclaw_git_creds.stat.exists
-
-- name: OpenclawServer | Warn if no git credentials mounted
-  ansible.builtin.debug:
-    msg: >-
-      No GitHub credentials found at /run/secrets/git-credentials.
-      {{ openclaw_server_agent_name }} cannot push to GitHub. Fix: create
-      ~/.anklume/secrets/git-credentials on the host and add the
-      github-creds disk device to the openclaw container.
-  when: not _openclaw_git_creds.stat.exists
+- name: OpenclawServer | Configure git identity and credentials
+  ansible.builtin.include_tasks:
+    file: credentials.yml
 
 # -- GitHub CLI (gh) -------------------------------------------------------
 

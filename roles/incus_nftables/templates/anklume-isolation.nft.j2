@@ -44,5 +44,9 @@ table inet anklume {
         # Admin communicates via Incus socket, not the network
         iifname { {{ incus_nftables_all_bridges | map('regex_replace', '^(.*)$', '"\\1"') | join(', ') }} } oifname { {{ incus_nftables_all_bridges | map('regex_replace', '^(.*)$', '"\\1"') | join(', ') }} } drop
 {% endif %}
+
+        # Default-deny: catch any net-* bridge not listed above (FINDING-07)
+        # Prevents new bridges from being open during regeneration window
+        iifname "net-*" oifname "net-*" drop
     }
 }

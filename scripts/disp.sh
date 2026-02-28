@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="${ANKLUME_PROJECT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # Defaults
 IMAGE=""
@@ -14,6 +14,7 @@ CMD=""
 CONSOLE=false
 NO_ATTACH=false
 VM=false
+FORCE=false
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "INFO: $*"; }
@@ -50,10 +51,55 @@ check_incus() {
     fi
 }
 
+# ── Find disposable domain from infra.yml ─────────────────
+find_disposable_domain() {
+    local infra_src
+    if [[ -f "$PROJECT_DIR/infra.yml" ]]; then
+        infra_src="$PROJECT_DIR/infra.yml"
+    elif [[ -d "$PROJECT_DIR/infra" && -f "$PROJECT_DIR/infra/base.yml" ]]; then
+        infra_src="$PROJECT_DIR/infra"
+    else
+        return 1
+    fi
+    python3 - "$infra_src" <<'PYEOF' 2>/dev/null
+import sys, yaml
+from pathlib import Path
+p = Path(sys.argv[1])
+if p.is_dir():
+    data = yaml.safe_load((p / "base.yml").read_text()) or {}
+    dd = p / "domains"
+    if dd.is_dir():
+        data.setdefault("domains", {})
+        for f in sorted(dd.glob("*.yml")):
+            data["domains"].update(yaml.safe_load(f.read_text()) or {})
+else:
+    data = yaml.safe_load(p.read_text()) or {}
+for dname, dcfg in (data.get("domains") or {}).items():
+    if dcfg.get("trust_level") == "disposable":
+        print(dname)
+        sys.exit(0)
+sys.exit(1)
+PYEOF
+}
+
 # ── Resolve domain to Incus project ───────────────────────
 resolve_project() {
     local domain="$1"
     if [[ -z "$domain" ]]; then
+        # Try to find a disposable domain in infra.yml
+        local disp_domain
+        if disp_domain=$(find_disposable_domain); then
+            info "Using disposable domain: ${disp_domain}" >&2
+            echo "$disp_domain"
+            return
+        fi
+        # No disposable domain found — refuse default project unless --force
+        if [[ "$FORCE" != "true" ]]; then
+            die "No --domain specified and no disposable domain found in infra.yml.
+  Either create a domain with trust_level: disposable in infra.yml,
+  or use --domain <name> to specify a project,
+  or use --force to launch in the default project."
+        fi
         echo "default"
         return
     fi
@@ -130,6 +176,7 @@ Options:
   --console          Attach console instead of shell
   --no-attach        Launch without attaching (background)
   --vm               Launch as VM instead of container
+  --force            Allow launching in the default project
   -h, --help         Show this help
 
 Instance name is auto-generated: disp-YYYYMMDD-HHMMSS
@@ -163,6 +210,8 @@ while [[ $# -gt 0 ]]; do
             NO_ATTACH=true; shift ;;
         --vm)
             VM=true; shift ;;
+        --force)
+            FORCE=true; shift ;;
         -h|--help)
             usage; exit 0 ;;
         *)

@@ -11,6 +11,20 @@ from conftest import read_log
 DEPLOY_SH = Path(__file__).resolve().parent.parent / "scripts" / "deploy-nftables.sh"
 
 
+def _add_br_netfilter_mocks(mock_bin):
+    """Add mock lsmod/sysctl to simulate br_netfilter loaded."""
+    mock_lsmod = mock_bin / "lsmod"
+    mock_lsmod.write_text("#!/usr/bin/env bash\necho 'br_netfilter 32768 0'\n")
+    mock_lsmod.chmod(mock_lsmod.stat().st_mode | stat.S_IEXEC)
+    mock_sysctl = mock_bin / "sysctl"
+    mock_sysctl.write_text(
+        '#!/usr/bin/env bash\n'
+        'if [[ "$2" == "net.bridge.bridge-nf-call-iptables" ]]; then echo 1; '
+        'else /usr/bin/sysctl "$@"; fi\n'
+    )
+    mock_sysctl.chmod(mock_sysctl.stat().st_mode | stat.S_IEXEC)
+
+
 @pytest.fixture()
 def mock_env(tmp_path):
     """Create a mock environment for deploy-nftables testing."""
@@ -81,6 +95,8 @@ exit 0
     mock_python = mock_bin / "python3"
     mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
     mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+
+    _add_br_netfilter_mocks(mock_bin)
 
     # Mock other tools
     for cmd in ["mkdir", "cp", "chmod", "wc", "cat", "mktemp"]:
@@ -207,6 +223,7 @@ class TestFindProjectFunction:
         """find_project returns 'anklume' when container is in anklume project."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         rules_file = tmp_path / "mock-rules.nft"
@@ -268,6 +285,7 @@ exit 0
         """When container not in anklume project, searches all projects via JSON."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         rules_file = tmp_path / "mock-rules.nft"
@@ -342,6 +360,7 @@ class TestDeployErrors:
         """Deploy fails when Incus is not available."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         mock_incus = mock_bin / "incus"
         mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
         mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
@@ -359,6 +378,7 @@ class TestDeployErrors:
         """When incus file pull fails, shows helpful error."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmd.log"
 
         mock_incus = mock_bin / "incus"
@@ -392,6 +412,7 @@ exit 0
         """When nft -c -f fails, shows syntax validation error."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmd.log"
 
         mock_incus = mock_bin / "incus"
@@ -434,6 +455,7 @@ exit 0
         """Container not found in any project gives clear error."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmd.log"
 
         mock_incus = mock_bin / "incus"
@@ -472,6 +494,7 @@ class TestDeployCleanup:
         """When file pull fails, the trap cleans up the temp file."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         tmpfile_tracker = tmp_path / "tmpfile_path.txt"
@@ -525,6 +548,7 @@ exit 0
         """When nft -c fails, the trap cleans up the temp file."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         tmpfile_tracker = tmp_path / "tmpfile_path.txt"
@@ -596,6 +620,7 @@ class TestDeployLocalMode:
         """--local reads rules from a local file, no container needed."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         rules_file = tmp_path / "test-rules.nft"
@@ -643,6 +668,7 @@ class TestDeployLocalMode:
         """--local with missing file gives clear error."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
 
         mock_nft = mock_bin / "nft"
         mock_nft.write_text("#!/usr/bin/env bash\nexit 0\n")
@@ -664,6 +690,7 @@ class TestDeployLocalMode:
         """--local --dry-run validates without installing."""
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
+        _add_br_netfilter_mocks(mock_bin)
         log_file = tmp_path / "cmds.log"
 
         rules_file = tmp_path / "test-rules.nft"
@@ -690,3 +717,55 @@ class TestDeployLocalMode:
         )
         assert result.returncode == 0
         assert "dry run" in result.stdout.lower()
+
+
+# ── br_netfilter pre-flight check (FINDING-06) ──────────────────
+
+
+class TestBrNetfilterCheck:
+    """Verify deploy-nftables.sh checks br_netfilter before applying rules."""
+
+    def test_script_checks_br_netfilter(self):
+        """Script contains br_netfilter check that exits on failure."""
+        content = DEPLOY_SH.read_text()
+        assert "br_netfilter" in content
+        assert "bridge-nf-call-iptables" in content
+
+    def test_check_is_blocking(self):
+        """br_netfilter check uses die() (not warn())."""
+        content = DEPLOY_SH.read_text()
+        # The check_br_netfilter function should call die, not just warn
+        import re
+        fn_match = re.search(
+            r"check_br_netfilter\(\)\s*\{(.*?)\}",
+            content,
+            re.DOTALL,
+        )
+        assert fn_match, "check_br_netfilter function not found"
+        fn_body = fn_match.group(1)
+        assert "die " in fn_body, "br_netfilter check must exit with error"
+        assert "warn" not in fn_body.split("die")[0], (
+            "br_netfilter check should not warn before dying"
+        )
+
+
+class TestBootstrapBrNetfilter:
+    """Verify bootstrap.sh persists br_netfilter module and sysctl."""
+
+    @classmethod
+    def setup_class(cls):
+        cls.content = (
+            Path(__file__).resolve().parent.parent
+            / "scripts"
+            / "bootstrap.sh"
+        ).read_text()
+
+    def test_module_persisted(self):
+        """bootstrap.sh persists br_netfilter in modules-load.d."""
+        assert "modules-load.d/anklume.conf" in self.content
+        assert "br_netfilter" in self.content
+
+    def test_sysctl_persisted(self):
+        """bootstrap.sh persists bridge-nf-call-iptables in sysctl."""
+        assert "bridge-nf-call-iptables=1" in self.content
+        assert "99-anklume.conf" in self.content

@@ -125,6 +125,7 @@ if [[ "$FLUSH_VRAM" == "true" ]]; then
     info "${PREFIX}VRAM flush: enabled"
 else
     info "${PREFIX}VRAM flush: skipped"
+    warn "SECURITY: --no-flush skips VRAM clearing. Previous domain data may persist in GPU memory."
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -155,6 +156,32 @@ if [[ "$FLUSH_VRAM" == "true" ]]; then
     # Attempt GPU reset (may fail on some hardware, non-fatal)
     incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
         nvidia-smi --gpu-reset 2>/dev/null || warn "GPU reset not supported (non-fatal)"
+
+    # Verify VRAM is clean: allocate a small CUDA buffer and check for zeros
+    info "Verifying VRAM flush..."
+    # shellcheck disable=SC2016
+    VERIFY_OK=$(incus exec "$GPU_CONTAINER" --project "$AI_PROJECT" -- \
+        python3 -c '
+import sys
+try:
+    import torch
+    if not torch.cuda.is_available():
+        print("skip"); sys.exit(0)
+    t = torch.zeros(1024, device="cuda")
+    r = torch.cuda.FloatTensor(1024)
+    if r.abs().max().item() < 1e-6:
+        print("ok")
+    else:
+        print("dirty")
+except Exception:
+    print("skip")
+' 2>/dev/null) || VERIFY_OK="skip"
+
+    case "$VERIFY_OK" in
+        ok)    info "VRAM verification passed (clean)." ;;
+        dirty) warn "VRAM verification: non-zero data detected after flush!" ;;
+        skip)  info "VRAM verification skipped (no CUDA/torch available)." ;;
+    esac
     info "VRAM flush complete."
 fi
 

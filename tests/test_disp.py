@@ -144,10 +144,11 @@ def mock_env(tmp_path):
     mock_bin.mkdir()
     log_file = tmp_path / "incus.log"
 
-    # Create a minimal infra.yml for default image detection
+    # Create a minimal infra.yml for default image detection + disposable domain
     infra_file = tmp_path / "infra.yml"
     infra_file.write_text(
         "global:\n  default_os_image: 'images:debian/13'\n"
+        "domains:\n  sandbox:\n    trust_level: disposable\n"
     )
 
     mock_incus = mock_bin / "incus"
@@ -178,15 +179,15 @@ exit 1
     # Also need python3 and date in PATH
     env = os.environ.copy()
     env["PATH"] = f"{mock_bin}:{env['PATH']}"
+    env["ANKLUME_PROJECT_DIR"] = str(tmp_path)
     return env, log_file, tmp_path
 
 
 class TestLaunch:
     def test_launch_default(self, mock_env):
-        """Launching with no args creates an ephemeral instance."""
+        """Launching with no args uses auto-detected disposable domain."""
         env, log, tmp = mock_env
-        # Override PROJECT_DIR to use our tmp infra.yml
-        # Use --no-attach to avoid interactive shell
+        # No --domain: auto-detects sandbox (trust_level: disposable)
         result = run_disp(["--no-attach"], env=env)
         assert result.returncode == 0
         cmds = read_log(log)
@@ -194,7 +195,7 @@ class TestLaunch:
         launch_cmds = [c for c in cmds if c.startswith("launch")]
         assert len(launch_cmds) == 1
         assert "--ephemeral" in launch_cmds[0]
-        assert "--project default" in launch_cmds[0]
+        assert "--project sandbox" in launch_cmds[0]
 
     def test_launch_with_domain(self, mock_env):
         """Launching with --domain uses the correct project."""
@@ -297,3 +298,32 @@ class TestScriptContent:
         content = DISP_SH.read_text()
         # The get_default_image function should provide the default
         assert "get_default_image" in content
+
+
+# ── Default project guard (FINDING-08) ───────────────────────
+
+
+class TestDefaultProjectGuard:
+    """Verify disp.sh refuses default project without --force."""
+
+    @classmethod
+    def setup_class(cls):
+        cls.content = DISP_SH.read_text()
+
+    def test_force_flag_exists(self):
+        """Script supports --force flag."""
+        assert "--force" in self.content
+
+    def test_default_project_refused(self):
+        """Script refuses default project when no --domain and no --force."""
+        assert "No --domain specified" in self.content
+
+    def test_disposable_domain_detection(self):
+        """Script auto-detects disposable domain from infra.yml."""
+        assert "find_disposable_domain" in self.content
+        assert "trust_level" in self.content
+        assert "disposable" in self.content
+
+    def test_help_mentions_force(self):
+        """--help shows --force option."""
+        assert "force" in self.content.lower()

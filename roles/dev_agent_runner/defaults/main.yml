@@ -23,3 +23,8 @@ dev_agent_runner_enable_teams: true
 
 # Audit hook (log every tool invocation)
 dev_agent_runner_audit_hook: true
+
+# Egress restriction (FINDING-10): only allow API endpoints
+dev_agent_runner_restrict_egress: true
+dev_agent_runner_allowed_domains:
+  - "api.anthropic.com"

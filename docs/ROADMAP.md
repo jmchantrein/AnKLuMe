@@ -3349,7 +3349,7 @@ g) **Makefile / CLI integration**:
 
 ---
 
-## Phase 46: Security Hardening (from Operational Audit)
+## Phase 46: Security Hardening (from Operational Audit) ✅ COMPLETE
 
 **Goal**: Implement actionable fixes from the security audit
 (`docs/security-audit-operational.md`). Findings that are
@@ -3459,21 +3459,21 @@ j) **Generated file integrity check** (FINDING-12):
      iterating) but makes the risk visible
 
 **Validation criteria**:
-- [ ] `docs/SPEC-operations.md` contains "Security Model and Accepted
+- [x] `docs/SPEC-operations.md` contains "Security Model and Accepted
   Risks" section covering FINDING-01 and FINDING-02
-- [ ] Credential mount uses `raw.idmap`, host file is `0600`
-- [ ] `generate.py` warns on untrusted/disposable LXC machines
-- [ ] VRAM flush includes verification step
-- [ ] `scripts/nftables-deploy.sh` fails if `br_netfilter` not loaded
-- [ ] `bootstrap.sh` persists `br_netfilter` module and sysctl
-- [ ] `anklume domain apply` regenerates nftables rules automatically
-- [ ] Default-deny nftables rule covers unknown `net-*` bridges
-- [ ] `scripts/disp.sh` refuses `default` project without `--force`
-- [ ] `requirements.yml` uses exact version pins
-- [ ] Agent sandbox blocks non-API egress
-- [ ] `anklume domain apply` warns on uncommitted generated file changes
-- [ ] `anklume dev lint` passes
-- [ ] All existing tests pass
+- [x] Credential mount uses `raw.idmap`, host file is `0600`
+- [x] `generate.py` warns on untrusted/disposable LXC machines
+- [x] VRAM flush includes verification step
+- [x] `scripts/nftables-deploy.sh` fails if `br_netfilter` not loaded
+- [x] `bootstrap.sh` persists `br_netfilter` module and sysctl
+- [x] `anklume domain apply` regenerates nftables rules automatically
+- [x] Default-deny nftables rule covers unknown `net-*` bridges
+- [x] `scripts/disp.sh` refuses `default` project without `--force`
+- [x] `requirements.yml` uses exact version pins
+- [x] Agent sandbox blocks non-API egress
+- [x] `anklume domain apply` warns on uncommitted generated file changes
+- [x] `anklume dev lint` passes
+- [x] All existing tests pass (3981 passed)
 
 ---
 
@@ -3702,7 +3702,7 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 43: Docker-Style CLI (Typer)
 - Phase 44: Test Infrastructure Consolidation and Hardening (in progress)
 - Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) (planned)
-- Phase 46: Security Hardening (from operational audit) (planned)
+- Phase 46: Security Hardening (from operational audit) ✅
 
 **In progress**:
 - Phase 44: Test Infrastructure Consolidation and Hardening

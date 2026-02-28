@@ -652,3 +652,25 @@ class TestMakefileLLMTargets:
         assert "ollama-dev" in phony_set, (
             "ollama-dev alias missing from .PHONY"
         )
+
+
+# ── TestMakefileIntegrityCheck (FINDING-12) ──────────────
+
+
+class TestMakefileIntegrityCheck:
+    """Verify apply target warns about uncommitted generated files."""
+
+    def test_apply_checks_uncommitted_generated_files(self):
+        """Apply target includes git diff check for inventory/group_vars/host_vars."""
+        content = _parse_makefile()
+        assert "git diff --name-only -- inventory/ group_vars/ host_vars/" in content
+
+    def test_apply_warns_on_dirty_generated_files(self):
+        """Apply target prints WARNING for uncommitted generated file changes."""
+        content = _parse_makefile()
+        assert "Uncommitted changes in generated files" in content
+
+    def test_apply_nftables_regen_after_apply(self):
+        """Apply target regenerates nftables rules after playbook run (FINDING-07)."""
+        content = _parse_makefile()
+        assert "Regenerating nftables isolation rules" in content

@@ -253,6 +253,7 @@ setup_host_networking() {
         if cat > /etc/sysctl.d/99-anklume.conf 2>/dev/null <<'SYSCTL'
 net.ipv4.ip_forward=1
 net.ipv4.conf.all.forwarding=1
+net.bridge.bridge-nf-call-iptables=1
 SYSCTL
         then
             sysctl --system > /dev/null 2>&1 || true
@@ -710,15 +711,13 @@ EOF
         fi
 
         # ── Enable br_netfilter for nftables bridge filtering ──
-        echo "--- Configuring br_netfilter for bridge filtering ---"
-        modprobe br_netfilter 2>/dev/null || echo "WARNING: Failed to load br_netfilter module"
-        echo "br_netfilter" > /etc/modules-load.d/br_netfilter.conf 2>/dev/null || \
-            echo "WARNING: Could not persist br_netfilter module (check permissions)"
+        info "Configuring br_netfilter for bridge filtering..."
+        modprobe br_netfilter 2>/dev/null || warn "Failed to load br_netfilter module"
+        echo "br_netfilter" > /etc/modules-load.d/anklume.conf 2>/dev/null || \
+            warn "Could not persist br_netfilter module"
         sysctl -w net.bridge.bridge-nf-call-iptables=1 >/dev/null 2>&1 || \
-            echo "WARNING: Failed to set net.bridge.bridge-nf-call-iptables"
-        echo "net.bridge.bridge-nf-call-iptables=1" > /etc/sysctl.d/99-anklume-bridge.conf 2>/dev/null || \
-            echo "WARNING: Could not persist sysctl setting (check permissions)"
-        echo "br_netfilter configured (nftables will filter bridge traffic)."
+            warn "Failed to set net.bridge.bridge-nf-call-iptables"
+        ok "br_netfilter configured (nftables will filter bridge traffic)"
 
         # ── Container creation (prod only) ──────────────────────
         create_container "anklume-instance"

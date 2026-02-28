@@ -1,14 +1,18 @@
 ---
+# Pin exact versions for reproducibility (FINDING-09).
+# Update versions explicitly after testing upstream releases.
 collections:
   - name: community.general
-    version: ">=9.0.0"
+    version: "12.4.0"
   - name: ansible.posix
-    version: ">=1.5.0"
+    version: "2.1.0"
 
 # Galaxy roles (installed to roles_vendor/ by make init)
 # Add entries here when using official upstream roles.
+# Pin exact versions — no >= ranges (FINDING-09).
+# Review process: test new version locally before bumping pin.
 # Example:
 #   roles:
 #     - name: geerlingguy.docker
-#       version: ">=7.0.0"
+#       version: "7.4.1"
 roles: []

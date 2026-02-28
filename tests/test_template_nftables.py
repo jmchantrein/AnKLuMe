@@ -221,11 +221,12 @@ class TestNftablesManyBridges:
         )
         for bridge in bridges:
             assert f'"{bridge}"' in result, f"Bridge {bridge} missing from output"
-        # Inter-bridge drop line should contain all 20 bridges
+        # Inter-bridge drop lines: explicit set + wildcard default-deny (FINDING-07)
         drop_lines = [line for line in result.splitlines() if "drop" in line and "iifname" in line]
-        assert len(drop_lines) == 1
+        assert len(drop_lines) == 2  # explicit bridges + net-* wildcard
         for bridge in bridges:
             assert bridge in drop_lines[0]
+        assert 'net-*' in drop_lines[1]
 
     def test_single_bridge_minimal_ruleset(self):
         """Single bridge produces minimal valid ruleset without inter-bridge drop."""
@@ -234,9 +235,10 @@ class TestNftablesManyBridges:
             incus_nftables_resolved_policies=[],
         )
         assert 'iifname "net-solo" oifname "net-solo" accept' in result
-        # With only one bridge, no inter-bridge drop is needed
+        # With only one bridge, no explicit inter-bridge drop, but wildcard present (FINDING-07)
         drop_lines = [line for line in result.splitlines() if "drop" in line and "iifname" in line]
-        assert len(drop_lines) == 0
+        assert len(drop_lines) == 1  # only the net-* wildcard default-deny
+        assert 'net-*' in drop_lines[0]
         assert "table inet anklume" in result
 
 
@@ -462,15 +464,16 @@ class TestNftablesSpecialBridgeNames:
         assert '"net-very-long-domain-name"' in result
 
     def test_two_bridges_have_inter_bridge_drop(self):
-        """Exactly two bridges produce an inter-bridge drop rule."""
+        """Exactly two bridges produce an inter-bridge drop rule + wildcard."""
         result = self._render(
             incus_nftables_all_bridges=["net-a", "net-b"],
             incus_nftables_resolved_policies=[],
         )
         drop_lines = [ln for ln in result.splitlines() if "drop" in ln and "iifname" in ln]
-        assert len(drop_lines) == 1
+        assert len(drop_lines) == 2  # explicit bridges + net-* wildcard (FINDING-07)
         assert '"net-a"' in drop_lines[0]
         assert '"net-b"' in drop_lines[0]
+        assert 'net-*' in drop_lines[1]
 
     def test_accept_rules_come_before_drop(self):
         """Same-bridge accept and policy accept rules appear before inter-bridge drop."""
