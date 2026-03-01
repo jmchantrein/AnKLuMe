@@ -1,0 +1,20 @@
+---
+- name: Converge
+  hosts: molecule-test-instance
+  gather_facts: false
+  pre_tasks:
+    - name: Converge | Bootstrap Python on target
+      ansible.builtin.raw: |
+        test -x /usr/bin/python3 || (apt-get update && apt-get install -y python3)
+      changed_when: false
+
+    - name: Converge | Gather facts
+      ansible.builtin.setup:
+  tasks:
+    - name: Converge | Include Node.js setup
+      ansible.builtin.include_tasks:
+        file: roles/_shared/tasks/nodejs.yml
+      vars:
+        _nodejs_version: "{{ openclaw_server_node_version }}"
+  roles:
+    - role: openclaw_server

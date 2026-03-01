@@ -6,15 +6,15 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import make_mock_script
 
 IMPORT_SH = Path(__file__).resolve().parent.parent / "scripts" / "import-infra.sh"
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock environment for import-infra testing."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "cmds.log"
 
     # Mock incus with 2 projects (anklume, work) and instances
@@ -38,8 +38,7 @@ def mock_env(tmp_path):
         '"state":{"network":{"enp5s0":{"addresses":'
         '[{"family":"inet","address":"10.100.1.20"}]}}}}]',
     )
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "incus $@" >> "{log_file}"
 
 # project list --format json
@@ -62,15 +61,10 @@ fi
 
 exit 0
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Mock python3
-    mock_python = mock_bin / "python3"
-    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
-    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(mock_bin / "python3", "#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path
 
 

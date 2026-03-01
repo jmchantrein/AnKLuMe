@@ -3,12 +3,11 @@
 import os
 import re
 import shutil
-import stat
 import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DISP_SH = PROJECT_ROOT / "scripts" / "disp.sh"
@@ -138,10 +137,9 @@ class TestArgParsing:
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock incus binary that logs calls."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "incus.log"
 
     # Create a minimal infra.yml for default image detection + disposable domain
@@ -151,8 +149,7 @@ def mock_env(tmp_path):
         "domains:\n  sandbox:\n    trust_level: disposable\n"
     )
 
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
 if [[ "$1" == "project" && "$2" == "list" ]]; then
     echo "default,YES,YES,YES,YES,YES,YES,Default,0"
@@ -174,11 +171,8 @@ fi
 echo "mock: unhandled command: $*" >&2
 exit 1
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Also need python3 and date in PATH
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     env["ANKLUME_PROJECT_DIR"] = str(tmp_path)
     return env, log_file, tmp_path
 

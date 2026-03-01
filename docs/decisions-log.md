@@ -769,3 +769,32 @@ the check result for human review.
 A warning in logs gives developers signal without blocking CI.
 
 **Status**: pending review
+
+---
+
+### DEC-AUDIT-001: Operational docs exempt from FR translation (ADR-011)
+
+**Date**: 2026-03-01
+
+**Problem**: Five documentation files lack French translations per ADR-011.
+These are internal development/operational documents, not user-facing:
+- `docs/live-os-checklist.md` (build checklist)
+- `docs/live-os-friction.md` (UX friction log)
+- `docs/overnight-execution-plan.md` (dev session plan)
+- `docs/phase-20g-persistent-data.md` (implementation notes)
+- `docs/security-audit-operational.md` (audit findings)
+
+**Decision**: Exempt internal operational documents from ADR-011 FR
+translation requirement. ADR-011 applies to user-facing documentation
+(SPEC, ARCHITECTURE, quickstart, guides, feature docs). Development
+logs, checklists, and session plans are developer-only artifacts that
+change frequently and provide no value translated.
+
+**Alternatives considered**:
+(a) Translate all 5 — high effort, low value, constant sync burden
+(b) Delete the files — loses useful operational context
+
+**Rationale**: ADR-011 intent is user accessibility, not internal
+process documentation. These files are referenced only by developers.
+
+**Status**: pending review

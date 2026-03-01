@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import make_mock_script
 
 BOOTSTRAP_SH = Path(__file__).resolve().parent.parent / "scripts" / "bootstrap.sh"
 
@@ -35,20 +36,19 @@ def _make_patched_bootstrap(tmp_path):
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock environment for bootstrap testing."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "cmds.log"
 
     # Mock systemd-detect-virt
-    mock_virt = mock_bin / "systemd-detect-virt"
-    mock_virt.write_text(f'#!/usr/bin/env bash\necho "$@" >> "{log_file}"\necho "none"\n')
-    mock_virt.chmod(mock_virt.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(
+        mock_bin / "systemd-detect-virt",
+        f'#!/usr/bin/env bash\necho "$@" >> "{log_file}"\necho "none"\n',
+    )
 
     # Mock incus (handles all commands bootstrap uses)
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "incus $@" >> "{log_file}"
 if [[ "$1" == "info" ]]; then
     if [[ -n "$2" ]]; then
@@ -86,23 +86,19 @@ if [[ "$1" == "exec" ]]; then
 fi
 exit 0
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Mock other commands that bootstrap checks
     for cmd in ["ansible-playbook", "ansible-lint", "yamllint", "pip3"]:
-        mock_cmd = mock_bin / cmd
-        mock_cmd.write_text("#!/usr/bin/env bash\nexit 0\n")
-        mock_cmd.chmod(mock_cmd.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / cmd)
 
     # Mock python3 to pass through
-    mock_python = mock_bin / "python3"
-    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
-    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(
+        mock_bin / "python3",
+        "#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n",
+    )
 
     patched_bootstrap, etc_anklume = _make_patched_bootstrap(tmp_path)
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path, patched_bootstrap, etc_anklume
 
 

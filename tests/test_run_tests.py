@@ -1,19 +1,14 @@
 """Tests for scripts/run-tests.sh — sandboxed Molecule test runner."""
 
 import os
-import stat
 import subprocess
 import textwrap
 from pathlib import Path
 
 import pytest
+from conftest import make_mock_script
 
 SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts" / "run-tests.sh"
-
-
-def _make_executable(path):
-    """Make a file executable."""
-    path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
 def _run(args, env, cwd=None, timeout=30):
@@ -29,19 +24,17 @@ def _run(args, env, cwd=None, timeout=30):
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock environment with fake binaries for run-tests.sh.
 
     Provides mock incus, ping, and sleep binaries.
     The mock incus logs every invocation to cmds.log.
     """
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "cmds.log"
 
     # Mock incus — logs all calls; behaves according to subcommand
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(textwrap.dedent(f"""\
+    make_mock_script(mock_bin / "incus", textwrap.dedent(f"""\
         #!/usr/bin/env bash
         echo "incus $*" >> "{log_file}"
 
@@ -88,21 +81,16 @@ def mock_env(tmp_path):
 
         exit 0
     """))
-    _make_executable(mock_incus)
 
     # Mock ping — always succeeds (for wait_for_network)
-    mock_ping = mock_bin / "ping"
-    mock_ping.write_text(textwrap.dedent(f"""\
+    make_mock_script(mock_bin / "ping", textwrap.dedent(f"""\
         #!/usr/bin/env bash
         echo "ping $*" >> "{log_file}"
         exit 0
     """))
-    _make_executable(mock_ping)
 
     # Mock sleep — noop (for speed)
-    mock_sleep = mock_bin / "sleep"
-    mock_sleep.write_text("#!/usr/bin/env bash\nexit 0\n")
-    _make_executable(mock_sleep)
+    make_mock_script(mock_bin / "sleep")
 
     # Mock seq — pass through to real seq
     mock_seq = mock_bin / "seq"
@@ -112,8 +100,6 @@ def mock_env(tmp_path):
             mock_seq.symlink_to(real_seq)
             break
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path, mock_bin
 
 
@@ -156,7 +142,7 @@ class TestRunTestsCreate:
         """When container does not exist, create launches a new one."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -173,7 +159,6 @@ class TestRunTestsCreate:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
         result = _run(["create"], env)
         assert result.returncode == 0
         log = log_file.read_text()
@@ -237,7 +222,7 @@ class TestRunTestsDestroy:
         """destroy handles missing container gracefully."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -248,7 +233,6 @@ class TestRunTestsDestroy:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
         result = _run(["destroy"], env)
         assert result.returncode == 0
         assert "not found or already removed" in result.stdout
@@ -292,7 +276,7 @@ class TestRunTestsNetworkWait:
         """Network timeout after MAX_WAIT seconds produces error."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -312,12 +296,10 @@ class TestRunTestsNetworkWait:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         patched = tmp_path / "run-tests-fast.sh"
         original = SCRIPT_PATH.read_text()
-        patched.write_text(original.replace("MAX_WAIT=120", "MAX_WAIT=2"))
-        _make_executable(patched)
+        make_mock_script(patched, original.replace("MAX_WAIT=120", "MAX_WAIT=2"))
 
         result = subprocess.run(
             ["bash", str(patched), "create"],
@@ -336,7 +318,7 @@ class TestRunTestsNetworkWait:
         counter_file.write_text("0")
 
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -364,7 +346,6 @@ class TestRunTestsNetworkWait:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         result = _run(["create"], env)
         assert result.returncode == 0
@@ -439,7 +420,7 @@ class TestRunTestsMolecule:
         """test checks that the runner container exists."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -450,7 +431,6 @@ class TestRunTestsMolecule:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         result = _run(["test"], env)
         assert result.returncode != 0
@@ -460,7 +440,7 @@ class TestRunTestsMolecule:
         """When molecule fails inside runner, test reports failure."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -474,7 +454,6 @@ class TestRunTestsMolecule:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         result = _run(["test"], env)
         assert result.returncode != 0
@@ -489,8 +468,7 @@ class TestRunTestsErrors:
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text("#!/usr/bin/env bash\nexit 1\n")
-        _make_executable(mock_incus)
+        make_mock_script(mock_incus, "#!/usr/bin/env bash\nexit 1\n")
 
         env = os.environ.copy()
         env["PATH"] = f"{mock_bin}:{env['PATH']}"
@@ -502,7 +480,7 @@ class TestRunTestsErrors:
         """create fails when incus launch returns error."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -520,7 +498,6 @@ class TestRunTestsErrors:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         result = _run(["create"], env)
         assert result.returncode != 0
@@ -542,7 +519,7 @@ class TestRunTestsNestingProfile:
         """When nesting profile does not exist, it is created with security settings."""
         env, log_file, tmp_path, mock_bin = mock_env
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -565,7 +542,6 @@ class TestRunTestsNestingProfile:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
         result = _run(["create"], env)
         assert result.returncode == 0
         log = log_file.read_text()
@@ -584,7 +560,7 @@ class TestRunTestsEnvOverrides:
         env, log_file, tmp_path, mock_bin = mock_env
         env["ANKLUME_RUNNER_IMAGE"] = "images:ubuntu/24.04"
         mock_incus = mock_bin / "incus"
-        mock_incus.write_text(textwrap.dedent(f"""\
+        make_mock_script(mock_incus, textwrap.dedent(f"""\
             #!/usr/bin/env bash
             echo "incus $*" >> "{log_file}"
             if [[ "$1" == "project" && "$2" == "list" ]]; then
@@ -601,7 +577,6 @@ class TestRunTestsEnvOverrides:
             fi
             exit 0
         """))
-        _make_executable(mock_incus)
 
         result = _run(["create"], env)
         assert result.returncode == 0

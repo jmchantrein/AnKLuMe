@@ -122,6 +122,42 @@ def validate(infra, *, check_host_subnets=True):
             f"got {type(nesting_prefix).__name__}"
         )
 
+    ai_vram_flush = g.get("ai_vram_flush")
+    if ai_vram_flush is not None and not isinstance(
+        ai_vram_flush, bool
+    ):
+        errors.append(
+            f"global.ai_vram_flush must be a boolean, "
+            f"got {type(ai_vram_flush).__name__}"
+        )
+
+    default_os_image = g.get("default_os_image")
+    if default_os_image is not None and not isinstance(
+        default_os_image, str
+    ):
+        errors.append(
+            f"global.default_os_image must be a string, "
+            f"got {type(default_os_image).__name__}"
+        )
+
+    default_connection = g.get("default_connection")
+    if default_connection is not None and not isinstance(
+        default_connection, str
+    ):
+        errors.append(
+            f"global.default_connection must be a string, "
+            f"got {type(default_connection).__name__}"
+        )
+
+    default_user = g.get("default_user")
+    if default_user is not None and not isinstance(
+        default_user, str
+    ):
+        errors.append(
+            f"global.default_user must be a string, "
+            f"got {type(default_user).__name__}"
+        )
+
     if gpu_policy not in valid_gpu_policies:
         errors.append(
             f"global.gpu_policy must be 'exclusive' or 'shared', "

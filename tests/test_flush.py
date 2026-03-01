@@ -6,23 +6,21 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 FLUSH_SH = Path(__file__).resolve().parent.parent / "scripts" / "flush.sh"
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock incus binary + anklume context files for flush testing."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "incus.log"
 
     # Simulate anklume resources: 2 projects, 2 instances, 1 profile, 1 bridge
     deleted_dir = tmp_path / "deleted"
     deleted_dir.mkdir()
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
 
 # project list --format csv -c n (used by _list_projects and pre-flight)
@@ -92,23 +90,18 @@ fi
 echo "mock: unhandled: $*" >&2
 exit 0
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Mock python3 for JSON parsing (flush.sh uses python3 -c)
-    mock_python = mock_bin / "python3"
-    mock_python.write_text("""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "python3", """#!/usr/bin/env bash
 # Pass-through to real python3
 /usr/bin/python3 "$@"
 """)
-    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
 
     # Create generated directories to be cleaned
     for d in ["inventory", "group_vars", "host_vars"]:
         (tmp_path / d).mkdir()
         (tmp_path / d / "test.yml").write_text("test: true\n")
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path
 
 

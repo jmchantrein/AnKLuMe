@@ -3,12 +3,11 @@
 import json
 import os
 import shutil
-import stat
 import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 GOLDEN_SH = Path(__file__).resolve().parent.parent / "scripts" / "golden.sh"
 
@@ -50,14 +49,12 @@ FAKE_ANKLUME_INSTANCES = json.dumps([
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock incus binary that logs calls and returns fake data."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "incus.log"
 
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
 
 # project list
@@ -114,10 +111,7 @@ fi
 echo "mock: unhandled command: $*" >&2
 exit 1
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file
 
 

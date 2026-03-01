@@ -46,11 +46,11 @@
       - --protocol
       - simplestreams
       - --public
-  register: incus_remote_add
-  changed_when: "'exists' not in incus_remote_add.stderr"
+  register: incus_instances_remote_add
+  changed_when: "'exists' not in incus_instances_remote_add.stderr"
   failed_when:
-    - incus_remote_add.rc != 0
-    - "'exists' not in incus_remote_add.stderr"
+    - incus_instances_remote_add.rc != 0
+    - "'exists' not in incus_instances_remote_add.stderr"
   run_once: true
 
 - name: IncusInstances | List locally cached images

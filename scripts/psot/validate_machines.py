@@ -156,3 +156,23 @@ def _validate_machine_fields(
             f"Machine '{mname}': weight must be a positive "
             f"integer, got {weight}"
         )
+    gpu = machine.get("gpu")
+    if gpu is not None and not isinstance(gpu, bool):
+        errors.append(
+            f"Machine '{mname}': gpu must be a boolean, "
+            f"got {type(gpu).__name__}"
+        )
+    roles = machine.get("roles")
+    if roles is not None and not isinstance(roles, list):
+        errors.append(
+            f"Machine '{mname}': roles must be a list, "
+            f"got {type(roles).__name__}"
+        )
+    storage_vols = machine.get("storage_volumes")
+    if storage_vols is not None and not isinstance(
+        storage_vols, dict
+    ):
+        errors.append(
+            f"Machine '{mname}': storage_volumes must be a "
+            f"mapping, got {type(storage_vols).__name__}"
+        )

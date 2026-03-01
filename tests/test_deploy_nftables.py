@@ -6,30 +6,29 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 DEPLOY_SH = Path(__file__).resolve().parent.parent / "scripts" / "deploy-nftables.sh"
 
 
 def _add_br_netfilter_mocks(mock_bin):
     """Add mock lsmod/sysctl to simulate br_netfilter loaded."""
-    mock_lsmod = mock_bin / "lsmod"
-    mock_lsmod.write_text("#!/usr/bin/env bash\necho 'br_netfilter 32768 0'\n")
-    mock_lsmod.chmod(mock_lsmod.stat().st_mode | stat.S_IEXEC)
-    mock_sysctl = mock_bin / "sysctl"
-    mock_sysctl.write_text(
+    make_mock_script(
+        mock_bin / "lsmod",
+        "#!/usr/bin/env bash\necho 'br_netfilter 32768 0'\n",
+    )
+    make_mock_script(
+        mock_bin / "sysctl",
         '#!/usr/bin/env bash\n'
         'if [[ "$2" == "net.bridge.bridge-nf-call-iptables" ]]; then echo 1; '
-        'else /usr/bin/sysctl "$@"; fi\n'
+        'else /usr/bin/sysctl "$@"; fi\n',
     )
-    mock_sysctl.chmod(mock_sysctl.stat().st_mode | stat.S_IEXEC)
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock environment for deploy-nftables testing."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "cmds.log"
 
     # Create a fake rules file that incus file pull will "retrieve"
@@ -48,8 +47,7 @@ def mock_env(tmp_path):
     rules_file.write_text(rules_content)
 
     # Mock incus
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "incus $@" >> "{log_file}"
 
 # project list --format csv (pre-flight)
@@ -73,11 +71,9 @@ fi
 
 exit 0
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Mock nft (validate syntax)
-    mock_nft = mock_bin / "nft"
-    mock_nft.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "nft", f"""#!/usr/bin/env bash
 echo "nft $@" >> "{log_file}"
 # -c = check mode (dry validation)
 if [[ "$1" == "-c" ]]; then
@@ -89,12 +85,9 @@ if [[ "$1" == "-f" ]]; then
 fi
 exit 0
 """)
-    mock_nft.chmod(mock_nft.stat().st_mode | stat.S_IEXEC)
 
     # Mock python3
-    mock_python = mock_bin / "python3"
-    mock_python.write_text("#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
-    mock_python.chmod(mock_python.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(mock_bin / "python3", "#!/usr/bin/env bash\n/usr/bin/python3 \"$@\"\n")
 
     _add_br_netfilter_mocks(mock_bin)
 
@@ -112,11 +105,8 @@ exit 0
     patched_dest = tmp_path / "nftables.d"
     patched_dest.mkdir()
     patched = original.replace('/etc/nftables.d', str(patched_dest))
-    patched_deploy.write_text(patched)
-    patched_deploy.chmod(patched_deploy.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(patched_deploy, patched)
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     return env, log_file, tmp_path, patched_deploy
 
 

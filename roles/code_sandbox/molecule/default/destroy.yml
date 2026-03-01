@@ -1,0 +1,17 @@
+---
+- name: Destroy test container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Destroy | Stop molecule test container
+      ansible.builtin.command:
+        cmd: incus stop molecule-test-instance --project default --force
+      changed_when: true
+      failed_when: false
+
+    - name: Destroy | Remove molecule test container
+      ansible.builtin.command:
+        cmd: incus delete molecule-test-instance --project default
+      changed_when: true
+      failed_when: false

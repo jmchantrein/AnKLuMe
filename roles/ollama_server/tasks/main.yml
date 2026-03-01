@@ -12,7 +12,7 @@
 - name: OllamaServer | Check GPU access
   ansible.builtin.command:
     cmd: nvidia-smi
-  register: ollama_gpu_check
+  register: ollama_server_gpu_check
   changed_when: false
   failed_when: false
 
@@ -20,7 +20,7 @@
   ansible.builtin.debug:
     msg: >-
       {{ 'GPU available: nvidia-smi succeeded'
-         if ollama_gpu_check.rc == 0
+         if ollama_server_gpu_check.rc == 0
          else 'No GPU detected — Ollama will run in CPU-only mode' }}
 
 - name: OllamaServer | Install prerequisites
@@ -60,11 +60,11 @@
 - name: OllamaServer | Wait for Ollama API to be ready  # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: curl -sf http://localhost:11434/api/tags
-  register: ollama_api_check
+  register: ollama_server_api_check
   changed_when: false
   retries: 15
   delay: 2
-  until: ollama_api_check.rc == 0
+  until: ollama_server_api_check.rc == 0
 
 - name: OllamaServer | Pull default model
   ansible.builtin.command:

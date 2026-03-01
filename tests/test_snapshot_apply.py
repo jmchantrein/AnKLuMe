@@ -2,32 +2,29 @@
 
 import os
 import re
-import stat
 import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 SNAPSHOT_APPLY_SH = Path(__file__).resolve().parent.parent / "scripts" / "snapshot-apply.sh"
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create mock incus, ansible-inventory, and python3 binaries.
 
     The mock incus tracks created snapshots in a sidecar directory so that
     rollback tests can verify snapshot existence realistically.
     """
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "incus.log"
     snap_track = tmp_path / "snap-track"
     snap_track.mkdir()
 
     # ── Mock incus ───────────────────────────────────────────
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "$@" >> "{log_file}"
 SNAP_TRACK="{snap_track}"
 
@@ -73,11 +70,9 @@ fi
 echo "mock: unhandled command: $*" >&2
 exit 1
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # ── Mock ansible-inventory ───────────────────────────────
-    mock_ansible_inv = mock_bin / "ansible-inventory"
-    mock_ansible_inv.write_text("""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "ansible-inventory", """#!/usr/bin/env bash
 cat << 'JSON'
 {
   "_meta": {
@@ -95,15 +90,13 @@ cat << 'JSON'
 }
 JSON
 """)
-    mock_ansible_inv.chmod(mock_ansible_inv.stat().st_mode | stat.S_IEXEC)
 
     # ── Mock python3 ─────────────────────────────────────────
     # Routes based on $2 (the -c code argument), not stdin.
     # Order matters: "import yaml" must be checked BEFORE "group = "
     # because get_instance_project code contains both "yaml" and
     # "group = f.split(...)" which would falsely match the group branch.
-    mock_python3 = mock_bin / "python3"
-    mock_python3.write_text("""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "python3", """#!/usr/bin/env bash
 code="$2"
 
 if echo "$code" | grep -q "hostvars"; then
@@ -136,10 +129,7 @@ else
     cat > /dev/null 2>&1 || true
 fi
 """)
-    mock_python3.chmod(mock_python3.stat().st_mode | stat.S_IEXEC)
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     env["HOME"] = str(tmp_path)
 
     return env, log_file, snap_track
@@ -233,18 +223,14 @@ class TestCreate:
         mock_bin.mkdir()
 
         # ansible-inventory returning empty hosts
-        ai = mock_bin / "ansible-inventory"
-        ai.write_text('#!/usr/bin/env bash\necho \'{"_meta":{"hostvars":{}}}\'\n')
-        ai.chmod(ai.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / "ansible-inventory",
+                         '#!/usr/bin/env bash\necho \'{"_meta":{"hostvars":{}}}\'\n')
 
         # python3 returning nothing (no hosts)
-        py = mock_bin / "python3"
-        py.write_text('#!/usr/bin/env bash\ncat > /dev/null 2>&1 || true\n')
-        py.chmod(py.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / "python3",
+                         '#!/usr/bin/env bash\ncat > /dev/null 2>&1 || true\n')
 
-        incus = mock_bin / "incus"
-        incus.write_text("#!/usr/bin/env bash\nexit 0\n")
-        incus.chmod(incus.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / "incus")
 
         env = os.environ.copy()
         env["PATH"] = f"{mock_bin}:{env['PATH']}"
@@ -300,9 +286,7 @@ class TestRollback:
         mock_bin.mkdir()
 
         for name in ("incus", "ansible-inventory", "python3"):
-            p = mock_bin / name
-            p.write_text("#!/usr/bin/env bash\nexit 0\n")
-            p.chmod(p.stat().st_mode | stat.S_IEXEC)
+            make_mock_script(mock_bin / name)
 
         env = os.environ.copy()
         env["PATH"] = f"{mock_bin}:{env['PATH']}"
@@ -351,9 +335,7 @@ class TestList:
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
 
-        incus = mock_bin / "incus"
-        incus.write_text("#!/usr/bin/env bash\nexit 0\n")
-        incus.chmod(incus.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / "incus")
 
         env = os.environ.copy()
         env["PATH"] = f"{mock_bin}:{env['PATH']}"
@@ -442,9 +424,7 @@ class TestCleanup:
         mock_bin = tmp_path / "bin"
         mock_bin.mkdir()
 
-        incus = mock_bin / "incus"
-        incus.write_text("#!/usr/bin/env bash\nexit 0\n")
-        incus.chmod(incus.stat().st_mode | stat.S_IEXEC)
+        make_mock_script(mock_bin / "incus")
 
         env = os.environ.copy()
         env["PATH"] = f"{mock_bin}:{env['PATH']}"

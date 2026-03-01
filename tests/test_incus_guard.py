@@ -1,27 +1,23 @@
 """Tests for scripts/incus-guard.sh — consolidated Incus network guard."""
 
-import os
-import stat
 import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import read_log
+from conftest import make_mock_script, read_log
 
 GUARD_SH = Path(__file__).resolve().parent.parent / "scripts" / "incus-guard.sh"
 
 
 @pytest.fixture()
-def mock_env(tmp_path):
+def mock_env(mock_bin_env, tmp_path):
     """Create a mock environment with fake ip, incus, systemctl, ping binaries."""
-    mock_bin = tmp_path / "bin"
-    mock_bin.mkdir()
+    mock_bin, env = mock_bin_env
     log_file = tmp_path / "commands.log"
     tmp_path / "incus-guard-host-dev"
 
     # Mock ip command: returns fake network info
-    mock_ip = mock_bin / "ip"
-    mock_ip.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "ip", f"""#!/usr/bin/env bash
 echo "ip $@" >> "{log_file}"
 if [[ "$*" == "route show default" ]]; then
     echo "default via 192.168.1.1 dev eth0 proto static"
@@ -51,11 +47,9 @@ if [[ "$*" == *"route add"* ]]; then
 fi
 exit 0
 """)
-    mock_ip.chmod(mock_ip.stat().st_mode | stat.S_IEXEC)
 
     # Mock incus command
-    mock_incus = mock_bin / "incus"
-    mock_incus.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "incus", f"""#!/usr/bin/env bash
 echo "incus $@" >> "{log_file}"
 if [[ "$1" == "network" && "$2" == "list" ]]; then
     echo "net-test,bridge,YES,YES"
@@ -70,52 +64,37 @@ if [[ "$1" == "network" && "$2" == "delete" ]]; then
 fi
 exit 0
 """)
-    mock_incus.chmod(mock_incus.stat().st_mode | stat.S_IEXEC)
 
     # Mock systemctl
-    mock_systemctl = mock_bin / "systemctl"
-    mock_systemctl.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "systemctl", f"""#!/usr/bin/env bash
 echo "systemctl $@" >> "{log_file}"
 if [[ "$*" == "is-active --quiet incus" ]]; then
     exit 1  # Not running by default
 fi
 exit 0
 """)
-    mock_systemctl.chmod(mock_systemctl.stat().st_mode | stat.S_IEXEC)
 
     # Mock ping
-    mock_ping = mock_bin / "ping"
-    mock_ping.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "ping", f"""#!/usr/bin/env bash
 echo "ping $@" >> "{log_file}"
 exit 0
 """)
-    mock_ping.chmod(mock_ping.stat().st_mode | stat.S_IEXEC)
 
     # Mock sleep (instant)
-    mock_sleep = mock_bin / "sleep"
-    mock_sleep.write_text("#!/usr/bin/env bash\nexit 0\n")
-    mock_sleep.chmod(mock_sleep.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(mock_bin / "sleep")
 
     # Mock date
-    mock_date = mock_bin / "date"
-    mock_date.write_text('#!/usr/bin/env bash\necho "2026-01-01T00:00:00+00:00"\n')
-    mock_date.chmod(mock_date.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(mock_bin / "date", '#!/usr/bin/env bash\necho "2026-01-01T00:00:00+00:00"\n')
 
     # Mock tee (just pass through)
-    mock_tee = mock_bin / "tee"
-    mock_tee.write_text("#!/usr/bin/env bash\ncat\n")
-    mock_tee.chmod(mock_tee.stat().st_mode | stat.S_IEXEC)
+    make_mock_script(mock_bin / "tee", "#!/usr/bin/env bash\ncat\n")
 
     # Mock install
-    mock_install_cmd = mock_bin / "install"
-    mock_install_cmd.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(mock_bin / "install", f"""#!/usr/bin/env bash
 echo "install $@" >> "{log_file}"
 exit 0
 """)
-    mock_install_cmd.chmod(mock_install_cmd.stat().st_mode | stat.S_IEXEC)
 
-    env = os.environ.copy()
-    env["PATH"] = f"{mock_bin}:{env['PATH']}"
     env["LOGFILE"] = str(tmp_path / "guard.log")
 
     # Override GUARD_STATE to use tmp_path
@@ -126,7 +105,7 @@ def run_guard(args, env, tmp_path):
     """Run incus-guard.sh with given args and environment."""
     # Create a wrapper that overrides paths
     wrapper = tmp_path / "run-guard.sh"
-    wrapper.write_text(f"""#!/usr/bin/env bash
+    make_mock_script(wrapper, f"""#!/usr/bin/env bash
 export LOGFILE="{tmp_path}/guard.log"
 # Override guard state path in the script
 export GUARD_STATE="{tmp_path}/incus-guard-host-dev"
@@ -141,7 +120,6 @@ sed \
 chmod +x "{tmp_path}/guard-patched.sh"
 bash "{tmp_path}/guard-patched.sh" "$@"
 """)
-    wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
 
     result = subprocess.run(
         ["bash", str(wrapper)] + args,
@@ -199,11 +177,10 @@ class TestPostStart:
         env, log_file, tmp_path = mock_env
         # Override ip to return nothing for route
         mock_ip = Path(env["PATH"].split(":")[0]) / "ip"
-        mock_ip.write_text(f"""#!/usr/bin/env bash
+        make_mock_script(mock_ip, f"""#!/usr/bin/env bash
 echo "ip $@" >> "{log_file}"
 exit 0
 """)
-        mock_ip.chmod(mock_ip.stat().st_mode | stat.S_IEXEC)
         result = run_guard(["post-start"], env, tmp_path)
         # Should exit 0 even with failure — don't block Incus
         assert result.returncode == 0
@@ -231,11 +208,10 @@ class TestStart:
         env, log_file, tmp_path = mock_env
         # Override systemctl to report incus as active
         mock_systemctl = Path(env["PATH"].split(":")[0]) / "systemctl"
-        mock_systemctl.write_text(f"""#!/usr/bin/env bash
+        make_mock_script(mock_systemctl, f"""#!/usr/bin/env bash
 echo "systemctl $@" >> "{log_file}"
 exit 0
 """)
-        mock_systemctl.chmod(mock_systemctl.stat().st_mode | stat.S_IEXEC)
         result = run_guard(["start"], env, tmp_path)
         assert result.returncode == 0
         assert "already running" in result.stdout
