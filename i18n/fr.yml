@@ -5,6 +5,9 @@
 
 # ── Getting started ──────────────────────────────────────
 guide: "Tutoriel interactif pas-a-pas"
+learn: "Plateforme d'apprentissage avec terminal integre (PORT=8890)"
+learn-setup: "Creer le conteneur anklume-learn et l'infrastructure de demo"
+learn-teardown: "Detruire le conteneur anklume-learn"
 quickstart: "Copier l'exemple infra.yml et generer les fichiers Ansible"
 init: "Installation initiale : dependances Ansible + outils"
 

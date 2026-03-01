@@ -640,12 +640,26 @@ import-infra: ## Generate infra.yml from existing Incus state
 	@scripts/import-infra.sh $(if $(O),-o $(O))
 
 # ── Getting Started ──────────────────────────────────────
-guide: ## Interactive step-by-step onboarding tutorial
+guide: ## Interactive capability tour (CHAPTER=N, SETUP=1, AUTO=1)
 	@if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
 		python3 scripts/welcome.py --tui; \
 	else \
-		scripts/guide.sh $(if $(STEP),--step $(STEP)) $(if $(AUTO),--auto); \
+		scripts/guide.sh \
+			$(if $(CHAPTER),--chapter $(CHAPTER)) \
+			$(if $(SETUP),--setup) \
+			$(if $(STEP),--step $(STEP)) \
+			$(if $(AUTO),--auto) \
+			$(if $(LANG),--lang $(LANG)); \
 	fi
+
+learn: ## Learning platform with split-pane terminal (PORT=8890)
+	python3 scripts/platform_server.py --port $(or $(PORT),8890)
+
+learn-setup: ## Create the anklume-learn container and demo infrastructure
+	bash scripts/learn-setup.sh
+
+learn-teardown: ## Destroy the anklume-learn container
+	bash scripts/learn-setup.sh teardown
 
 quickstart: ## Copy example infra.yml and generate Ansible files
 	@test ! -f infra.yml || { echo "infra.yml already exists. Remove it first."; exit 1; }
@@ -816,4 +830,4 @@ help-all: ## Show all available targets
         mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
         lab-list lab-start lab-check lab-hint lab-reset lab-solution \
         mode-student mode-user mode-dev \
-        guide quickstart init install-hooks help help-all
+        guide learn learn-setup learn-teardown quickstart init install-hooks help help-all

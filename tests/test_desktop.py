@@ -155,11 +155,11 @@ class TestDashboard:
         assert "test policy" in html
 
     def test_trust_colors_complete(self):
-        from dashboard import TRUST_COLORS
+        from web.theme import trust_css
 
-        expected = {"admin", "trusted", "semi-trusted", "untrusted", "disposable"}
-        assert set(TRUST_COLORS.keys()) == expected
-        for colors in TRUST_COLORS.values():
+        expected = ["admin", "trusted", "semi-trusted", "untrusted", "disposable"]
+        for level in expected:
+            colors = trust_css(level)
             assert "border" in colors
             assert "bg" in colors
 

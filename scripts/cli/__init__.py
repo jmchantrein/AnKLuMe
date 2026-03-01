@@ -23,6 +23,7 @@ from scripts.cli.domain import app as domain_app
 from scripts.cli.golden import app as golden_app
 from scripts.cli.instance import app as instance_app
 from scripts.cli.lab import app as lab_app
+from scripts.cli.learn import app as learn_app
 from scripts.cli.live import app as live_app
 from scripts.cli.llm import app as llm_app
 from scripts.cli.mcp import app as mcp_app
@@ -135,6 +136,7 @@ _mode = get_mode()
 # Essential groups (always visible)
 app.add_typer(domain_app)
 app.add_typer(lab_app)
+app.add_typer(learn_app)
 app.add_typer(mode_app)
 
 # Standard groups (hidden in student mode for simplicity)

@@ -1,85 +1,123 @@
-# Interactive Onboarding Guide
+# Interactive Guide
 
-anklume includes a step-by-step interactive guide that walks you through
-setting up your infrastructure from scratch.
+anklume includes two interactive guides:
 
-## Usage
+1. **Capability Tour** — discover what anklume can do (terminal + web)
+2. **Setup Wizard** — initial infrastructure setup (terminal)
 
-```bash
-anklume guide              # Start from step 1
-anklume guide STEP=5       # Resume from step 5
-anklume guide AUTO=1       # Non-interactive CI mode
-```
-
-Or run the script directly:
+## Capability Tour (terminal)
 
 ```bash
-scripts/guide.sh
-scripts/guide.sh --step 5
-scripts/guide.sh --auto
+anklume guide              # Interactive chapter menu
+anklume guide CHAPTER=3    # Jump to chapter 3
+anklume guide AUTO=1       # Non-interactive (CI)
+anklume guide LANG=fr      # French
 ```
 
-## Steps
+### Chapters
+
+| # | Title | Demo | Prerequisite |
+|---|-------|------|-------------|
+| 1 | Domain Isolation | `incus list --all-projects` | Incus + domains |
+| 2 | Tmux Console | `console.py --dry-run` | tmux |
+| 3 | GUI App Forwarding | Wayland socket sharing | Wayland display |
+| 4 | Clipboard Transfer | `clipboard.sh copy-to/from` | Incus |
+| 5 | Network Isolation | nftables rules | Incus |
+| 6 | Snapshots & Restore | Create, modify, restore | Incus |
+| 7 | Web Dashboard | `dashboard.py` in browser | FastAPI |
+| 8 | GPU & AI Services | `nvidia-smi`, Ollama | GPU (optional) |
+
+Each chapter follows: **Explain**, **Live demo**, **Your turn**, **Recap**
+
+Chapters with missing prerequisites are skipped gracefully (no error).
+
+## Learning Platform (web)
+
+The learning platform provides a Play-with-Docker-style split-pane
+interface: guide content on the left, a live terminal on the right.
+Clickable commands inject directly into the terminal.
+
+```bash
+anklume learn start          # Start on port 8890
+anklume learn start --port 9000  # Custom port
+```
+
+### Architecture
+
+The platform runs inside a dedicated `anklume-learn` container in
+the Incus `learn` project. The container connects to Incus via a
+TLS certificate restricted to the `learn` project only — it cannot
+see or modify production projects (pro, perso, anklume, etc.).
+
+```
+Browser (host)  →  http://localhost:8890
+                          │
+              ┌───────────┘
+              ↓
+  anklume-learn (LXC, project: learn)
+  ├── platform_server.py (FastAPI)
+  │   ├── /guide/{n}     — split-pane view
+  │   └── /ws/terminal   — xterm.js WebSocket
+  └── PTY (bash)
+      └── incus CLI (TLS, learn project only)
+```
+
+### Setup
+
+```bash
+anklume learn setup        # Create container + demo instances
+anklume learn teardown     # Destroy everything
+```
+
+`anklume learn setup` creates:
+- The `learn` Incus project
+- The `anklume-learn` container with Python + FastAPI
+- Demo instances (`learn-web`, `learn-db`) for guided exercises
+- A TLS certificate restricted to the `learn` project
+
+### Routes
+
+| Route | Description |
+|-------|-------------|
+| `GET /` | Landing page (guide + labs links) |
+| `GET /guide` | Chapter overview (8 chapters) |
+| `GET /guide/{n}` | Split-pane: content + terminal |
+| `GET /labs` | Educational labs (future) |
+| `WS /ws/terminal/{id}` | Terminal WebSocket |
+
+## Setup Wizard
+
+```bash
+anklume guide SETUP=1      # Run setup wizard
+anklume guide STEP=3       # Resume from step 3 (legacy)
+```
+
+### Setup steps
 
 | Step | Name | Description |
 |------|------|-------------|
-| 1 | Prerequisites | Checks required tools (incus, ansible, python3, git, make) |
-| 2 | Use case | Select a pre-built example (student, teacher, pro, custom) |
-| 3 | infra.yml | Copy the example and optionally edit it |
-| 4 | Generate | Run `anklume sync` to create Ansible files |
-| 5 | Validate | Run linters and syntax checks |
-| 6 | Apply | Create Incus infrastructure (`anklume domain apply`) |
-| 7 | Verify | List running instances and networks |
-| 8 | Snapshot | Create an initial snapshot for rollback |
-| 9 | Next steps | Links to advanced features and documentation |
+| 0 | Environment | Detect host vs container, delegate if needed |
+| 1 | Prerequisites | Check required tools |
+| 2 | Use case | Select example (student, teacher, pro, custom) |
+| 3 | infra.yml | Create from template |
+| 4 | Generate | Run `anklume sync` |
+| 5 | Validate | Syntax check |
+| 6 | Apply | Create Incus infrastructure |
+| 7 | Verify & Snapshot | Check instances, create initial snapshot |
+| 8 | Next steps | Links to capability tour and documentation |
 
 ## Auto mode
 
-The `--auto` flag runs all steps non-interactively:
+The `--auto` flag (or `AUTO=1`) runs non-interactively:
+- Skips all prompts (selects default option)
+- Skips steps requiring live interaction (GUI, dashboard launch)
+- Exits immediately on prerequisite failure
 
-- Selects option 1 for all prompts
-- Skips steps requiring a live Incus daemon (steps 6-8)
-- Exits immediately on any failure
-- Useful for CI smoke testing
+## Deep dives
 
-## Resume support
+After the capability tour, explore specialized topics:
 
-Each step is independent. If the guide exits or you press Ctrl+C,
-resume from where you left off:
-
-```bash
-anklume guide STEP=4    # Resume from step 4
-```
-
-## Troubleshooting
-
-### "incus not found"
-
-Install Incus following the upstream documentation:
-https://linuxcontainers.org/incus/docs/main/installing/
-
-### "anklume sync failed"
-
-Check `infra.yml` for syntax errors. Common issues:
-- Duplicate machine names
-- Duplicate subnet IDs
-- IPs outside the declared subnet
-
-Run `anklume sync --dry-run` to preview without writing.
-
-### "Cannot connect to Incus"
-
-Steps 6-8 require a running Incus daemon. Either:
-- Run from a machine with Incus installed and initialized
-- Run from the admin container with the Incus socket mounted
-- Skip these steps and run `anklume domain apply` manually later
-
-### Editor not opening
-
-The guide uses `$EDITOR` or `$VISUAL` (defaults to `vi`).
-Set your preferred editor:
-
-```bash
-export EDITOR=nano
-anklume guide STEP=3
-```
+- [Network isolation](network-isolation.md) — nftables, firewall VM
+- [GPU & AI](gpu-advanced.md) — Ollama, VRAM flush, sanitization
+- [Educational labs](../labs/README.md) — guided exercises
+- [Tor gateway](tor-gateway.md) — anonymous routing

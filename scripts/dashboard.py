@@ -29,16 +29,7 @@ from fastapi.responses import HTMLResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# ── Trust level colors (shared with console.py, desktop-config.py) ──
-
-TRUST_COLORS = {
-    "admin": {"border": "#3333ff", "bg": "#0a0a2a", "label": "blue"},
-    "trusted": {"border": "#33cc33", "bg": "#0a1a0a", "label": "green"},
-    "semi-trusted": {"border": "#cccc33", "bg": "#1a1a0a", "label": "yellow"},
-    "untrusted": {"border": "#cc3333", "bg": "#1a0a0a", "label": "red"},
-    "disposable": {"border": "#cc33cc", "bg": "#1a0a1a", "label": "magenta"},
-}
-
+from web.theme import BASE_CSS, DASHBOARD_CSS, trust_css  # noqa: E402
 
 # ── Data fetchers ────────────────────────────────────────────────
 
@@ -122,7 +113,7 @@ def build_status():
             domain_map[mname] = {
                 "domain": dname,
                 "trust_level": trust,
-                "colors": TRUST_COLORS.get(trust, TRUST_COLORS["trusted"]),
+                "colors": trust_css(trust),
             }
 
     enriched = []
@@ -166,49 +157,20 @@ def build_status():
 
 # ── HTML template ────────────────────────────────────────────────
 
-HTML_TEMPLATE = """\
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>anklume Dashboard</title>
-<script src="https://unpkg.com/htmx.org@2.0.4"></script>
-<style>
-  :root { --bg: #0d1117; --fg: #c9d1d9; --card: #161b22; --border: #30363d; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
-         background: var(--bg); color: var(--fg); padding: 20px; }
-  h1 { color: #58a6ff; margin-bottom: 20px; }
-  h2 { color: #8b949e; margin: 20px 0 10px; font-size: 14px; text-transform: uppercase; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .card { background: var(--card); border: 2px solid var(--border); border-radius: 8px;
-          padding: 16px; transition: border-color 0.2s; }
-  .card:hover { border-color: #58a6ff; }
-  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-            margin-right: 6px; }
-  .status.running { background: #3fb950; }
-  .status.stopped { background: #f85149; }
-  .name { font-weight: bold; font-size: 16px; }
-  .meta { color: #8b949e; font-size: 12px; margin-top: 4px; }
-  .domain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
-                  font-size: 11px; font-weight: bold; margin-left: 8px; }
-  .net-card { display: flex; justify-content: space-between; align-items: center; }
-  .policy { background: var(--card); border: 1px solid var(--border); border-radius: 6px;
-            padding: 8px 12px; margin: 4px 0; font-size: 13px; }
-  .policy .arrow { color: #58a6ff; margin: 0 8px; }
-  .refresh-info { color: #484f58; font-size: 11px; text-align: right; margin-top: 8px; }
-  .empty { color: #484f58; font-style: italic; padding: 20px; }
-</style>
-</head>
-<body>
-<h1>anklume Dashboard</h1>
-<div id="content" hx-get="/api/html" hx-trigger="load, every 5s" hx-swap="innerHTML">
-  <p class="empty">Loading...</p>
-</div>
-<p class="refresh-info">Auto-refresh every 5s via htmx</p>
-</body>
-</html>
-"""
+HTML_TEMPLATE = (
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">\n'
+    "<title>anklume Dashboard</title>\n"
+    '<script src="https://unpkg.com/htmx.org@2.0.4"></script>\n'
+    f"<style>{BASE_CSS}\n{DASHBOARD_CSS}</style>\n"
+    "</head><body>\n"
+    "<h1>anklume Dashboard</h1>\n"
+    '<div id="content" hx-get="/api/html" hx-trigger="load, every 5s"'
+    ' hx-swap="innerHTML">\n'
+    '  <p class="empty">Loading...</p>\n'
+    "</div>\n"
+    '<p class="refresh-info">Auto-refresh every 5s via htmx</p>\n'
+    "</body></html>"
+)
 
 
 def render_status_html(status):
