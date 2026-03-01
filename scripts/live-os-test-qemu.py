@@ -504,12 +504,24 @@ def build_phases(distro: str) -> list[Phase]:
     ])
     phases.append(p4)
 
-    # Phase 5: ZFS Backend — 12 tests (requires /dev/vda + ZFS module)
+    # Phase 5: ZFS Backend — 13 tests (requires /dev/vda + ZFS module)
     p5 = Phase(5, "ZFS Backend", gate=False)
     if distro == "debian":
         p5.tests.extend([
             Test("Virtual disk visible",
                  "test -b /dev/vda && echo PASS || echo FAIL"),
+            Test("DKMS build ZFS module (first-boot)",
+                 "zfs_src=$(ls -d /usr/src/zfs-* 2>/dev/null | head -1); "
+                 "if [ -z \"$zfs_src\" ]; then echo 'No ZFS DKMS source found'; echo FAIL; exit 0; fi; "
+                 "zfs_ver=$(basename $zfs_src | sed 's/^zfs-//'); "
+                 "dkms status zfs/$zfs_ver 2>/dev/null | grep -q installed "
+                 "&& { echo 'Already built'; echo PASS; exit 0; }; "
+                 "dkms add -m zfs -v $zfs_ver 2>&1 || true; "
+                 "dkms build -m zfs -v $zfs_ver 2>&1 | tail -5; "
+                 "dkms install -m zfs -v $zfs_ver 2>&1 | tail -3; "
+                 "dkms status zfs/$zfs_ver 2>&1; "
+                 "modprobe zfs 2>/dev/null && echo PASS || echo FAIL",
+                 timeout=DEPLOY_TIMEOUT),
             Test("ZFS kernel module loads",
                  "modprobe zfs 2>&1 && lsmod | grep -q zfs && echo PASS || "
                  "(echo 'ZFS module not available — DKMS may not have built for this kernel'; echo FAIL)",
