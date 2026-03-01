@@ -3477,6 +3477,98 @@ j) **Generated file integrity check** (FINDING-12):
 
 ---
 
+## Phase 47: Unified Learning Platform (Web Terminal + Container-First) ✅ COMPLETE
+
+**Goal**: Replace the terminal-only `guide-server.py` with a unified
+web platform featuring a split-pane interface (content left, xterm.js
+terminal right) with clickable commands. First implementation of
+ADR-047 (container-first services).
+
+**Prerequisites**: Phase 30 (labs framework), Phase 43 (Typer CLI),
+Phase 18c (interactive guide).
+
+**Architecture (ADR-047)**:
+
+The learning platform runs entirely inside a dedicated LXC container
+(`anklume-learn`) in the `learn` Incus project. The container
+connects to Incus via TLS with a restricted certificate (can only
+see the `learn` project). This is the first service to follow the
+"container-first" principle.
+
+```mermaid
+graph TD
+    subgraph Host["Host"]
+        Browser["Browser<br/>http://localhost:8890"]
+        Incus["Incus daemon<br/>TLS on :8443"]
+    end
+    subgraph Learn["anklume-learn container<br/>(project: learn)"]
+        Server["platform_server.py<br/>FastAPI + uvicorn"]
+        PTY["PTY sessions<br/>pty.fork()"]
+        WS["WebSocket relay<br/>xterm.js ↔ PTY"]
+    end
+    Browser -->|"HTTP / WS"| Server
+    Server --> PTY
+    Server --> WS
+    Learn -->|"TLS cert<br/>restricted to learn"| Incus
+```
+
+**Deliverables**:
+
+a) **Shared web module** (`scripts/web/`):
+   - [x] `__init__.py` — `create_app()` FastAPI factory
+   - [x] `theme.py` — CSS constants (BASE, TERMINAL, DASHBOARD, GUIDE)
+     extracted from dashboard.py, single source of truth
+   - [x] `html.py` — String builders (page_wrap, card, command_block,
+     nav_bar, render_markdown) with XSS protection
+   - [x] `content.py` — Unified content model (ContentBlock, ContentPage,
+     ContentSection) bridging guide_chapters.py + labs
+
+b) **Terminal WebSocket** (`scripts/web/`):
+   - [x] `pty_manager.py` — PtySession + PtyManager with idle cleanup,
+     max sessions, resize support
+   - [x] `ws_terminal.py` — WebSocket endpoint relaying xterm.js ↔ PTY
+
+c) **Platform server** (`scripts/platform_server.py`):
+   - [x] Routes: `/` (landing), `/guide` (chapter index),
+     `/guide/{n}` (split-pane), `/labs` (placeholder)
+   - [x] WebSocket: `/ws/terminal/{sid}`
+   - [x] Frontend: htmx + xterm.js via CDN (no build step)
+   - [x] Clickable commands inject into terminal via `runCmd()`
+   - [x] Replaces `guide-server.py`
+
+d) **CLI integration** (`scripts/cli/learn.py`):
+   - [x] `anklume learn start` — start the platform
+   - [x] `anklume learn setup` — create container + demo instances
+   - [x] `anklume learn teardown` — destroy everything
+
+e) **Setup script** (`scripts/learn-setup.sh`):
+   - [x] Creates `learn` Incus project
+   - [x] Launches `anklume-learn` container with Debian 13
+   - [x] Mounts project git read-only, proxies port 8890
+   - [x] Creates demo instances (`learn-web`, `learn-db`)
+   - [x] Configures TLS for daemon
+
+f) **Tests**:
+   - [x] `tests/test_web_theme.py` — 40 tests
+   - [x] `tests/test_web_html.py` — 53 tests
+   - [x] `tests/test_web_content.py` — 34 tests
+   - [x] `tests/test_pty_manager.py` — 29 tests
+   - [x] `tests/test_platform.py` — 43 tests
+   - [x] `tests/test_cli_learn.py` — 8 tests
+   - [x] `tests/test_learn_setup.py` — 18 tests
+   - [x] BDD: 132 scenarios across 9 feature files in `scenarios/learn/`
+
+**Validation criteria**:
+- [x] 220+ pytest tests pass
+- [x] 132 BDD scenarios pass
+- [x] All files < 200 lines
+- [x] ruff + shellcheck clean
+- [x] XSS protection on all HTML builders
+- [x] No CSS duplication between dashboard and theme
+- [ ] Manual test: `anklume learn setup && anklume learn start` in browser
+
+---
+
 ## Deferred Enhancements (from prior sessions)
 
 Items discussed and deferred during development sessions. Each is
@@ -3703,26 +3795,17 @@ Track coverage trend over time. Goal: 90%+ matrix coverage.
 - Phase 44: Test Infrastructure Consolidation and Hardening ✅
 - Phase 45: Documentation Site (MkDocs Material + Mermaid + CI) ✅
 - Phase 46: Security Hardening (from operational audit) ✅
+- Phase 47: Unified Learning Platform (Web Terminal + Container-First) ✅
 
 **All phases complete!**
 
 **Recently completed**:
-- Phase 20g: Data Persistence and Flush Protection
-- Phase 30: Educational Platform and Guided Labs
-- Phase 31: Live OS with Encrypted Persistent Storage (hybrid ISO, A/B updates, dm-verity, toram)
-- Phase 32: Makefile UX and Robustness
-- Phase 33: Student Mode and Internationalization
-- Phase 35: Development Workflow Simplification
-- Phase 36: Naming Convention Migration
-- Phase 37: OpenClaw Instances — KISS Simplification
-- Phase 38: OpenClaw Heartbeat and Proactive Monitoring
-- Phase 39: LLM Sanitization Proxy
-- Phase 40: Network Inspection and Security Monitoring
-- Phase 41: Official Roles and External Role Integration
-- Phase 42: Desktop Environment Plugin System
-- Phase 43: Docker-Style CLI (Typer)
+- Phase 44: Test Infrastructure Consolidation and Hardening
+- Phase 45: Documentation Site (MkDocs Material + Mermaid + CI)
+- Phase 46: Security Hardening (from operational audit)
+- Phase 47: Unified Learning Platform (Web Terminal + Container-First)
 
-**All 46 phases complete.** All phases (1-46) implemented. Remaining unchecked criteria are deployment-dependent
+**All 47 phases complete.** Remaining unchecked criteria are deployment-dependent
 (require running infrastructure: OpenClaw messaging channels, LLM sanitizer proxy
 deployment, network inspection with live captures). These will be validated during
 real-world deployment.

@@ -831,3 +831,39 @@ syntax (```` ```mermaid ````). ASCII art is forbidden for diagrams.
 MkDocs. They are version-control friendly (text diffs), searchable,
 and consistent across platforms. Contributors edit diagram logic,
 not character alignment.
+
+---
+
+## ADR-047: Container-first services — minimize host footprint
+
+**Context**: ADR-004 established "minimize host modifications" but in
+practice, many scripts run directly on the host: `generate.py`,
+`dashboard.py`, `guide-server.py`, `console.py`, `doctor.sh`,
+`telemetry.py`, `desktop_config.py`, etc. This violates the spirit
+of ADR-004 and increases the host attack surface.
+
+**Decision**: New services MUST run inside containers, not on the host.
+The learning platform (`anklume learn`) is the first implementation of
+this principle:
+
+- A dedicated container (`anklume-learn`) in a project (`learn`)
+  runs the FastAPI server, xterm.js terminal, and PTY sessions
+- The container connects to Incus via TLS with a certificate
+  restricted to the `learn` project — it cannot see or modify
+  production projects
+- The project git repository is mounted read-only at `/opt/anklume`
+- Port proxying via Incus device exposes the web UI on the host
+
+Existing host-side scripts (`dashboard.py`, `console.py`, etc.) are
+grandfathered. Their migration to containers is tracked as a separate
+enhancement, not a blocking requirement.
+
+**Why TLS restricted certificates, not socket mounting**: Mounting
+the Incus socket grants unrestricted access to all projects. TLS
+certificates can be scoped to specific projects via
+`incus config trust add --restricted --projects <name>`, providing
+least-privilege access.
+
+**Consequence**: New services get network isolation, least-privilege
+Incus access, and clean separation from the host. The learning
+platform serves as the reference implementation for this pattern.
