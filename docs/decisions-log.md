@@ -665,7 +665,7 @@ targets, test-summary.sh, Gherkin fixes). Documentation and security are
 roadmap entries only. Ordering by implementation readiness minimizes
 context-switching.
 
-**Status**: pending review
+**Status**: VALIDATED (2026-03-01)
 
 ---
 
@@ -691,7 +691,7 @@ blocker.
 proxy) are accepted architectural constraints documented in ADR-004 and
 ADR-043. The remaining findings have concrete fixes in Phase 46 deliverables.
 
-**Status**: pending review
+**Status**: VALIDATED (2026-03-01)
 
 ---
 
@@ -720,7 +720,11 @@ for a new concern (vision) follows separation of responsibility without
 disrupting what works. The generated scenarios in `scenarios/generated/`
 are documentation-level (no assertions) and pass trivially.
 
-**Status**: pending review
+**Status**: SUPERSEDED (2026-03-01) — user prefers domain-based split
+(sync_steps.py, infra_steps.py, network_steps.py, instance_steps.py,
+validation_steps.py, vision_steps.py). given.py at 338 lines violates
+the 200-line KISS limit. Migration planned: regroup steps by domain,
+feature files unchanged.
 
 ---
 
@@ -741,7 +745,7 @@ call. If the socket connect fails, the scenario is skipped immediately.
 timeout only applies after the TCP connection is established. The
 2-second pre-check catches unreachable hosts in ~2s instead of >60s.
 
-**Status**: pending review
+**Status**: VALIDATED (2026-03-01)
 
 ---
 
@@ -768,7 +772,10 @@ the check result for human review.
 **Rationale**: Vision tests are complementary, not gatekeeping.
 A warning in logs gives developers signal without blocking CI.
 
-**Status**: pending review
+**Status**: AMENDED (2026-03-01) — user prefers retry + majority vote:
+run each vision check 3 times, assert failure only if 2/3 fail. This
+reduces flakiness while maintaining real assertions. Implementation:
+wrap vision steps in a retry loop with majority logic.
 
 ---
 
