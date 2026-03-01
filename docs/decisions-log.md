@@ -720,11 +720,12 @@ for a new concern (vision) follows separation of responsibility without
 disrupting what works. The generated scenarios in `scenarios/generated/`
 are documentation-level (no assertions) and pass trivially.
 
-**Status**: SUPERSEDED (2026-03-01) — user prefers domain-based split
-(sync_steps.py, infra_steps.py, network_steps.py, instance_steps.py,
-validation_steps.py, vision_steps.py). given.py at 338 lines violates
-the 200-line KISS limit. Migration planned: regroup steps by domain,
-feature files unchanged.
+**Status**: SUPERSEDED (2026-03-01) — user prefers domain-based split.
+Implemented: given.py/when.py/then.py/vision_steps.py replaced by 7
+domain-based files (common_steps.py, sync_steps.py, infra_steps.py,
+network_steps.py, instance_steps.py, validation_steps.py) + 2 vision
+files (vision_cli_steps.py, vision_gui_steps.py). All files under 200
+lines. 378/378 steps matched, 87 scenarios pass, 0 regression.
 
 ---
 
@@ -772,10 +773,11 @@ the check result for human review.
 **Rationale**: Vision tests are complementary, not gatekeeping.
 A warning in logs gives developers signal without blocking CI.
 
-**Status**: AMENDED (2026-03-01) — user prefers retry + majority vote:
-run each vision check 3 times, assert failure only if 2/3 fail. This
-reduces flakiness while maintaining real assertions. Implementation:
-wrap vision steps in a retry loop with majority logic.
+**Status**: AMENDED + IMPLEMENTED (2026-03-01) — retry 3x + majority
+vote (2/3). `_vision_check_majority()` in vision_gui_steps.py runs
+each vision check 3 times; passes if >= 2 responses contain YES.
+Applied to: admin_blue_tones, untrusted_red_tones,
+window_borders_domain_colors.
 
 ---
 
