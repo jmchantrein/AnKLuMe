@@ -477,6 +477,10 @@ bootstrap_rootfs_debian() {
     printf '#!/bin/sh\nexit 0\n' > "$ROOTFS_DIR/sbin/apparmor_parser"
     chmod +x "$ROOTFS_DIR/sbin/apparmor_parser"
 
+    # Enable contrib repo (needed for zfsutils-linux, which depends on non-main kernel modules)
+    sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib/' \
+        "$ROOTFS_DIR/etc/apt/sources.list" 2>/dev/null || true
+
     # Install additional packages via chroot (all anklume runtime + dev deps)
     local packages="nftables cryptsetup btrfs-progs zfsutils-linux squashfs-tools"
     packages="$packages firmware-linux-free"
@@ -556,7 +560,8 @@ MODULES
 
     # Install NVIDIA drivers from backports (non-free)
     # Add non-free components to existing sources (for nvidia-driver)
-    sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib non-free non-free-firmware/' \
+    # Note: contrib may already be present from ZFS step — match both patterns
+    sed -i 's/^deb \(.*\) trixie main\( contrib\)\?$/deb \1 trixie main contrib non-free non-free-firmware/' \
         "$ROOTFS_DIR/etc/apt/sources.list" 2>/dev/null || true
     cat > "$ROOTFS_DIR/etc/apt/sources.list.d/backports.list" << NVSRC
 deb http://deb.debian.org/debian trixie-backports main contrib non-free non-free-firmware
