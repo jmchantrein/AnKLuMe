@@ -797,4 +797,5 @@ change frequently and provide no value translated.
 **Rationale**: ADR-011 intent is user accessibility, not internal
 process documentation. These files are referenced only by developers.
 
-**Status**: pending review
+**Status**: REJECTED — user requires all docs translated per ADR-011.
+French translations created for all 5 files.
