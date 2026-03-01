@@ -487,7 +487,8 @@ bootstrap_rootfs_debian() {
     packages="$packages ansible git make sudo nano tmux rsync"
     packages="$packages iproute2 dmidecode lsof htop file"
     # Incus: Debian Trixie ships incus in official repos
-    packages="$packages incus"
+    # dnsmasq-base is required for managed bridges (DHCP/DNS) — not a hard dep of incus
+    packages="$packages incus dnsmasq-base"
     # Wayland desktop — conditional on $DESKTOP
     packages="$packages foot wl-clipboard xwayland"
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
@@ -575,9 +576,10 @@ NVSRC
     local deb_kernel chroot_path
     chroot_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     # Step 1: Install DKMS, backports kernel + headers (newer = better hw support + NVIDIA compat)
+    # zfs-dkms: build ZFS kernel module for backports kernel (pre-built zfs-modules only matches stock)
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         apt-get install -y -qq -t trixie-backports \
-        dkms linux-image-amd64 linux-headers-amd64 2>&1 | tail -5 || true
+        dkms linux-image-amd64 linux-headers-amd64 zfs-dkms 2>&1 | tail -5 || true
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a --force-all 2>&1 | tail -3 || true
     # Detect the kernel that has matching headers (build symlink present)
@@ -601,7 +603,13 @@ NVSRC
     # Step 3: Fix any broken packages
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a 2>&1 | tail -5 || true
-    # Step 4: Manually build NVIDIA DKMS module for the Debian kernel
+    # Step 4: Rebuild ALL DKMS modules for the backports kernel (ZFS, etc.)
+    if [ -n "$deb_kernel" ]; then
+        info "  Rebuilding all DKMS modules for kernel $deb_kernel..."
+        chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+            dkms autoinstall -k "$deb_kernel" 2>&1 | tail -10 || true
+    fi
+    # Step 5: Manually build NVIDIA DKMS module for the Debian kernel
     if [ -n "$deb_kernel" ]; then
         # Read module name and version from dkms.conf
         local dkms_conf nv_name nv_ver
@@ -703,11 +711,10 @@ MOTD
         info "  Ansible Galaxy collections pre-installed"
     fi
 
-    # Create /etc/anklume marker
+    # Create /etc/anklume marker (directory only — no nesting context files;
+    # absolute_level/relative_level/vm_nested are created by the PARENT when
+    # instantiating nested children, per SPEC.md)
     mkdir -p "$ROOTFS_DIR/etc/anklume"
-    echo "0" > "$ROOTFS_DIR/etc/anklume/absolute_level"
-    echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
-    echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
     # (hooks and modules already installed before NVIDIA section above)
 
@@ -733,7 +740,13 @@ KBD
 
     # Enable Incus daemon (required for anklume)
     chroot "$ROOTFS_DIR" systemctl enable incus.service >/dev/null 2>&1 || true
-    info "  Incus daemon enabled"
+    # Set up subuid/subgid for unprivileged containers (Debian postinst does
+    # this automatically; explicit setup here as a safety net)
+    grep -q "^root:" "$ROOTFS_DIR/etc/subuid" 2>/dev/null \
+        || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subuid"
+    grep -q "^root:" "$ROOTFS_DIR/etc/subgid" 2>/dev/null \
+        || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subgid"
+    info "  Incus daemon enabled + subuid/subgid configured"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
@@ -955,7 +968,7 @@ PACCONF
         base linux linux-firmware linux-headers mkinitcpio \
         openssh curl jq python python-pip python-yaml file \
         nftables cryptsetup btrfs-progs squashfs-tools \
-        incus ansible git make ca-certificates \
+        incus dnsmasq ansible git make ca-certificates \
         sudo nano iproute2 systemd-resolvconf \
         dmidecode lsof htop tmux rsync \
         $desktop_pkgs
@@ -1058,11 +1071,10 @@ FSTAB
         info "  Ansible Galaxy collections pre-installed"
     fi
 
-    # Create /etc/anklume marker
+    # Create /etc/anklume marker (directory only — no nesting context files;
+    # absolute_level/relative_level/vm_nested are created by the PARENT when
+    # instantiating nested children, per SPEC.md)
     mkdir -p "$ROOTFS_DIR/etc/anklume"
-    echo "0" > "$ROOTFS_DIR/etc/anklume/absolute_level"
-    echo "0" > "$ROOTFS_DIR/etc/anklume/relative_level"
-    echo "false" > "$ROOTFS_DIR/etc/anklume/vm_nested"
 
     # Copy mkinitcpio hooks
     # ZFS not included by default on Arch (requires archzfs repo). Use BTRFS.
@@ -1120,9 +1132,30 @@ AGENT
     # Create vconsole.conf — French AZERTY keyboard layout
     echo "KEYMAP=$KEYMAP" > "$ROOTFS_DIR/etc/vconsole.conf"
 
+    # Enable networking (systemd-networkd + systemd-resolved for DHCP)
+    mkdir -p "$ROOTFS_DIR/etc/systemd/network"
+    cat > "$ROOTFS_DIR/etc/systemd/network/20-wired.network" << 'NETCFG'
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
+NETCFG
+    chroot "$ROOTFS_DIR" systemctl enable systemd-networkd.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable systemd-resolved.service >/dev/null 2>&1 || true
+    # Symlink resolv.conf to systemd-resolved stub
+    ln -sf /run/systemd/resolve/stub-resolv.conf "$ROOTFS_DIR/etc/resolv.conf"
+    info "  Network (systemd-networkd + resolved) enabled"
+
     # Enable Incus daemon (required for anklume)
     chroot "$ROOTFS_DIR" systemctl enable incus.service >/dev/null 2>&1 || true
-    info "  Incus daemon enabled"
+    # Set up subuid/subgid for unprivileged containers (Debian postinst does
+    # this automatically; Arch does not — we must do it explicitly)
+    grep -q "^root:" "$ROOTFS_DIR/etc/subuid" 2>/dev/null \
+        || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subuid"
+    grep -q "^root:" "$ROOTFS_DIR/etc/subgid" 2>/dev/null \
+        || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subgid"
+    info "  Incus daemon enabled + subuid/subgid configured"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
@@ -1514,24 +1547,24 @@ terminal_input at_keyboard console
 keymap /boot/grub/fr.gkb
 
 menuentry "anklume Live — $base_label" {
-    linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+    linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
     initrd /boot/initrd.img
 }
 submenu "Options avancees / Advanced options" {
     menuentry "anklume Live — $base_label (KDE, no NVIDIA)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
+        linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
     menuentry "anklume Live — $base_label (sway)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
     menuentry "anklume Live — $base_label (Console)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
     menuentry "anklume Live — $base_label (boot from media, KDE)" {
-        linux /boot/vmlinuz ro boot=anklume anklume.boot_mode=iso anklume.slot=A anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
+        linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.desktop=kde anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
 }

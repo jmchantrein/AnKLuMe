@@ -79,14 +79,18 @@ while IFS= read -r project; do
     while IFS= read -r instance; do
         [ -z "$instance" ] && continue
         # Check delete protection (ADR-042)
-        if [ "$BYPASS_PROTECTION" != "true" ]; then
-            protected=$(incus config get "$instance" security.protection.delete \
-                --project "$project" 2>/dev/null || echo "")
-            if [ "$protected" = "true" ]; then
+        protected=$(incus config get "$instance" security.protection.delete \
+            --project "$project" 2>/dev/null || echo "")
+        if [ "$protected" = "true" ]; then
+            if [ "$BYPASS_PROTECTION" != "true" ]; then
                 echo "  $(_yellow "PROTECTED (skipped)"): $instance (project: $project)"
                 skipped=$((skipped + 1))
                 continue
             fi
+            # Unset protection before deleting (Incus enforces it even with --force)
+            echo "  Unprotecting: $instance (project: $project)"
+            incus config set "$instance" security.protection.delete false \
+                --project "$project" 2>/dev/null || true
         fi
         echo "  Deleting: $instance (project: $project)"
         if incus delete "$instance" --project "$project" --force; then

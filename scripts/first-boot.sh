@@ -464,6 +464,12 @@ initialize_incus() {
     modprobe bridge 2>/dev/null || true
     modprobe br_netfilter 2>/dev/null || true
 
+    # Disable AppArmor for Incus dnsmasq (AppArmor profile generation fails on overlayfs)
+    # This allows Incus to spawn dnsmasq for managed bridges on live ISO
+    if grep -q "boot=anklume" /proc/cmdline 2>/dev/null; then
+        aa-teardown 2>/dev/null || true
+    fi
+
     # Try preseed (creates incusbr0 + default storage pool + default profile)
     if cat <<PRESEED | incus admin init --preseed 2>/dev/null
 config: {}
