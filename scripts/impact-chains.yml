@@ -1,0 +1,29 @@
+# Impact chains — declarative enforcement of development workflows.
+#
+# Each chain links a file trigger pattern to required checks.
+# Tests in tests/test_consistency.py enforce these bidirectionally.
+# See also: scripts/hooks/pre-commit for staging-time warnings.
+
+chains:
+  cli_module:
+    description: "CLI module must be imported in __init__.py and covered in tree test"
+    trigger: "scripts/cli/[a-z]*.py"
+    exclude: ["_*.py"]
+    checks: [imported_in_init, in_tree_coverage_test]
+
+  python_script:
+    description: "Python script must have a corresponding test file"
+    trigger: "scripts/[a-z]*.py"
+    exclude: ["__*.py"]
+    checks: [has_test_file]
+
+  shell_script:
+    description: "Shell script must be executable and use strict mode"
+    trigger: "scripts/*.sh"
+    checks: [is_executable, has_strict_mode]
+
+  doc_translation:
+    description: "English doc must have a French translation"
+    trigger: "docs/[a-z]*.md"
+    exclude: ["*.fr.md", "decisions-log.md"]
+    checks: [has_fr_counterpart]

@@ -88,4 +88,39 @@ if [ -n "$errors" ]; then
     exit 1
 fi
 
+# 4. Impact chain warnings (advisory, not blocking)
+warnings=""
+
+# Check: new CLI module staged without __init__.py update
+for file in $staged; do
+    case "$file" in
+        scripts/cli/[a-z]*.py)
+            basename=$(basename "$file")
+            case "$basename" in _*) continue ;; esac
+            if ! echo "$staged" | grep -q 'scripts/cli/__init__.py'; then
+                warnings="${warnings}\n    - ${file} (new CLI module — is scripts/cli/__init__.py updated?)"
+            fi
+            ;;
+    esac
+done
+
+# Check: CLI module modified without tree coverage test update
+for file in $staged; do
+    case "$file" in
+        scripts/cli/*.py)
+            if ! echo "$staged" | grep -q 'tests/test_cli_tree_coverage.py'; then
+                warnings="${warnings}\n    - ${file} (CLI changed — is tests/test_cli_tree_coverage.py updated?)"
+                break
+            fi
+            ;;
+    esac
+done
+
+if [ -n "$warnings" ]; then
+    printf '[AnKLuMe] ADVISORY: Impact chain reminders.\n\n'
+    printf '  Check:'
+    printf '%b\n' "$warnings"
+    printf '\n  These are warnings, not blockers. pytest will catch real issues.\n\n'
+fi
+
 exit 0
