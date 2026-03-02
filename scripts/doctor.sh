@@ -64,6 +64,11 @@ trap cleanup EXIT
 
 setup_repair_container() {
     $REPAIR_READY && return 0
+    # Check that net-anklume exists (not available on fresh ISO before first apply)
+    if ! incus network info net-anklume &>/dev/null; then
+        result_warn "Infrastructure not initialized yet (net-anklume missing). Run 'anklume guide' first."
+        return 1
+    fi
     verbose "Creating temporary privileged container..."
     incus launch images:debian/13 "$REPAIR_CONTAINER" --ephemeral \
         -c security.privileged=true -p default --network net-anklume &>/dev/null

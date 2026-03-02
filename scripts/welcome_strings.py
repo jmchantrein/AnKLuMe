@@ -4,78 +4,80 @@ STRINGS = {
     "fr": {
         "welcome_title": "BIENVENUE",
         "welcome_what": (
-            "anklume isole vos activites dans des compartiments etanches\n"
+            "anklume isole vos activités dans des compartiments étanches\n"
             "(conteneurs, VM) — comme QubesOS, mais sur n'importe quel Linux.\n"
-            "Chaque domaine a son reseau, son stockage, ses regles."
+            "Chaque domaine a son réseau, son stockage, ses règles."
         ),
         "start": "Commencer",
         "situation_title": "SITUATION",
-        "returning": "Disque de donnees trouve — bienvenue !",
-        "opt_persist": "Sauvegarder mon travail (necessite un disque ou une partition)",
-        "opt_persist_desc": "Vos conteneurs et fichiers survivront aux redemarrages.",
-        "opt_explore": "Juste essayer (tout disparait a l'extinction)",
+        "returning": "Disque de données trouvé — bienvenue !",
+        "opt_persist": "Sauvegarder mon travail (nécessite un disque ou une partition)",
+        "opt_persist_desc": "Vos conteneurs et fichiers survivront aux redémarrages.",
+        "opt_explore": "Juste essayer (tout disparaît à l'extinction)",
         "opt_explore_desc": (
-            "ATTENTION : TOUT sera efface a l'arret — fichiers, conteneurs, config.\n"
-            "Sauvegardez vos fichiers importants sur une cle USB."
+            "ATTENTION : TOUT sera effacé à l'arrêt — fichiers, conteneurs, config.\n"
+            "Sauvegardez vos fichiers importants sur une clé USB."
         ),
         "opt_skip": "Je sais ce que je fais — passer",
         "persist_title": "PERSISTANCE",
         "persist_explain": (
             "La persistance chiffre un disque avec LUKS.\n"
-            "Vos conteneurs, donnees et configuration survivront aux redemarrages."
+            "Vos conteneurs, données et configuration survivront aux redémarrages."
         ),
-        "persist_no_disk": "Aucun disque supplementaire detecte.",
+        "persist_no_disk": "Aucun disque supplémentaire détecté.",
         "persist_no_script": "first-boot.sh introuvable.",
         "persist_confirm": "Lancer la configuration maintenant ?",
         "persist_running": "Lancement de first-boot.sh...",
-        "persist_skip": "Passe. Lancez manuellement : sudo /opt/anklume/scripts/first-boot.sh",
+        "persist_skip": "Passé. Lancez manuellement : sudo /opt/anklume/scripts/first-boot.sh",
+        "persist_success": "Configuration de la persistance terminée avec succès.",
+        "persist_error": "Erreur lors de la configuration de la persistance.",
         "explore_title": "MODE EXPLORATION",
-        "explore_init": "Preparation de l'environnement d'exploration...",
+        "explore_init": "Préparation de l'environnement d'exploration...",
         "explore_incus": "Initialisation d'Incus...",
-        "explore_infra": "Configuration de l'infrastructure par defaut...",
-        "explore_sync": "Generation des fichiers Ansible...",
-        "explore_apply": "Deploiement de l'infrastructure (cela peut prendre quelques minutes)...",
-        "explore_done": "Environnement pret ! Les donnees seront perdues au redemarrage.",
-        "explore_space": "Espace disponible : {free_mb} Mo (limite par la RAM)",
+        "explore_infra": "Configuration de l'infrastructure par défaut...",
+        "explore_sync": "Génération des fichiers Ansible...",
+        "explore_apply": "Déploiement de l'infrastructure (cela peut prendre quelques minutes)...",
+        "explore_done": "Environnement prêt ! Les données seront perdues au redémarrage.",
+        "explore_space": "Espace disponible : {free_mb} Mo (limité par la RAM)",
         "explore_warn": (
-            "Rappel : TOUT sera efface a l'arret.\n"
-            "Sauvegardez vos fichiers importants sur une cle USB."
+            "Rappel : TOUT sera effacé à l'arrêt.\n"
+            "Sauvegardez vos fichiers importants sur une clé USB."
         ),
         "keyboard_title": "CLAVIER",
         "keyboard_choice": "Disposition",
-        "keyboard_set": "Clavier configure :",
-        "tour_title": "DECOUVERTE",
+        "keyboard_set": "Clavier configuré :",
+        "tour_title": "DÉCOUVERTE",
         "tour_steps": [
             (
-                "Domaines = environnements isoles",
-                "Chaque domaine est un reseau separe avec ses propres machines.\n"
-                "Exemple : 'pro' pour le travail, 'perso' pour la vie privee.",
+                "Domaines = environnements isolés",
+                "Chaque domaine est un réseau séparé avec ses propres machines.\n"
+                "Exemple : 'pro' pour le travail, 'perso' pour la vie privée.",
             ),
             (
-                "anklume sync → genere l'infrastructure",
-                "Editez infra.yml puis lancez 'anklume sync'.\n"
-                "Les fichiers Ansible sont generes automatiquement.",
+                "anklume sync → génère l'infrastructure",
+                "Éditez infra.yml puis lancez 'anklume sync'.\n"
+                "Les fichiers Ansible sont générés automatiquement.",
             ),
             (
-                "anklume domain apply → cree tout",
-                "Reseaux, projets Incus, conteneurs : tout est cree\n"
-                "d'apres votre description dans infra.yml.",
+                "anklume domain apply → crée tout",
+                "Réseaux, projets Incus, conteneurs : tout est créé\n"
+                "d'après votre description dans infra.yml.",
             ),
             (
                 "Apprendre en pratiquant",
-                "'anklume lab list' affiche les exercices guides.\n"
+                "'anklume lab list' affiche les exercices guidés.\n"
                 "Commencez avec 'anklume lab start 01'.",
             ),
         ],
-        "next_title": "PROCHAINES ETAPES",
+        "next_title": "PROCHAINES ÉTAPES",
         "next_keys_label": "Raccourcis essentiels",
         "next_guide": "'anklume guide' pour revenir ici",
         "next_help": "'anklume --help' pour toutes les commandes",
         "next_console": "'anklume console' pour la console par domaine",
-        "next_labs": "'anklume lab list' pour les exercices guides",
+        "next_labs": "'anklume lab list' pour les exercices guidés",
         "finish": "Terminer",
         "choice": "Choix",
-        "continue": "Appuyez sur Entree pour continuer...",
+        "continue": "Appuyez sur Entrée pour continuer...",
         "yes": "o",
         "disks": "Disques disponibles :",
     },
@@ -107,6 +109,8 @@ STRINGS = {
         "persist_confirm": "Run setup now?",
         "persist_running": "Running first-boot.sh...",
         "persist_skip": "Skipped. Run manually: sudo /opt/anklume/scripts/first-boot.sh",
+        "persist_success": "Persistence setup completed successfully.",
+        "persist_error": "Error during persistence setup.",
         "explore_title": "EXPLORE MODE",
         "explore_init": "Preparing explore environment...",
         "explore_incus": "Initializing Incus...",

@@ -1,3 +1,4 @@
+---
 # Impact chains — declarative enforcement of development workflows.
 #
 # Each chain links a file trigger pattern to required checks.

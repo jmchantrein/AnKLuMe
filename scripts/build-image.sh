@@ -502,13 +502,14 @@ bootstrap_rootfs_debian() {
     printf '#!/bin/sh\nexit 0\n' > "$ROOTFS_DIR/sbin/apparmor_parser"
     chmod +x "$ROOTFS_DIR/sbin/apparmor_parser"
 
-    # Enable contrib repo (needed for zfsutils-linux, which depends on non-main kernel modules)
-    sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib/' \
+    # Enable contrib + non-free-firmware repos (contrib for zfsutils-linux, non-free-firmware for WiFi/GPU firmware)
+    sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib non-free-firmware/' \
         "$ROOTFS_DIR/etc/apt/sources.list" 2>/dev/null || true
 
     # Install additional packages via chroot (all anklume runtime + dev deps)
     local packages="nftables cryptsetup btrfs-progs zfsutils-linux squashfs-tools"
-    packages="$packages firmware-linux-free"
+    packages="$packages firmware-linux-free firmware-linux-nonfree"
+    packages="$packages network-manager wpasupplicant"
     packages="$packages ansible git make sudo nano tmux rsync"
     packages="$packages iproute2 dmidecode lsof htop file"
     # Incus: Debian Trixie ships incus in official repos
@@ -525,6 +526,8 @@ bootstrap_rootfs_debian() {
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
         packages="$packages plasma-desktop kwin-wayland dolphin konsole"
     fi
+    # Web browser
+    packages="$packages firefox-esr"
     # Dev/lint/test tools
     packages="$packages ansible-lint yamllint shellcheck"
     packages="$packages python3-pytest python3-hypothesis python3-pexpect"
@@ -585,9 +588,9 @@ MODULES
     info "  initramfs-tools modules configured (early)"
 
     # Install NVIDIA drivers from backports (non-free)
-    # Add non-free components to existing sources (for nvidia-driver)
-    # Note: contrib may already be present from ZFS step — match both patterns
-    sed -i 's/^deb \(.*\) trixie main\( contrib\)\?$/deb \1 trixie main contrib non-free non-free-firmware/' \
+    # Add non-free component to existing sources (for nvidia-driver)
+    # Sources already have: main contrib non-free-firmware (from earlier step)
+    sed -i 's/^deb \(.*\) trixie main contrib non-free-firmware$/deb \1 trixie main contrib non-free non-free-firmware/' \
         "$ROOTFS_DIR/etc/apt/sources.list" 2>/dev/null || true
     cat > "$ROOTFS_DIR/etc/apt/sources.list.d/backports.list" << NVSRC
 deb http://deb.debian.org/debian trixie-backports main contrib non-free non-free-firmware
@@ -624,7 +627,7 @@ NVSRC
     # DKMS trigger will fail (builds for host kernel via uname -r) — OK, we rebuild manually
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         apt-get install -y -qq -t trixie-backports \
-        nvidia-driver 2>&1 | tail -10 || true
+        nvidia-driver libnvidia-egl-wayland1 2>&1 | tail -10 || true
     # Step 3: Fix any broken packages
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a 2>&1 | tail -5 || true
@@ -772,6 +775,9 @@ KBD
     grep -q "^root:" "$ROOTFS_DIR/etc/subgid" 2>/dev/null \
         || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subgid"
     info "  Incus daemon enabled + subuid/subgid configured"
+    # Enable NetworkManager for WiFi support
+    chroot "$ROOTFS_DIR" systemctl enable NetworkManager.service >/dev/null 2>&1 || true
+    info "  NetworkManager enabled"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
@@ -1009,6 +1015,7 @@ PACCONF
         incus dnsmasq ansible git make ca-certificates \
         sudo nano iproute2 systemd-resolvconf \
         dmidecode lsof htop tmux rsync \
+        networkmanager wpa_supplicant firefox \
         $desktop_pkgs
 
     info "  Pacstrap complete (base packages, desktop=$DESKTOP)"
@@ -1048,7 +1055,7 @@ PACCONF
 
     # Install packages that CachyOS pacstrap can't resolve from vanilla repos
     # Using chroot pacman (vanilla Arch inside rootfs) to install them
-    local extra_pkgs="nvidia-open-dkms nvidia-utils python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff"
+    local extra_pkgs="nvidia-open-dkms nvidia-utils egl-wayland python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff"
     if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
         extra_pkgs="$extra_pkgs plasma-desktop dolphin konsole"
     fi
@@ -1179,11 +1186,12 @@ Name=en* eth*
 [Network]
 DHCP=yes
 NETCFG
-    chroot "$ROOTFS_DIR" systemctl enable systemd-networkd.service >/dev/null 2>&1 || true
+    # NetworkManager handles both wired and WiFi (replaces systemd-networkd)
+    chroot "$ROOTFS_DIR" systemctl enable NetworkManager.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable systemd-resolved.service >/dev/null 2>&1 || true
     # Symlink resolv.conf to systemd-resolved stub
     ln -sf /run/systemd/resolve/stub-resolv.conf "$ROOTFS_DIR/etc/resolv.conf"
-    info "  Network (systemd-networkd + resolved) enabled"
+    info "  Network (NetworkManager + resolved) enabled"
 
     # Enable Incus daemon (required for anklume)
     chroot "$ROOTFS_DIR" systemctl enable incus.service >/dev/null 2>&1 || true

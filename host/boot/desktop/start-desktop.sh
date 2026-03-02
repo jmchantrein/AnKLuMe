@@ -19,9 +19,12 @@ if [ -z "${XKB_DEFAULT_LAYOUT:-}" ]; then
     fi
 fi
 
-# NVIDIA: use Vulkan renderer for proprietary driver compatibility
+# NVIDIA: configure Wayland for proprietary driver
 if lsmod | grep -q '^nvidia '; then
     export WLR_RENDERER=vulkan
+    export GBM_BACKEND=nvidia-drm
+    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export WLR_NO_HARDWARE_CURSORS=1
 fi
 
 export XDG_SESSION_TYPE=wayland
@@ -34,8 +37,8 @@ case "$DE" in
         exec labwc 2>/dev/null
         ;;
     kde)
-        # KDE Plasma manages its own renderer
-        unset WLR_RENDERER
+        # KDE Plasma manages its own renderer — keep NVIDIA GBM/GLX vars
+        unset WLR_RENDERER WLR_NO_HARDWARE_CURSORS
         exec startplasma-wayland 2>/dev/null
         ;;
     *)

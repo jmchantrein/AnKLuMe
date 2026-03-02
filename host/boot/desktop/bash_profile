@@ -3,6 +3,11 @@
 # Parsed parameter: anklume.desktop=<sway|labwc|kde|1>
 # Only activates on tty1 with no existing Wayland session
 
+# CLI autocompletion for anklume (Typer-based)
+if command -v anklume >/dev/null 2>&1; then
+    eval "$(anklume --show-completion bash 2>/dev/null)" || true
+fi
+
 # Auto-detect locale from keyboard layout
 # Fixes foot "'C' is not a UTF-8 locale" warning
 if [ -z "$LANG" ] || [ "$LANG" = "C" ] || [ "$LANG" = "en_US.UTF-8" ]; then

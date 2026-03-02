@@ -11,7 +11,7 @@ check_orphan_veths() {
     # frames go to the stale port, causing ARP (broadcast) to work but
     # ping/DNS (unicast) to fail. This is likely an Incus race condition
     # during container restart — upstream investigation pending.
-    setup_repair_container
+    setup_repair_container || return 0
     local veth_list orphan_count=0
     veth_list="$(host_cmd ip -br link show type veth)" || return 0
 
@@ -51,7 +51,7 @@ check_stale_fdb_entries() {
     # Stale FDB entries are the direct cause of unicast failure after
     # container restart. Even after removing the orphan veth, the bridge
     # may still have stale learned MAC entries pointing to non-existent ports.
-    setup_repair_container
+    setup_repair_container || return 0
     local stale_count=0
 
     local bridges
@@ -83,7 +83,7 @@ check_stale_fdb_entries() {
 }
 
 check_stale_routes() {
-    setup_repair_container
+    setup_repair_container || return 0
     local routes stale_count=0
     routes="$(host_cmd ip route)" || return 0
 
@@ -110,7 +110,7 @@ check_stale_routes() {
 }
 
 check_nat_rules() {
-    setup_repair_container
+    setup_repair_container || return 0
     local bridges nft_rules missing=0
     bridges="$(host_cmd ip -br link show type bridge | awk '/^net-/{print $1}')" || return 0
     nft_rules="$(host_cmd nft list table inet incus 2>/dev/null)" || {
@@ -132,7 +132,7 @@ check_nat_rules() {
 }
 
 check_dns_dhcp_chains() {
-    setup_repair_container
+    setup_repair_container || return 0
     local bridges nft_rules missing=0
     bridges="$(host_cmd ip -br link show type bridge | awk '/^net-/{print $1}')" || return 0
     nft_rules="$(host_cmd nft list table inet incus 2>/dev/null)" || return 0
@@ -149,7 +149,7 @@ check_dns_dhcp_chains() {
 }
 
 check_bridge_health() {
-    setup_repair_container
+    setup_repair_container || return 0
     local bridges unhealthy=0
     bridges="$(host_cmd ip -br link show type bridge | awk '/^net-/{print $1, $2}')" || return 0
 

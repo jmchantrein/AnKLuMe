@@ -8,9 +8,12 @@ import os
 import random
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
-from welcome_strings import STRINGS
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from welcome_strings import STRINGS  # noqa: E402
 
 WELCOME_DONE = Path.home() / ".anklume" / "welcome-done"
 POOL_CONF = Path("/mnt/anklume-persist/pool.conf")
@@ -78,12 +81,12 @@ def has_extra_disks() -> tuple[bool, str]:
     return len(real) > 1, r.stdout.strip()
 
 KEYBOARD_LAYOUTS = [
-    ("fr", "Francais (AZERTY)"),
+    ("fr", "Français (AZERTY)"),
     ("us", "English (QWERTY)"),
     ("de", "Deutsch (QWERTZ)"),
-    ("es", "Espanol"),
+    ("es", "Español"),
     ("it", "Italiano"),
-    ("pt", "Portugues"),
+    ("pt", "Português"),
     ("gb", "English UK"),
 ]
 
@@ -225,7 +228,11 @@ def do_persistence(s: dict) -> None:
     answer = input(f"  {s['persist_confirm']} [{s['yes']}/n] ").strip().lower()
     if answer in (s["yes"], "y", "o", ""):
         print(f"  {s['persist_running']}")
-        os.system(f"sudo {fb}")
+        rc = os.system(f"sudo {fb}")
+        if rc == 0:
+            print(f"  {s['persist_success']}")
+        else:
+            print(f"  {s['persist_error']}")
     else:
         print(f"  {s['persist_skip']}")
 

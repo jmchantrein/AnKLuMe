@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from scripts.cli._helpers import run_make
+from scripts.cli._helpers import run_cmd, run_make
 
 app = typer.Typer(name="live", help="Live OS / USB boot image management.")
 
@@ -62,3 +62,15 @@ def test(
         run_make("live-os-test-vm", "CLEAN=1")
     else:
         run_make("live-os-test-vm")
+
+
+@app.command()
+def mount() -> None:
+    """Mount LUKS-encrypted persistent storage."""
+    run_cmd(["sudo", "bash", "/opt/anklume/host/boot/scripts/mount-data.sh"])
+
+
+@app.command()
+def umount() -> None:
+    """Unmount persistent storage."""
+    run_cmd(["sudo", "bash", "/opt/anklume/host/boot/scripts/umount-data.sh"])

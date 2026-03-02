@@ -51,7 +51,7 @@ GROUPS = {
         "test-report", "test-summary",
     ],
     "telemetry": ["clear", "off", "on", "report", "status"],
-    "live": ["build", "status", "test", "update"],
+    "live": ["build", "mount", "status", "test", "umount", "update"],
     "golden": ["create", "derive", "list", "publish"],
     "mcp": ["call", "list"],
 }
