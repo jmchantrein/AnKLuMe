@@ -61,6 +61,24 @@ Condense les fichiers de capture de paquets en resumes lisibles.
 Extrait la distribution des protocoles, les conversations principales,
 les requetes DNS et signale les schemas de trafic anormaux.
 
+## Niveau 4 : Apprentissage continu de baseline
+
+Le module `scripts/network_baseline.py` ajoute la detection d'anomalies
+en maintenant une baseline statistique par domaine. Chaque scan nmap met
+a jour la baseline avec les hotes, ports et services observes. Les scans
+suivants sont scores par rapport a la baseline :
+
+| Type d'anomalie | Severite | Description |
+|----------------|----------|-------------|
+| `new_host` | suspect | Hote non vu precedemment dans le domaine |
+| `new_port` | suspect | Nouveau port ouvert sur un hote connu |
+| `missing_host` | suspect | Hote present dans >50% des scans est absent |
+| `service_change` | normal | Nom de service change sur un port connu |
+
+Score d'anomalie : normal=1, suspect=5, critical=10. La baseline est
+stockee en JSON par domaine (`baseline-learned.json` a cote des
+baselines nmap XML).
+
 ## nmap-diff.sh
 
 Script shell autonome pour le scan nmap par domaine avec comparaison

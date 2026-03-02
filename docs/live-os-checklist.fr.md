@@ -33,7 +33,7 @@ Tester dans QEMU avec le firmware UEFI (OVMF).
 - [ ] Appuyer sur 'c' pendant le compte a rebours bascule en mode console
 - [ ] Le bureau se lance automatiquement sans interruption
 - [ ] La deconnexion du bureau revient a la console (pas de boucle de re-connexion automatique)
-- [ ] La sentinelle `~/.anklume-console` empeche le lancement du bureau
+- [ ] La sentinelle `~/.anklume/console-sentinel` empeche le lancement du bureau
 - [ ] Supprimer la sentinelle restaure le bureau au prochain login
 
 ## Operations de premier demarrage

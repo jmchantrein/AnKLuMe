@@ -98,8 +98,14 @@ class TestDoctor:
             )
 
     def test_expected_check_functions_exist(self):
-        """All expected check_* functions are defined in the script."""
+        """All expected check_* functions are defined or sourced."""
+        # doctor.sh sources doctor-network.sh and doctor-checks.sh
+        scripts_dir = SCRIPT.parent
         content = SCRIPT.read_text()
+        for src in ("doctor-network.sh", "doctor-checks.sh"):
+            src_path = scripts_dir / src
+            if src_path.exists():
+                content += src_path.read_text()
         expected_functions = [
             "check_orphan_veths",
             "check_stale_routes",
@@ -114,7 +120,7 @@ class TestDoctor:
         ]
         for func in expected_functions:
             assert f"{func}()" in content, (
-                f"Expected function '{func}' not found in doctor.sh"
+                f"Expected function '{func}' not found in doctor scripts"
             )
 
     def test_expected_runner_functions_exist(self):

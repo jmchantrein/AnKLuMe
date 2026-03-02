@@ -212,10 +212,10 @@ provision_container() {
     $exec_cmd apt-get update -qq
     $exec_cmd apt-get install -y -qq \
         python3 python3-pip python3-yaml ansible \
-        git jq curl ca-certificates make
+        git jq curl ca-certificates make tmux
 
     # Install pip dependencies (PEP 668 on Debian 13)
-    $exec_cmd pip install --break-system-packages pyyaml 2>/dev/null || true
+    $exec_cmd pip install --break-system-packages pyyaml libtmux 2>/dev/null || true
 
     ok "Container provisioned"
 }

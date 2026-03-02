@@ -56,6 +56,36 @@ Condenses packet capture files into readable summaries. Extracts
 protocol distribution, top conversations, DNS queries, and flags
 anomalous traffic patterns.
 
+## Level 4: Continuous baseline learning
+
+The `scripts/network_baseline.py` module adds anomaly detection by
+maintaining a statistical baseline per domain. Each nmap scan updates
+the baseline with observed hosts, ports, and services. Subsequent scans
+are scored against the baseline:
+
+| Anomaly type | Severity | Description |
+|-------------|----------|-------------|
+| `new_host` | suspect | Host not previously seen in domain |
+| `new_port` | suspect | New open port on a known host |
+| `missing_host` | suspect | Host present in >50% of scans is absent |
+| `service_change` | normal | Service name changed on a known port |
+
+The anomaly score weights: normal=1, suspect=5, critical=10. The
+baseline is stored as a JSON file per domain (`baseline-learned.json`
+alongside the nmap XML baselines).
+
+Usage from OpenClaw or scripts:
+```python
+from network_baseline import (
+    DomainBaseline, ScanResult, ScanHost, ScanPort,
+    load_baseline, save_baseline,
+)
+bl = load_baseline(Path("/var/lib/openclaw/baselines/pro.json"), "pro")
+report = bl.score(scan)
+bl.update(scan)
+save_baseline(bl, path)
+```
+
 ## nmap-diff.sh
 
 Standalone shell script for domain-scoped nmap scanning with

@@ -88,11 +88,30 @@ Sans `plotext`, un affichage textuel de secours est utilise.
 
 ## Emplacement des donnees
 
+Tout l'etat utilisateur mutable se trouve sous `~/.anklume/`. Pour
+les deploiements Live OS, ce repertoire unique est le point de
+montage pour le stockage persistant — un seul montage capture tout
+l'etat utilisateur.
+
 ```
 ~/.anklume/
-└── telemetry/
-    ├── enabled        # Fichier marqueur (presence = active)
-    └── usage.jsonl    # Journal d'evenements (format JSON Lines)
+├── mode                    # Mode CLI (user/student/dev)
+├── passphrase              # Phrase de passe chiffrement (Live OS)
+├── console-sentinel        # Empeche le lancement du bureau
+├── last-upgrade-commit     # Hash du dernier commit d'upgrade
+├── portal-audit.log        # Journal d'audit du portail fichiers
+├── tmux-last-domain        # Dernier domaine actif dans tmux
+├── clipboard/              # Historique des purges presse-papiers
+├── host-audit/             # Journaux d'audit Claude host-guard
+├── labs/                   # Fichiers de progression des labs
+│   └── <lab-id>/
+│       └── progress.yml
+├── pre-apply-snapshots/    # Metadonnees snapshot-before-apply
+├── secrets/                # Identifiants (git, etc.)
+├── telemetry/
+│   ├── enabled             # Fichier marqueur (presence = active)
+│   └── usage.jsonl         # Journal d'evenements (JSON Lines)
+└── ...
 ```
 
 ## Utilisation du script

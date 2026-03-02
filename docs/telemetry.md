@@ -85,11 +85,29 @@ Without `plotext`, a text-only fallback is displayed.
 
 ## Data Location
 
+All user-mutable state lives under `~/.anklume/`. For Live OS
+deployments, this single directory is the bind mount point for
+persistent storage — one mount captures all user state.
+
 ```
 ~/.anklume/
-└── telemetry/
-    ├── enabled        # Marker file (presence = enabled)
-    └── usage.jsonl    # Event log (JSON Lines format)
+├── mode                    # CLI mode (user/student/dev)
+├── passphrase              # Disk encryption passphrase (Live OS)
+├── console-sentinel        # Prevents desktop launch (console mode)
+├── last-upgrade-commit     # Git commit hash of last upgrade
+├── portal-audit.log        # File portal audit log
+├── tmux-last-domain        # Last active domain in tmux console
+├── clipboard/              # Clipboard purge history
+├── host-audit/             # Claude host-guard audit logs
+├── labs/                   # Lab progress files
+│   └── <lab-id>/
+│       └── progress.yml
+├── pre-apply-snapshots/    # Snapshot-before-apply metadata
+├── secrets/                # Credentials (git, etc.)
+├── telemetry/
+│   ├── enabled             # Marker file (presence = enabled)
+│   └── usage.jsonl         # Event log (JSON Lines format)
+└── ...
 ```
 
 ## Script Usage

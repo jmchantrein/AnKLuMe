@@ -31,7 +31,7 @@ Test in QEMU with UEFI firmware (OVMF).
 - [ ] Pressing 'c' during countdown drops to console mode
 - [ ] Desktop launches automatically if no interrupt
 - [ ] Desktop logout returns to console (no auto-re-login loop)
-- [ ] `~/.anklume-console` sentinel prevents desktop launch
+- [ ] `~/.anklume/console-sentinel` prevents desktop launch
 - [ ] Removing sentinel restores desktop on next login
 
 ## First-boot operations

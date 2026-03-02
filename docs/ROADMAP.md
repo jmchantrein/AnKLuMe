@@ -3575,37 +3575,32 @@ Items discussed and deferred during development sessions. Each is
 tracked here until promoted to a phase or integrated into an
 existing phase.
 
-### NER-based sanitization (Phase 39 enhancement)
+### NER-based sanitization (Phase 39 enhancement) -- DONE
 
-Current Phase 39 sanitization uses regex-based tokenization for IPs,
-hostnames, and FQDNs. A future enhancement would use Named Entity
-Recognition (NER) to detect and anonymize infrastructure-specific
-entities (domain names, project names, service identifiers) that
-regex cannot reliably catch. Requires evaluation of local NER models
-(spaCy, GLiNER) running on GPU alongside Ollama.
+Implemented: `scripts/ner_sanitizer.py` provides a Protocol-based
+NER backend interface with GLiNER, spaCy, and heuristic backends.
+`NerSanitizer` class detects and redacts infrastructure entities
+(hosts, projects, networks). Falls back to heuristic when ML
+backends are unavailable. Role defaults in `llm_sanitizer`.
 
-### Level 4 network analysis pipeline (Phase 40 enhancement)
+### Level 4 network analysis pipeline (Phase 40 enhancement) -- DONE
 
-Current Phase 40 provides network inspection (nmap scan diff, PCAP
-summary). A Level 4 pipeline would add continuous monitoring with
-anomaly baseline learning: establish normal traffic patterns per
-domain, detect deviations, and escalate through the three-level
-triage pipeline (local fast → local LLM → cloud via sanitizer).
+Implemented: `scripts/network_baseline.py` maintains a statistical
+baseline per domain. Each scan updates the baseline; subsequent
+scans are scored for anomalies (new_host, new_port, missing_host,
+service_change). JSON persistence, no external dependencies.
 
-### `~/.anklume/` single mount point (Phase 31 enhancement)
+### `~/.anklume/` single mount point (Phase 31 enhancement) -- DONE
 
-For Live OS deployments, consolidate all user-mutable data under
-`~/.anklume/` as a single bind mount point. This simplifies the
-persistent data partition layout: one mount = all user state
-(mode, telemetry, agent config, session data). Currently scattered
-across `~/.anklume/mode`, `~/.anklume/telemetry/`, etc.
+Implemented: All user-mutable state consolidated under `~/.anklume/`.
+Documentation updated (live-os.md, telemetry.md) with complete
+directory tree. Legacy paths (`~/.anklume-console`, `~/.anklume-passphrase`)
+migrated to `~/.anklume/console-sentinel` and `~/.anklume/passphrase`.
 
-### tmux/libtmux in bootstrap (Phase 23 enhancement)
+### tmux/libtmux in bootstrap (Phase 23 enhancement) -- DONE
 
-`tmux` and `libtmux` (Python) are currently installed manually in
-`anklume-instance`. They should be added to `scripts/bootstrap.sh`
-as part of the container provisioning step, since `anklume console`
-(Phase 19a) depends on them.
+Implemented: `tmux` added to apt-get install and `libtmux` added
+to pip install in `scripts/bootstrap.sh` container provisioning.
 
 ### GUI app forwarding priority (Phase 26 enhancement) -- DONE
 
@@ -3616,18 +3611,13 @@ proxy devices. PipeWire audio forwarding also implemented (commit
 Exported apps automatically include `--gui`. Remaining: real-world
 validation with complex apps (VS Code, Firefox).
 
-### Orphan veth pair cleanup (Incus upstream investigation)
+### Orphan veth pair cleanup (Incus upstream investigation) -- DONE
 
-When Incus containers restart, stale veth pairs can remain in the
-host network namespace with the same MAC address as the new pair.
-The bridge FDB sends unicast frames to the wrong port, causing
-ARP to work (broadcast) but ping/DNS to fail (unicast).
-
-**Workaround**: `anklume doctor FIX=1` (or `scripts/doctor.sh --fix
---check network`) detects and removes orphan veth pairs and stale
-routes automatically. Root cause investigation still needed:
-determine if this is an Incus bug or expected behavior, and
-whether `incus restart` should clean up old veths automatically.
+Implemented: `scripts/doctor-network.sh` detects and cleans orphan
+veth pairs, stale FDB entries, and stale routes. `doctor.sh` split
+into 3 modules (doctor.sh, doctor-network.sh, doctor-checks.sh).
+Root cause documented in code: Incus race condition during container
+restart where old veth pairs remain with same MAC.
 
 ---
 

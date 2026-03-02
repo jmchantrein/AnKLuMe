@@ -1091,6 +1091,14 @@ capabilities:
         action: "Network inspection + heartbeat + network scan cron"
         expected: "CRON.md includes network scan when enabled, skills deployed"
         deterministic: true
+      - id: NI-3-002
+        action: "Baseline learning detects anomalies across multiple scans"
+        expected: "new_host, new_port, missing_host, service_change detected"
+        deterministic: true
+      - id: NI-3-003
+        action: "Baseline persistence roundtrip (save/load JSON)"
+        expected: "Loaded baseline matches saved baseline data"
+        deterministic: true
 
   galaxy_roles:
     description: "Official Galaxy role integration and vendor roles (Phase 41)"
@@ -1196,4 +1204,38 @@ capabilities:
       - id: GF-3-001
         action: "GUI app export with --gui and domain-colored terminal"
         expected: "Exported .desktop Exec line includes --gui, domain-exec.sh handles both display and audio"
+        deterministic: true
+
+  nesting_integration:
+    description: "Multi-level anklume nesting (anklume-in-anklume)"
+    depth_1:
+      - id: NS-001
+        action: "Nesting test script exists and is executable"
+        expected: "scripts/test-nesting.sh is present and has +x"
+        deterministic: true
+      - id: NS-002
+        action: "Nesting test dry-run validates structure"
+        expected: "Dry-run passes with 5/5 checks"
+        deterministic: true
+      - id: NS-003
+        action: "Nesting context files referenced in test"
+        expected: "absolute_level, relative_level, vm_nested, yolo all present"
+        deterministic: true
+      - id: NS-004
+        action: "Nesting prefix format is zero-padded 3 digits"
+        expected: "Level 0=000-, level 1=001-, level 12=012-"
+        deterministic: true
+      - id: NS-005
+        action: "Level 3 triggers stop condition"
+        expected: "Nesting stops when absolute_level >= 2"
+        deterministic: true
+    depth_2:
+      - id: NS-2-001
+        action: "Nesting context + nesting prefix interaction"
+        expected: "Prefix applied based on absolute_level from context files"
+        deterministic: true
+    depth_3:
+      - id: NS-3-001
+        action: "Nesting + addressing + firewall in nested instance"
+        expected: "IP addressing and firewall rules correct at each nesting level"
         deterministic: true

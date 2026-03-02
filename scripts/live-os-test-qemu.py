@@ -41,7 +41,7 @@ CMD_TIMEOUT = 60
 LONG_TIMEOUT = 180
 DEPLOY_TIMEOUT = 600
 ROOT_PASSWORD = "anklume"
-DISK_SIZE = "20G"
+DISK_SIZE = "120G"  # Must be >= 100G for first-boot.sh data disk detection
 
 # ANSI colors
 C_RESET = "\033[0m"

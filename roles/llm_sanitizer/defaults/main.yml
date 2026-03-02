@@ -26,6 +26,13 @@ llm_sanitizer_enable_credential_patterns: true
 llm_sanitizer_enable_ansible_patterns: true
 llm_sanitizer_enable_service_patterns: true
 
+# NER enhancement (optional, complements regex patterns)
+# Requires GLiNER or spaCy. Falls back to heuristic detection.
+llm_sanitizer_enable_ner: false
+llm_sanitizer_ner_backend: auto  # auto, gliner, spacy
+llm_sanitizer_ner_min_confidence: 0.5
+llm_sanitizer_ner_model: "urchade/gliner_base"  # GLiNER model name
+
 # Packages required by the sanitizer
 llm_sanitizer_packages:
   - python3

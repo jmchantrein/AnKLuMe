@@ -274,7 +274,7 @@ sudo /opt/anklume/scripts/first-boot.sh --interactive
 sudo /opt/anklume/scripts/first-boot.sh \
   --disk /dev/nvme0n1 \
   --pool-name datapool \
-  --passphrase-file ~/.anklume-passphrase
+  --passphrase-file ~/.anklume/passphrase
 ```
 
 ## A/B Update Mechanism
