@@ -30,6 +30,12 @@ calmly orchestrated by you, Ansible, Incus and Molecule.
 8. **Spec-driven, test-driven development**: Write/update spec first, write
    tests second, implement third. No code without a spec and a test.
 9. **No wheel reinvented**: Glue standard, battle-tested tools together.
+10. **CLI-first development**: When developing or testing anklume,
+   always use `anklume` CLI commands (`anklume dev test`,
+   `anklume dev lint`, `anklume dev scenario`, etc.) instead of raw
+   tool invocations (`pytest`, `behave`, `shellcheck`, `incus`, etc.).
+   If a needed CLI command doesn't exist, add it to `scripts/cli/*.py`
+   first, then use it.
 
 ## Source of truth model (PSOT)
 

@@ -320,6 +320,19 @@ def generate_scenarios(
     run_cmd(args, cwd=str(PROJECT_ROOT))
 
 
+@app.command()
+def nesting(
+    mode: Annotated[str, typer.Option("--mode", "-m", help="Nesting mode: lxc, vm, or both")] = "lxc",
+    max_depth: Annotated[int, typer.Option("--max-depth", "-d", help="Max nesting depth (1-5)")] = 3,
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Validate structure only")] = False,
+) -> None:
+    """Run nesting integration test (LXC/VM containers-in-containers)."""
+    args = ["--mode", mode, "--max-depth", str(max_depth)]
+    if dry_run:
+        args.append("--dry-run")
+    run_script("test-nesting.sh", *args)
+
+
 @app.command("runner")
 def runner(
     action: Annotated[str, typer.Argument(help="Action: create or destroy")],
