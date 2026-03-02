@@ -1,8 +1,21 @@
 """Tests for scripts/platform_server.py — learning platform."""
 
+import pty
 import shutil
 
 import pytest
+
+
+def _pty_available():
+    """Check if PTY devices are available."""
+    try:
+        m, s = pty.openpty()
+        import os
+        os.close(m)
+        os.close(s)
+        return True
+    except OSError:
+        return False
 
 fastapi = pytest.importorskip("fastapi")
 httpx = pytest.importorskip("httpx")
@@ -164,6 +177,7 @@ class TestNotFound:
         assert resp.status_code == 404
 
 
+@pytest.mark.skipif(not _pty_available(), reason="PTY devices not available")
 class TestWebSocket:
     @pytest.mark.skipif(
         not shutil.which("bash"),

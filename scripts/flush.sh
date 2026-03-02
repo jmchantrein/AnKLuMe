@@ -73,10 +73,20 @@ _list_projects() {
     incus project list --format csv -c n 2>/dev/null | sed 's/ (current)$//'
 }
 
+# Helper: collect lines into an array (portable, no /dev/fd needed)
+_readlines() {
+    mapfile -t _lines < <("$@" 2>/dev/null) 2>/dev/null || _lines=()
+}
+
 # 1. Destroy instances in all projects (with protection check)
 echo "--- Destroying instances ---"
-while IFS= read -r project; do
-    while IFS= read -r instance; do
+_projects=()
+mapfile -t _projects <<< "$(_list_projects)" 2>/dev/null || true
+for project in "${_projects[@]}"; do
+    [ -z "$project" ] && continue
+    _instances=()
+    mapfile -t _instances <<< "$(incus list --project "$project" --format csv -c n 2>/dev/null)" 2>/dev/null || true
+    for instance in "${_instances[@]}"; do
         [ -z "$instance" ] && continue
         # Check delete protection (ADR-042)
         protected=$(incus config get "$instance" security.protection.delete \
@@ -98,38 +108,45 @@ while IFS= read -r project; do
         else
             echo "  WARNING: Failed to delete $instance (project: $project)"
         fi
-    done < <(incus list --project "$project" --format csv -c n 2>/dev/null)
-done < <(_list_projects)
+    done
+done
 
 # 2. Delete cached images in non-default projects (blocks project deletion)
 echo "--- Deleting cached images ---"
-while IFS= read -r project; do
+for project in "${_projects[@]}"; do
+    [ -z "$project" ] && continue
     [ "$project" = "default" ] && continue
-    while IFS= read -r fingerprint; do
+    _fingerprints=()
+    mapfile -t _fingerprints <<< "$(incus image list --project "$project" --format csv -c f 2>/dev/null)" 2>/dev/null || true
+    for fingerprint in "${_fingerprints[@]}"; do
         [ -z "$fingerprint" ] && continue
         echo "  Deleting image: ${fingerprint:0:12} (project: $project)"
         if incus image delete "$fingerprint" --project "$project" 2>/dev/null; then
             deleted=$((deleted + 1))
         fi
-    done < <(incus image list --project "$project" --format csv -c f 2>/dev/null)
-done < <(_list_projects)
+    done
+done
 
 # 3. Delete non-default profiles in all projects
 echo "--- Deleting profiles ---"
-while IFS= read -r project; do
-    while IFS= read -r profile; do
+for project in "${_projects[@]}"; do
+    [ -z "$project" ] && continue
+    _profiles=()
+    mapfile -t _profiles <<< "$(incus profile list --project "$project" --format csv -c n 2>/dev/null)" 2>/dev/null || true
+    for profile in "${_profiles[@]}"; do
         [ -z "$profile" ] && continue
         [ "$profile" = "default" ] && continue
         echo "  Deleting profile: $profile (project: $project)"
         if incus profile delete "$profile" --project "$project"; then
             deleted=$((deleted + 1))
         fi
-    done < <(incus profile list --project "$project" --format csv -c n 2>/dev/null)
-done < <(_list_projects)
+    done
+done
 
 # 4. Reset default profile in non-default projects
 echo "--- Resetting default profiles ---"
-while IFS= read -r project; do
+for project in "${_projects[@]}"; do
+    [ -z "$project" ] && continue
     [ "$project" = "default" ] && continue
     for device in $(incus profile device list default --project "$project" \
             --format csv 2>/dev/null | cut -d, -f1); do
@@ -137,11 +154,12 @@ while IFS= read -r project; do
         echo "  Removing device '$device' from default profile (project: $project)"
         incus profile device remove default "$device" --project "$project" 2>/dev/null || true
     done
-done < <(_list_projects)
+done
 
 # 5. Delete non-default projects (skip if instances remain after step 1)
 echo "--- Deleting projects ---"
-while IFS= read -r project; do
+for project in "${_projects[@]}"; do
+    [ -z "$project" ] && continue
     [ "$project" = "default" ] && continue
     # Check if project still has instances (protected ones survived step 1)
     remaining=$(incus list --project "$project" --format csv -c n 2>/dev/null | wc -l)
@@ -156,11 +174,13 @@ while IFS= read -r project; do
     else
         echo "  WARNING: Failed to delete project $project"
     fi
-done < <(_list_projects)
+done
 
 # 6. Delete anklume bridges (net-*) — now unreferenced by any project
 echo "--- Deleting bridges ---"
-while IFS= read -r bridge; do
+_bridges=()
+mapfile -t _bridges <<< "$(incus network list --format csv -c n 2>/dev/null | grep "^net-")" 2>/dev/null || true
+for bridge in "${_bridges[@]}"; do
     [ -z "$bridge" ] && continue
     echo "  Deleting bridge: $bridge"
     if incus network delete "$bridge"; then
@@ -168,7 +188,7 @@ while IFS= read -r bridge; do
     else
         echo "  WARNING: Failed to delete bridge $bridge"
     fi
-done < <(incus network list --format csv -c n 2>/dev/null | grep "^net-")
+done
 
 # 7. Remove generated Ansible files
 echo "--- Removing generated files ---"

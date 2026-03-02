@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import os
+import pty
 import time
 
 import pytest
@@ -10,6 +11,18 @@ import pytest
 from scripts.web.pty_manager import PtyManager, PtySession
 
 
+def _pty_available():
+    """Check if PTY devices are available."""
+    try:
+        m, s = pty.openpty()
+        os.close(m)
+        os.close(s)
+        return True
+    except OSError:
+        return False
+
+
+@pytest.mark.skipif(not _pty_available(), reason="PTY devices not available")
 class TestPtySession:
     def test_session_starts_with_valid_fd(self):
         session = PtySession(cmd=["/bin/echo", "hello"])
@@ -118,6 +131,7 @@ class TestPtySession:
             session.close()
 
 
+@pytest.mark.skipif(not _pty_available(), reason="PTY devices not available")
 class TestPtyManager:
     def test_create_and_get(self):
         mgr = PtyManager(max_sessions=4)
@@ -222,6 +236,7 @@ class TestPtyManager:
             mgr.close_all()
 
 
+@pytest.mark.skipif(not _pty_available(), reason="PTY devices not available")
 class TestPtyManagerReadLoop:
     def test_read_loop_receives_data(self):
         async def _run():

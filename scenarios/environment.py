@@ -12,6 +12,7 @@ Usage:
 
 import logging
 import os
+import pty as pty_module
 import shutil
 
 from scenarios.support import (
@@ -56,6 +57,23 @@ def after_all(context):
     if SESSION_BACKUP_DIR.exists():
         _restore_state(SESSION_BACKUP_DIR, PROJECT_DIR)
         shutil.rmtree(SESSION_BACKUP_DIR)
+
+
+def _pty_available():
+    """Check if PTY devices are available."""
+    try:
+        m, s = pty_module.openpty()
+        os.close(m)
+        os.close(s)
+        return True
+    except OSError:
+        return False
+
+
+def before_feature(context, feature):
+    """Skip features tagged @pty_required when PTY devices are unavailable."""
+    if "pty_required" in feature.tags and not _pty_available():
+        feature.skip("PTY devices not available")
 
 
 def before_scenario(context, scenario):
