@@ -308,7 +308,7 @@ class TestFlushProductionSafety:
         result = subprocess.run(
             ["bash", str(patched)],
             capture_output=True, text=True, env=env, cwd=cwd,
-            input="yes\n",
+            input="yes\n", timeout=30,
         )
         assert result.returncode == 0
         assert "Flush complete" in result.stdout

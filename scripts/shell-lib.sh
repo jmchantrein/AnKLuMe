@@ -4,8 +4,7 @@
 # source live-os-lib.sh instead (which re-exports these functions too).
 #
 # Usage: source "$(dirname "$0")/shell-lib.sh"
-
-set -euo pipefail
+# Note: callers are responsible for setting their own `set -euo pipefail`.
 
 info()  { echo -e "\033[0;34m[INFO]\033[0m $*"; }
 ok()    { echo -e "\033[0;32m[ OK ]\033[0m $*"; }

@@ -154,13 +154,11 @@ GUIDE_CSS = """\
 """
 
 
-def trust_css(level: str, palette: str | None = None) -> dict[str, str]:
-    """Return border/bg colors for a trust level, with palette support.
+def trust_css(level: str) -> dict[str, str]:
+    """Return border/bg colors for a trust level.
 
     Delegates to colors.resolve_colors() which handles accessibility
-    palette loading. The ``palette`` parameter is accepted for backward
-    compatibility but ignored (resolve_colors auto-detects the active
-    palette from user settings).
+    palette loading and auto-detects the active palette from user settings.
     """
     colors = resolve_colors(level)
     return {"border": colors["border"], "bg": colors["bg"]}
