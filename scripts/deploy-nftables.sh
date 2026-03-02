@@ -126,7 +126,7 @@ check_br_netfilter
 
 echo "=== anklume nftables deployment ==="
 
-TMPFILE=$(mktemp /tmp/anklume-nft-XXXXXX.nft)
+TMPFILE=$(mktemp -t anklume-nft-XXXXXX.nft)
 # shellcheck disable=SC2064
 trap "rm -f '$TMPFILE'" EXIT
 

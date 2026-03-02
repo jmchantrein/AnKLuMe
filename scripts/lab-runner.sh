@@ -86,7 +86,7 @@ cmd_check() {
         return 0
     fi
     echo -e "${DIM}Running: $validation${RESET}"
-    if eval "$validation" 2>/dev/null; then
+    if bash -c "$validation" 2>/dev/null; then
         echo -e "${GREEN}PASS${RESET} - Step $((current_step + 1)) validated."
         _advance_step "$lab_dir" "$lab_id" "$lab_yml" "$current_step" "$total_steps"
     else

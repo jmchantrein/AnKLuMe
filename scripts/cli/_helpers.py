@@ -1,6 +1,7 @@
 """Shared utilities for the anklume CLI."""
 
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,8 @@ import typer
 from rich.console import Console
 
 console = Console()
+
+_learn_incus_cache: bool | None = None
 
 # Project root: two levels up from scripts/cli/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -25,7 +28,7 @@ def get_infra_path() -> Path:
     return yml  # let load_infra raise
 
 
-def load_infra_safe():
+def load_infra_safe() -> dict:
     """Load and return parsed infra dict, or exit on error."""
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
     from generate import load_infra
@@ -37,6 +40,30 @@ def load_infra_safe():
         raise typer.Exit(1) from None
 
 
+def is_learn_incus() -> bool:
+    """Check if Incus learning mode is enabled (~/.anklume/learn_incus)."""
+    global _learn_incus_cache  # noqa: PLW0603
+    if _learn_incus_cache is None:
+        try:
+            _learn_incus_cache = (
+                Path.home() / ".anklume" / "learn_incus"
+            ).read_text().strip() == "on"
+        except FileNotFoundError:
+            _learn_incus_cache = False
+    return _learn_incus_cache
+
+
+def format_bytes(n: int) -> str:
+    """Format byte count as human-readable string (KiB, MiB, GiB)."""
+    if n < 1024:
+        return f"{n}B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.0f}KiB"
+    if n < 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f}MiB"
+    return f"{n / (1024 * 1024 * 1024):.1f}GiB"
+
+
 def run_cmd(
     args: list[str],
     *,
@@ -45,6 +72,8 @@ def run_cmd(
     capture: bool = False,
 ) -> subprocess.CompletedProcess:
     """Run a subprocess with optional Rich output."""
+    if args and args[0] == "incus" and is_learn_incus():
+        console.print(f"[dim][incus] {shlex.join(args)}[/dim]")
     effective_cwd = cwd or str(PROJECT_ROOT)
     try:
         return subprocess.run(
@@ -79,7 +108,7 @@ def is_live_os() -> bool:
         return False
 
 
-def require_container():
+def require_container() -> None:
     """Exit if not running inside a container (bypassed on Live OS)."""
     if is_live_os():
         return

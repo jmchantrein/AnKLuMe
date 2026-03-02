@@ -8,15 +8,9 @@ from pathlib import Path
 # Add scripts/ to path for imports (same pattern as tests/conftest.py)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from colors import TRUST_TMUX_COLORS as TRUST_COLORS  # noqa: E402
+from colors import infer_trust_level  # noqa: E402
 from generate import load_infra  # noqa: E402
-
-TRUST_COLORS = {
-    "admin": "colour17",
-    "trusted": "colour22",
-    "semi-trusted": "colour58",
-    "untrusted": "colour52",
-    "disposable": "colour53",
-}
 
 TRUST_LABELS = {
     "admin": "dark blue",
@@ -30,21 +24,6 @@ TRUST_LABELS = {
 # When running tmux inside containers (nested tmux), use Ctrl-a on the inner
 # session to avoid prefix collision.
 DEFAULT_PREFIX = "C-b"
-
-
-def infer_trust_level(domain_name, domain_config):
-    """Infer trust level from domain name and config if not explicitly set.
-
-    Heuristic:
-    - domain name contains "admin" or "anklume" → admin
-    - ephemeral: true → disposable
-    - default → trusted
-    """
-    if "admin" in domain_name.lower() or "anklume" in domain_name.lower():
-        return "admin"
-    if domain_config.get("ephemeral", False):
-        return "disposable"
-    return "trusted"
 
 
 def build_session_config(infra):
@@ -148,6 +127,15 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
     # Status bar base style
     session.cmd("set-option", "status-style", "bg=black,fg=white")
 
+    # Status-right: host resource summary (refreshed every 5s)
+    scripts_dir = str(Path(__file__).resolve().parent)
+    session.cmd("set-option", "status-right-length", "80")
+    session.cmd(
+        "set-option", "status-right",
+        f"#(python3 {scripts_dir}/host_resources.py --tmux)",
+    )
+    session.cmd("set-option", "status-interval", "5")
+
     for window_idx, window_config in enumerate(config):
         if window_idx == 0:
             # Use the default first window created by tmux
@@ -158,6 +146,14 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
 
         panes = window_config["panes"]
         color_code = TRUST_COLORS.get(window_config["trust"], "default")
+
+        # Load accessibility settings for tmux coloring mode
+        try:
+            from scripts.accessibility import load_accessibility
+            a11y_settings = load_accessibility()
+            _title_only = a11y_settings.get("tmux_coloring") == "title-only"
+        except (ImportError, KeyError, OSError):
+            _title_only = False
 
         # Color the window tab in the status bar (server-side, cannot be spoofed)
         window.cmd("set-window-option", "window-status-style", f"bg={color_code},fg=white")
@@ -175,8 +171,12 @@ def create_session(config, session_name="anklume", attach=True, prefix=DEFAULT_P
                           f"Terminal too small? Skipping.")
                     continue
 
-            # Set pane background color (server-side, cannot be spoofed)
-            pane.cmd("select-pane", "-P", f"bg={color_code}")
+            # Color pane: full background or border/title only
+            if _title_only:
+                pane.cmd("select-pane", "-P", "bg=default")
+                session.cmd("set-option", "pane-border-style", f"fg={color_code}")
+            else:
+                pane.cmd("select-pane", "-P", f"bg={color_code}")
             pane_label = f"[{window_config['name']}] {pane_config['machine']}"
             pane.cmd("select-pane", "-T", pane_label)
 

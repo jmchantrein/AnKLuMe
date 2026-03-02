@@ -33,7 +33,7 @@ run_layer() {
 
     start=$(date +%s%N)
     rc=0
-    output=$(eval "$cmd" 2>&1) || rc=$?
+    output=$(bash -c "$cmd" 2>&1) || rc=$?
     duration=$(( ($(date +%s%N) - start) / 1000000 ))
     local dur_s
     dur_s=$(awk "BEGIN {printf \"%.1f\", $duration/1000}")

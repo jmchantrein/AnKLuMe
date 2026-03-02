@@ -151,7 +151,7 @@ cmd_export() {
 
     # Step 2: Pull .desktop content from container
     local tmp_desktop
-    tmp_desktop=$(mktemp /tmp/anklume-export-XXXXXX.desktop)
+    tmp_desktop=$(mktemp -t anklume-export-XXXXXX.desktop)
     # shellcheck disable=SC2064  # Intentional: expand tmp_desktop now
     trap "rm -f '$tmp_desktop'" EXIT
 

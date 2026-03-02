@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-import yaml
+from lib.infra_loader import load_infra_from_path
 
 
 def main():
@@ -12,17 +12,7 @@ def main():
         print(f"Usage: {sys.argv[0]} <infra.yml|infra/>", file=sys.stderr)
         sys.exit(1)
 
-    infra_path = Path(sys.argv[1])
-    if infra_path.is_dir():
-        base_path = infra_path / "base.yml"
-        if not base_path.exists():
-            print(f"ERROR: {base_path} not found", file=sys.stderr)
-            sys.exit(1)
-        with open(base_path) as f:
-            infra = yaml.safe_load(f) or {}
-    else:
-        with open(infra_path) as f:
-            infra = yaml.safe_load(f) or {}
+    infra = load_infra_from_path(sys.argv[1])
 
     g = infra.get("global", {})
     sv_base = g.get("shared_volumes_base", "/srv/anklume/shares")

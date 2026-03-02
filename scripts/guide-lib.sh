@@ -182,7 +182,7 @@ skip_chapter() {
 run_demo() {
     check_info "$ $1"
     echo ""
-    if eval "$1" 2>&1 | sed 's/^/    /'; then
+    if bash -c "$1" 2>&1 | sed 's/^/    /'; then
         check_ok "Done"
     else
         check_warn "Command had warnings"

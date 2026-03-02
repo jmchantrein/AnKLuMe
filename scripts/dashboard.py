@@ -29,7 +29,8 @@ from fastapi.responses import HTMLResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from web.theme import BASE_CSS, DASHBOARD_CSS, trust_css  # noqa: E402
+from colors import infer_trust_level  # noqa: E402
+from web.theme import BASE_CSS, DASHBOARD_CSS, RESOURCE_CSS, trust_css  # noqa: E402
 
 # ── Data fetchers ────────────────────────────────────────────────
 
@@ -79,24 +80,14 @@ def fetch_projects():
 
 def load_infra_yml():
     """Load infra.yml if available."""
+    import yaml
     for path in [Path("infra.yml"), Path("infra/base.yml")]:
-        if path.exists():
-            import yaml
+        try:
             with open(path) as f:
                 return yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            continue
     return {}
-
-
-def infer_trust_level(domain_name, domain_config):
-    """Infer trust level (same logic as console.py)."""
-    trust = domain_config.get("trust_level")
-    if trust:
-        return trust
-    if "admin" in domain_name.lower() or "anklume" in domain_name.lower():
-        return "admin"
-    if domain_config.get("ephemeral", False):
-        return "disposable"
-    return "trusted"
 
 
 def build_status():
@@ -161,7 +152,7 @@ HTML_TEMPLATE = (
     '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">\n'
     "<title>anklume Dashboard</title>\n"
     '<script src="https://unpkg.com/htmx.org@2.0.4"></script>\n'
-    f"<style>{BASE_CSS}\n{DASHBOARD_CSS}</style>\n"
+    f"<style>{BASE_CSS}\n{DASHBOARD_CSS}\n{RESOURCE_CSS}</style>\n"
     "</head><body>\n"
     "<h1>anklume Dashboard</h1>\n"
     '<div id="content" hx-get="/api/html" hx-trigger="load, every 5s"'
@@ -173,9 +164,24 @@ HTML_TEMPLATE = (
 )
 
 
+def _fetch_resources_html():
+    """Fetch host resources and render as HTML widget."""
+    try:
+        from host_resources import collect_all, render_dashboard_data
+        data = collect_all()
+        return render_dashboard_data(data)
+    except (ImportError, OSError, ValueError):
+        return ""
+
+
 def render_status_html(status):
     """Render status as HTML fragment for htmx."""
     parts = []
+
+    # Host resources widget
+    res_html = _fetch_resources_html()
+    if res_html:
+        parts.append(res_html)
 
     # Instances
     parts.append("<h2>Instances</h2>")

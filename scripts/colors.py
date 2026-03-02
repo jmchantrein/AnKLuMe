@@ -49,3 +49,23 @@ def infer_trust_level(domain_name, domain_config):
     if domain_config.get("ephemeral", False):
         return "disposable"
     return "trusted"
+
+
+def resolve_colors(trust_level):
+    """Return {border, bg, tmux} using the active accessibility palette.
+
+    Falls back to the hardcoded dicts above if accessibility module
+    is not available or palette is 'default'.
+    """
+    try:
+        from scripts.accessibility import get_trust_colors, load_accessibility
+        settings = load_accessibility()
+        if settings["color_palette"] != "default":
+            return get_trust_colors(trust_level, settings["color_palette"])
+    except (ImportError, KeyError, OSError):
+        pass
+    return {
+        "border": TRUST_BORDER_COLORS.get(trust_level, "#30363d"),
+        "bg": TRUST_BG_COLORS.get(trust_level, "#161b22"),
+        "tmux": TRUST_TMUX_COLORS.get(trust_level, "default"),
+    }
