@@ -1,6 +1,6 @@
 """anklume setup — initialization and configuration."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -72,6 +72,6 @@ def production(
             console.print("[dim]Not in production mode.[/dim]")
     else:
         marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(f"deployed={datetime.now().isoformat()}\n")
+        marker.write_text(f"deployed={datetime.now(tz=UTC).isoformat()}\n")
         console.print("[bold]Production mode enabled.[/bold]")
         console.print("[dim]git push blocked. Use --off to revert.[/dim]")

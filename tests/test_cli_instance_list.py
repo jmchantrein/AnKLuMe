@@ -76,8 +76,8 @@ def _mock_run_cmd(args, *, capture=False, check=True, cwd=None):
 
 
 class TestInstanceList:
-    @patch("scripts.cli.instance.load_infra_safe", return_value=SAMPLE_INFRA)
-    @patch("scripts.cli.instance.run_cmd", side_effect=_mock_run_cmd)
+    @patch("scripts.cli._instance_list.load_infra_safe", return_value=SAMPLE_INFRA)
+    @patch("scripts.cli._instance_list.run_cmd", side_effect=_mock_run_cmd)
     def test_list_shows_table(self, mock_run, mock_infra):
         result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
@@ -85,8 +85,8 @@ class TestInstanceList:
         assert "pro" in result.output
         assert "ai-gpu" in result.output or "ai-g" in result.output
 
-    @patch("scripts.cli.instance.load_infra_safe", return_value=SAMPLE_INFRA)
-    @patch("scripts.cli.instance.run_cmd", side_effect=_mock_run_cmd)
+    @patch("scripts.cli._instance_list.load_infra_safe", return_value=SAMPLE_INFRA)
+    @patch("scripts.cli._instance_list.run_cmd", side_effect=_mock_run_cmd)
     def test_list_filter_domain(self, mock_run, mock_infra):
         result = runner.invoke(app, ["list", "--domain", "pro"])
         assert result.exit_code == 0
@@ -94,32 +94,32 @@ class TestInstanceList:
         # ai-gpu should be filtered out (no "ai-" prefix present)
         assert "ai-gpu" not in result.output and "ai-g" not in result.output
 
-    @patch("scripts.cli.instance.load_infra_safe", return_value=SAMPLE_INFRA)
-    @patch("scripts.cli.instance.run_cmd", side_effect=_mock_run_cmd)
+    @patch("scripts.cli._instance_list.load_infra_safe", return_value=SAMPLE_INFRA)
+    @patch("scripts.cli._instance_list.run_cmd", side_effect=_mock_run_cmd)
     def test_list_sort_memory(self, mock_run, mock_infra):
         result = runner.invoke(app, ["list", "--sort", "memory"])
         assert result.exit_code == 0
         # pro-dev has memory=512M, ai-gpu has 0 → pro should appear first
         # Filter data rows (start with │) containing instance names
         lines = result.output.splitlines()
-        data_lines = [l for l in lines if l.startswith("│") and ("pro" in l or "ai" in l)]
+        data_lines = [line for line in lines if line.startswith("│") and ("pro" in line or "ai" in line)]
         assert len(data_lines) == 2
         assert "pro" in data_lines[0]
 
-    @patch("scripts.cli.instance.load_infra_safe", return_value=SAMPLE_INFRA)
-    @patch("scripts.cli.instance.run_cmd", side_effect=_mock_run_cmd)
+    @patch("scripts.cli._instance_list.load_infra_safe", return_value=SAMPLE_INFRA)
+    @patch("scripts.cli._instance_list.run_cmd", side_effect=_mock_run_cmd)
     def test_list_shows_gpu(self, mock_run, mock_infra):
         result = runner.invoke(app, ["list"])
         assert "yes" in result.output  # GPU column for ai-gpu
 
-    @patch("scripts.cli.instance.load_infra_safe", return_value=SAMPLE_INFRA)
-    @patch("scripts.cli.instance.run_cmd", side_effect=_mock_run_cmd)
+    @patch("scripts.cli._instance_list.load_infra_safe", return_value=SAMPLE_INFRA)
+    @patch("scripts.cli._instance_list.run_cmd", side_effect=_mock_run_cmd)
     def test_list_shows_ip(self, mock_run, mock_infra):
         result = runner.invoke(app, ["list"])
         # Rich may truncate IP: "10.1…" or full "10.120.0.1"
         assert "10.1" in result.output
 
-    @patch("scripts.cli.instance.run_cmd")
+    @patch("scripts.cli._instance_list.run_cmd")
     def test_list_empty(self, mock_run):
         mock = MagicMock()
         mock.returncode = 0

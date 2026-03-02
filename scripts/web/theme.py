@@ -155,16 +155,13 @@ GUIDE_CSS = """\
 
 
 def trust_css(level: str, palette: str | None = None) -> dict[str, str]:
-    """Return border and background colors for a trust level.
-
-    Uses the specified palette, or falls back to the default colors.
-    """
+    """Return border/bg colors for a trust level, with palette support."""
     if palette and palette != "default":
         try:
             from scripts.accessibility import get_trust_colors
             colors = get_trust_colors(level, palette)
             return {"border": colors["border"], "bg": colors["bg"]}
-        except Exception:
+        except (ImportError, KeyError, TypeError):
             pass
     return {
         "border": TRUST_BORDER_COLORS.get(level, "#30363d"),
@@ -173,31 +170,21 @@ def trust_css(level: str, palette: str | None = None) -> dict[str, str]:
 
 
 def accessible_css(settings: dict | None = None) -> str:
-    """Return extra CSS for accessibility (dyslexia, high-contrast).
-
-    Args:
-        settings: Accessibility settings dict from load_accessibility().
-                  If None, loads from disk.
-    """
+    """Return extra CSS for accessibility (dyslexia, high-contrast)."""
     if settings is None:
         try:
             from scripts.accessibility import load_accessibility
             settings = load_accessibility()
-        except Exception:
+        except (ImportError, OSError):
             return ""
-
     parts = []
     if settings.get("dyslexia_mode"):
         try:
             from scripts.accessibility import get_dyslexia_css
             parts.append(get_dyslexia_css())
-        except Exception:
+        except (ImportError, KeyError):
             pass
-
     if settings.get("color_palette") == "high-contrast":
-        parts.append(
-            ":root { --bg: #000000; --fg: #ffffff; --card: #111111;\n"
-            "  --border: #666666; --muted: #cccccc; }\n"
-        )
-
+        parts.append(":root { --bg: #000; --fg: #fff; --card: #111;\n"
+                     "  --border: #666; --muted: #ccc; }\n")
     return "\n".join(parts)

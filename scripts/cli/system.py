@@ -24,7 +24,8 @@ def resources(
     """Show host resource usage (CPU, RAM, disk, GPU/VRAM, LLM models)."""
     import time
 
-    from scripts.host_resources import collect_all, render_cli, render_tmux
+    from scripts.host_resources import collect_all
+    from scripts.host_resources_render import render_cli, render_tmux
 
     targets = output.split(",") if "," in output else [output]
     if "all" in targets:
@@ -38,7 +39,7 @@ def resources(
         if "tmux" in targets:
             render_tmux(data)
         if "web" in targets:
-            from scripts.host_resources import render_dashboard_data
+            from scripts.host_resources_render import render_dashboard_data
             console.print(render_dashboard_data(data))
 
         if not watch:

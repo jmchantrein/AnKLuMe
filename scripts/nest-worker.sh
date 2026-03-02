@@ -118,7 +118,8 @@ if [ "$FULL" = "1" ]; then
 fi
 
 # ── Push worker and recurse ─────────────────────────────────
-cat /tmp/nest-worker.sh | incus exec "$CHILD" -- \
-    tee /tmp/nest-worker.sh > /dev/null
+# shellcheck disable=SC2094  # reads local, writes remote via incus exec
+incus exec "$CHILD" -- \
+    tee /tmp/nest-worker.sh < /tmp/nest-worker.sh > /dev/null
 incus exec "$CHILD" -- chmod +x /tmp/nest-worker.sh
 incus exec "$CHILD" -- bash /tmp/nest-worker.sh "$NEXT" "$MAX" "$IMG" "$FULL" "$BEHAVE"

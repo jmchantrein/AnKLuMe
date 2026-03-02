@@ -147,24 +147,14 @@ def pattern_stats(patterns):
 
 def main():
     """CLI entrypoint."""
-    parser = argparse.ArgumentParser(
-        description="Dry-run LLM sanitizer: show what would be redacted",
-    )
-    parser.add_argument("text", nargs="?", help="Text to sanitize (or use stdin)")
-    parser.add_argument(
-        "--file", "-f", type=str, help="Read text from file",
-    )
-    parser.add_argument(
-        "--patterns", "-p", type=str, help="Custom patterns YAML file",
-    )
-    parser.add_argument(
-        "--json", dest="json_output", action="store_true",
-        help="JSON output with redaction details",
-    )
-    parser.add_argument(
-        "--stats", action="store_true",
-        help="Show pattern statistics only",
-    )
+    parser = argparse.ArgumentParser(description="Dry-run LLM sanitizer")
+    parser.add_argument("text", nargs="?", help="Text to sanitize (or stdin)")
+    parser.add_argument("--file", "-f", type=str, help="Read text from file")
+    parser.add_argument("--patterns", "-p", type=str, help="Custom patterns file")
+    parser.add_argument("--json", dest="json_output", action="store_true",
+                        help="JSON output with redaction details")
+    parser.add_argument("--stats", action="store_true",
+                        help="Show pattern statistics only")
     args = parser.parse_args()
 
     patterns = load_patterns(args.patterns)
@@ -177,9 +167,8 @@ def main():
         print(f"Loaded {len(patterns)} patterns in {len(stats)} categories:")
         for cat, count in sorted(stats.items()):
             print(f"  {cat}: {count} patterns")
-        sys.exit(0)
+        return
 
-    # Read input
     if args.file:
         text = Path(args.file).read_text()
     elif args.text:

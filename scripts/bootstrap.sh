@@ -135,7 +135,7 @@ create_container() {
     local container_os="${2:-images:debian/13}"
     local project="${3:-default}"
 
-    if incus info "$container_name" --project "$project" &>/dev/null 2>&1; then
+    if incus info "$container_name" --project "$project" &>/dev/null 2>&1>/dev/null; then
         ok "Container $container_name already exists"
         # Start if stopped
         local state
@@ -585,7 +585,7 @@ main() {
         # Distinguish "Incus not installed" from "daemon unreachable"
         if ! command -v incus &>/dev/null; then
             INCUS_STATE="missing"
-        elif incus info &>/dev/null 2>&1; then
+        elif incus info &>/dev/null 2>&1>/dev/null; then
             INCUS_STATE="ready"
         else
             INCUS_STATE="installed"
@@ -750,7 +750,7 @@ EOF
             echo "ERROR: Incus is not installed. Install it first, then re-run bootstrap." >&2
             exit 1
         fi
-        if ! incus info &>/dev/null 2>&1; then
+        if ! incus info &>/dev/null 2>&1>/dev/null; then
             echo "Incus not initialized. Running minimal init..."
             incus admin init --minimal
         fi

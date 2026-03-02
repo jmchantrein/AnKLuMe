@@ -21,10 +21,17 @@ class TestPrePushHook:
         assert first_line == "#!/bin/sh"
 
     def test_exits_0_without_marker(self, tmp_path):
-        """Without /etc/anklume/deployed, hook should pass."""
+        """Without deployed marker, hook should pass."""
+        marker = tmp_path / "nonexistent"
+        wrapper = tmp_path / "test-hook.sh"
+        hook_text = self.hook_path.read_text().replace(
+            'DEPLOYED_MARKER="/etc/anklume/deployed"',
+            f'DEPLOYED_MARKER="{marker}"',
+        )
+        wrapper.write_text(hook_text)
+        wrapper.chmod(0o755)
         result = subprocess.run(
-            ["sh", str(self.hook_path)],
-            env={"PATH": "/usr/bin:/bin"},
+            ["sh", str(wrapper)],
             cwd=str(tmp_path),
             capture_output=True, text=True,
         )
@@ -102,21 +109,21 @@ class TestSetupProductionCLI:
     def test_production_on(self, tmp_path, monkeypatch):
         """Production on should create the marker file."""
         marker = tmp_path / "etc" / "anklume" / "deployed"
-        monkeypatch.setattr(
-            "scripts.cli.setup.Path",
-            lambda x: marker if x == "/etc/anklume/deployed" else Path(x),
-        )
-        # Direct function test: just verify the logic works
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("scripts.cli.setup.Path", lambda x: marker if x == "/etc/anklume/deployed" else Path(x))
+        from scripts.cli.setup import production
+        production(off=False)
+        assert marker.exists()
+        assert "deployed=" in marker.read_text()
+
+    def test_production_off(self, tmp_path, monkeypatch):
+        """Production off should remove the marker file."""
+        marker = tmp_path / "etc" / "anklume" / "deployed"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text("deployed=test\n")
-        assert marker.exists()
-
-    def test_production_off(self, tmp_path):
-        """Production off should remove the marker file."""
-        marker = tmp_path / "deployed"
-        marker.write_text("deployed=test\n")
-        assert marker.exists()
-        marker.unlink()
+        monkeypatch.setattr("scripts.cli.setup.Path", lambda x: marker if x == "/etc/anklume/deployed" else Path(x))
+        from scripts.cli.setup import production
+        production(off=True)
         assert not marker.exists()
 
 

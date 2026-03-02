@@ -100,7 +100,7 @@ def _infer_llm_deps(tree: dict) -> list[dict[str, str]]:
     """Call local LLM to infer semantic dependencies."""
     import subprocess
 
-    import yaml as _yaml
+    import yaml
 
     from scripts.cli._helpers import console
 
@@ -150,7 +150,7 @@ def _infer_llm_deps(tree: dict) -> list[dict[str, str]]:
                     raw = cleaned
                     break
 
-        edges = _yaml.safe_load(raw)
+        edges = yaml.safe_load(raw)
         if not isinstance(edges, list):
             return []
         valid = []
@@ -162,6 +162,6 @@ def _infer_llm_deps(tree: dict) -> list[dict[str, str]]:
                     "reason": str(edge.get("reason", "LLM-inferred")),
                 })
         return valid[:10]
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as exc:
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, OSError) as exc:
         console.print(f"[yellow]LLM inference skipped: {exc}[/yellow]")
         return []

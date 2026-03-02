@@ -115,8 +115,11 @@ run_nesting_test() {
     local l1
     l1=$(incus exec "nest-l1" --project "$NEST_PROJECT" -- \
         cat /etc/anklume/absolute_level)
-    [[ "$l1" == "1" ]] && pass "Level 1: absolute_level=1" \
-        || fail "Level 1: expected 1, got $l1"
+    if [[ "$l1" == "1" ]]; then
+        pass "Level 1: absolute_level=1"
+    else
+        fail "Level 1: expected 1, got $l1"
+    fi
 
     # Copy repo into L1 for --full mode
     if $FULL; then
@@ -135,9 +138,8 @@ run_nesting_test() {
     fi
 
     # Push worker into L1 and run recursively
-    cat "$SCRIPT_DIR/nest-worker.sh" | \
-        incus exec "nest-l1" --project "$NEST_PROJECT" -- \
-        tee /tmp/nest-worker.sh > /dev/null
+    incus exec "nest-l1" --project "$NEST_PROJECT" -- \
+        tee /tmp/nest-worker.sh < "$SCRIPT_DIR/nest-worker.sh" > /dev/null
     incus exec "nest-l1" --project "$NEST_PROJECT" -- chmod +x /tmp/nest-worker.sh
     info "Recursive nesting levels 1->$MAX_DEPTH (~$((MAX_DEPTH * 90))s)..."
     local output

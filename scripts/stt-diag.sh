@@ -129,17 +129,13 @@ cmd_status() {
 
 cmd_restart() {
     echo "=== Restarting STT Service ==="
-    echo ""
-
-    # Unload all Ollama models to free VRAM
     echo "--- Unloading Ollama models ---"
     local models
     models=$(curl -s "http://${STT_HOST}:11434/api/ps" 2>/dev/null) || true
     if [ -n "$models" ]; then
         echo "$models" | python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-for m in data.get('models', []):
+for m in json.load(sys.stdin).get('models', []):
     print(m['name'])
 " 2>/dev/null | while read -r model; do
             dim "  Unloading $model..."
@@ -148,30 +144,19 @@ for m in data.get('models', []):
         done
     fi
     ok "Ollama models unloaded"
-
-    # Restart speaches service
-    echo ""
     echo "--- Restarting speaches ---"
     incus exec "$STT_CONTAINER" --project "$STT_PROJECT" -- \
         systemctl restart speaches 2>/dev/null || err "Failed to restart speaches"
-
-    # Wait for health
     echo "Waiting for health endpoint..."
     local retries=0
     while [ $retries -lt 30 ]; do
         if curl -s -o /dev/null -w "" "http://${STT_HOST}:${STT_PORT}/health" 2>/dev/null; then
-            ok "STT service is healthy"
-            break
+            ok "STT service is healthy"; break
         fi
-        sleep 1
-        retries=$((retries + 1))
+        sleep 1; retries=$((retries + 1))
     done
-    if [ $retries -ge 30 ]; then
-        err "STT did not become healthy after 30s"
-    fi
-
-    echo ""
-    cmd_status
+    [ $retries -ge 30 ] && err "STT did not become healthy after 30s"
+    echo ""; cmd_status
 }
 
 cmd_logs() {
