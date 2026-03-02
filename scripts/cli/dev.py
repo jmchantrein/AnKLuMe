@@ -324,10 +324,13 @@ def generate_scenarios(
 def nesting(
     mode: Annotated[str, typer.Option("--mode", "-m", help="Nesting mode: lxc, vm, or both")] = "lxc",
     max_depth: Annotated[int, typer.Option("--max-depth", "-d", help="Max nesting depth (1-5)")] = 3,
+    full: Annotated[bool, typer.Option("--full", "-f", help="Run pytest at each nesting level")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Validate structure only")] = False,
 ) -> None:
     """Run nesting integration test (LXC/VM containers-in-containers)."""
     args = ["--mode", mode, "--max-depth", str(max_depth)]
+    if full:
+        args.append("--full")
     if dry_run:
         args.append("--dry-run")
     run_script("test-nesting.sh", *args)

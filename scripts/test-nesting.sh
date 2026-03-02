@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
 # test-nesting.sh — Test anklume LXC/VM nesting up to N levels deep
 #
-# Recursive approach: pushes a worker script into each container level.
+# Recursive: pushes nest-worker.sh into each container level.
 # Worker installs Incus, creates child, pushes self, and recurses.
 # LXC: L1 unprivileged+nesting, L2+ privileged+nesting (stgraber).
+# --full: also copies repo + runs pytest at each nesting level.
 #
 # Usage:
-#   scripts/test-nesting.sh [--mode lxc|vm|both] [--max-depth N] [--dry-run]
+#   scripts/test-nesting.sh [--mode lxc|vm|both] [--max-depth N] [--full] [--dry-run]
 #
 # Requires: Incus daemon. VM mode requires KVM + 8GB+ RAM.
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NEST_PROJECT="nesting-test"
 NEST_IMAGE="images:debian/13"
 DRY_RUN=false
 MODE="lxc"
 MAX_DEPTH=3
+FULL=false
 PASSED=0
 FAILED=0
 
@@ -25,8 +29,9 @@ while [[ $# -gt 0 ]]; do
         --dry-run)    DRY_RUN=true ;;
         --mode)       MODE="$2"; shift ;;
         --max-depth)  MAX_DEPTH="$2"; shift ;;
+        --full)       FULL=true ;;
         -h|--help)
-            echo "Usage: $0 [--mode lxc|vm|both] [--max-depth N] [--dry-run]"
+            echo "Usage: $0 [--mode lxc|vm|both] [--max-depth N] [--full] [--dry-run]"
             exit 0 ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
@@ -57,7 +62,7 @@ info "Checking prerequisites..."
 incus info >/dev/null 2>&1 || { fail "Incus daemon not available"; exit 1; }
 
 if $DRY_RUN; then
-    info "Dry-run (--mode $MODE, --max-depth $MAX_DEPTH)"
+    info "Dry-run (--mode $MODE, --max-depth $MAX_DEPTH, --full=$FULL)"
     pass "Script structure valid"
     pass "Prerequisites checked"
     pass "Would create project: $NEST_PROJECT"
@@ -68,51 +73,9 @@ if $DRY_RUN; then
     exit 0
 fi
 
-# ── Worker script (pushed into each level, recurses) ─────────
-# Each level: install Incus → create child → write context → recurse
-# shellcheck disable=SC2016
-WORKER='#!/bin/bash
-set -euo pipefail
-LEVEL=$1; MAX=$2; IMG=$3; NEXT=$((LEVEL + 1)); CHILD="nest-l${NEXT}"
-if [ "$LEVEL" -ge "$MAX" ]; then
-    echo "[STOP] max depth reached (level=$LEVEL)"; exit 0; fi
-echo "[WORKER] Level $LEVEL: installing Incus (~60s)..."
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq >/dev/null 2>&1
-apt-get install -y -qq incus >/dev/null 2>&1
-grep -q "^root:" /etc/subuid 2>/dev/null || echo "root:100000:1000000000" >> /etc/subuid
-grep -q "^root:" /etc/subgid 2>/dev/null || echo "root:100000:1000000000" >> /etc/subgid
-incus admin init --minimal >/dev/null 2>&1 || true
-if ! incus info >/dev/null 2>&1; then
-    echo "[FAIL] Level $LEVEL: Incus daemon not running"; exit 1; fi
-echo "[PASS] Level $LEVEL: Incus daemon running"
-echo "[WORKER] Level $LEVEL: launching $CHILD..."
-incus launch "$IMG" "$CHILD" \
-    -c security.privileged=true -c security.nesting=true \
-    -c security.syscalls.intercept.mknod=true \
-    -c security.syscalls.intercept.setxattr=true 2>/dev/null
-WAIT=$((30 + LEVEL * 15))
-for _i in $(seq 1 "$WAIT"); do
-    incus exec "$CHILD" -- true 2>/dev/null && break; sleep 2; done
-if ! incus exec "$CHILD" -- true 2>/dev/null; then
-    echo "[FAIL] Level $NEXT: container not ready"; exit 1; fi
-incus exec "$CHILD" -- mkdir -p /etc/anklume
-incus exec "$CHILD" -- bash -c "echo $NEXT > /etc/anklume/absolute_level"
-incus exec "$CHILD" -- bash -c "echo $((NEXT - 1)) > /etc/anklume/relative_level"
-incus exec "$CHILD" -- bash -c "echo false > /etc/anklume/vm_nested"
-LVL=$(incus exec "$CHILD" -- cat /etc/anklume/absolute_level)
-if [ "$LVL" = "$NEXT" ]; then
-    echo "[PASS] Level $NEXT: absolute_level=$NEXT"
-else
-    echo "[FAIL] Level $NEXT: absolute_level=$LVL (expected $NEXT)"; fi
-cat /tmp/nest-worker.sh | incus exec "$CHILD" -- tee /tmp/nest-worker.sh > /dev/null
-incus exec "$CHILD" -- chmod +x /tmp/nest-worker.sh
-incus exec "$CHILD" -- bash /tmp/nest-worker.sh "$NEXT" "$MAX" "$IMG"
-'
-
 # ── Test function ────────────────────────────────────────────
 run_nesting_test() {
-    local itype="$1" flags="" wait_time=30 label="LXC"
+    local itype="$1" flags="" wait_time=30 label="LXC" full_flag="0"
     if [[ "$itype" == "vm" ]]; then
         flags="--vm -c limits.cpu=2 -c limits.memory=4GiB"
         flags+=" -c security.secureboot=false"
@@ -122,7 +85,8 @@ run_nesting_test() {
         flags+=" -c security.syscalls.intercept.mknod=true"
         flags+=" -c security.syscalls.intercept.setxattr=true"
     fi
-    info "=== Testing $label nesting (max-depth=$MAX_DEPTH) ==="
+    $FULL && full_flag="1"
+    info "=== Testing $label nesting (max-depth=$MAX_DEPTH, full=$FULL) ==="
     incus project create "$NEST_PROJECT" \
         -c features.images=false -c features.profiles=false 2>/dev/null || true
 
@@ -151,25 +115,38 @@ run_nesting_test() {
     [[ "$l1" == "1" ]] && pass "Level 1: absolute_level=1" \
         || fail "Level 1: expected 1, got $l1"
 
+    # Copy repo into L1 for --full mode
+    if $FULL; then
+        info "Copying anklume repo into nest-l1 (~10s)..."
+        incus exec "nest-l1" --project "$NEST_PROJECT" -- mkdir -p /opt/anklume
+        tar --exclude='.git' --exclude='images' --exclude='*.iso' \
+            --exclude='__pycache__' --exclude='.pytest_cache' \
+            --exclude='*.egg-info' -cf - -C "$PROJECT_ROOT" . | \
+            incus exec "nest-l1" --project "$NEST_PROJECT" -- \
+            tar -C /opt/anklume -xf -
+    fi
+
     if [[ "$MAX_DEPTH" -le 1 ]]; then
         echo ""; echo "RESULTS ($label): $PASSED passed, $FAILED failed"
         return $(( FAILED > 0 ? 1 : 0 ))
     fi
 
     # Push worker into L1 and run recursively
-    echo "$WORKER" | incus exec "nest-l1" --project "$NEST_PROJECT" -- \
+    cat "$SCRIPT_DIR/nest-worker.sh" | \
+        incus exec "nest-l1" --project "$NEST_PROJECT" -- \
         tee /tmp/nest-worker.sh > /dev/null
     incus exec "nest-l1" --project "$NEST_PROJECT" -- chmod +x /tmp/nest-worker.sh
     info "Recursive nesting levels 1->$MAX_DEPTH (~$((MAX_DEPTH * 90))s)..."
     local output
     output=$(incus exec "nest-l1" --project "$NEST_PROJECT" -- \
-        bash /tmp/nest-worker.sh 1 "$MAX_DEPTH" "$NEST_IMAGE" 2>&1) || true
+        bash /tmp/nest-worker.sh 1 "$MAX_DEPTH" "$NEST_IMAGE" "$full_flag" 2>&1) || true
     while IFS= read -r line; do
         case "$line" in
             *"[PASS]"*) pass "${line#*\[PASS\] }" ;;
             *"[FAIL]"*) fail "${line#*\[FAIL\] }" ;;
             *"[STOP]"*) pass "Level $MAX_DEPTH: nesting stops correctly" ;;
             *"[WORKER]"*) info "${line#*\[WORKER\] }" ;;
+            *"[DETAIL]"*) printf "         %s\n" "${line#*\[DETAIL\] }" ;;
         esac
     done <<< "$output"
 
