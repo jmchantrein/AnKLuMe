@@ -4,6 +4,7 @@ Feature: Anklume nesting — multi-level infrastructure isolation
   Nesting allows running anklume inside anklume (up to 3 levels).
   Each level creates /etc/anklume/ context files for hierarchy awareness.
   Level 3 is the maximum depth — nesting stops there.
+  Supports --mode lxc (container nesting), vm (KVM), or both.
 
   Scenario: Nesting test script exists and is executable
     # Matrix: NS-001
@@ -12,12 +13,25 @@ Feature: Anklume nesting — multi-level infrastructure isolation
     Then exit code is 0
     And output contains "executable"
 
-  Scenario: Nesting test dry-run validates structure
+  Scenario: Nesting test dry-run validates structure (lxc mode)
     # Matrix: NS-002
     Given "bash" is available
-    When I run "bash scripts/test-nesting.sh --dry-run"
+    When I run "bash scripts/test-nesting.sh --mode lxc --dry-run"
     Then exit code is 0
     And output contains "5 passed, 0 failed"
+
+  Scenario: Nesting test dry-run validates structure (vm mode)
+    # Matrix: NS-002
+    Given "bash" is available
+    When I run "bash scripts/test-nesting.sh --mode vm --dry-run"
+    Then exit code is 0
+    And output contains "5 passed, 0 failed"
+
+  Scenario: Nesting test supports mode selection
+    # Matrix: NS-003
+    Given "bash" is available
+    When I run "bash scripts/test-nesting.sh --mode invalid 2>&1 || true"
+    Then output contains "Invalid mode"
 
   Scenario: Nesting context files are individual files not structured config
     # Matrix: NS-003
