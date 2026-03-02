@@ -166,6 +166,7 @@ At the start of each session or after a /clear, you MUST ask the user:
 Always loaded (core project instructions):
 - @docs/SPEC.md — Core specification (vision, PSOT model, infra.yml format)
 - @docs/ARCHITECTURE.md — Architecture decisions (ADR-style)
+- @docs/claude-code-workflow.md — Development workflow with Claude Code (dev cycle, LLM delegation, agents, skills)
 
 Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/SPEC-operations.md` — Operational reference (generator, roles, snapshots, validators, bootstrap)
@@ -186,7 +187,6 @@ Read on demand with the Read tool (NOT auto-loaded — too large):
 - `docs/desktop-integration.md` — GUI app forwarding (Phase 19b)
 - `docs/live-os.md` — Live OS / USB boot
 - `docs/openclaw.md` — OpenClaw AI agent framework
-- `docs/claude-code-workflow.md` — Development workflow with Claude Code
 - `docs/mcp-services.md` — MCP services architecture
 - `docs/golden-images.md` — Pre-built OS images
 - `docs/disposable.md` — Disposable containers
