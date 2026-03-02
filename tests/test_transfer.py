@@ -62,7 +62,7 @@ def run_transfer(args, env, cwd=None):
     """Run transfer.sh with given args and environment."""
     result = subprocess.run(
         ["bash", str(TRANSFER_SH)] + args,
-        capture_output=True, text=True, env=env, cwd=cwd,
+        capture_output=True, text=True, env=env, cwd=cwd, timeout=10,
     )
     return result
 
@@ -76,7 +76,7 @@ class TestScriptQuality:
         """transfer.sh passes shellcheck."""
         result = subprocess.run(
             ["shellcheck", str(TRANSFER_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 
@@ -93,7 +93,7 @@ class TestHelp:
         """--help shows usage without error."""
         result = subprocess.run(
             ["bash", str(TRANSFER_SH), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -105,7 +105,7 @@ class TestHelp:
         """No arguments shows usage."""
         result = subprocess.run(
             ["bash", str(TRANSFER_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -259,7 +259,7 @@ class TestUnknownCommand:
         """Unknown subcommand gives error."""
         result = subprocess.run(
             ["bash", str(TRANSFER_SH), "invalid"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
         assert "Unknown command" in result.stderr

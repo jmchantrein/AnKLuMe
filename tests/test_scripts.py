@@ -2,16 +2,12 @@
 
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-# Add scripts/ to path for importing
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 
 # ── matrix-coverage.py ──────────────────────────────────────
@@ -65,7 +61,7 @@ class TestMatrixCoverage:
         result = subprocess.run(
             ["python3", str(PROJECT_ROOT / "scripts" / "matrix-coverage.py")],
             capture_output=True, text=True,
-            cwd=str(PROJECT_ROOT),
+            cwd=str(PROJECT_ROOT), timeout=10,
         )
         assert result.returncode == 0
         assert "100%" in result.stdout

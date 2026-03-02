@@ -18,10 +18,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_DIR="$PROJECT_ROOT/plugins/desktop"
 INFRA_FILE="$PROJECT_ROOT/infra.yml"
 
-info()  { echo -e "\033[0;34m[INFO]\033[0m $*"; }
-ok()    { echo -e "\033[0;32m[ OK ]\033[0m $*"; }
-warn()  { echo -e "\033[1;33m[WARN]\033[0m $*"; }
-err()   { echo -e "\033[0;31m[ERR ]\033[0m $*" >&2; }
+# shellcheck source=shell-lib.sh
+source "$SCRIPT_DIR/shell-lib.sh"
 
 # ── Plugin discovery ──────────────────────────────────────────
 

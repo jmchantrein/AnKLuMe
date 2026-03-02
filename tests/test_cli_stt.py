@@ -57,7 +57,7 @@ class TestSTTScript:
         import subprocess
         result = subprocess.run(
             ["shellcheck", str(self.script_path)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, result.stdout
 

@@ -142,7 +142,7 @@ def run_snapshot_apply(args, env, cwd=None):
         capture_output=True,
         text=True,
         env=env,
-        cwd=cwd,
+        cwd=cwd, timeout=10,
     )
 
 

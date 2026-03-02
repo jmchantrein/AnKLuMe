@@ -1,19 +1,12 @@
 """Nesting and security context readers for the PSOT generator."""
 
-import sys
+from functools import partial
 from pathlib import Path
 
+from psot._compat import resolve as _resolve_base
 
-def _resolve(name):
-    """Look up a patchable function on the ``generate`` module.
-
-    See psot.validation._resolve for rationale.
-    """
-    gen = sys.modules.get("generate")
-    if gen and hasattr(gen, name):
-        return getattr(gen, name)
-    # Fallback: return from this module itself
-    return globals()[name]
+# context.py needs fallback to local globals (local functions like _read_absolute_level)
+_resolve = partial(_resolve_base, fallback_globals=globals())
 
 
 def _read_absolute_level():

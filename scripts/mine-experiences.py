@@ -46,6 +46,7 @@ def run_git(args: list[str]) -> str:
         capture_output=True,
         text=True,
         check=False,
+        timeout=30,
     )
     if result.returncode != 0:
         return ""

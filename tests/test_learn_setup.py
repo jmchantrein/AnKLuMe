@@ -20,7 +20,7 @@ class TestLearnSetupSyntax:
     def test_bash_syntax_check(self):
         result = subprocess.run(
             ["bash", "-n", str(SCRIPT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0, f"Syntax error: {result.stderr}"
 
@@ -31,7 +31,7 @@ class TestLearnSetupSyntax:
     def test_shellcheck(self):
         result = subprocess.run(
             ["shellcheck", "-S", "warning", str(SCRIPT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck: {result.stdout}"
 

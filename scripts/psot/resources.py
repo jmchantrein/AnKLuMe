@@ -2,20 +2,6 @@
 
 import json
 import subprocess
-import sys
-
-
-def _resolve(name):
-    """Look up a patchable function on the ``generate`` module.
-
-    See psot.validation._resolve for rationale.
-    """
-    gen = sys.modules.get("generate")
-    if gen and hasattr(gen, name):
-        return getattr(gen, name)
-    import psot  # noqa: PLC0415
-
-    return getattr(psot, name)
 
 
 def _detect_host_resources():

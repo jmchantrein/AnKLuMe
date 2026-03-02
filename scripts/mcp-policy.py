@@ -12,39 +12,12 @@ See docs/mcp-services.md and ROADMAP.md Phase 20c.
 
 import argparse
 import sys
-from pathlib import Path
 
-import yaml
+from psot.io import load_infra
 
 # ── Known MCP tool names (must match mcp-server.py) ─────────────
 
 KNOWN_TOOLS = {"gpg_sign", "clipboard_get", "clipboard_set", "file_accept", "file_provide"}
-
-
-def load_infra(path):
-    """Load infra.yml (file) or infra/ (directory)."""
-    p = Path(path)
-    if p.is_file():
-        with open(p) as f:
-            return yaml.safe_load(f)
-    if p.is_dir():
-        base = p / "base.yml"
-        if not base.exists():
-            print(f"ERROR: {base} not found", file=sys.stderr)
-            sys.exit(1)
-        with open(base) as f:
-            infra = yaml.safe_load(f) or {}
-        domains_dir = p / "domains"
-        if domains_dir.is_dir():
-            infra.setdefault("domains", {})
-            for df in sorted(domains_dir.glob("*.yml")):
-                with open(df) as f:
-                    dd = yaml.safe_load(f) or {}
-                for dname, dconf in dd.items():
-                    infra["domains"][dname] = dconf
-        return infra
-    print(f"ERROR: {path} not found", file=sys.stderr)
-    sys.exit(1)
 
 
 def build_policy_map(infra):

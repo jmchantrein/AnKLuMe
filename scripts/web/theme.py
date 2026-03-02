@@ -5,7 +5,7 @@ and learning platform. Extracted from dashboard.py and the former guide-server.p
 to eliminate duplication.
 """
 
-from scripts.colors import TRUST_BG_COLORS, TRUST_BORDER_COLORS
+from scripts.colors import resolve_colors
 
 # ── Base CSS (shared across all web apps) ───────────────────
 
@@ -155,18 +155,15 @@ GUIDE_CSS = """\
 
 
 def trust_css(level: str, palette: str | None = None) -> dict[str, str]:
-    """Return border/bg colors for a trust level, with palette support."""
-    if palette and palette != "default":
-        try:
-            from scripts.accessibility import get_trust_colors
-            colors = get_trust_colors(level, palette)
-            return {"border": colors["border"], "bg": colors["bg"]}
-        except (ImportError, KeyError, TypeError):
-            pass
-    return {
-        "border": TRUST_BORDER_COLORS.get(level, "#30363d"),
-        "bg": TRUST_BG_COLORS.get(level, "#161b22"),
-    }
+    """Return border/bg colors for a trust level, with palette support.
+
+    Delegates to colors.resolve_colors() which handles accessibility
+    palette loading. The ``palette`` parameter is accepted for backward
+    compatibility but ignored (resolve_colors auto-detects the active
+    palette from user settings).
+    """
+    colors = resolve_colors(level)
+    return {"border": colors["border"], "bg": colors["bg"]}
 
 
 def accessible_css(settings: dict | None = None) -> str:

@@ -82,7 +82,7 @@ def render_cli(data: dict, json_output: bool = False) -> None:
 
     models = data.get("ollama_models", [])
     connections = data.get("ollama_connections", {})
-    callers = list(connections.values())
+    caller_str = ", ".join(connections.values()) if connections else ""
 
     if models or gpu:
         con.print()
@@ -94,7 +94,6 @@ def render_cli(data: dict, json_output: bool = False) -> None:
 
         for m in models:
             vram_gib = m["size_vram"] / (1024 ** 3)
-            caller_str = ", ".join(callers) if callers else ""
             mtable.add_row(
                 m["name"],
                 f"{vram_gib:.1f} GiB",
@@ -152,12 +151,14 @@ def render_dashboard_data(data: dict) -> str:
     ]:
         if pct is None:
             continue
+        clamped = min(pct, 100)
         color = "#3fb950" if pct < 70 else "#d29922" if pct < 90 else "#f85149"
+        safe_label = html.escape(label)
         parts.append(
             f'<div class="resource-bar">'
-            f'<span class="resource-label">{label}: {pct:.0f}%</span>'
+            f'<span class="resource-label">{safe_label}: {pct:.0f}%</span>'
             f'<div class="resource-track">'
-            f'<div class="resource-fill" style="width:{pct}%;background:{color}"></div>'
+            f'<div class="resource-fill" style="width:{clamped}%;background:{color}"></div>'
             f'</div></div>'
         )
 

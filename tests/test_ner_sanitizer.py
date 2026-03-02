@@ -4,12 +4,7 @@ Tests the heuristic backend (always available) and the NerSanitizer
 interface. GLiNER/spaCy backends are tested only when available.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from ner_sanitizer import (
     INFRA_LABELS,
     GlinerBackend,

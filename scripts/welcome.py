@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from cli._helpers import is_live_os  # noqa: E402
 from welcome_strings import STRINGS  # noqa: E402
 
 WELCOME_DONE = Path.home() / ".anklume" / "welcome-done"
@@ -89,14 +90,6 @@ KEYBOARD_LAYOUTS = [
     ("pt", "Português"),
     ("gb", "English UK"),
 ]
-
-
-def is_live_os() -> bool:
-    """Detect if running on anklume Live OS."""
-    try:
-        return "boot=anklume" in Path("/proc/cmdline").read_text()
-    except OSError:
-        return False
 
 
 def do_keyboard(s: dict) -> None:
@@ -266,7 +259,8 @@ def tui_main() -> None:
     except ImportError:
         plain_main()
         return
-    lang, s, c = detect_lang(), STRINGS[detect_lang()], Console()
+    lang = detect_lang()
+    s, c = STRINGS[lang], Console()
     # Page 1: Welcome
     txt = Text()
     for line in BANNER.splitlines(keepends=True):
@@ -320,7 +314,8 @@ def tui_main() -> None:
 
 # ── Plain text fallback ──
 def plain_main() -> None:
-    lang, s = detect_lang(), STRINGS[detect_lang()]
+    lang = detect_lang()
+    s = STRINGS[lang]
     print(f"\n{BANNER}")
     quote = get_quote(lang)
     if quote:

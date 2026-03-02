@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from lib.infra_loader import load_infra_from_path
+from psot.io import load_infra as load_infra_from_path
 
 
 def main():

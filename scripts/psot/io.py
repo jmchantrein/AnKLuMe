@@ -137,5 +137,5 @@ def _is_orphan_protected(filepath):
                 return not data[key]
         # Default: not protected (no ephemeral info found)
         return False
-    except Exception:
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return False

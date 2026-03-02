@@ -240,7 +240,7 @@ class TestNmapDiffShellcheck:
         result = subprocess.run(
             ["shellcheck", "--severity=warning", str(SCRIPTS_DIR / "nmap-diff.sh")],
             capture_output=True,
-            text=True,
+            text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 

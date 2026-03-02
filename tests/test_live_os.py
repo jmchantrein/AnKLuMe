@@ -222,31 +222,25 @@ class TestLiveOsLibStructure:
         """Verify ensure_persist_mounted() function."""
         assert re.search(r'ensure_persist_mounted\(\)', self.content)
 
-    # Logging helpers
-    def test_info_helper(self):
-        """Verify info() logging helper."""
-        assert re.search(r'^info\(\)', self.content, re.MULTILINE)
+    # Logging helpers (sourced from shell-lib.sh)
+    def test_sources_shell_lib(self):
+        """Verify live-os-lib.sh sources shell-lib.sh for logging helpers."""
+        assert "shell-lib.sh" in self.content
 
-    def test_ok_helper(self):
-        """Verify ok() logging helper."""
-        assert re.search(r'^ok\(\)', self.content, re.MULTILINE)
-
-    def test_warn_helper(self):
-        """Verify warn() logging helper."""
-        assert re.search(r'^warn\(\)', self.content, re.MULTILINE)
-
-    def test_err_helper(self):
-        """Verify err() logging helper."""
-        assert re.search(r'^err\(\)', self.content, re.MULTILINE)
-
-    # Logging with ANSI colors
-    def test_ansi_colors_in_logging(self):
-        """Verify logging helpers use ANSI color codes."""
-        assert "\\033" in self.content
-        assert "[INFO]" in self.content
-        assert "[ OK ]" in self.content
-        assert "[WARN]" in self.content
-        assert "[ERR ]" in self.content
+    def test_shell_lib_has_logging_helpers(self):
+        """Verify shell-lib.sh defines info/ok/warn/err helpers."""
+        shell_lib = LIVE_OS_LIB.parent / "shell-lib.sh"
+        assert shell_lib.exists(), "shell-lib.sh not found"
+        lib_content = shell_lib.read_text()
+        assert re.search(r'^info\(\)', lib_content, re.MULTILINE)
+        assert re.search(r'^ok\(\)', lib_content, re.MULTILINE)
+        assert re.search(r'^warn\(\)', lib_content, re.MULTILINE)
+        assert re.search(r'^err\(\)', lib_content, re.MULTILINE)
+        assert "\\033" in lib_content
+        assert "[INFO]" in lib_content
+        assert "[ OK ]" in lib_content
+        assert "[WARN]" in lib_content
+        assert "[ERR ]" in lib_content
 
 
 # ── TestBuildImageStructure ───────────────────────────────────────

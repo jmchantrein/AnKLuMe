@@ -11,6 +11,24 @@ class TestPrePushHook:
 
     hook_path = PROJECT_ROOT / "scripts" / "hooks" / "pre-push"
 
+    def _make_hook(self, tmp_path: Path, marker: Path) -> Path:
+        """Create a patched hook script with a custom marker path."""
+        wrapper = tmp_path / "test-hook.sh"
+        hook_text = self.hook_path.read_text().replace(
+            'DEPLOYED_MARKER="/etc/anklume/deployed"',
+            f'DEPLOYED_MARKER="{marker}"',
+        )
+        wrapper.write_text(hook_text)
+        wrapper.chmod(0o755)
+        return wrapper
+
+    def _run_hook(self, tmp_path: Path, wrapper: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["sh", str(wrapper)],
+            cwd=str(tmp_path),
+            capture_output=True, text=True, timeout=10,
+        )
+
     def test_hook_exists_and_executable(self):
         assert self.hook_path.is_file()
         assert self.hook_path.stat().st_mode & 0o111
@@ -23,36 +41,16 @@ class TestPrePushHook:
     def test_exits_0_without_marker(self, tmp_path):
         """Without deployed marker, hook should pass."""
         marker = tmp_path / "nonexistent"
-        wrapper = tmp_path / "test-hook.sh"
-        hook_text = self.hook_path.read_text().replace(
-            'DEPLOYED_MARKER="/etc/anklume/deployed"',
-            f'DEPLOYED_MARKER="{marker}"',
-        )
-        wrapper.write_text(hook_text)
-        wrapper.chmod(0o755)
-        result = subprocess.run(
-            ["sh", str(wrapper)],
-            cwd=str(tmp_path),
-            capture_output=True, text=True,
-        )
+        wrapper = self._make_hook(tmp_path, marker)
+        result = self._run_hook(tmp_path, wrapper)
         assert result.returncode == 0
 
     def test_exits_1_with_marker(self, tmp_path):
         """With /etc/anklume/deployed, hook should block."""
         marker = tmp_path / "deployed"
         marker.write_text("deployed=test\n")
-        wrapper = tmp_path / "test-hook.sh"
-        hook_text = self.hook_path.read_text().replace(
-            'DEPLOYED_MARKER="/etc/anklume/deployed"',
-            f'DEPLOYED_MARKER="{marker}"',
-        )
-        wrapper.write_text(hook_text)
-        wrapper.chmod(0o755)
-        result = subprocess.run(
-            ["sh", str(wrapper)],
-            cwd=str(tmp_path),
-            capture_output=True, text=True,
-        )
+        wrapper = self._make_hook(tmp_path, marker)
+        result = self._run_hook(tmp_path, wrapper)
         assert result.returncode == 1
         assert "BLOCKED" in result.stdout
 
@@ -60,17 +58,8 @@ class TestPrePushHook:
         """Block message should explain how to fix."""
         marker = tmp_path / "deployed"
         marker.write_text("deployed=test\n")
-        wrapper = tmp_path / "test-hook.sh"
-        hook_text = self.hook_path.read_text().replace(
-            'DEPLOYED_MARKER="/etc/anklume/deployed"',
-            f'DEPLOYED_MARKER="{marker}"',
-        )
-        wrapper.write_text(hook_text)
-        wrapper.chmod(0o755)
-        result = subprocess.run(
-            ["sh", str(wrapper)], cwd=str(tmp_path),
-            capture_output=True, text=True,
-        )
+        wrapper = self._make_hook(tmp_path, marker)
+        result = self._run_hook(tmp_path, wrapper)
         assert "anklume setup production --off" in result.stdout
         assert "--no-verify" in result.stdout
 
@@ -80,7 +69,7 @@ class TestPrePushHook:
         result = subprocess.run(
             ["sh", str(self.hook_path)],
             cwd=str(tmp_path),
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
 

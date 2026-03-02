@@ -70,6 +70,7 @@ def run_cmd(
     cwd: str | None = None,
     check: bool = True,
     capture: bool = False,
+    timeout: int | None = None,
 ) -> subprocess.CompletedProcess:
     """Run a subprocess with optional Rich output."""
     if args and args[0] == "incus" and is_learn_incus():
@@ -78,7 +79,7 @@ def run_cmd(
     try:
         return subprocess.run(
             args, cwd=effective_cwd, check=check,
-            capture_output=capture, text=True,
+            capture_output=capture, text=True, timeout=timeout,
         )
     except subprocess.CalledProcessError as e:
         if not capture:
@@ -115,7 +116,7 @@ def require_container() -> None:
     try:
         result = subprocess.run(
             ["systemd-detect-virt", "--container"],
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, check=False, timeout=5,
         )
         if result.returncode != 0:
             console.print("[yellow]This command must run inside the anklume container.[/yellow]")

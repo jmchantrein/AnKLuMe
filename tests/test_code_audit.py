@@ -1,14 +1,9 @@
 """Tests for scripts/code-audit.py — codebase audit report."""
 
+import importlib
 import json
-import sys
-from pathlib import Path
 
 import pytest
-
-# Import the module under test
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import importlib
 
 code_audit = importlib.import_module("code-audit")
 
@@ -197,16 +192,10 @@ class TestPrintReport:
 
 
 class TestCountLines:
-    def test_count_lines(self, tmp_path):
-        f = tmp_path / "test.py"
-        f.write_text("# comment\ncode\n\nmore_code\n")
-        assert code_audit.count_lines(f) == 2  # Only non-comment, non-empty
-
     def test_count_lines_raw(self, tmp_path):
         f = tmp_path / "test.py"
         f.write_text("# comment\ncode\n\nmore_code\n")
         assert code_audit.count_lines_raw(f) == 4
 
     def test_missing_file(self, tmp_path):
-        assert code_audit.count_lines(tmp_path / "nope.py") == 0
         assert code_audit.count_lines_raw(tmp_path / "nope.py") == 0

@@ -102,7 +102,7 @@ class TestCLIRootApp:
     def test_has_version_option(self):
         result = subprocess.run(
             ["python3", "-m", "scripts.cli", "--version"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "anklume" in result.stdout

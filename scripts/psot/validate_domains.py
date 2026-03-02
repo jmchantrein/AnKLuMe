@@ -2,7 +2,7 @@
 
 import re
 
-from psot.constants import DEFAULT_TRUST_LEVEL
+from psot.constants import DEFAULT_TRUST_LEVEL, ZONE_OFFSETS
 from psot.validate_machines import _validate_machine
 
 
@@ -75,10 +75,7 @@ def _validate_domains(
                 f"got {type(domain_eph).__name__}"
             )
 
-        valid_trust_levels = (
-            "admin", "trusted", "semi-trusted",
-            "untrusted", "disposable",
-        )
+        valid_trust_levels = tuple(ZONE_OFFSETS.keys())
         trust_level = domain.get("trust_level")
         if (
             trust_level is not None

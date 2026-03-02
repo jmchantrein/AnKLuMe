@@ -303,7 +303,7 @@ class TestLoadInfraEdgeCases:
         import subprocess
         result = subprocess.run(
             [sys.executable, str(SCRIPTS_DIR / "generate.py"), str(d)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
 

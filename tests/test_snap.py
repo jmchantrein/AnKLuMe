@@ -47,7 +47,7 @@ def run_snap(args, env, input_text=None):
     """Run snap.sh with given args and environment."""
     result = subprocess.run(
         ["bash", str(SNAP_SH)] + args,
-        capture_output=True, text=True, env=env, input=input_text,
+        capture_output=True, text=True, env=env, input=input_text, timeout=10,
     )
     return result
 

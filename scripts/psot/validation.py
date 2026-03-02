@@ -3,8 +3,7 @@
 Delegates to sub-validators for domain, policy, and infra-level checks.
 """
 
-import sys
-
+from psot._compat import resolve as _resolve
 from psot.addressing import _compute_addressing
 from psot.validate_domains import _validate_domains
 from psot.validate_infra import (
@@ -19,17 +18,6 @@ from psot.validate_volumes import (
     _validate_persistent_data_collisions,
     _validate_shared_volumes,
 )
-
-
-def _resolve(name):
-    """Late-bind a function via ``generate`` module for monkeypatch compat."""
-    gen = sys.modules.get("generate")
-    if gen and hasattr(gen, name):
-        return getattr(gen, name)
-    # Fallback: resolve from the psot sub-modules directly
-    import psot  # noqa: PLC0415
-
-    return getattr(psot, name)
 
 
 def _collect_gpu_instances(infra):

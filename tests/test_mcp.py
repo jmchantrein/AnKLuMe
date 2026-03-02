@@ -35,7 +35,7 @@ class TestScriptQuality:
     def test_mcp_server_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_SERVER)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"ruff errors in mcp-server.py:\n{result.stdout}"
 
@@ -43,7 +43,7 @@ class TestScriptQuality:
     def test_mcp_client_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_CLIENT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"ruff errors in mcp-client.py:\n{result.stdout}"
 
@@ -51,7 +51,7 @@ class TestScriptQuality:
     def test_mcp_policy_ruff_clean(self):
         result = subprocess.run(
             ["ruff", "check", str(MCP_POLICY)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"ruff errors in mcp-policy.py:\n{result.stdout}"
 
@@ -67,7 +67,7 @@ class TestMCPServer:
         """--help shows usage."""
         result = subprocess.run(
             [sys.executable, str(MCP_SERVER), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "anklume MCP server" in result.stdout
@@ -76,7 +76,7 @@ class TestMCPServer:
         """--list-tools shows all registered tools."""
         result = subprocess.run(
             [sys.executable, str(MCP_SERVER), "--list-tools"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "gpg_sign" in result.stdout
@@ -89,7 +89,7 @@ class TestMCPServer:
         """Server imports succeed (MCP SDK available)."""
         result = subprocess.run(
             [sys.executable, "-c", "from mcp.server.fastmcp import FastMCP; print('OK')"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "OK" in result.stdout
@@ -105,7 +105,7 @@ class TestMCPServer:
              "spec.loader.exec_module(mod); "
              "print(','.join(sorted(['gpg_sign', 'clipboard_get', 'clipboard_set', "
              "'file_accept', 'file_provide'])))"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "clipboard_get" in result.stdout
@@ -177,7 +177,7 @@ class TestMCPClient:
         """--help shows usage."""
         result = subprocess.run(
             [sys.executable, str(MCP_CLIENT), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "anklume MCP client" in result.stdout
@@ -186,7 +186,7 @@ class TestMCPClient:
         """No arguments shows help."""
         result = subprocess.run(
             [sys.executable, str(MCP_CLIENT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
 
@@ -194,7 +194,7 @@ class TestMCPClient:
         """list --dry-run shows what would be sent."""
         result = subprocess.run(
             [sys.executable, str(MCP_CLIENT), "--dry-run", "list"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "Would connect" in result.stdout
@@ -204,7 +204,7 @@ class TestMCPClient:
         """call --dry-run shows what would be sent."""
         result = subprocess.run(
             [sys.executable, str(MCP_CLIENT), "--dry-run", "call", "clipboard_get"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "Would connect" in result.stdout
@@ -214,7 +214,7 @@ class TestMCPClient:
         """call with invalid JSON arguments fails."""
         result = subprocess.run(
             [sys.executable, str(MCP_CLIENT), "--dry-run", "call", "clipboard_set", "not-json"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
         assert "Invalid JSON" in result.stderr
@@ -276,7 +276,7 @@ class TestMCPPolicy:
         """--help shows usage."""
         result = subprocess.run(
             [sys.executable, str(MCP_POLICY), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "anklume MCP policy engine" in result.stdout
@@ -287,7 +287,7 @@ class TestMCPPolicy:
             [sys.executable, str(MCP_POLICY), "check",
              "--caller", "work-dev", "--service", "file_sign",
              "--infra", infra_with_services],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "authorized" in result.stdout.lower()
@@ -298,7 +298,7 @@ class TestMCPPolicy:
             [sys.executable, str(MCP_POLICY), "check",
              "--caller", "pro-dev", "--service", "clipboard",
              "--infra", infra_with_services],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 1
         assert "not" in result.stdout.lower()
@@ -309,7 +309,7 @@ class TestMCPPolicy:
             [sys.executable, str(MCP_POLICY), "check",
              "--caller", "work-dev", "--service", "nonexistent",
              "--infra", infra_with_services],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 1
 
@@ -331,7 +331,7 @@ class TestMCPPolicy:
             [sys.executable, str(MCP_POLICY), "check",
              "--caller", "work-dev", "--service", "file_sign",
              "--infra", str(p)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 1
         assert "No services" in result.stdout
@@ -341,7 +341,7 @@ class TestMCPPolicy:
         result = subprocess.run(
             [sys.executable, str(MCP_POLICY), "list",
              "--infra", infra_with_services],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "vault-signer:file_sign" in result.stdout
@@ -353,7 +353,7 @@ class TestMCPPolicy:
             [sys.executable, str(MCP_POLICY), "check",
              "--caller", "x", "--service", "y",
              "--infra", "/nonexistent/infra.yml"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
 
@@ -364,7 +364,7 @@ class TestMCPPolicy:
              "--caller", "work-dev", "--service", "file_sign",
              "--provider", "vault-signer",
              "--infra", infra_with_services],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0
         assert "authorized" in result.stdout.lower()

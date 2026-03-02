@@ -17,14 +17,14 @@ def git_workspace(tmp_path):
     ws.mkdir()
 
     # Initialize git repo
-    subprocess.run(["git", "init"], cwd=ws, capture_output=True)
+    subprocess.run(["git", "init"], cwd=ws, capture_output=True, timeout=10)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
-        cwd=ws, capture_output=True,
+        cwd=ws, capture_output=True, timeout=10,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
-        cwd=ws, capture_output=True,
+        cwd=ws, capture_output=True, timeout=10,
     )
 
     # Create framework files
@@ -54,10 +54,10 @@ def git_workspace(tmp_path):
     shutil.copy2(PROJECT_ROOT / "scripts" / "generate.py", scripts_dir / "generate.py")
 
     # Initial commit
-    subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True, timeout=10)
     subprocess.run(
         ["git", "commit", "-m", "initial"],
-        cwd=ws, capture_output=True,
+        cwd=ws, capture_output=True, timeout=10,
     )
 
     return ws
@@ -113,10 +113,10 @@ class TestUpgradeBackup:
         """Modified framework files get .bak backups."""
         # Modify a framework file after initial commit
         (git_workspace / "Makefile").write_text("# user modification\n")
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "user edit"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         # Make another local change (unstaged)
         (git_workspace / "Makefile").write_text("# another modification\n")
@@ -159,10 +159,10 @@ class TestUpgradeInfraDirectory:
             "      ip: '10.100.0.10'\n"
         )
         # Commit the changes to avoid "uncommitted changes" prompt
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "switch to infra dir"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         assert result.returncode == 0
@@ -171,10 +171,10 @@ class TestUpgradeInfraDirectory:
     def test_no_infra_warns(self, git_workspace):
         """Upgrade warns if neither infra.yml nor infra/ exists."""
         (git_workspace / "infra.yml").unlink()
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "remove infra"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         assert "No infra.yml or infra/" in result.stdout or result.returncode == 0
@@ -205,10 +205,10 @@ class TestUpgradeInfraDirectoryDetection:
             "      type: lxc\n"
             "      ip: '10.100.0.10'\n"
         )
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "switch to infra dir"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         assert result.returncode == 0
@@ -281,19 +281,19 @@ class TestUpgradeMergeConflict:
         # Create the "upstream" bare repo
         upstream = tmp_path / "upstream.git"
         upstream.mkdir()
-        subprocess.run(["git", "init", "--bare"], cwd=upstream, capture_output=True)
+        subprocess.run(["git", "init", "--bare"], cwd=upstream, capture_output=True, timeout=10)
 
         # Create the working repo
         ws = tmp_path / "project"
         ws.mkdir()
-        subprocess.run(["git", "init"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "init"], cwd=ws, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
 
         # Create framework files
@@ -323,53 +323,53 @@ class TestUpgradeMergeConflict:
         shutil.copy2(PROJECT_ROOT / "scripts" / "generate.py", scripts_dir / "generate.py")
 
         # Initial commit and push to upstream
-        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "initial"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
         subprocess.run(
             ["git", "remote", "add", "origin", str(upstream)],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
         subprocess.run(
             ["git", "push", "-u", "origin", "master"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
         # Try main if master failed
         subprocess.run(
             ["git", "push", "-u", "origin", "main"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
 
         # Now create a conflicting change on upstream via a separate clone
         clone = tmp_path / "clone"
         subprocess.run(
             ["git", "clone", str(upstream), str(clone)],
-            capture_output=True,
+            capture_output=True, timeout=10,
         )
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=clone, capture_output=True,
+            cwd=clone, capture_output=True, timeout=10,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=clone, capture_output=True,
+            cwd=clone, capture_output=True, timeout=10,
         )
         (clone / "Makefile").write_text("# upstream change\nall:\n\t@echo upstream\n")
-        subprocess.run(["git", "add", "-A"], cwd=clone, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=clone, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "upstream change"],
-            cwd=clone, capture_output=True,
+            cwd=clone, capture_output=True, timeout=10,
         )
-        subprocess.run(["git", "push"], cwd=clone, capture_output=True)
+        subprocess.run(["git", "push"], cwd=clone, capture_output=True, timeout=10)
 
         # Now create a conflicting local change
         (ws / "Makefile").write_text("# local conflicting change\nall:\n\t@echo local\n")
-        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=ws, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "local change"],
-            cwd=ws, capture_output=True,
+            cwd=ws, capture_output=True, timeout=10,
         )
 
         return ws
@@ -572,7 +572,7 @@ class TestUpgradeCleanWorkingTree:
         """Staged (but uncommitted) changes trigger the uncommitted changes warning."""
         # Stage a change without committing
         (git_workspace / "ansible.cfg").write_text("[defaults]\nstaged_change=true\n")
-        subprocess.run(["git", "add", "ansible.cfg"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "ansible.cfg"], cwd=git_workspace, capture_output=True, timeout=10)
         # Run upgrade and answer 'n' to abort
         result = run_upgrade(git_workspace, input_text="n\n")
         assert "Uncommitted changes" in result.stdout or "Aborted" in result.stdout
@@ -585,10 +585,10 @@ class TestUpgradeEdgeCases:
         """If scripts/generate.py is missing, upgrade reports an error."""
         (git_workspace / "scripts" / "generate.py").unlink()
         # Commit the deletion so stash doesn't restore it
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "remove generate.py"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         # python3 scripts/generate.py will fail since the file is missing
@@ -597,10 +597,10 @@ class TestUpgradeEdgeCases:
     def test_empty_infra_yml_fails(self, git_workspace):
         """Empty infra.yml causes generate.py to fail during upgrade."""
         (git_workspace / "infra.yml").write_text("")
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "empty infra"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         # generate.py will fail validation on empty/None input
@@ -610,10 +610,10 @@ class TestUpgradeEdgeCases:
         """site.yml being different does not affect regeneration."""
         # Modify site.yml (a framework file) but commit it
         (git_workspace / "site.yml").write_text("---\n# modified site.yml\n- hosts: all\n")
-        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_workspace, capture_output=True, timeout=10)
         subprocess.run(
             ["git", "commit", "-m", "modify site.yml"],
-            cwd=git_workspace, capture_output=True,
+            cwd=git_workspace, capture_output=True, timeout=10,
         )
         result = run_upgrade(git_workspace)
         assert result.returncode == 0

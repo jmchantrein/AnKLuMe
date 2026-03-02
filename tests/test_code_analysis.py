@@ -132,7 +132,7 @@ class TestScriptQuality:
         """code-analysis.sh passes shellcheck."""
         result = subprocess.run(
             ["shellcheck", str(SCRIPT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 

@@ -9,6 +9,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 
 def collect_cpu() -> float | None:
@@ -79,15 +80,15 @@ def collect_gpu(
         )
         if result.returncode != 0:
             return None
-        p = [x.strip() for x in result.stdout.strip().split(",")]
-        if len(p) < 6:
+        fields = [x.strip() for x in result.stdout.strip().split(",")]
+        if len(fields) < 6:
             return None
-        vt = int(p[2])
+        vram_total = int(fields[2])
         return {
-            "name": p[0], "vram_used": int(p[1]), "vram_total": vt,
-            "vram_free": int(p[3]),
-            "vram_percent": round(int(p[1]) / vt * 100, 1) if vt > 0 else 0,
-            "temperature": int(p[4]), "utilization": int(p[5]),
+            "name": fields[0], "vram_used": int(fields[1]),
+            "vram_total": vram_total, "vram_free": int(fields[3]),
+            "vram_percent": round(int(fields[1]) / vram_total * 100, 1) if vram_total > 0 else 0,
+            "temperature": int(fields[4]), "utilization": int(fields[5]),
         }
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):
         return None
@@ -158,15 +159,20 @@ def collect_ollama_connections(
 
 
 def collect_all() -> dict:
-    """Aggregate all resource data."""
+    """Aggregate all resource data (I/O-bound collectors run in parallel)."""
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        cpu_fut = pool.submit(collect_cpu)
+        gpu_fut = pool.submit(collect_gpu)
+        models_fut = pool.submit(collect_ollama_models)
+        conns_fut = pool.submit(collect_ollama_connections)
     return {
-        "cpu_percent": collect_cpu(),
+        "cpu_percent": cpu_fut.result(),
         "cpu_count": collect_cpu_count(),
         "memory": collect_memory(),
         "disk": collect_disk(),
-        "gpu": collect_gpu(),
-        "ollama_models": collect_ollama_models(),
-        "ollama_connections": collect_ollama_connections(),
+        "gpu": gpu_fut.result(),
+        "ollama_models": models_fut.result(),
+        "ollama_connections": conns_fut.result(),
     }
 
 

@@ -5,38 +5,16 @@ import json
 from rich.table import Table
 
 from scripts.cli._helpers import console, format_bytes, load_infra_safe, run_cmd
-
-TRUST_STYLES = {
-    "admin": "bold blue",
-    "trusted": "bold green",
-    "semi-trusted": "bold yellow",
-    "untrusted": "bold red",
-    "disposable": "bold magenta",
-}
-
-
-def _build_domain_map(infra: dict) -> dict:
-    """Build machine_name -> (domain_name, domain_config) mapping."""
-    result = {}
-    for dname, dconf in (infra.get("domains") or {}).items():
-        for mname in (dconf.get("machines") or {}):
-            result[mname] = (dname, dconf)
-    return result
-
-
-def _extract_ip(state: dict) -> str:
-    """Extract first IPv4 from common NIC names."""
-    network = state.get("network") or {}
-    for nic_name in ("eth0", "enp5s0", "enp6s0"):
-        for addr in network.get(nic_name, {}).get("addresses", []):
-            if addr.get("family") == "inet" and addr.get("scope") == "global":
-                return addr["address"]
-    return "-"
+from scripts.colors import (
+    TRUST_RICH_STYLES,
+    build_domain_map,
+    extract_ipv4,
+    infer_trust_level,
+)
 
 
 def render_instance_table(domain: str | None, sort: str) -> None:
     """Fetch instances from Incus and render a Rich table."""
-    from scripts.colors import infer_trust_level
 
     result = run_cmd(
         ["incus", "list", "--all-projects", "--format", "json"],
@@ -58,7 +36,7 @@ def render_instance_table(domain: str | None, sort: str) -> None:
         infra = load_infra_safe()
     except SystemExit:
         infra = {"domains": {}}
-    domain_map = _build_domain_map(infra)
+    domain_map = build_domain_map(infra)
 
     rows = []
     for inst in instances:
@@ -88,7 +66,7 @@ def render_instance_table(domain: str | None, sort: str) -> None:
             "memory_val": mem_usage,
             "disk": format_bytes(disk_usage) if disk_usage else "-",
             "disk_val": disk_usage,
-            "ip": _extract_ip(state), "gpu": "yes" if has_gpu else "",
+            "ip": extract_ipv4(state, default="-"), "gpu": "yes" if has_gpu else "",
         })
 
     sort_keys = {
@@ -110,7 +88,7 @@ def render_instance_table(domain: str | None, sort: str) -> None:
 
     for row in rows:
         ss = "green" if row["status"] == "Running" else "red"
-        ts = TRUST_STYLES.get(row["trust"], "dim")
+        ts = TRUST_RICH_STYLES.get(row["trust"], "dim")
         table.add_row(
             row["name"], row["domain"],
             f"[{ts}]{row['trust']}[/{ts}]",

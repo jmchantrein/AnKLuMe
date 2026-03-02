@@ -1,9 +1,5 @@
 """Tests for network baseline learning module (Phase 40 Level 4)."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from network_baseline import (
     Anomaly,
     AnomalyReport,

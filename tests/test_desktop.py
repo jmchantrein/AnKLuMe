@@ -183,7 +183,7 @@ class TestClipboard:
     def test_help_exit_zero(self):
         result = subprocess.run(
             ["bash", str(SCRIPTS_DIR / "clipboard.sh"), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "copy-to" in result.stdout
@@ -192,7 +192,7 @@ class TestClipboard:
     def test_missing_args_fails(self):
         result = subprocess.run(
             ["bash", str(SCRIPTS_DIR / "clipboard.sh")],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
 
@@ -206,7 +206,7 @@ class TestDomainExec:
     def test_help_exit_zero(self):
         result = subprocess.run(
             ["bash", str(SCRIPTS_DIR / "domain-exec.sh"), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "INSTANCE" in result.stdout
@@ -214,7 +214,7 @@ class TestDomainExec:
     def test_missing_instance_fails(self):
         result = subprocess.run(
             ["bash", str(SCRIPTS_DIR / "domain-exec.sh")],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
 

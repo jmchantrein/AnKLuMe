@@ -17,9 +17,13 @@ def _patch_bootstrap_content(original, etc_dir, tmp_path):
 
     Replaces /etc/anklume and /srv/anklume so the script does not require
     root access (which fails in CI environments).
+    Also copies shell-lib.sh alongside patched scripts (sourced via SCRIPT_DIR).
     """
     srv_dir = tmp_path / "srv_anklume"
     srv_dir.mkdir(exist_ok=True)
+    shell_lib = BOOTSTRAP_SH.parent / "shell-lib.sh"
+    if shell_lib.exists():
+        (tmp_path / "shell-lib.sh").write_text(shell_lib.read_text())
     content = original.replace("/etc/anklume", str(etc_dir))
     return content.replace("/srv/anklume", str(srv_dir))
 
@@ -657,7 +661,7 @@ class TestShellSyntax:
     def test_syntax(self, script):
         result = subprocess.run(
             ["bash", "-n", str(script)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0, f"Syntax error in {script.name}:\n{result.stderr}"
 

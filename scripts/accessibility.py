@@ -8,16 +8,19 @@ from pathlib import Path
 
 import yaml
 
+from scripts.colors import TRUST_BG_COLORS, TRUST_BORDER_COLORS, TRUST_TMUX_COLORS
+
 # ── Palettes ──────────────────────────────────────────────
 # Each palette maps trust_level -> {border, bg, tmux}
 
 PALETTES = {
     "default": {
-        "admin": {"border": "#3333ff", "bg": "#0a0a2a", "tmux": "colour17"},
-        "trusted": {"border": "#33cc33", "bg": "#0a1a0a", "tmux": "colour22"},
-        "semi-trusted": {"border": "#cccc33", "bg": "#1a1a0a", "tmux": "colour58"},
-        "untrusted": {"border": "#cc3333", "bg": "#1a0a0a", "tmux": "colour52"},
-        "disposable": {"border": "#cc33cc", "bg": "#1a0a1a", "tmux": "colour53"},
+        level: {
+            "border": TRUST_BORDER_COLORS[level],
+            "bg": TRUST_BG_COLORS[level],
+            "tmux": TRUST_TMUX_COLORS[level],
+        }
+        for level in TRUST_BORDER_COLORS
     },
     "colorblind-deutan": {
         "admin": {"border": "#0077bb", "bg": "#001a33", "tmux": "colour25"},

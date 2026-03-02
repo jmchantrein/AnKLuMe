@@ -76,7 +76,7 @@ def run_tor(args, env):
     """Run tor-gateway.sh with given args and environment."""
     return subprocess.run(
         ["bash", str(TOR_SH)] + args,
-        capture_output=True, text=True, env=env,
+        capture_output=True, text=True, env=env, timeout=30,
     )
 
 
@@ -89,7 +89,7 @@ class TestScriptQuality:
         """tor-gateway.sh passes shellcheck."""
         result = subprocess.run(
             ["shellcheck", str(TOR_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 
@@ -106,7 +106,7 @@ class TestHelp:
         """--help shows usage and exits 0."""
         result = subprocess.run(
             ["bash", str(TOR_SH), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -118,7 +118,7 @@ class TestHelp:
         """No arguments shows usage and exits 0."""
         result = subprocess.run(
             ["bash", str(TOR_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -228,7 +228,7 @@ class TestUnknown:
         """Unknown subcommand gives clear error."""
         result = subprocess.run(
             ["bash", str(TOR_SH), "badcmd"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
         assert "Unknown command" in result.stderr

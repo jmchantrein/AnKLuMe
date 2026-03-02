@@ -119,7 +119,7 @@ def run_golden(args, env, input_text=None):
     """Run golden.sh with given args and environment."""
     return subprocess.run(
         ["bash", str(GOLDEN_SH)] + args,
-        capture_output=True, text=True, env=env, input=input_text,
+        capture_output=True, text=True, env=env, input=input_text, timeout=10,
     )
 
 
@@ -132,7 +132,7 @@ class TestScriptQuality:
         """golden.sh passes shellcheck."""
         result = subprocess.run(
             ["shellcheck", str(GOLDEN_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 
@@ -149,7 +149,7 @@ class TestHelp:
         """--help shows usage and exits 0."""
         result = subprocess.run(
             ["bash", str(GOLDEN_SH), "--help"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -161,7 +161,7 @@ class TestHelp:
         """No arguments shows usage and exits 0."""
         result = subprocess.run(
             ["bash", str(GOLDEN_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -296,7 +296,7 @@ class TestUnknown:
         """Unknown subcommand gives clear error."""
         result = subprocess.run(
             ["bash", str(GOLDEN_SH), "badcmd"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode != 0
         assert "Unknown command" in result.stderr

@@ -21,20 +21,6 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
-def count_lines(filepath):
-    """Count non-empty, non-comment lines in a file."""
-    try:
-        total = 0
-        with open(filepath) as f:
-            for line in f:
-                stripped = line.strip()
-                if stripped and not stripped.startswith("#"):
-                    total += 1
-        return total
-    except (OSError, UnicodeDecodeError):
-        return 0
-
-
 def count_lines_raw(filepath):
     """Count total lines in a file."""
     try:

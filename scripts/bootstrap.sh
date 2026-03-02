@@ -30,10 +30,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Helpers ───────────────────────────────────────────────
 
-info()  { echo -e "\033[0;34m[INFO]\033[0m $*"; }
-ok()    { echo -e "\033[0;32m[ OK ]\033[0m $*"; }
-warn()  { echo -e "\033[1;33m[WARN]\033[0m $*"; }
-err()   { echo -e "\033[0;31m[ERR ]\033[0m $*" >&2; }
+# shellcheck source=shell-lib.sh
+source "$SCRIPT_DIR/shell-lib.sh"
 
 ask() {
     local prompt="$1" default="${2:-y}"
@@ -135,7 +133,7 @@ create_container() {
     local container_os="${2:-images:debian/13}"
     local project="${3:-default}"
 
-    if incus info "$container_name" --project "$project" &>/dev/null 2>&1>/dev/null; then
+    if incus info "$container_name" --project "$project" &>/dev/null; then
         ok "Container $container_name already exists"
         # Start if stopped
         local state
@@ -585,7 +583,7 @@ main() {
         # Distinguish "Incus not installed" from "daemon unreachable"
         if ! command -v incus &>/dev/null; then
             INCUS_STATE="missing"
-        elif incus info &>/dev/null 2>&1>/dev/null; then
+        elif incus info &>/dev/null; then
             INCUS_STATE="ready"
         else
             INCUS_STATE="installed"
@@ -750,7 +748,7 @@ EOF
             echo "ERROR: Incus is not installed. Install it first, then re-run bootstrap." >&2
             exit 1
         fi
-        if ! incus info &>/dev/null 2>&1>/dev/null; then
+        if ! incus info &>/dev/null; then
             echo "Incus not initialized. Running minimal init..."
             incus admin init --minimal
         fi

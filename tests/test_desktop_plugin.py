@@ -120,7 +120,7 @@ class TestDesktopPluginScript:
     def test_shellcheck_clean(self):
         result = subprocess.run(
             ["shellcheck", "-S", "warning", str(PLUGIN_SCRIPT)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, result.stdout
 
@@ -165,7 +165,7 @@ class TestSwayDetect:
         result = subprocess.run(
             ["shellcheck", "-S", "warning",
              str(SWAY_DIR / "detect.sh")],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, result.stdout
 
@@ -202,7 +202,7 @@ class TestSwayApply:
         result = subprocess.run(
             ["shellcheck", "-S", "warning",
              str(SWAY_DIR / "apply.sh")],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, result.stdout
 

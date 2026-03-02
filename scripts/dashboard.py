@@ -29,7 +29,7 @@ from fastapi.responses import HTMLResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from colors import infer_trust_level  # noqa: E402
+from colors import build_domain_map, extract_ipv4, infer_trust_level  # noqa: E402
 from web.theme import BASE_CSS, DASHBOARD_CSS, RESOURCE_CSS, trust_css  # noqa: E402
 
 # ── Data fetchers ────────────────────────────────────────────────
@@ -79,15 +79,12 @@ def fetch_projects():
 
 
 def load_infra_yml():
-    """Load infra.yml if available."""
-    import yaml
-    for path in [Path("infra.yml"), Path("infra/base.yml")]:
-        try:
-            with open(path) as f:
-                return yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            continue
-    return {}
+    """Load infra.yml if available, return {} on failure."""
+    try:
+        from psot.io import load_infra
+        return load_infra("infra.yml") or {}
+    except (FileNotFoundError, OSError):
+        return {}
 
 
 def build_status():
@@ -97,31 +94,21 @@ def build_status():
     infra = load_infra_yml()
 
     # Enrich instances with domain info
+    raw_map = build_domain_map(infra)
     domain_map = {}
-    for dname, dconfig in infra.get("domains", {}).items():
-        trust = infer_trust_level(dname, dconfig)
-        for mname in dconfig.get("machines", {}):
-            domain_map[mname] = {
-                "domain": dname,
-                "trust_level": trust,
-                "colors": trust_css(trust),
-            }
+    for mname, (dname, dconf) in raw_map.items():
+        trust = infer_trust_level(dname, dconf)
+        domain_map[mname] = {
+            "domain": dname,
+            "trust_level": trust,
+            "colors": trust_css(trust),
+        }
 
     enriched = []
     for inst in instances:
         name = inst.get("name", "")
         info = domain_map.get(name, {})
-        # Extract first non-lo IPv4
-        ip = ""
-        for net_name, net in inst.get("state", {}).get("network", {}).items():
-            if net_name == "lo":
-                continue
-            for addr in net.get("addresses", []):
-                if addr.get("family") == "inet":
-                    ip = addr["address"]
-                    break
-            if ip:
-                break
+        ip = extract_ipv4(inst.get("state", {}))
         enriched.append({
             "name": name,
             "status": inst.get("status", "Unknown"),

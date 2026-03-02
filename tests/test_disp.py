@@ -17,7 +17,7 @@ def run_disp(args, env=None, input_text=None):
     """Run disp.sh with given args and environment."""
     result = subprocess.run(
         ["bash", str(DISP_SH)] + args,
-        capture_output=True, text=True, env=env, input=input_text,
+        capture_output=True, text=True, env=env, input=input_text, timeout=30,
     )
     return result
 
@@ -39,7 +39,7 @@ class TestScriptBasics:
         """disp.sh passes shellcheck validation."""
         result = subprocess.run(
             ["shellcheck", str(DISP_SH)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=30,
         )
         assert result.returncode == 0, f"shellcheck errors:\n{result.stdout}"
 
@@ -85,15 +85,13 @@ class TestNameGeneration:
         # Extract the generate_name function output via bash
         result = subprocess.run(
             ["bash", "-c", 'source "' + str(DISP_SH) + '" 2>/dev/null; generate_name'],
-            capture_output=True, text=True,
-            # Source the file but only call generate_name
-            # We need to prevent the main logic from running
+            capture_output=True, text=True, timeout=10,
         )
         # The script runs on source due to no main guard, so use a different approach
         result = subprocess.run(
             ["bash", "-c",
              r'echo "disp-$(date +%Y%m%d-%H%M%S)"'],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=10,
         )
         name = result.stdout.strip()
         assert re.match(r"^disp-\d{8}-\d{6}$", name), f"Name '{name}' doesn't match pattern"

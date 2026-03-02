@@ -3,11 +3,11 @@
 import contextlib
 import sys
 
+from psot._compat import resolve as _resolve
 from psot.resources import (
     _apply_memory_enforce,
     _format_memory,
     _parse_memory_value,
-    _resolve,
 )
 
 

@@ -1,21 +1,7 @@
 """Non-fatal warning generation for the PSOT generator."""
 
-import sys
-
+from psot._compat import resolve as _resolve
 from psot.validation import _collect_gpu_instances
-
-
-def _resolve(name):
-    """Look up a patchable function on the ``generate`` module.
-
-    See psot.validation._resolve for rationale.
-    """
-    gen = sys.modules.get("generate")
-    if gen and hasattr(gen, name):
-        return getattr(gen, name)
-    import psot  # noqa: PLC0415
-
-    return getattr(psot, name)
 
 
 def get_warnings(infra):

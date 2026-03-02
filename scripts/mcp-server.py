@@ -15,6 +15,7 @@ See docs/mcp-services.md and ROADMAP.md Phase 20c.
 
 import argparse
 import base64
+import binascii
 import os
 import subprocess
 import tempfile
@@ -34,7 +35,7 @@ def gpg_sign(data: str, key_id: str = "") -> str:
     """Sign data with GPG. Input is base64-encoded, returns base64 signature."""
     try:
         raw = base64.b64decode(data)
-    except Exception as exc:
+    except (ValueError, binascii.Error) as exc:
         return f"ERROR: Invalid base64 data: {exc}"
 
     with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
@@ -80,7 +81,7 @@ def file_accept(path: str, data: str, mode: str = "") -> str:
         return "ERROR: path is required"
     try:
         raw = base64.b64decode(data)
-    except Exception as exc:
+    except (ValueError, binascii.Error) as exc:
         return f"ERROR: Invalid base64 data: {exc}"
 
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

@@ -1,14 +1,10 @@
 """Tests for the telemetry script (scripts/telemetry.py)."""
 
 import json
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-
-import pytest  # noqa: E402
-import telemetry  # noqa: E402
+import pytest
+import telemetry
 
 
 @pytest.fixture()

@@ -1,13 +1,7 @@
 """Tests for the console generator (scripts/console.py)."""
 
-import sys
-from pathlib import Path
-
-# Add scripts/ to sys.path (same as conftest.py does for generate.py)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-
-import console  # noqa: E402
-import pytest  # noqa: E402
+import console
+import pytest
 
 
 @pytest.fixture()

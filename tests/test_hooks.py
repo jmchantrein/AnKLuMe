@@ -47,26 +47,26 @@ class TestPreCommitHook:
         """Initialize a git repo in repo_dir with an initial commit."""
         subprocess.run(
             ["git", "init", str(repo_dir)],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
         subprocess.run(
             ["git", "-C", str(repo_dir), "config", "user.email", "test@test.com"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
         subprocess.run(
             ["git", "-C", str(repo_dir), "config", "user.name", "Test"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
         # Create an initial commit so HEAD exists
         dummy = repo_dir / ".gitkeep"
         dummy.write_text("")
         subprocess.run(
             ["git", "-C", str(repo_dir), "add", ".gitkeep"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
         subprocess.run(
             ["git", "-C", str(repo_dir), "commit", "-m", "init"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
     def test_blocks_private_ips(self, tmp_path):
@@ -88,7 +88,7 @@ class TestPreCommitHook:
         bad_file.write_text('SERVER = "192.168.1.1"\n')
         subprocess.run(
             ["git", "-C", str(repo), "add", "config.py"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -114,7 +114,7 @@ class TestPreCommitHook:
         bad_file.write_text('GATEWAY = "172.16.0.1"\n')
         subprocess.run(
             ["git", "-C", str(repo), "add", "network.py"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -139,7 +139,7 @@ class TestPreCommitHook:
         bad_file.write_text('HOST = "10.50.1.5"\n')
         subprocess.run(
             ["git", "-C", str(repo), "add", "server.py"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -168,7 +168,7 @@ class TestPreCommitHook:
         md_file.write_text("The server is at 10.100.1.5\n")
         subprocess.run(
             ["git", "-C", str(repo), "add", "notes.md"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -197,7 +197,7 @@ class TestPreCommitHook:
         )
         subprocess.run(
             ["git", "-C", str(repo), "add", "utils.py"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -223,7 +223,7 @@ class TestPreCommitHook:
         infra.write_text("project_name: myinfra\n")
         subprocess.run(
             ["git", "-C", str(repo), "add", "infra.yml"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -252,7 +252,7 @@ class TestPreCommitHook:
         gv_file.write_text("domain_name: pro\n")
         subprocess.run(
             ["git", "-C", str(repo), "add", "group_vars/pro.yml"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(
@@ -281,7 +281,7 @@ class TestPreCommitHook:
         bad_file.write_text('SERVER = "192.168.1.1"\n')
         subprocess.run(
             ["git", "-C", str(repo), "add", "config.py"],
-            capture_output=True, check=True,
+            capture_output=True, check=True, timeout=10,
         )
 
         result = subprocess.run(

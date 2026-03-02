@@ -1177,16 +1177,7 @@ AGENT
     # Create vconsole.conf — French AZERTY keyboard layout
     echo "KEYMAP=$KEYMAP" > "$ROOTFS_DIR/etc/vconsole.conf"
 
-    # Enable networking (systemd-networkd + systemd-resolved for DHCP)
-    mkdir -p "$ROOTFS_DIR/etc/systemd/network"
-    cat > "$ROOTFS_DIR/etc/systemd/network/20-wired.network" << 'NETCFG'
-[Match]
-Name=en* eth*
-
-[Network]
-DHCP=yes
-NETCFG
-    # NetworkManager handles both wired and WiFi (replaces systemd-networkd)
+    # NetworkManager handles both wired and WiFi
     chroot "$ROOTFS_DIR" systemctl enable NetworkManager.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable systemd-resolved.service >/dev/null 2>&1 || true
     # Symlink resolv.conf to systemd-resolved stub

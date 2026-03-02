@@ -109,7 +109,7 @@ def run_flush(args, env, cwd=None, input_text=None):
     """Run flush.sh with given args and environment."""
     result = subprocess.run(
         ["bash", str(FLUSH_SH)] + args,
-        capture_output=True, text=True, env=env, cwd=cwd, input=input_text,
+        capture_output=True, text=True, env=env, cwd=cwd, input=input_text, timeout=30,
     )
     return result
 
@@ -282,7 +282,7 @@ class TestFlushProductionSafety:
         patched = _make_patched_flush(cwd, etc)
         result = subprocess.run(
             ["bash", str(patched)],
-            capture_output=True, text=True, env=env, cwd=cwd,
+            capture_output=True, text=True, env=env, cwd=cwd, timeout=30,
         )
         assert result.returncode == 1
         assert "ERROR" in result.stdout or "ERROR" in result.stderr
@@ -295,7 +295,7 @@ class TestFlushProductionSafety:
         patched = _make_patched_flush(cwd, etc)
         result = subprocess.run(
             ["bash", str(patched), "--force"],
-            capture_output=True, text=True, env=env, cwd=cwd,
+            capture_output=True, text=True, env=env, cwd=cwd, timeout=30,
         )
         assert result.returncode == 0
         assert "Flush complete" in result.stdout
@@ -320,7 +320,7 @@ class TestFlushProductionSafety:
         patched = _make_patched_flush(cwd, etc)
         result = subprocess.run(
             ["bash", str(patched), "--force"],
-            capture_output=True, text=True, env=env, cwd=cwd,
+            capture_output=True, text=True, env=env, cwd=cwd, timeout=30,
         )
         assert result.returncode == 0
         assert "Flush complete" in result.stdout
@@ -332,7 +332,7 @@ class TestFlushProductionSafety:
         patched = _make_patched_flush(cwd, etc)
         result = subprocess.run(
             ["bash", str(patched), "--force"],
-            capture_output=True, text=True, env=env, cwd=cwd,
+            capture_output=True, text=True, env=env, cwd=cwd, timeout=30,
         )
         assert result.returncode == 0
         assert "Flush complete" in result.stdout

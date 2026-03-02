@@ -8,13 +8,11 @@ Run with: pytest tests/test_integration.py -v
 """
 
 import copy
-import sys
 from pathlib import Path
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 import generate  # noqa: E402  # isort: skip
 
 

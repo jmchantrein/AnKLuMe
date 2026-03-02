@@ -33,6 +33,35 @@ TRUST_TMUX_COLORS = {
     "disposable": "colour53",
 }
 
+# Trust level → Rich markup styles (for CLI tables)
+TRUST_RICH_STYLES = {
+    "admin": "bold blue",
+    "trusted": "bold green",
+    "semi-trusted": "bold yellow",
+    "untrusted": "bold red",
+    "disposable": "bold magenta",
+}
+
+
+def extract_ipv4(state: dict, default: str = "") -> str:
+    """Extract first global IPv4 from Incus instance state (skipping lo)."""
+    for nic, net in (state.get("network") or {}).items():
+        if nic == "lo":
+            continue
+        for addr in net.get("addresses", []):
+            if addr.get("family") == "inet" and addr.get("scope") == "global":
+                return addr["address"]
+    return default
+
+
+def build_domain_map(infra: dict) -> dict:
+    """Build machine_name -> (domain_name, domain_config) mapping from infra.yml."""
+    result = {}
+    for dname, dconf in (infra.get("domains") or {}).items():
+        for mname in (dconf.get("machines") or {}):
+            result[mname] = (dname, dconf)
+    return result
+
 
 def infer_trust_level(domain_name, domain_config):
     """Infer trust level from domain name and config.
