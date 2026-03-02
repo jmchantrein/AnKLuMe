@@ -1,0 +1,24 @@
+#!/bin/sh
+# pre-push hook — Block git push on deployed (production) instances.
+# Installed by `anklume setup hooks`. Bypass with `git push --no-verify`.
+set -e
+
+# Skip if dev marker exists
+if [ -f .anklume-no-verify ]; then
+    exit 0
+fi
+
+# Check production marker
+DEPLOYED_MARKER="/etc/anklume/deployed"
+if [ -f "$DEPLOYED_MARKER" ]; then
+    printf '[AnKLuMe] BLOCKED: git push is disabled on deployed instances.\n\n'
+    printf '  This instance is marked as production (%s exists).\n' "$DEPLOYED_MARKER"
+    printf '  Only git pull is allowed in production.\n\n'
+    printf '  To remove the restriction:\n'
+    printf '    anklume setup production --off\n\n'
+    printf '  Or bypass once:\n'
+    printf '    git push --no-verify\n\n'
+    exit 1
+fi
+
+exit 0

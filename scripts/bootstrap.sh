@@ -710,6 +710,10 @@ EOF
             echo "Incus installed and initialized (minimal). Configure storage manually if needed."
         fi
 
+        # ── Mark as production instance ─────────────────────────
+        echo "deployed=$(date -Is)" > /etc/anklume/deployed
+        ok "Production marker set (/etc/anklume/deployed)"
+
         # ── Enable br_netfilter for nftables bridge filtering ──
         info "Configuring br_netfilter for bridge filtering..."
         modprobe br_netfilter 2>/dev/null || warn "Failed to load br_netfilter module"

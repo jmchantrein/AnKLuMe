@@ -1,8 +1,11 @@
 """anklume setup — initialization and configuration."""
 
+from datetime import datetime
+from pathlib import Path
+
 import typer
 
-from scripts.cli._helpers import run_make, run_script
+from scripts.cli._helpers import console, run_make, run_script
 
 app = typer.Typer(name="setup", help="Setup, initialization, and configuration.")
 
@@ -53,3 +56,22 @@ def import_() -> None:
 def export_images() -> None:
     """Export images for nested anklume instances."""
     run_make("export-images")
+
+
+@app.command()
+def production(
+    off: bool = typer.Option(False, "--off", help="Remove production marker"),
+) -> None:
+    """Mark/unmark this instance as production (blocks git push)."""
+    marker = Path("/etc/anklume/deployed")
+    if off:
+        if marker.exists():
+            marker.unlink()
+            console.print("[green]Production mode disabled.[/green]")
+        else:
+            console.print("[dim]Not in production mode.[/dim]")
+    else:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(f"deployed={datetime.now().isoformat()}\n")
+        console.print("[bold]Production mode enabled.[/bold]")
+        console.print("[dim]git push blocked. Use --off to revert.[/dim]")

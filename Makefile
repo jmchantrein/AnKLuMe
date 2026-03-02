@@ -700,10 +700,12 @@ init: install-hooks ## Initial setup: install all dependencies
 	@echo "  Arch:   pacman -S ansible-lint yamllint shellcheck"
 	@echo "  Debian: apt install ansible-lint yamllint shellcheck"
 
-install-hooks: ## Install git pre-commit hooks
+install-hooks: ## Install git hooks (pre-commit, pre-push)
 	@mkdir -p .git/hooks
 	@cp scripts/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
+	@cp scripts/hooks/pre-push .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
 	@echo "Git hooks installed. Use --no-verify to bypass."
 
 # ── CLI Mode Targets (Phase 33) ──────────────────────────

@@ -110,6 +110,34 @@ DASHBOARD_CSS = """\
 .refresh-info { color: var(--dim); font-size: 11px; text-align: right; margin-top: 8px; }
 """
 
+# ── Resource monitoring CSS ───────────────────────────────────
+
+RESOURCE_CSS = """\
+.resource-widget {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 16px;
+}
+.resource-bar {
+  display: flex; align-items: center; gap: 12px; margin: 6px 0;
+}
+.resource-label {
+  min-width: 100px; font-size: 13px; color: var(--fg);
+}
+.resource-track {
+  flex: 1; background: #21262d; border-radius: 4px; height: 8px;
+}
+.resource-fill {
+  height: 8px; border-radius: 4px; transition: width 0.3s;
+}
+.resource-models {
+  margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;
+}
+.resource-model {
+  background: #21262d; border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--muted);
+}
+"""
+
 # ── Guide-specific CSS (chapter cards) ──────────────────────
 
 GUIDE_CSS = """\
@@ -126,9 +154,50 @@ GUIDE_CSS = """\
 """
 
 
-def trust_css(level: str) -> dict[str, str]:
-    """Return border and background colors for a trust level."""
+def trust_css(level: str, palette: str | None = None) -> dict[str, str]:
+    """Return border and background colors for a trust level.
+
+    Uses the specified palette, or falls back to the default colors.
+    """
+    if palette and palette != "default":
+        try:
+            from scripts.accessibility import get_trust_colors
+            colors = get_trust_colors(level, palette)
+            return {"border": colors["border"], "bg": colors["bg"]}
+        except Exception:
+            pass
     return {
         "border": TRUST_BORDER_COLORS.get(level, "#30363d"),
         "bg": TRUST_BG_COLORS.get(level, "#161b22"),
     }
+
+
+def accessible_css(settings: dict | None = None) -> str:
+    """Return extra CSS for accessibility (dyslexia, high-contrast).
+
+    Args:
+        settings: Accessibility settings dict from load_accessibility().
+                  If None, loads from disk.
+    """
+    if settings is None:
+        try:
+            from scripts.accessibility import load_accessibility
+            settings = load_accessibility()
+        except Exception:
+            return ""
+
+    parts = []
+    if settings.get("dyslexia_mode"):
+        try:
+            from scripts.accessibility import get_dyslexia_css
+            parts.append(get_dyslexia_css())
+        except Exception:
+            pass
+
+    if settings.get("color_palette") == "high-contrast":
+        parts.append(
+            ":root { --bg: #000000; --fg: #ffffff; --card: #111111;\n"
+            "  --border: #666666; --muted: #cccccc; }\n"
+        )
+
+    return "\n".join(parts)

@@ -32,6 +32,8 @@ from scripts.cli.network import app as network_app
 from scripts.cli.portal import app as portal_app
 from scripts.cli.setup import app as setup_app
 from scripts.cli.snapshot import app as snapshot_app
+from scripts.cli.stt import app as stt_app
+from scripts.cli.system import app as system_app
 from scripts.cli.telemetry import app as telemetry_app
 
 __version__ = "0.1.0"
@@ -142,8 +144,8 @@ app.add_typer(mode_app)
 # Standard groups (hidden in student mode for simplicity)
 _standard = (
     instance_app, snapshot_app, network_app, portal_app,
-    appexport_app, desktop_app, llm_app, setup_app,
-    backup_app, ai_app, docs_app,
+    appexport_app, desktop_app, llm_app, stt_app, system_app,
+    setup_app, backup_app, ai_app, docs_app,
 )
 for _grp in _standard:
     if _mode == "student":

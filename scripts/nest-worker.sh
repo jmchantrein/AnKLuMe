@@ -5,11 +5,11 @@
 # creates a child container, writes context files, and recurses.
 # With FULL=1, also installs test deps and runs pytest at each level.
 #
-# Args: LEVEL MAX_DEPTH IMAGE FULL(0|1)
+# Args: LEVEL MAX_DEPTH IMAGE FULL(0|1) BEHAVE(0|1)
 
 set -euo pipefail
 
-LEVEL=$1; MAX=$2; IMG=$3; FULL=${4:-0}
+LEVEL=$1; MAX=$2; IMG=$3; FULL=${4:-0}; BEHAVE=${5:-0}
 NEXT=$((LEVEL + 1)); CHILD="nest-l${NEXT}"
 
 if [ "$LEVEL" -ge "$MAX" ]; then
@@ -57,6 +57,21 @@ if [ "$FULL" = "1" ]; then
     mv /etc/anklume.bak /etc/anklume 2>/dev/null || true
 fi
 
+# ── Behave mode: run behave scenarios ─────────────────────
+if [ "$BEHAVE" = "1" ] && [ "$FULL" = "1" ]; then
+    echo "[WORKER] Level $LEVEL: running behave..."
+    mv /etc/anklume /etc/anklume.bak 2>/dev/null || true
+    if (cd /opt/anklume && python3 -m behave scenarios/ \
+            --tags='~@vision' -q > /tmp/behave.log 2>&1); then
+        echo "[PASS] Level $LEVEL: behave $(tail -1 /tmp/behave.log)"
+    else
+        tail -10 /tmp/behave.log | while IFS= read -r fl; do
+            echo "[DETAIL] $fl"; done
+        echo "[FAIL] Level $LEVEL: behave $(tail -1 /tmp/behave.log)"
+    fi
+    mv /etc/anklume.bak /etc/anklume 2>/dev/null || true
+fi
+
 # ── Create child container ───────────────────────────────────
 echo "[WORKER] Level $LEVEL: launching $CHILD..."
 incus launch "$IMG" "$CHILD" \
@@ -85,6 +100,16 @@ else
     echo "[FAIL] Level $NEXT: absolute_level=$LVL (expected $NEXT)"
 fi
 
+# ── Behave: GPU network test from nested level ────────────────
+if [ "$BEHAVE" = "1" ] && [ "$LEVEL" -ge 2 ]; then
+    OLLAMA_HOST="${OLLAMA_HOST:-10.100.3.1:11434}"
+    if curl -s --connect-timeout 5 "http://$OLLAMA_HOST/api/version" >/dev/null 2>&1; then
+        echo "[PASS] Level $LEVEL: GPU network reachable ($OLLAMA_HOST)"
+    else
+        echo "[INFO] Level $LEVEL: GPU network NOT reachable ($OLLAMA_HOST)"
+    fi
+fi
+
 # ── Full mode: copy repo into child ─────────────────────────
 if [ "$FULL" = "1" ]; then
     incus exec "$CHILD" -- mkdir -p /opt/anklume
@@ -96,4 +121,4 @@ fi
 cat /tmp/nest-worker.sh | incus exec "$CHILD" -- \
     tee /tmp/nest-worker.sh > /dev/null
 incus exec "$CHILD" -- chmod +x /tmp/nest-worker.sh
-incus exec "$CHILD" -- bash /tmp/nest-worker.sh "$NEXT" "$MAX" "$IMG" "$FULL"
+incus exec "$CHILD" -- bash /tmp/nest-worker.sh "$NEXT" "$MAX" "$IMG" "$FULL" "$BEHAVE"

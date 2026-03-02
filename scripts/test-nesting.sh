@@ -7,7 +7,7 @@
 # --full: also copies repo + runs pytest at each nesting level.
 #
 # Usage:
-#   scripts/test-nesting.sh [--mode lxc|vm|both] [--max-depth N] [--full] [--dry-run]
+#   scripts/test-nesting.sh [--mode lxc|vm|both] [--max-depth N] [--full] [--behave] [--dry-run]
 #
 # Requires: Incus daemon. VM mode requires KVM + 8GB+ RAM.
 
@@ -21,6 +21,7 @@ DRY_RUN=false
 MODE="lxc"
 MAX_DEPTH=3
 FULL=false
+BEHAVE=false
 PASSED=0
 FAILED=0
 
@@ -30,8 +31,9 @@ while [[ $# -gt 0 ]]; do
         --mode)       MODE="$2"; shift ;;
         --max-depth)  MAX_DEPTH="$2"; shift ;;
         --full)       FULL=true ;;
+        --behave)     BEHAVE=true ;;
         -h|--help)
-            echo "Usage: $0 [--mode lxc|vm|both] [--max-depth N] [--full] [--dry-run]"
+            echo "Usage: $0 [--mode lxc|vm|both] [--max-depth N] [--full] [--behave] [--dry-run]"
             exit 0 ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
@@ -62,7 +64,7 @@ info "Checking prerequisites..."
 incus info >/dev/null 2>&1 || { fail "Incus daemon not available"; exit 1; }
 
 if $DRY_RUN; then
-    info "Dry-run (--mode $MODE, --max-depth $MAX_DEPTH, --full=$FULL)"
+    info "Dry-run (--mode $MODE, --max-depth $MAX_DEPTH, --full=$FULL, --behave=$BEHAVE)"
     pass "Script structure valid"
     pass "Prerequisites checked"
     pass "Would create project: $NEST_PROJECT"
@@ -75,7 +77,7 @@ fi
 
 # ── Test function ────────────────────────────────────────────
 run_nesting_test() {
-    local itype="$1" flags="" wait_time=30 label="LXC" full_flag="0"
+    local itype="$1" flags="" wait_time=30 label="LXC" full_flag="0" behave_flag="0"
     if [[ "$itype" == "vm" ]]; then
         flags="--vm -c limits.cpu=2 -c limits.memory=4GiB"
         flags+=" -c security.secureboot=false"
@@ -86,7 +88,8 @@ run_nesting_test() {
         flags+=" -c security.syscalls.intercept.setxattr=true"
     fi
     $FULL && full_flag="1"
-    info "=== Testing $label nesting (max-depth=$MAX_DEPTH, full=$FULL) ==="
+    $BEHAVE && behave_flag="1"
+    info "=== Testing $label nesting (max-depth=$MAX_DEPTH, full=$FULL, behave=$BEHAVE) ==="
     incus project create "$NEST_PROJECT" \
         -c features.images=false -c features.profiles=false 2>/dev/null || true
 
@@ -139,7 +142,7 @@ run_nesting_test() {
     info "Recursive nesting levels 1->$MAX_DEPTH (~$((MAX_DEPTH * 90))s)..."
     local output
     output=$(incus exec "nest-l1" --project "$NEST_PROJECT" -- \
-        bash /tmp/nest-worker.sh 1 "$MAX_DEPTH" "$NEST_IMAGE" "$full_flag" 2>&1) || true
+        bash /tmp/nest-worker.sh 1 "$MAX_DEPTH" "$NEST_IMAGE" "$full_flag" "$behave_flag" 2>&1) || true
     while IFS= read -r line; do
         case "$line" in
             *"[PASS]"*) pass "${line#*\[PASS\] }" ;;

@@ -1,10 +1,11 @@
-# Matrix: NS-001 to NS-005
+# Matrix: NS-001 to NS-006
 Feature: Anklume nesting — multi-level infrastructure isolation
 
   Nesting allows running anklume inside anklume (up to 5 levels).
   Each level creates /etc/anklume/ context files for hierarchy awareness.
   Supports --mode lxc (container nesting), vm (KVM), or both.
   Supports --max-depth N to control nesting depth (1-5).
+  Supports --behave to run BDD scenarios at each level.
 
   Scenario: Nesting test script exists and is executable
     # Matrix: NS-001
@@ -67,3 +68,11 @@ Feature: Anklume nesting — multi-level infrastructure isolation
     When I run "python3 -c 'level = 2; stop = level >= 2; assert stop, "Should stop at level >= 2"; print("stop condition ok")'"
     Then exit code is 0
     And output contains "stop condition ok"
+
+  Scenario: Nesting test dry-run with --behave flag
+    # Matrix: NS-006
+    Given "bash" is available
+    When I run "bash scripts/test-nesting.sh --mode lxc --behave --dry-run"
+    Then exit code is 0
+    And output contains "behave=true"
+    And output contains "5 passed, 0 failed"
