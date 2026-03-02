@@ -107,15 +107,40 @@ check_root() {
     ok "Running as root"
 }
 
+# ── Ensure essential /dev nodes exist ──
+# Some sandboxed environments (Claude Code, containers) may lack these.
+ensure_dev_nodes() {
+    local created=false
+    for dev_spec in "zero:1:5" "random:1:8" "urandom:1:9"; do
+        local name="${dev_spec%%:*}"
+        local rest="${dev_spec#*:}"
+        local major="${rest%%:*}"
+        local minor="${rest#*:}"
+        if [ ! -e "/dev/$name" ]; then
+            mknod "/dev/$name" c "$major" "$minor"
+            chmod 666 "/dev/$name"
+            created=true
+        fi
+    done
+    if [ "$created" = true ]; then
+        warn "Created missing /dev nodes (zero, random, urandom)"
+    fi
+}
+
 # ── Check dependencies ──
 check_dependencies() {
     info "Checking dependencies..."
 
     local missing=()
     local cmds_common=(
-        "mksquashfs" "veritysetup"
+        "mksquashfs"
         "mount" "umount" "curl" "jq" "dd"
     )
+
+    # veritysetup is only required when dm-verity is enabled
+    if [ "$NO_VERITY" != true ]; then
+        cmds_common+=("veritysetup")
+    fi
     local cmds_distro=()
     local cmds_format=()
 
@@ -934,20 +959,33 @@ Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
 Server = https://archlinux.mailtunnel.eu/$repo/os/$arch
 MIRRORS
 
-    # Create a minimal pacman.conf with only vanilla Arch repos
-    cat > "$WORK_DIR/pacman-vanilla.conf" << 'PACCONF'
+    # Create a dedicated vanilla Arch mirrorlist (NOT the host one, which
+    # may contain CachyOS mirrors that resolve CachyOS-patched packages).
+    cat > "$WORK_DIR/vanilla-mirrorlist" << 'MIRRORS'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+Server = https://archlinux.mailtunnel.eu/$repo/os/$arch
+MIRRORS
+
+    # Create a minimal pacman.conf pointing to the vanilla mirrorlist
+    cat > "$WORK_DIR/pacman-vanilla.conf" << PACCONF
 [options]
 HoldPkg     = pacman glibc
 Architecture = auto
 SigLevel    = Required DatabaseOptional
 LocalFileSigLevel = Optional
+DBPath      = $WORK_DIR/pacman-db/
 
 [core]
-Include = /etc/pacman.d/mirrorlist
+Include = $WORK_DIR/vanilla-mirrorlist
 
 [extra]
-Include = /etc/pacman.d/mirrorlist
+Include = $WORK_DIR/vanilla-mirrorlist
 PACCONF
+
+    # Sync vanilla DB separately to avoid CachyOS package resolution
+    mkdir -p "$WORK_DIR/pacman-db"
+    pacman -Sy --config "$WORK_DIR/pacman-vanilla.conf" --dbpath "$WORK_DIR/pacman-db" 2>&1 || true
 
     # Run pacstrap with vanilla config
     # Include all anklume runtime deps: Incus, Ansible, Python, Git, etc.
@@ -1298,6 +1336,15 @@ setup_verity() {
 
     if [ "$NO_VERITY" = true ]; then
         warn "Skipping dm-verity setup (--no-verity)"
+        VERITY_HASH="disabled"
+        return 0
+    fi
+
+    # Auto-detect: skip if dm-verity kernel module is unavailable
+    if ! modprobe -n dm-verity 2>/dev/null; then
+        warn "dm-verity kernel module not available — skipping verity automatically"
+        warn "  (use a kernel with dm-verity or pass --no-verity to silence this)"
+        NO_VERITY=true
         VERITY_HASH="disabled"
         return 0
     fi
@@ -1795,6 +1842,7 @@ main() {
     info "Work directory: $WORK_DIR"
 
     check_root
+    ensure_dev_nodes
     check_dependencies
     bootstrap_rootfs
     create_squashfs
