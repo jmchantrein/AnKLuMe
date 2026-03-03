@@ -45,15 +45,17 @@ if [ "$FULL" = "1" ]; then
     # nesting prefix (tests expect bare host-level names)
     mv /etc/anklume /etc/anklume.bak 2>/dev/null || true
     # Exclude GUI tests (need display/screenshots, not in headless container)
+    PYTEST_LOG=$(mktemp /tmp/anklume-pytest.XXXXXXXXXX)
     if (cd /opt/anklume && python3 -m pytest tests/ -x -q --tb=short \
             --ignore=tests/test_gui_automation.py \
-            > /tmp/pytest.log 2>&1); then
-        echo "[PASS] Level $LEVEL: pytest $(tail -1 /tmp/pytest.log)"
+            > "$PYTEST_LOG" 2>&1); then
+        echo "[PASS] Level $LEVEL: pytest $(tail -1 "$PYTEST_LOG")"
     else
-        tail -20 /tmp/pytest.log | while IFS= read -r fl; do
+        tail -20 "$PYTEST_LOG" | while IFS= read -r fl; do
             echo "[DETAIL] $fl"; done
-        echo "[FAIL] Level $LEVEL: pytest $(tail -1 /tmp/pytest.log)"
+        echo "[FAIL] Level $LEVEL: pytest $(tail -1 "$PYTEST_LOG")"
     fi
+    rm -f "$PYTEST_LOG"
     mv /etc/anklume.bak /etc/anklume 2>/dev/null || true
 fi
 
@@ -61,14 +63,16 @@ fi
 if [ "$BEHAVE" = "1" ] && [ "$FULL" = "1" ]; then
     echo "[WORKER] Level $LEVEL: running behave..."
     mv /etc/anklume /etc/anklume.bak 2>/dev/null || true
+    BEHAVE_LOG=$(mktemp /tmp/anklume-behave.XXXXXXXXXX)
     if (cd /opt/anklume && python3 -m behave scenarios/ \
-            --tags='~@vision' -q > /tmp/behave.log 2>&1); then
-        echo "[PASS] Level $LEVEL: behave $(tail -1 /tmp/behave.log)"
+            --tags='~@vision' -q > "$BEHAVE_LOG" 2>&1); then
+        echo "[PASS] Level $LEVEL: behave $(tail -1 "$BEHAVE_LOG")"
     else
-        tail -10 /tmp/behave.log | while IFS= read -r fl; do
+        tail -10 "$BEHAVE_LOG" | while IFS= read -r fl; do
             echo "[DETAIL] $fl"; done
-        echo "[FAIL] Level $LEVEL: behave $(tail -1 /tmp/behave.log)"
+        echo "[FAIL] Level $LEVEL: behave $(tail -1 "$BEHAVE_LOG")"
     fi
+    rm -f "$BEHAVE_LOG"
     mv /etc/anklume.bak /etc/anklume 2>/dev/null || true
 fi
 

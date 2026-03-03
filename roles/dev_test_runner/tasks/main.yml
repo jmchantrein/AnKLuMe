@@ -46,7 +46,7 @@
       - json
   register: dev_test_runner_storage_check
   changed_when: false
-  failed_when: false
+  failed_when: false  # Empty list if no pools exist; preseed task follows
 
 - name: DevTestRunner | Initialize nested Incus with preseed  # noqa: risky-shell-pipe
   ansible.builtin.shell:
@@ -137,4 +137,4 @@
   when: incus_images_import_from_host | default(false)
   register: dev_test_runner_images_nested_import
   changed_when: dev_test_runner_images_nested_import.rc == 0
-  failed_when: false
+  failed_when: false  # Image may already exist or cache may be missing; non-fatal

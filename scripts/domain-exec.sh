@@ -118,11 +118,11 @@ fi
 # ── Build incus exec command ─────────────────────────────
 
 build_exec_cmd() {
-    local exec_cmd=("incus" "exec")
+    EXEC_ARGS=("incus" "exec")
     if [[ -n "$PROJECT" ]]; then
-        exec_cmd+=("--project" "$PROJECT")
+        EXEC_ARGS+=("--project" "$PROJECT")
     fi
-    exec_cmd+=("$INSTANCE" "--" "env"
+    EXEC_ARGS+=("$INSTANCE" "--" "env"
         "ANKLUME_DOMAIN=$DOMAIN"
         "ANKLUME_TRUST_LEVEL=$TRUST_LEVEL"
         "ANKLUME_INSTANCE=$INSTANCE"
@@ -130,14 +130,13 @@ build_exec_cmd() {
         "${DISPLAY_ENV[@]}"
     )
     if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
-        exec_cmd+=("${CMD_ARGS[@]}")
+        EXEC_ARGS+=("${CMD_ARGS[@]}")
     else
-        exec_cmd+=("bash")
+        EXEC_ARGS+=("bash")
     fi
-    echo "${exec_cmd[@]}"
 }
 
-EXEC_CMD=$(build_exec_cmd)
+build_exec_cmd
 
 # ── Terminal mode ────────────────────────────────────────
 
@@ -148,16 +147,16 @@ if [[ "$TERMINAL" == "true" ]]; then
         exec foot \
             --title "$TITLE" \
             --override "colors.background=$BG_COLOR" \
-            -- bash -c "$EXEC_CMD"
+            -- "${EXEC_ARGS[@]}"
     elif command -v alacritty &>/dev/null; then
         exec alacritty \
             --title "$TITLE" \
-            -e bash -c "$EXEC_CMD"
+            -e "${EXEC_ARGS[@]}"
     elif command -v xterm &>/dev/null; then
         exec xterm \
             -title "$TITLE" \
             -bg "$BG_COLOR" \
-            -e bash -c "$EXEC_CMD"
+            -e "${EXEC_ARGS[@]}"
     else
         echo "No terminal emulator found (need foot, alacritty, or xterm)" >&2
         exit 1
@@ -166,4 +165,4 @@ fi
 
 # ── Direct mode ──────────────────────────────────────────
 
-exec $EXEC_CMD
+exec "${EXEC_ARGS[@]}"

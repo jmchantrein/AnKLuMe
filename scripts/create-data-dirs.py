@@ -26,7 +26,11 @@ def main():
                 continue
             for vname in pd:
                 source = f"{pd_base}/{dname}/{mname}/{vname}"
-                p = Path(source)
+                p = Path(source).resolve()
+                base = Path(pd_base).resolve()
+                if not str(p).startswith(str(base) + "/"):
+                    print(f"  SKIP (outside base): {source}", file=sys.stderr)
+                    continue
                 if not p.exists():
                     p.mkdir(parents=True, exist_ok=True)
                     created.append(str(p))

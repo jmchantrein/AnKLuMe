@@ -2,8 +2,11 @@
 """anklume tmux console — domain-colored panes from infra.yml."""
 
 import argparse
+import re
 import sys
 from pathlib import Path
+
+_DNS_SAFE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 
 # Add scripts/ to path for imports (same pattern as tests/conftest.py)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -67,6 +70,8 @@ def build_session_config(infra):
 
         panes = []
         for machine_name in sorted(machines.keys()):
+            if not _DNS_SAFE.match(machine_name) or not _DNS_SAFE.match(domain_name):
+                continue
             panes.append({
                 "machine": machine_name,
                 "command": f"incus exec {machine_name} --project {domain_name} -- bash",

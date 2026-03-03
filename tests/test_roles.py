@@ -356,12 +356,11 @@ class TestTemplates:
         result = template.render(
             opencode_server_port=4096,
             opencode_server_host="0.0.0.0",
-            opencode_server_password="secret123",
         )
         assert "[Unit]" in result
         assert "[Service]" in result
         assert "4096" in result
-        assert "secret123" in result
+        assert "EnvironmentFile=/etc/opencode/env" in result
         assert "opencode serve" in result
 
     def test_opencode_config_template(self):

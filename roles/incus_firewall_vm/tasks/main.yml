@@ -39,7 +39,7 @@
       - "{{ incus_firewall_vm_project }}"
   register: incus_firewall_vm_profile_check
   changed_when: false
-  failed_when: false
+  failed_when: false  # rc != 0 means profile absent; next task creates it
   check_mode: false
 
 - name: IncusFirewallVM | Create profile if missing

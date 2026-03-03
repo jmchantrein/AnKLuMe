@@ -80,9 +80,9 @@ for p in projects:
         echo "    machines:"
     } >> "$OUTPUT"
 
-    python3 -c "
+    echo "$INSTANCES" | python3 -c "
 import sys, json
-instances = json.loads('''$INSTANCES''')
+instances = json.load(sys.stdin)
 for inst in instances:
     name = inst.get('name', 'unknown')
     itype = inst.get('type', 'container')

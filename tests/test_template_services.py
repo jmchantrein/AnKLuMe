@@ -175,11 +175,10 @@ class TestOpencodeEdgeCases:
         result = template.render(
             opencode_server_port=5000,
             opencode_server_host="127.0.0.1",
-            opencode_server_password="mypass",
         )
         assert "--hostname 127.0.0.1" in result
         assert "--port 5000" in result
-        assert "OPENCODE_SERVER_PASSWORD=mypass" in result
+        assert "EnvironmentFile=/etc/opencode/env" in result
 
     def test_config_custom_model(self):
         """OpenCode config renders with custom model name."""

@@ -23,7 +23,7 @@ source "$SCRIPT_DIR/live-os-lib.sh"
 
 # ── Local constants ────────────────────────────────────────
 
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-/tmp/anklume-update}"
+DOWNLOAD_DIR="${DOWNLOAD_DIR:-$(mktemp -d /tmp/anklume-update.XXXXXXXXXX)}"
 UPDATE_TIMESTAMP="$PERSIST_MNT/update-timestamp"
 VERITY_HASHES="$PERSIST_MNT/verity-hashes"
 PREVIOUS_SLOT_STATE="$PERSIST_MNT/previous-slot"

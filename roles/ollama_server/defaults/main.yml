@@ -2,7 +2,10 @@
 # Default variables for ollama_server
 # Override in group_vars or host_vars as needed.
 
-# Ollama listen address (0.0.0.0 to allow access from other containers)
+# Ollama listen address (0.0.0.0 to allow access from other containers).
+# SECURITY: Binds to all interfaces — access is restricted by nftables
+# inter-bridge isolation (ADR-022) and network_policies in infra.yml.
+# Do NOT expose on a network without firewall rules in place.
 ollama_host: "0.0.0.0:11434"
 
 # Default model to pull after install (empty = skip)

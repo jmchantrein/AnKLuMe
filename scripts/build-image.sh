@@ -634,7 +634,7 @@ NVSRC
     # Step 4: Rebuild ALL DKMS modules for the backports kernel (ZFS, etc.)
     if [ -n "$deb_kernel" ]; then
         info "  Rebuilding all DKMS modules for kernel $deb_kernel..."
-        chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+        chroot "$ROOTFS_DIR" env PATH="$chroot_path" TMPDIR=/tmp \
             dkms autoinstall -k "$deb_kernel" 2>&1 | tail -10 || true
     fi
     # Step 5: Manually build NVIDIA DKMS module for the Debian kernel
@@ -648,9 +648,9 @@ NVSRC
             nv_ver=$(grep '^PACKAGE_VERSION=' "$dkms_conf" | cut -d= -f2 | tr -d '"')
             info "  Building NVIDIA $nv_name/$nv_ver DKMS for kernel $deb_kernel..."
             # Remove any failed auto-build first, then rebuild for the right kernel
-            chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+            chroot "$ROOTFS_DIR" env PATH="$chroot_path" TMPDIR=/tmp \
                 dkms remove -m "$nv_name" -v "$nv_ver" --all 2>&1 | tail -3 || true
-            if ! chroot "$ROOTFS_DIR" env PATH="$chroot_path" \
+            if ! chroot "$ROOTFS_DIR" env PATH="$chroot_path" TMPDIR=/tmp \
                 dkms install -m "$nv_name" -v "$nv_ver" \
                 -k "$deb_kernel" --force 2>&1 | tail -10; then
                 warn "  NVIDIA DKMS build failed — modules not prebuilt (DKMS will rebuild at boot)"
@@ -734,7 +734,7 @@ MOTD
 
     # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
     if [ -f "$ROOTFS_DIR/opt/anklume/requirements.yml" ]; then
-        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 ansible-galaxy collection install \
+        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 TMPDIR=/tmp ansible-galaxy collection install \
             -r /opt/anklume/requirements.yml 2>&1 | tail -3
         info "  Ansible Galaxy collections pre-installed"
     fi
@@ -1111,7 +1111,7 @@ FSTAB
 
     # Pre-install Ansible Galaxy collections (avoids needing make init on first boot)
     if [ -f "$ROOTFS_DIR/opt/anklume/requirements.yml" ]; then
-        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 ansible-galaxy collection install \
+        chroot "$ROOTFS_DIR" env LC_ALL=C.UTF-8 TMPDIR=/tmp ansible-galaxy collection install \
             -r /opt/anklume/requirements.yml 2>&1 | tail -3
         info "  Ansible Galaxy collections pre-installed"
     fi

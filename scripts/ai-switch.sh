@@ -66,6 +66,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$DOMAIN" ]] || die "Missing required --domain argument. See --help."
+[[ "$DOMAIN" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || die "Invalid domain name: $DOMAIN (must be DNS-safe)"
 
 # --- Resolve infra source ---
 if [[ -d "$PROJECT_DIR/infra" ]]; then

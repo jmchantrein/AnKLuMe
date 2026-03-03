@@ -11,7 +11,7 @@
       - /var/lib/dpkg/lock-frontend
   register: _dpkg_lock
   changed_when: false
-  failed_when: false
+  failed_when: false  # rc != 0 means lock is free (fuser found no process) — success condition
   check_mode: false
   retries: 30
   delay: 5

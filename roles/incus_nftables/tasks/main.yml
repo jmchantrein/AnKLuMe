@@ -54,7 +54,7 @@
              )
            | list
          ) }}
-  failed_when: false
+  failed_when: false  # Jinja2 may fail if hostvars incomplete; yields empty map safely
 
 - name: IncusNftables | Resolve network policies to bridge names
   ansible.builtin.set_fact:

@@ -101,7 +101,8 @@
       token=$(sed 's|.*://[^:]*:||;s|@.*||' /run/secrets/git-credentials | head -1)
       echo "$token" | gh auth login --with-token --hostname github.com
   changed_when: true
-  failed_when: false
+  failed_when: false  # gh auth may fail if token is expired; non-blocking for deployment
+  no_log: true
   when: _openclaw_git_creds.stat.exists
 
 # -- Agent workspace files (ADR-036) ---------------------------------------

@@ -114,7 +114,7 @@ setup_audio() {
             bind=container \
             "connect=unix:${host_path}" \
             "listen=unix:${container_path}" \
-            uid=0 gid=0 mode=0777 2>/dev/null || true
+            uid=0 gid=0 mode=0660 2>/dev/null || true
     done
 
     # shellcheck disable=SC2034  # Used by sourcing script
@@ -150,7 +150,7 @@ setup_display() {
             bind=container \
             "connect=unix:${wl_sock}" \
             "listen=unix:/tmp/wayland-0" \
-            uid=0 gid=0 mode=0777 2>/dev/null || true
+            uid=0 gid=0 mode=0660 2>/dev/null || true
     fi
 
     # X11 socket (Xwayland compatibility)
@@ -160,7 +160,7 @@ setup_display() {
             bind=container \
             "connect=unix:/tmp/.X11-unix/X0" \
             "listen=unix:/tmp/.X11-unix/X0" \
-            uid=0 gid=0 mode=0777 2>/dev/null || true
+            uid=0 gid=0 mode=0660 2>/dev/null || true
     fi
 
     # GPU device (renders via host GPU driver)

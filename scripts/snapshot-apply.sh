@@ -50,11 +50,11 @@ get_running_instances() {
 
     if [[ -n "${limit}" ]]; then
         # Get hosts for a specific group only
-        ansible-inventory -i inventory/ --list 2>/dev/null \
-            | python3 -c "
-import sys, json
+        _ANKLUME_GROUP="${limit}" ansible-inventory -i inventory/ --list 2>/dev/null \
+            | _ANKLUME_GROUP="${limit}" python3 -c "
+import sys, json, os
 data = json.load(sys.stdin)
-group = '${limit}'
+group = os.environ['_ANKLUME_GROUP']
 hosts = set()
 if group in data:
     for h in data[group].get('hosts', []):
@@ -78,23 +78,22 @@ for h in sorted(hosts):
 get_instance_project() {
     # Get the Incus project for an instance from its group_vars.
     local instance="$1"
-    python3 -c "
-import yaml, glob, sys
+    _ANKLUME_INSTANCE="$instance" python3 -c "
+import yaml, glob, sys, os
+target = os.environ['_ANKLUME_INSTANCE']
 for f in glob.glob('group_vars/*/vars.yml'):
     with open(f) as fh:
         data = yaml.safe_load(fh) or {}
         project = data.get('incus_project')
         if project:
-            # Check if this instance belongs to this group
             group = f.split('/')[1]
-            # Read inventory to check membership
             for inv in glob.glob('inventory/*.yml'):
                 with open(inv) as ih:
                     inv_data = yaml.safe_load(ih) or {}
                     for g, gdata in (inv_data.get('all', {}).get('children', {}) or {}).items():
                         if g == group:
                             hosts = (gdata or {}).get('hosts', {}) or {}
-                            if '${instance}' in hosts:
+                            if target in hosts:
                                 print(project)
                                 sys.exit(0)
 print('default')
@@ -207,11 +206,11 @@ do_rollback() {
         # Check if this snapshot exists on this instance
         local has_snap
         has_snap=$(incus snapshot list "${instance}" --project "${project}" --format json 2>/dev/null \
-            | python3 -c "
-import sys, json
+            | _ANKLUME_SNAP="${snap_name}" python3 -c "
+import sys, json, os
 snaps = json.load(sys.stdin)
 names = [s['name'] for s in snaps]
-print('yes' if '${snap_name}' in names else 'no')
+print('yes' if os.environ['_ANKLUME_SNAP'] in names else 'no')
 " 2>/dev/null || echo "no")
 
         if [[ "${has_snap}" != "yes" ]]; then

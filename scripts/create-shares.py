@@ -27,7 +27,11 @@ def main():
         if not isinstance(vconfig, dict):
             continue
         source = vconfig.get("source") or f"{sv_base}/{vname}"
-        p = Path(source)
+        p = Path(source).resolve()
+        base = Path(sv_base).resolve()
+        if not str(p).startswith(str(base) + "/") and p != base:
+            print(f"  SKIP (outside base): {source}", file=sys.stderr)
+            continue
         if not p.exists():
             p.mkdir(parents=True, exist_ok=True)
             created.append(str(p))

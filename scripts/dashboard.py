@@ -18,6 +18,7 @@ Phase 21: Desktop Integration
 """
 
 import argparse
+import html
 import json
 import subprocess
 import sys
@@ -176,23 +177,29 @@ def render_status_html(status):
         parts.append('<div class="grid">')
         for inst in sorted(status["instances"], key=lambda x: (x["domain"], x["name"])):
             status_class = "running" if inst["status"] == "Running" else "stopped"
-            border_color = inst.get("colors", {}).get("border", "#30363d")
-            badge_bg = inst.get("colors", {}).get("border", "#30363d")
-            trust = inst.get("trust_level", "")
+            border_color = html.escape(inst.get("colors", {}).get("border", "#30363d"))
+            badge_bg = html.escape(inst.get("colors", {}).get("border", "#30363d"))
+            trust = html.escape(inst.get("trust_level", ""))
+            name = html.escape(inst["name"])
+            domain = html.escape(inst.get("domain", ""))
+            ip = html.escape(inst["ip"] or "no IP")
+            itype = html.escape(inst["type"])
+            istatus = html.escape(inst["status"])
+            project = html.escape(inst["project"])
             parts.append(
                 f'<div class="card" style="border-left: 4px solid {border_color}">'
                 f'<div><span class="status {status_class}"></span>'
-                f'<span class="name">{inst["name"]}</span>'
+                f'<span class="name">{name}</span>'
             )
             if trust:
                 parts.append(
                     f'<span class="domain-badge" style="background:{badge_bg};color:#fff">'
-                    f'{inst["domain"]}</span>'
+                    f'{domain}</span>'
                 )
             parts.append("</div>")
             parts.append(
-                f'<div class="meta">{inst["type"]} | {inst["status"]} | '
-                f'{inst["ip"] or "no IP"} | project: {inst["project"]}</div>'
+                f'<div class="meta">{itype} | {istatus} | '
+                f'{ip} | project: {project}</div>'
             )
             parts.append("</div>")
         parts.append("</div>")
@@ -204,10 +211,11 @@ def render_status_html(status):
     if status["networks"]:
         parts.append('<div class="grid">')
         for net in status["networks"]:
-            subnet = net.get("config", {}).get("ipv4.address", "")
+            subnet = html.escape(net.get("config", {}).get("ipv4.address", ""))
+            net_name = html.escape(net["name"])
             parts.append(
                 f'<div class="card net-card">'
-                f'<span class="name">{net["name"]}</span>'
+                f'<span class="name">{net_name}</span>'
                 f'<span class="meta">{subnet}</span>'
                 f"</div>"
             )
@@ -220,12 +228,14 @@ def render_status_html(status):
     policies = status.get("policies", [])
     if policies:
         for pol in policies:
-            desc = pol.get("description", "")
-            src = pol.get("from", "?")
-            dst = pol.get("to", "?")
+            desc = html.escape(str(pol.get("description", "")))
+            src = html.escape(str(pol.get("from", "?")))
+            dst = html.escape(str(pol.get("to", "?")))
             ports = pol.get("ports", "all")
             if isinstance(ports, list):
-                ports = ", ".join(str(p) for p in ports)
+                ports = html.escape(", ".join(str(p) for p in ports))
+            else:
+                ports = html.escape(str(ports))
             parts.append(
                 f'<div class="policy">'
                 f'{desc}: <strong>{src}</strong>'
@@ -242,6 +252,18 @@ def render_status_html(status):
 # ── FastAPI application ──────────────────────────────────────────
 
 app = FastAPI(title="anklume Dashboard")
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'"
+    )
+    return response
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -264,8 +286,13 @@ async def api_html():
 
 @app.get("/api/infra")
 async def api_infra():
-    """Return parsed infra.yml as JSON."""
-    return load_infra_yml()
+    """Return parsed infra.yml as JSON (localhost only — no auth)."""
+    infra = load_infra_yml()
+    # Strip sensitive fields before exposing
+    for _dname, dconf in infra.get("domains", {}).items():
+        for _mname, mconf in (dconf.get("machines") or {}).items():
+            mconf.pop("config", None)
+    return infra
 
 
 # ── Entry point ──────────────────────────────────────────────────

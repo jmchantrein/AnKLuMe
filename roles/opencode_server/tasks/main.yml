@@ -15,6 +15,14 @@
 #   - opencode_server_model (string): default model name
 #   - opencode_server_password (string): HTTP Basic Auth password
 
+- name: OpencodeServer | Validate password is set
+  ansible.builtin.assert:
+    that:
+      - opencode_server_password | length > 0
+    fail_msg: >-
+      opencode_server_password must be set in host_vars or group_vars.
+      Using an empty or default password is a security risk.
+
 - name: OpencodeServer | Install Node.js
   ansible.builtin.include_tasks:
     file: roles/_shared/tasks/nodejs.yml
@@ -44,6 +52,20 @@
     src: opencode-config.json.j2
     dest: /root/.config/opencode/config.json
     mode: "0644"
+  notify: OpencodeServer | Restart OpenCode
+
+- name: OpencodeServer | Create environment directory
+  ansible.builtin.file:
+    path: /etc/opencode
+    state: directory
+    mode: "0700"
+
+- name: OpencodeServer | Deploy environment file with password
+  ansible.builtin.copy:
+    content: "OPENCODE_SERVER_PASSWORD={{ opencode_server_password }}\n"
+    dest: /etc/opencode/env
+    mode: "0600"
+  no_log: true
   notify: OpencodeServer | Restart OpenCode
 
 - name: OpencodeServer | Deploy systemd service

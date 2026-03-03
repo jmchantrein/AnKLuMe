@@ -354,11 +354,11 @@ setup_zfs_pool() {
 
     if [[ "$LUKS_ENABLED" == "true" ]]; then
         info "Formatting and encrypting $DISK with LUKS..."
-        cryptsetup luksFormat --batch-mode "$DISK" <<<"$LUKS_PASSWORD" || \
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup luksFormat --batch-mode --key-file - "$DISK" || \
             die "Failed to create LUKS volume on $DISK"
 
         info "Opening LUKS volume..."
-        cryptsetup luksOpen "$DISK" "$LUKS_NAME" <<<"$LUKS_PASSWORD" || \
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup luksOpen --key-file - "$DISK" "$LUKS_NAME" || \
             die "Failed to open LUKS volume"
 
         pool_device="/dev/mapper/$LUKS_NAME"
@@ -399,11 +399,11 @@ setup_btrfs_pool() {
 
     if [[ "$LUKS_ENABLED" == "true" ]]; then
         info "Formatting and encrypting $DISK with LUKS..."
-        cryptsetup luksFormat --batch-mode "$DISK" <<<"$LUKS_PASSWORD" || \
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup luksFormat --batch-mode --key-file - "$DISK" || \
             die "Failed to create LUKS volume on $DISK"
 
         info "Opening LUKS volume..."
-        cryptsetup luksOpen "$DISK" "$LUKS_NAME" <<<"$LUKS_PASSWORD" || \
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup luksOpen --key-file - "$DISK" "$LUKS_NAME" || \
             die "Failed to open LUKS volume"
 
         pool_device="/dev/mapper/$LUKS_NAME"

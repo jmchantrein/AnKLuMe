@@ -104,7 +104,7 @@
   register: incus_instances_agent_check
   changed_when: false
   check_mode: false  # Safe: read-only probe
-  failed_when: false
+  failed_when: false  # Retried via until; agent may not be ready yet
   until: incus_instances_agent_check.rc == 0
   retries: "{{ incus_instances_vm_agent_retries }}"
   delay: "{{ incus_instances_vm_agent_delay }}"

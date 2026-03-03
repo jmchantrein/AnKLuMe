@@ -369,3 +369,73 @@ class TestMCPPolicy:
         assert result.returncode == 0
         assert "authorized" in result.stdout.lower()
 
+
+# ── MCP Server Security ──────────────────────────────────────────────
+
+
+@pytest.mark.skipif(not _HAS_MCP_SDK, reason="MCP SDK not installed")
+class TestMCPServerSecurity:
+    """Security tests for path traversal and input validation."""
+
+    def test_safe_portal_path_rejects_traversal(self):
+        """_safe_portal_path blocks directory traversal."""
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import importlib.util; "
+             f"spec = importlib.util.spec_from_file_location('m', '{MCP_SERVER}'); "
+             "mod = importlib.util.module_from_spec(spec); "
+             "spec.loader.exec_module(mod); "
+             "r = mod._safe_portal_path('../../etc/passwd'); "
+             "print('BLOCKED' if r is None else r)"],
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0
+        assert "BLOCKED" in result.stdout
+
+    def test_safe_portal_path_allows_normal(self):
+        """_safe_portal_path allows paths within the portal."""
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import importlib.util, os; "
+             f"spec = importlib.util.spec_from_file_location('m', '{MCP_SERVER}'); "
+             "mod = importlib.util.module_from_spec(spec); "
+             "spec.loader.exec_module(mod); "
+             "r = mod._safe_portal_path('subdir/file.txt'); "
+             "print('OK' if r and r.startswith(mod.MCP_PORTAL_DIR) else 'FAIL')"],
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0
+        assert "OK" in result.stdout
+
+    def test_file_accept_rejects_absolute_path(self):
+        """file_accept refuses absolute paths outside portal."""
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import importlib.util, base64; "
+             f"spec = importlib.util.spec_from_file_location('m', '{MCP_SERVER}'); "
+             "mod = importlib.util.module_from_spec(spec); "
+             "spec.loader.exec_module(mod); "
+             "r = mod.file_accept('/etc/crontab', base64.b64encode(b'x').decode()); "
+             "print(r)"],
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0
+        assert "ERROR" in result.stdout
+        assert "escapes" in result.stdout
+
+    def test_file_accept_rejects_setuid_mode(self):
+        """file_accept refuses setuid/setgid mode bits."""
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import importlib.util, base64; "
+             f"spec = importlib.util.spec_from_file_location('m', '{MCP_SERVER}'); "
+             "mod = importlib.util.module_from_spec(spec); "
+             "spec.loader.exec_module(mod); "
+             "r = mod.file_accept('test.sh', base64.b64encode(b'x').decode(), '4755'); "
+             "print(r)"],
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0
+        assert "ERROR" in result.stdout
+        assert "special bits" in result.stdout
+

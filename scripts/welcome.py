@@ -221,7 +221,8 @@ def do_persistence(s: dict) -> None:
     answer = input(f"  {s['persist_confirm']} [{s['yes']}/n] ").strip().lower()
     if answer in (s["yes"], "y", "o", ""):
         print(f"  {s['persist_running']}")
-        rc = os.system(f"sudo {fb}")
+        result = subprocess.run(["sudo", str(fb)], check=False)
+        rc = result.returncode
         if rc == 0:
             print(f"  {s['persist_success']}")
         else:

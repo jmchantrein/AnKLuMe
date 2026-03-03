@@ -92,13 +92,13 @@ Workflow:
     log "Task: ${task}"
     log "Branch: feature/${branch_slug}"
 
-    incus exec "$RUNNER_NAME" --project "$RUNNER_PROJECT" -- \
-        bash -c "
+    printf '%s' "$prompt" | incus exec "$RUNNER_NAME" --project "$RUNNER_PROJECT" -- \
+        bash -c '
             source /root/.anthropic_key 2>/dev/null || true
-            cd ${REPO_DIR}
+            cd '"${REPO_DIR}"'
             git fetch origin && git pull origin main || true
-            claude -p '${prompt}' --dangerously-skip-permissions
-        " 2>&1 | tee -a "$SESSION_LOG"
+            claude -p "$(cat /dev/stdin)" --dangerously-skip-permissions
+        ' 2>&1 | tee -a "$SESSION_LOG"
 
     log "Development session complete"
 }

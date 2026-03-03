@@ -25,7 +25,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="/tmp/anklume-test-report"
+OUTPUT_DIR=""
 SUITE_FILTER=""
 
 # ── Argument parsing ──────────────────────────────────────
@@ -41,6 +41,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Use mktemp for default to avoid predictable /tmp paths
+if [[ -z "$OUTPUT_DIR" ]]; then
+    OUTPUT_DIR=$(mktemp -d /tmp/anklume-test-report.XXXXXXXXXX)
+fi
 mkdir -p "$OUTPUT_DIR"
 
 PROGRESS_FILE="$OUTPUT_DIR/progress.json"

@@ -39,6 +39,19 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator:
 app = FastAPI(title="anklume Learn", lifespan=lifespan)
 app.include_router(ws_router)
 
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:*"
+    )
+    return response
+
 _sections = load_guide_sections()
 _guide = _sections[0]
 

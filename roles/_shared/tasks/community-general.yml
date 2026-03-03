@@ -13,7 +13,7 @@
       - community.general
   register: _collection_check
   changed_when: false
-  failed_when: false
+  failed_when: false  # rc != 0 means collection absent; next task installs it
 
 - name: Install community.general collection
   ansible.builtin.command:

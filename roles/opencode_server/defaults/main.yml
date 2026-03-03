@@ -17,8 +17,8 @@ opencode_server_ollama_url: "http://localhost:11434/v1"
 # Default model to use
 opencode_server_model: "qwen2.5-coder:32b"
 
-# HTTP Basic Auth password (required for server mode)
-opencode_server_password: "opencode"
+# HTTP Basic Auth password (REQUIRED — must be overridden in host/group vars)
+opencode_server_password: ""
 
 # Enable and start the systemd service
 opencode_server_enabled: true

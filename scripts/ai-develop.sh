@@ -84,8 +84,8 @@ Use YAML best practices, FQCN for Ansible modules, and follow DRY/KISS."
     local response_file="${AI_LOG_DIR}/${_ai_session_id}-develop-response.txt"
 
     ai_log "Querying Ollama for development task..."
-    if ! curl -sf "${AI_OLLAMA_URL}/api/generate" \
-        -d "$(python3 -c "import json; print(json.dumps({'model':'${AI_OLLAMA_MODEL}','prompt':'''${prompt}''','stream':False}))")" \
+    if ! printf '%s' "$prompt" | python3 -c "import json,sys; print(json.dumps({'model':'${AI_OLLAMA_MODEL}','prompt':sys.stdin.read(),'stream':False}))" \
+        | curl -sf "${AI_OLLAMA_URL}/api/generate" -d @- \
         | python3 -c "import json,sys; print(json.load(sys.stdin)['response'])" \
         > "$response_file" 2>/dev/null; then
         ai_log "ERROR: Ollama query failed"
@@ -169,12 +169,12 @@ Format: filename followed by content in a code block."
 
     ai_log "Querying Claude API for development task..."
     local payload
-    payload="$(python3 -c "
-import json
+    payload="$(printf '%s' "$prompt" | python3 -c "
+import json, sys
 print(json.dumps({
     'model': 'claude-sonnet-4-5-20250929',
     'max_tokens': 8192,
-    'messages': [{'role': 'user', 'content': '''${prompt}'''}]
+    'messages': [{'role': 'user', 'content': sys.stdin.read()}]
 }))
 ")"
 

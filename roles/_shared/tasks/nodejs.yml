@@ -6,9 +6,16 @@
 #        vars:
 #          _nodejs_version: "{{ my_role_node_version }}"
 
-- name: Install Node.js repository  # noqa: command-instead-of-module risky-shell-pipe
-  ansible.builtin.shell:
-    cmd: "curl -fsSL https://deb.nodesource.com/setup_{{ _nodejs_version }}.x | bash -"
+- name: Download NodeSource setup script
+  ansible.builtin.get_url:
+    url: "https://deb.nodesource.com/setup_{{ _nodejs_version }}.x"
+    dest: /tmp/nodesource-setup.sh
+    mode: "0755"
+    force: false
+
+- name: Install Node.js repository  # noqa: command-instead-of-module
+  ansible.builtin.command:
+    cmd: bash /tmp/nodesource-setup.sh
     creates: /etc/apt/sources.list.d/nodesource.list
   changed_when: true
 

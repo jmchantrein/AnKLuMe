@@ -85,6 +85,12 @@ cmd_check() {
         _advance_step "$lab_dir" "$lab_id" "$lab_yml" "$current_step" "$total_steps"
         return 0
     fi
+    # Validation commands come from lab.yml (trusted, part of the repo).
+    # Reject commands with obvious shell injection patterns as defense-in-depth.
+    if [[ "$validation" =~ (rm -rf|mkfs|dd if=|curl.*\|.*sh) ]]; then
+        echo -e "${RED}BLOCKED${RESET} - Suspicious validation command: $validation"
+        return 1
+    fi
     echo -e "${DIM}Running: $validation${RESET}"
     if bash -c "$validation" 2>/dev/null; then
         echo -e "${GREEN}PASS${RESET} - Step $((current_step + 1)) validated."

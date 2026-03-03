@@ -2,6 +2,9 @@
 
 Relays I/O between xterm.js (browser) and a PTY session managed by
 PtyManager. Supports text I/O and JSON control messages (resize).
+
+Security: connections are restricted to localhost origins only.
+Session IDs are validated to prevent path injection.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -19,10 +23,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 manager = PtyManager(max_sessions=4, idle_timeout=1800)
 
+# Allowed origins — only localhost connections.
+_ALLOWED_ORIGINS = re.compile(
+    r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+)
+
+# Session IDs: alphanumeric + hyphen, max 64 chars.
+_VALID_SESSION_ID = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
 
 @router.websocket("/ws/terminal/{session_id}")
 async def terminal_ws(ws: WebSocket, session_id: str) -> None:
     """Bidirectional WebSocket relay between xterm.js and a PTY."""
+    # Validate session ID format
+    if not _VALID_SESSION_ID.match(session_id):
+        await ws.close(code=1008, reason="Invalid session ID")
+        return
+
+    # Origin check — reject non-localhost connections
+    origin = ws.headers.get("origin", "")
+    if origin and not _ALLOWED_ORIGINS.match(origin):
+        await ws.close(code=1008, reason="Forbidden origin")
+        return
+
     await ws.accept()
     try:
         session = manager.create(session_id)

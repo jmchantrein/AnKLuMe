@@ -178,7 +178,7 @@
   ansible.builtin.command:
     cmd: >-
       incus profile device add {{ item.profile }} {{ item.device }} {{ item.config.type }}
-      {% for k, v in item.config.items() if k != 'type' %}{{ k }}={{ v }} {% endfor %}
+      {% for k, v in item.config.items() if k != 'type' %}'{{ k }}={{ v }}' {% endfor %}
       --project {{ incus_project }}
   loop: "{{ incus_profiles_flat_devices | default([]) }}"
   loop_control:

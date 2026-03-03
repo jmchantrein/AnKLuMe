@@ -55,18 +55,31 @@ def card(title: str, content: str, border_color: str | None = None) -> str:
 
 def nav_bar(items: list[tuple[str, str]]) -> str:
     """Render a navigation bar from (label, href) pairs."""
-    links = " ".join(f'<a href="{href}">{html.escape(label)}</a>' for label, href in items)
+    links = " ".join(f'<a href="{html.escape(href)}">{html.escape(label)}</a>' for label, href in items)
     return f'<div class="nav">{links}</div>'
+
+
+def _js_string_escape(s: str) -> str:
+    """Escape a string for safe embedding inside a JS single-quoted literal."""
+    s = s.replace("\\", "\\\\")
+    s = s.replace("'", "\\'")
+    s = s.replace('"', '\\"')
+    s = s.replace("\n", "\\n")
+    s = s.replace("\r", "\\r")
+    return s
 
 
 def command_block(cmd: str, *, clickable: bool = False) -> str:
     """Render a styled command block with optional run button."""
     escaped = html.escape(cmd)
     if clickable:
+        # JS context: escape for single-quoted JS string, then HTML-escape
+        # the full attribute value to prevent breaking out of onclick="..."
+        js_safe = html.escape(_js_string_escape(cmd))
         return (
             f'<div class="cmd-block">'
             f"<code>{escaped}</code>"
-            f'<button class="run-btn" onclick="runCmd(\'{escaped}\')">&#9654;</button>'
+            f'<button class="run-btn" onclick="runCmd(\'{js_safe}\')">&#9654;</button>'
             f"</div>"
         )
     return f'<pre class="terminal">$ {escaped}</pre>'

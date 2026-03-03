@@ -184,12 +184,21 @@ cmd_export() {
     safe_app=$(echo "$APP" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]-' '-' | sed 's/-$//')
     local desktop_file="${DESKTOP_DIR}/anklume-${domain}-${safe_app}.desktop"
 
+    # Sanitize orig_exec: strip desktop entry field codes (%f, %F, %u, etc.)
+    # and reject suspicious shell metacharacters from the container
+    local sanitized_exec
+    sanitized_exec=$(echo "$orig_exec" | sed 's/%[fFuUdDnNickvm]//g')
+    if [[ "$sanitized_exec" =~ [\;\`\$\(] ]]; then
+        domlib_err "Exec= line contains suspicious characters: $sanitized_exec"
+        exit 1
+    fi
+
     # Build the wrapper Exec line using domain-exec.sh --gui
     local wrapper_exec="${SCRIPT_DIR}/domain-exec.sh ${INSTANCE}"
     if [[ -n "$PROJECT" ]]; then
         wrapper_exec+=" --project ${PROJECT}"
     fi
-    wrapper_exec+=" --gui -- ${orig_exec}"
+    wrapper_exec+=" --gui -- ${sanitized_exec}"
 
     # Write the new .desktop file
     {

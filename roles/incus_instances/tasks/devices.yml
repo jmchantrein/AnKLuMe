@@ -69,7 +69,7 @@
     cmd: >-
       incus config device add
       {{ instance_name }} {{ item.key }} {{ item.value.type }}
-      {% for k, v in item.value.items() if k != 'type' %}{{ k }}={{ v }} {% endfor %}
+      {% for k, v in item.value.items() if k != 'type' %}'{{ k }}={{ v }}' {% endfor %}
       --project {{ instance_domain }}
   loop: "{{ (instance_devices | default({})) | dict2items }}"
   loop_control:

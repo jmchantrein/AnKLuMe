@@ -204,16 +204,16 @@ setup_container_devices() {
 provision_container() {
     local container_name="${1:-anklume-instance}"
     local project="${2:-default}"
-    local exec_cmd="incus exec $container_name --project $project --"
+    local exec_cmd=("incus" "exec" "$container_name" "--project" "$project" "--")
 
     info "Provisioning container $container_name..."
-    $exec_cmd apt-get update -qq
-    $exec_cmd apt-get install -y -qq \
+    "${exec_cmd[@]}" apt-get update -qq
+    "${exec_cmd[@]}" apt-get install -y -qq \
         python3 python3-pip python3-yaml ansible \
         git jq curl ca-certificates make tmux
 
     # Install pip dependencies (PEP 668 on Debian 13)
-    $exec_cmd pip install --break-system-packages pyyaml libtmux 2>/dev/null || true
+    "${exec_cmd[@]}" pip install --break-system-packages pyyaml libtmux 2>/dev/null || true
 
     ok "Container provisioned"
 }
@@ -229,11 +229,11 @@ first_apply() {
         return 0
     fi
 
-    local exec_cmd="incus exec $container_name --project $project --"
+    local exec_cmd=("incus" "exec" "$container_name" "--project" "$project" "--")
 
-    if $exec_cmd test -f /root/anklume/Makefile 2>/dev/null; then
+    if "${exec_cmd[@]}" test -f /root/anklume/Makefile 2>/dev/null; then
         info "Running first apply (make sync && make apply)..."
-        $exec_cmd bash -c "cd /root/anklume && make sync && make apply"
+        "${exec_cmd[@]}" bash -c "cd /root/anklume && make sync && make apply"
         ok "First apply completed"
     else
         warn "Makefile not found — skipping first apply"

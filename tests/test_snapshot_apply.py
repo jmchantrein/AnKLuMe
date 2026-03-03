@@ -107,19 +107,19 @@ if echo "$code" | grep -q "hostvars"; then
 elif echo "$code" | grep -q "import yaml"; then
     # get_instance_project — NOT piped, no stdin to drain
     echo "default"
-elif echo "$code" | grep -q "group = '"; then
-    # get_running_instances (filtered) — piped from ansible-inventory
+elif echo "$code" | grep -q "_ANKLUME_GROUP"; then
+    # get_running_instances (filtered) — reads group from env var (H5 security fix)
     cat > /dev/null 2>&1 || true
-    group_name=$(echo "$code" | grep "group = '" | head -1 | sed "s/.*group = '\\([^']*\\)'.*/\\1/")
+    group_name="${_ANKLUME_GROUP:-}"
     case "$group_name" in
         homelab) echo "app-server" ;;
         webservers) echo "web-frontend" ;;
         *) ;;
     esac
-elif echo "$code" | grep -q "in names"; then
-    # Snapshot existence check in rollback — piped from incus snapshot list
-    snap_name=$(echo "$code" | sed -n "s/.*'\\([^']*\\)' in names.*/\\1/p" | head -1)
+elif echo "$code" | grep -q "_ANKLUME_SNAP"; then
+    # Snapshot existence check in rollback — reads snap name from env var (H5 security fix)
     json_input=$(cat)
+    snap_name="${_ANKLUME_SNAP:-}"
     if echo "$json_input" | grep -q "\\"name\\":\\"${snap_name}\\""; then
         echo "yes"
     else

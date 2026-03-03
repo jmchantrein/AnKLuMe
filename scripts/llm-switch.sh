@@ -79,6 +79,14 @@ write_llama_service() {
     local blob_path="$1"
     local model_alias="$2"
 
+    # Validate inputs to prevent systemd unit injection
+    if [[ ! "$blob_path" =~ ^/[a-zA-Z0-9_./-]+$ ]]; then
+        echo "ERROR: Invalid blob path: $blob_path" >&2; return 1
+    fi
+    if [[ ! "$model_alias" =~ ^[a-zA-Z0-9._:/-]+$ ]]; then
+        echo "ERROR: Invalid model alias: $model_alias" >&2; return 1
+    fi
+
     _exec bash -c "cat > /etc/systemd/system/llama-server.service" <<EOF
 [Unit]
 Description=llama.cpp inference server (GPU) — ${model_alias}

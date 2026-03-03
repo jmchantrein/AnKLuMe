@@ -23,7 +23,7 @@ table inet anklume {
 {% if incus_nftables_resolved_policies | default([]) | length > 0 %}
         # Network policies (ADR-021): selective cross-domain accept rules
 {% for rule in incus_nftables_resolved_policies %}
-        # {{ rule.description }}
+        # {{ rule.description | replace('\n', ' ') | replace('\r', '') | regex_replace('[^a-zA-Z0-9 _.,:;/<>()@#+-]', '') }}
 {% if rule.ports == 'all' %}
         iifname "{{ rule.from_bridge }}" oifname "{{ rule.to_bridge }}" accept
 {% else %}

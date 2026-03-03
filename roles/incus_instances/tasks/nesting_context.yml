@@ -13,25 +13,25 @@
   ansible.builtin.slurp:
     src: /etc/anklume/absolute_level
   register: incus_instances_parent_abs
-  failed_when: false
+  failed_when: false  # File absent on non-nested host; defaults applied below
 
 - name: IncusInstances | Read parent relative_level
   ansible.builtin.slurp:
     src: /etc/anklume/relative_level
   register: incus_instances_parent_rel
-  failed_when: false
+  failed_when: false  # File absent on non-nested host; defaults applied below
 
 - name: IncusInstances | Read parent vm_nested
   ansible.builtin.slurp:
     src: /etc/anklume/vm_nested
   register: incus_instances_parent_vm_nested
-  failed_when: false
+  failed_when: false  # File absent on non-nested host; defaults applied below
 
 - name: IncusInstances | Read parent yolo
   ansible.builtin.slurp:
     src: /etc/anklume/yolo
   register: incus_instances_parent_yolo
-  failed_when: false
+  failed_when: false  # File absent on non-nested host; defaults applied below
 
 - name: IncusInstances | Compute child nesting context
   ansible.builtin.set_fact:
@@ -62,7 +62,7 @@
       - /etc/anklume
   register: _incus_instances_anklume_dir_check
   changed_when: false
-  failed_when: false
+  failed_when: false  # rc != 0 means directory absent; next task creates it
   when: incus_instances_child_abs is defined
 
 - name: IncusInstances | Create /etc/anklume in child instance
@@ -99,10 +99,11 @@
   when: incus_instances_child_abs is defined
 
 - name: IncusInstances | Write child context files
-  ansible.builtin.command:
+  ansible.builtin.shell:
     cmd: >-
-      incus exec {{ instance_name }} --project {{ instance_domain }}
-      -- bash -c 'echo "{{ item.item.value }}" > /etc/anklume/{{ item.item.key }}'
+      printf '%s\n' '{{ item.item.value | regex_replace("'", "") }}' |
+      incus file push - {{ instance_name }}/etc/anklume/{{ item.item.key }}
+      --project {{ instance_domain }}
   loop: "{{ _incus_instances_child_context_current.results | default([]) }}"
   loop_control:
     label: "{{ item.item.key }}={{ item.item.value | trim }}"
