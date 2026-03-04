@@ -1,4 +1,5 @@
 # Matrix: SV-001 to SV-004
+@requires.generator
 Feature: Shared Volumes — declarative cross-domain data sharing
 
   Scenario: Shared volume generates sv- prefixed devices

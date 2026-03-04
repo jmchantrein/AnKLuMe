@@ -5,7 +5,15 @@ and learning platform. Extracted from dashboard.py and the former guide-server.p
 to eliminate duplication.
 """
 
-from scripts.colors import resolve_colors
+import sys
+from pathlib import Path
+
+# Ensure scripts/ is in sys.path (when imported from dashboard.py or other scripts)
+_scripts_dir = str(Path(__file__).resolve().parent.parent)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+
+from colors import resolve_colors  # noqa: E402
 
 # ── Base CSS (shared across all web apps) ───────────────────
 

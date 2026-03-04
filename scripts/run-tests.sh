@@ -106,11 +106,11 @@ PRESEED
         git config --global user.email 'runner@anklume.local'
 
         # Clone or update repo
-        if [ -d "${REPO_DIR}" ]; then
-            cd "${REPO_DIR}" && git fetch origin && git checkout "${REPO_BRANCH}" \
-                && git pull origin "${REPO_BRANCH}" || true
+        if [ -d \"${REPO_DIR}\" ]; then
+            cd \"${REPO_DIR}\" && git fetch origin && git checkout \"${REPO_BRANCH}\" \
+                && git pull origin \"${REPO_BRANCH}\" || true
         else
-            git clone -q -b "${REPO_BRANCH}" "${REPO_URL}" "${REPO_DIR}"
+            git clone -q -b \"${REPO_BRANCH}\" \"${REPO_URL}\" \"${REPO_DIR}\"
         fi
 
         echo '=== Runner provisioned ==='

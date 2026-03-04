@@ -1,4 +1,5 @@
 # Matrix: EL-001, BA-001, BA-002
+@requires.generator
 Feature: Ephemeral Policy and Boot Configuration
 
   Scenario: Ephemeral flag validates as boolean

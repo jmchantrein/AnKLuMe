@@ -1,3 +1,4 @@
+@requires.web_html
 Feature: HTML helpers
   String builders for HTML pages, cards, command blocks, navigation,
   and minimal markdown rendering. No template engine.

@@ -101,9 +101,11 @@
 - name: IncusInstances | Write child context files
   ansible.builtin.shell:
     cmd: >-
+      set -o pipefail &&
       printf '%s\n' '{{ item.item.value | regex_replace("'", "") }}' |
       incus file push - {{ instance_name }}/etc/anklume/{{ item.item.key }}
       --project {{ instance_domain }}
+    executable: /bin/bash
   loop: "{{ _incus_instances_child_context_current.results | default([]) }}"
   loop_control:
     label: "{{ item.item.key }}={{ item.item.value | trim }}"

@@ -92,6 +92,10 @@ def accessibility(
         bool | None,
         typer.Option("--dyslexia/--no-dyslexia", help="Enable/disable dyslexia-friendly mode"),
     ] = None,
+    font_size: Annotated[
+        int | None,
+        typer.Option("--font-size", help="Terminal font size (8-72)"),
+    ] = None,
     show: Annotated[
         bool,
         typer.Option("--show", help="Show current accessibility settings"),
@@ -102,7 +106,7 @@ def accessibility(
 
     settings = load_accessibility()
 
-    if show or (palette is None and tmux_coloring is None and dyslexia is None):
+    if show or (palette is None and tmux_coloring is None and dyslexia is None and font_size is None):
         console.print("[bold]Accessibility settings:[/bold]")
         console.print(f"  Palette: [cyan]{settings['color_palette']}[/cyan]")
         console.print(f"  Tmux coloring: [cyan]{settings['tmux_coloring']}[/cyan]")
@@ -124,6 +128,12 @@ def accessibility(
 
     if dyslexia is not None:
         settings["dyslexia_mode"] = dyslexia
+
+    if font_size is not None:
+        if not 8 <= font_size <= 72:
+            console.print("[red]Font size must be 8-72.[/red]")
+            raise typer.Exit(1)
+        settings["font_size"] = font_size
 
     save_accessibility(settings)
     console.print("[green]Accessibility settings updated.[/green]")

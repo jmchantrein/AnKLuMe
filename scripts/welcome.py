@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""anklume Welcome Guide — French-first bilingual first-boot wizard."""
+"""anklume Welcome Guide — French-first bilingual start wizard."""
 
 from __future__ import annotations
 
@@ -12,13 +12,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "cli"))
 
-from cli._helpers import is_live_os  # noqa: E402
+from _helpers import is_live_os  # noqa: E402
 from welcome_strings import STRINGS  # noqa: E402
 
 WELCOME_DONE = Path.home() / ".anklume" / "welcome-done"
 POOL_CONF = Path("/mnt/anklume-persist/pool.conf")
-FIRST_BOOT = Path("/opt/anklume/scripts/first-boot.sh")
+START_SCRIPT = Path("/opt/anklume/scripts/start.sh")
 BASE = Path("/opt/anklume/host/boot/desktop")
 BASE_DEV = Path(__file__).resolve().parent.parent / "host/boot/desktop"
 # Project root for explore mode
@@ -92,6 +93,17 @@ KEYBOARD_LAYOUTS = [
 ]
 
 
+def _box_prompt(label: str) -> str:
+    """Wrap a label in a Unicode box-drawing frame for plain text prompts."""
+    pad = len(label) + 4
+    bar = "\u2500" * pad
+    return (
+        f"  \u250c{bar}\u2510\n"
+        f"  \u2502  {label}  \u2502\n"
+        f"  \u2514{bar}\u2518"
+    )
+
+
 def do_keyboard(s: dict) -> None:
     """Let the user choose a keyboard layout."""
     if not is_live_os():
@@ -104,7 +116,11 @@ def do_keyboard(s: dict) -> None:
     print()
 
     while True:
-        choice = input(f"  {s['keyboard_choice']} [1-{len(KEYBOARD_LAYOUTS)}]: ").strip()
+        choice = input(
+            f"  {s['keyboard_choice']} [1-{len(KEYBOARD_LAYOUTS)}, default=1]: "
+        ).strip()
+        if not choice:
+            choice = "1"
         if choice.isdigit() and 1 <= int(choice) <= len(KEYBOARD_LAYOUTS):
             break
         print(f"  (1-{len(KEYBOARD_LAYOUTS)})")
@@ -211,12 +227,21 @@ def do_explore(s: dict) -> None:
 
 
 def do_persistence(s: dict) -> None:
-    fb = FIRST_BOOT if FIRST_BOOT.exists() else Path("scripts/first-boot.sh")
+    fb = START_SCRIPT if START_SCRIPT.exists() else Path("scripts/start.sh")
     if not fb.exists():
         return print(f"  {s['persist_no_script']}")
     found, disk_output = has_extra_disks()
     if not found:
-        return print(f"  {s['persist_no_disk']}")
+        print(f"  {s['persist_no_disk']}")
+        if "persist_no_disk_explain" in s:
+            print(f"  {s['persist_no_disk_explain']}")
+        if "persist_fallback_explore" in s:
+            fallback = input(
+                f"  {s['persist_fallback_explore']} [{s['yes']}/n] "
+            ).strip().lower()
+            if fallback in (s["yes"], "y", "o", ""):
+                do_explore(s)
+        return
     print(f"  {s['disks']}\n{disk_output}\n")
     answer = input(f"  {s['persist_confirm']} [{s['yes']}/n] ").strip().lower()
     if answer in (s["yes"], "y", "o", ""):
@@ -263,6 +288,7 @@ def tui_main() -> None:
     lang = detect_lang()
     s, c = STRINGS[lang], Console()
     # Page 1: Welcome
+    c.clear()
     txt = Text()
     for line in BANNER.splitlines(keepends=True):
         txt.append(line, style="bold magenta")
@@ -272,11 +298,12 @@ def tui_main() -> None:
         c.print(Panel(f"[italic]{quote}[/italic]", border_style="dim"))
     c.print(f"\n[bold cyan]{s['welcome_title']}[/bold cyan]\n")
     c.print(s["welcome_what"])
-    input(f"\n  [{s['start']}] ")
+    c.print(Panel(f"[bold cyan]{s['start']}[/bold cyan]", style="cyan"))
+    input()
     # Page 1b: Keyboard layout (live OS only)
     do_keyboard(s)
-    c.clear()
     # Page 2: Situation
+    c.clear()
     c.print(f"\n[bold cyan]{s['situation_title']}[/bold cyan]\n")
     if POOL_CONF.exists():
         c.print(f"[green]{s['returning']}[/green]\n")
@@ -303,26 +330,32 @@ def tui_main() -> None:
             mark_done()
             c.print(f"\n[dim]{s['next_guide']}[/dim]\n")
             return
-    # Page 4-5: Tour + Next steps
+    # Page 4: Tour
     c.clear()
     c.print(f"\n[bold cyan]{s['tour_title']}[/bold cyan]\n")
     show_tour(s)
-    input(f"  [{s['continue']}] ")
+    c.print(Panel(f"[bold cyan]{s['continue']}[/bold cyan]", style="cyan"))
+    input()
+    # Page 5: Next steps
+    c.clear()
     c.print(f"\n[bold cyan]{s['next_title']}[/bold cyan]\n")
     show_next_steps(s, lang)
-    input(f"\n  [{s['finish']}] ")
+    c.print(Panel(f"[bold cyan]{s['finish']}[/bold cyan]", style="cyan"))
+    input()
     mark_done()
 
 # ── Plain text fallback ──
 def plain_main() -> None:
     lang = detect_lang()
     s = STRINGS[lang]
+    print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n{BANNER}")
     quote = get_quote(lang)
     if quote:
         print(f"  {quote}\n")
     print(f"  {s['welcome_title']}\n\n  {s['welcome_what']}\n")
-    input(f"  [{s['start']}] ")
+    print(_box_prompt(s["start"]))
+    input()
     # Keyboard layout (live OS only)
     do_keyboard(s)
     print("\033[2J\033[H", end="")  # Clear screen
@@ -359,11 +392,13 @@ def plain_main() -> None:
     print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n  {s['tour_title']}\n")
     show_tour(s)
-    input(f"  [{s['continue']}] ")
+    print(_box_prompt(s["continue"]))
+    input()
     print("\033[2J\033[H", end="")  # Clear screen
     print(f"\n  {s['next_title']}\n")
     show_next_steps(s, lang)
-    input(f"\n  [{s['finish']}] ")
+    print(_box_prompt(s["finish"]))
+    input()
     mark_done()
 
 if __name__ == "__main__":

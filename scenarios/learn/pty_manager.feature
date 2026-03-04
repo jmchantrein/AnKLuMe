@@ -1,4 +1,4 @@
-@pty_required
+@pty_required @requires.pty_module
 Feature: PTY manager
   Manages pseudo-terminal sessions that back the xterm.js WebSocket
   connections. Handles session creation, lifecycle, cleanup, and limits.

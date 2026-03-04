@@ -1,4 +1,5 @@
 # Matrix: NX-001, NX-002
+@requires.generator
 Feature: Nesting Prefix — collision avoidance for nested anklume
 
   Scenario: Nesting prefix format is 3-digit zero-padded

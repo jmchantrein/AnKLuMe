@@ -1,3 +1,4 @@
+@requires.web_theme
 Feature: Web theme
   Shared CSS theme for all anklume web applications. Single source of
   truth for the dark theme, trust-level colors, and component styles.

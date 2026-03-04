@@ -1,4 +1,5 @@
 # Matrix: AA-001, AA-002
+@requires.generator
 Feature: AI Access Policy — exclusive mode and sanitization
 
   Scenario: ai_provider defaults and sanitization logic

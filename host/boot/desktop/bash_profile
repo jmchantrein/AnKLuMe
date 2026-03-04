@@ -26,6 +26,21 @@ fi
 unset _current_tty
 
 if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+    # Setup wizard: run on live ISO if not already configured
+    if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null && \
+       [ ! -f /run/anklume-start.done ]; then
+        echo ""
+        echo "  ╔══════════════════════════════════════════════════════════════╗"
+        echo "  ║  anklume Setup                                              ║"
+        echo "  ╚══════════════════════════════════════════════════════════════╝"
+        echo ""
+        # Stop the background service (it's blocking on tty2 waiting for input)
+        sudo systemctl stop anklume-start.service 2>/dev/null || true
+        # Run wizard interactively on this tty
+        sudo /opt/anklume/scripts/start.sh
+        touch /run/anklume-start.done 2>/dev/null || true
+    fi
+
     # Parse anklume.desktop=<de> from kernel cmdline
     ANKLUME_DE=""
     for param in $(cat /proc/cmdline); do

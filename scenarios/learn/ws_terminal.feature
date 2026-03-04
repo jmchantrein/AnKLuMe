@@ -7,16 +7,19 @@ Feature: WebSocket terminal
     When I run "python3 -m py_compile scripts/web/ws_terminal.py"
     Then exit code is 0
 
+  @requires.ws_terminal
   Scenario: WebSocket terminal router has endpoint
     Given "python3" is available
     When I run "python3 -c 'from scripts.web.ws_terminal import router; assert any(hasattr(r, "path") and "terminal" in getattr(r, "path", "") for r in router.routes)'"
     Then exit code is 0
 
+  @requires.ws_terminal
   Scenario: WebSocket terminal get_manager returns PtyManager
     Given "python3" is available
     When I run "python3 -c 'from scripts.web.ws_terminal import get_manager; from scripts.web.pty_manager import PtyManager; assert isinstance(get_manager(), PtyManager)'"
     Then exit code is 0
 
+  @requires.ws_terminal
   Scenario: WebSocket terminal manager has correct limits
     Given "python3" is available
     When I run "python3 -c 'from scripts.web.ws_terminal import get_manager; m = get_manager(); assert m.max_sessions == 4 and m.idle_timeout == 1800'"

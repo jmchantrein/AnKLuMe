@@ -6,10 +6,14 @@ Rendering functions are in host_resources_render.py (re-exported here).
 import json
 import os
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def collect_cpu() -> float | None:
@@ -177,7 +181,7 @@ def collect_all() -> dict:
 
 
 # Re-export render functions for backward compatibility
-from scripts.host_resources_render import (  # noqa: E402, F401
+from host_resources_render import (  # noqa: E402, F401
     render_cli,
     render_dashboard_data,
     render_tmux,

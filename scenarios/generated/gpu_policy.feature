@@ -1,4 +1,5 @@
 # Matrix: GP-001, GP-005
+@requires.generator
 Feature: GPU Policy — exclusive and shared modes
 
   Scenario: Exclusive GPU policy rejects duplicate gpu instances

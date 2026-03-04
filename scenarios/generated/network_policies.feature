@@ -1,4 +1,5 @@
 # Matrix: NP-001 to NP-003
+@requires.generator
 Feature: Network Policies — cross-domain rules validation
 
   Scenario: Network policy validates known source and destination

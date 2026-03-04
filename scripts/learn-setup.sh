@@ -84,10 +84,10 @@ do_setup() {
         ok "Project $LEARN_PROJECT created"
     fi
 
-    # 2. Copy default profile to learn project
-    if ! incus profile show default --project "$LEARN_PROJECT" >/dev/null 2>&1; then
-        incus profile copy default default --target-project "$LEARN_PROJECT" 2>/dev/null || true
-    fi
+    # 2. Copy default profile to learn project (overwrite empty auto-created one)
+    log "Copying default profile to $LEARN_PROJECT..."
+    incus profile copy default default --target-project "$LEARN_PROJECT" 2>/dev/null || true
+    ok "Default profile configured in $LEARN_PROJECT"
 
     # 3. Enable TLS on daemon (if not already)
     log "Ensuring TLS is enabled on Incus daemon..."

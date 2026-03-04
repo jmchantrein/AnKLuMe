@@ -64,11 +64,30 @@ def apply(
             help="Ansible tags (infra, provision, llm, stt, ai, openclaw, base, images, code-sandbox)",
         ),
     ] = None,
+    limit: Annotated[
+        str | None,
+        typer.Option(
+            "--limit", "-l",
+            help="Ansible host/group limit pattern",
+        ),
+    ] = None,
+    check: Annotated[
+        bool, typer.Option("--check", help="Dry-run (ansible --check --diff)")
+    ] = False,
+    diff: Annotated[
+        bool, typer.Option("--diff", help="Show diff of changes")
+    ] = False,
 ) -> None:
     """Apply infrastructure for a domain (or all)."""
     cmd = ["ansible-playbook", str(PROJECT_ROOT / "site.yml")]
-    if domain and not all_:
+    if limit:
+        cmd.extend(["--limit", limit])
+    elif domain and not all_:
         cmd.extend(["--limit", domain])
+    if check:
+        cmd.extend(["--check", "--diff"])
+    elif diff:
+        cmd.append("--diff")
     if tags:
         cmd.extend(["--tags", tags])
 

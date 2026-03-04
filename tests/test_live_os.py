@@ -3,10 +3,10 @@
 This module tests all scripts and configurations for the anklume live OS phase:
   - live-os-lib.sh (shared library)
   - build-image.sh (image building)
-  - first-boot.sh (initial setup)
+  - start.sh (initial setup)
   - live-update.sh (A/B updates)
   - Initramfs hooks (anklume-toram, anklume-verity)
-  - Systemd services (anklume-first-boot.service, anklume-data-mount.service)
+  - Systemd services (anklume-start.service, anklume-data-mount.service)
   - Boot scripts (mount-data.sh, umount-data.sh)
   - Makefile targets (build-image, live-update, live-status)
 """
@@ -22,11 +22,11 @@ import pytest
 
 LIVE_OS_LIB = Path(__file__).resolve().parent.parent / "scripts" / "live-os-lib.sh"
 BUILD_IMAGE = Path(__file__).resolve().parent.parent / "scripts" / "build-image.sh"
-FIRST_BOOT = Path(__file__).resolve().parent.parent / "scripts" / "first-boot.sh"
+START_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "start.sh"
 LIVE_UPDATE = Path(__file__).resolve().parent.parent / "scripts" / "live-update.sh"
 TORAM_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "initramfs" / "anklume-toram"
 VERITY_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "initramfs" / "anklume-verity"
-FIRST_BOOT_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-first-boot.service"
+START_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-start.service"
 DATA_MOUNT_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-data-mount.service"
 MOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts" / "mount-data.sh"
 UMOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts" / "umount-data.sh"
@@ -309,22 +309,22 @@ class TestBuildImageStructure:
         assert "pacman" in self.content
 
 
-# ── TestFirstBootStructure ────────────────────────────────────────
+# ── TestStartScriptStructure ─────────────────────────────────────
 
 
-class TestFirstBootStructure:
-    """Verify first-boot.sh has correct structure."""
+class TestStartScriptStructure:
+    """Verify start.sh has correct structure."""
 
     @classmethod
     def setup_class(cls):
         """Cache file content for test class."""
-        if not FIRST_BOOT.exists():
-            pytest.skip(f"File not found: {FIRST_BOOT}")
-        cls.content = FIRST_BOOT.read_text()
+        if not START_SCRIPT.exists():
+            pytest.skip(f"File not found: {START_SCRIPT}")
+        cls.content = START_SCRIPT.read_text()
 
     def test_file_exists(self):
-        """Verify first-boot.sh exists."""
-        assert FIRST_BOOT.exists()
+        """Verify start.sh exists."""
+        assert START_SCRIPT.exists()
 
     def test_shebang(self):
         """Verify shebang line."""
@@ -515,36 +515,36 @@ class TestInitramfsVerity:
 class TestSystemdServices:
     """Verify systemd service files have correct INI format and conditions."""
 
-    def test_first_boot_service_exists(self):
-        """Verify anklume-first-boot.service exists."""
-        if not FIRST_BOOT_SERVICE.exists():
-            pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
-        assert FIRST_BOOT_SERVICE.exists()
+    def test_start_service_exists(self):
+        """Verify anklume-start.service exists."""
+        if not START_SERVICE.exists():
+            pytest.skip(f"File not found: {START_SERVICE}")
+        assert START_SERVICE.exists()
 
-    def test_first_boot_valid_ini(self):
-        """Verify first-boot service has valid INI sections."""
-        if not FIRST_BOOT_SERVICE.exists():
-            pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
+    def test_start_valid_ini(self):
+        """Verify start service has valid INI sections."""
+        if not START_SERVICE.exists():
+            pytest.skip(f"File not found: {START_SERVICE}")
 
-        content = FIRST_BOOT_SERVICE.read_text()
+        content = START_SERVICE.read_text()
         assert "[Unit]" in content
         assert "[Service]" in content
         assert "[Install]" in content
 
-    def test_first_boot_condition_path_not_exists(self):
-        """Verify first-boot runs only if persist not initialized."""
-        if not FIRST_BOOT_SERVICE.exists():
-            pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
+    def test_start_condition_path_not_exists(self):
+        """Verify start service runs only if persist not initialized."""
+        if not START_SERVICE.exists():
+            pytest.skip(f"File not found: {START_SERVICE}")
 
-        content = FIRST_BOOT_SERVICE.read_text()
+        content = START_SERVICE.read_text()
         assert "ConditionPathExists=!/mnt/anklume-persist/pool.conf" in content
 
-    def test_first_boot_wanted_by(self):
-        """Verify first-boot is wanted by multi-user.target."""
-        if not FIRST_BOOT_SERVICE.exists():
-            pytest.skip(f"File not found: {FIRST_BOOT_SERVICE}")
+    def test_start_wanted_by(self):
+        """Verify start service is wanted by multi-user.target."""
+        if not START_SERVICE.exists():
+            pytest.skip(f"File not found: {START_SERVICE}")
 
-        content = FIRST_BOOT_SERVICE.read_text()
+        content = START_SERVICE.read_text()
         assert "WantedBy=multi-user.target" in content
 
     def test_data_mount_service_exists(self):
@@ -1370,7 +1370,7 @@ class TestDesktopConfig:
         """F-09: Cheat sheet has floating/centered sway rule."""
         assert 'app_id="anklume-cheatsheet"' in self.sway
 
-    def test_cheatsheet_launched_on_first_boot(self):
+    def test_cheatsheet_launched_on_setup(self):
         """F-09: Cheat sheet launched alongside welcome wizard."""
         assert "anklume-cheatsheet" in self.sway
         assert "--app-id anklume-cheatsheet" in self.sway
@@ -1381,7 +1381,7 @@ class TestDesktopConfig:
         assert "Super + d" in self.cheatsheet
         assert "Super + Shift + q" in self.cheatsheet
 
-    def test_auto_terminal_on_first_boot(self):
+    def test_auto_terminal_on_setup(self):
         """F-10: Auto-open foot terminal on first sway launch."""
         # Must have a bare 'foot &' (not the welcome/cheatsheet ones)
         lines = self.sway.splitlines()

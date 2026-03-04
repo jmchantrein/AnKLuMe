@@ -41,7 +41,7 @@ CMD_TIMEOUT = 60
 LONG_TIMEOUT = 180
 DEPLOY_TIMEOUT = 600
 ROOT_PASSWORD = "anklume"
-DISK_SIZE = "120G"  # Must be >= 100G for first-boot.sh data disk detection
+DISK_SIZE = "120G"  # Must be >= 100G for start.sh data disk detection
 
 # ANSI colors
 C_RESET = "\033[0m"
@@ -510,7 +510,7 @@ def build_phases(distro: str) -> list[Phase]:
         p5.tests.extend([
             Test("Virtual disk visible",
                  "test -b /dev/vda && echo PASS || echo FAIL"),
-            Test("DKMS build ZFS module (first-boot)",
+            Test("DKMS build ZFS module (start.sh)",
                  "zfs_src=$(ls -d /usr/src/zfs-* 2>/dev/null | head -1); "
                  "if [ -z \"$zfs_src\" ]; then echo 'No ZFS DKMS source found'; echo FAIL; exit 0; fi; "
                  "zfs_ver=$(basename $zfs_src | sed 's/^zfs-//'); "

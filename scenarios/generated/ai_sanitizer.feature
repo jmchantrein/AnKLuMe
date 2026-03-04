@@ -1,4 +1,5 @@
 # Matrix: LS-001, LS-002, NI-3-002, NI-3-003
+@requires.generator
 Feature: AI Sanitization and Network Baseline
 
   Scenario: NER sanitizer detects infrastructure hosts

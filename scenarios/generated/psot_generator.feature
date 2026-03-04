@@ -9,6 +9,7 @@ Feature: PSOT Generator — managed sections and idempotency
     When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
 
+  @requires.generator
   Scenario: Managed sections contain markers
     # Matrix: PP-002
     Given "python3" is available
@@ -19,6 +20,7 @@ Feature: PSOT Generator — managed sections and idempotency
     When I run "python3 -c 'from pathlib import Path; gv=list(Path("group_vars").glob("*.yml")); assert any("MANAGED" in f.read_text() for f in gv), "No managed markers"'"
     Then exit code is 0
 
+  @requires.generator
   Scenario: Generator idempotency — second run succeeds
     # Matrix: PP-004
     Given "python3" is available
@@ -29,6 +31,7 @@ Feature: PSOT Generator — managed sections and idempotency
     When I run "python3 scripts/generate.py infra.yml"
     Then exit code is 0
 
+  @requires.generator
   Scenario: Orphan detection reports removed machines
     # Matrix: PP-005
     Given "python3" is available
@@ -40,6 +43,7 @@ Feature: PSOT Generator — managed sections and idempotency
     Then exit code is 0
     And output contains "Orphans:"
 
+  @requires.generator
   Scenario: User edits outside managed sections are preserved
     # Matrix: PP-003
     Given "python3" is available

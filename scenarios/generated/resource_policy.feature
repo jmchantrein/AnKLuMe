@@ -1,4 +1,5 @@
 # Matrix: RP-001, RP-002
+@requires.generator
 Feature: Resource Policy — automatic CPU and memory allocation
 
   Scenario: Resource policy validates mode values

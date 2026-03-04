@@ -1,3 +1,4 @@
+@requires.generator
 Feature: CLI dependency chain
   Commands must be run in prerequisite order. The resource flow
   model (_cli_deps.yml) defines which commands produce and consume

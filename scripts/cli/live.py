@@ -11,30 +11,27 @@ app = typer.Typer(name="live", help="Live OS / USB boot image management.")
 
 @app.command()
 def build(
-    debian: Annotated[
-        bool, typer.Option("--debian", help="Build Debian-based image only")
-    ] = False,
-    arch: Annotated[
-        bool, typer.Option("--arch", help="Build Arch-based image only")
-    ] = False,
+    base: Annotated[
+        str | None,
+        typer.Option("--base", "-b", help="Base distro: debian, arch (both if omitted)"),
+    ] = None,
     desktop: Annotated[
         str, typer.Option(help="Desktop environment")
     ] = "kde",
+    output: Annotated[
+        str | None,
+        typer.Option("--output", "-o", help="Output ISO path"),
+    ] = None,
 ) -> None:
     """Build live ISO images (both Debian+Arch by default)."""
-    if debian and arch:
-        # Both flags = build both (same as no flag)
-        run_make("build-images", f"DESKTOP={desktop}")
-    elif debian:
-        run_make(
-            "build-image",
-            f"BASE=debian DESKTOP={desktop} OUT=images/anklume-debian-{desktop}.iso",
-        )
-    elif arch:
-        run_make(
-            "build-image",
-            f"BASE=arch DESKTOP={desktop} OUT=images/anklume-arch-{desktop}.iso",
-        )
+    if base and base not in ("debian", "arch"):
+        from scripts.cli._helpers import console
+        console.print(f"[red]Invalid base: {base}. Choose debian or arch.[/red]")
+        raise typer.Exit(1)
+
+    if base:
+        out = output or f"images/anklume-{base}-{desktop}.iso"
+        run_make("build-image", f"BASE={base} DESKTOP={desktop} OUT={out}")
     else:
         run_make("build-images", f"DESKTOP={desktop}")
 

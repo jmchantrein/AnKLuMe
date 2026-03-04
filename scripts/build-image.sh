@@ -293,14 +293,11 @@ create_live_user() {
     local home="/home/$user"
 
     # Ensure required groups exist (Debian may not have wheel, Arch may not have sudo)
-    for grp in wheel sudo video audio input; do
+    for grp in wheel sudo video audio input adm incus-admin; do
         chroot "$rootfs" groupadd -f "$grp" 2>/dev/null || true
     done
     # Create user with home directory and bash shell
-    chroot "$rootfs" useradd -m -s /bin/bash -G sudo,video,audio,input "$user" 2>/dev/null \
-        || chroot "$rootfs" useradd -m -s /bin/bash -G video,audio "$user" 2>/dev/null \
-        || chroot "$rootfs" useradd -m -s /bin/bash "$user" 2>/dev/null \
-        || true
+    chroot "$rootfs" useradd -m -s /bin/bash "$user" 2>/dev/null || true
     # Verify user was created
     if ! chroot "$rootfs" id "$user" >/dev/null 2>&1; then
         warn "Failed to create user $user — creating manually"
@@ -311,6 +308,16 @@ create_live_user() {
         mkdir -p "$rootfs/home/$user"
         chroot "$rootfs" chown -R 1000:1000 "/home/$user" 2>/dev/null || true
     fi
+    # Add supplementary groups one at a time
+    # incus-admin: talk to Incus daemon; adm: read journalctl
+    # Edit /etc/group directly — usermod -aG fails silently in chroot
+    for grp in sudo video audio input adm incus-admin; do
+        grep -q "^${grp}:" "$rootfs/etc/group" 2>/dev/null || continue
+        # Skip if user already a member
+        grep -qP "^${grp}:[^:]*:[^:]*:.*\\b${user}\\b" "$rootfs/etc/group" && continue
+        # Append user: if line ends with : (no members), add user; else append ,user
+        sed -i "/^${grp}:/ { s/:$/:${user}/; t; s/\$/,${user}/; }" "$rootfs/etc/group"
+    done
     # Ensure shadow entry exists (useradd sometimes skips it in chroot)
     if ! grep -q "^${user}:" "$rootfs/etc/shadow" 2>/dev/null; then
         echo "${user}:!:19781:0:99999:7:::" >> "$rootfs/etc/shadow"
@@ -363,6 +370,12 @@ AUTOLOGIN
     # bash_profile (DE dispatcher)
     cp "$desktop_dir/bash_profile" "$rootfs/$user_home/.bash_profile"
 
+    # bash completion for anklume CLI (Typer-generated)
+    cat >> "$rootfs/$user_home/.bashrc" << 'BASHRC_COMPLETION'
+# anklume CLI tab-completion
+eval "$(_ANKLUME_COMPLETE=bash_source anklume 2>/dev/null)" || true
+BASHRC_COMPLETION
+
     # foot terminal config (shared)
     mkdir -p "$rootfs/$user_home/.config/foot"
     cp "$desktop_dir/foot.ini" "$rootfs/$user_home/.config/foot/foot.ini"
@@ -391,6 +404,9 @@ AUTOLOGIN
             cp "$desktop_dir/anklume.desktop" "$rootfs/usr/share/applications/anklume.desktop"
             mkdir -p "$rootfs/$user_home/Desktop"
             cp "$desktop_dir/anklume.desktop" "$rootfs/$user_home/Desktop/anklume.desktop"
+            chmod +x "$rootfs/$user_home/Desktop/anklume.desktop"
+            # Pre-trust the desktop icon so KDE doesn't show a warning popup
+            mkdir -p "$rootfs/$user_home/.local/share/trusted-desktop-files"
         fi
     fi
 
@@ -498,9 +514,10 @@ bootstrap_rootfs_debian() {
     printf '#!/bin/sh\nexit 101\n' > "$ROOTFS_DIR/usr/sbin/policy-rc.d"
     chmod +x "$ROOTFS_DIR/usr/sbin/policy-rc.d"
     # Divert apparmor_parser so postinst gets a no-op (real binary installs alongside)
-    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --add /sbin/apparmor_parser 2>/dev/null || true
-    printf '#!/bin/sh\nexit 0\n' > "$ROOTFS_DIR/sbin/apparmor_parser"
-    chmod +x "$ROOTFS_DIR/sbin/apparmor_parser"
+    # Use /usr/sbin/ (canonical path in Trixie usrmerge); /sbin/ diversion misses it
+    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --add /usr/sbin/apparmor_parser 2>/dev/null || true
+    printf '#!/bin/sh\nexit 0\n' > "$ROOTFS_DIR/usr/sbin/apparmor_parser"
+    chmod +x "$ROOTFS_DIR/usr/sbin/apparmor_parser"
 
     # Enable contrib + non-free-firmware repos (contrib for zfsutils-linux, non-free-firmware for WiFi/GPU firmware)
     sed -i 's/^deb \(.*\) trixie main$/deb \1 trixie main contrib non-free-firmware/' \
@@ -541,14 +558,26 @@ bootstrap_rootfs_debian() {
     local chroot_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a --force-all 2>&1 | tail -5 || true
+    # Purge SDDM if pulled in as a recommended dep of plasma-desktop.
+    # anklume is terminal-first: user types `startde` to launch the desktop.
+    # SDDM auto-enables itself on install and would bypass the setup wizard.
+    if chroot "$ROOTFS_DIR" dpkg -l sddm 2>/dev/null | grep -q '^ii'; then
+        chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
+            apt-get remove --purge -y sddm 2>&1 | tail -3 || true
+        info "  Purged sddm (terminal-first: user types startde)"
+    fi
+    # Mask all display managers to prevent any from being pulled in later
+    for dm in sddm gdm3 lightdm; do
+        chroot "$ROOTFS_DIR" systemctl mask "$dm.service" 2>/dev/null || true
+    done
     info "  System packages installed (apt: incus, ansible, desktop=$DESKTOP, lint/test tools)"
 
     # Install Python packages not available in Debian system repos
     # --ignore-installed avoids conflict with Debian's system click package
     chroot "$ROOTFS_DIR" pip3 install --break-system-packages --ignore-installed \
         "typer[all]>=0.12" "fastapi>=0.115" "uvicorn>=0.32" \
-        ruff behave 2>&1 | tail -5
-    info "  Python pip packages installed (pip: typer, fastapi, uvicorn, ruff, behave)"
+        ruff behave libtmux 2>&1 | tail -5
+    info "  Python pip packages installed (pip: typer, fastapi, uvicorn, ruff, behave, libtmux)"
 
     # Install initramfs-tools hooks and boot scripts BEFORE NVIDIA/backports
     # (backports kernel install triggers update-initramfs; hooks must be in place)
@@ -631,9 +660,22 @@ NVSRC
     # Step 3: Fix any broken packages
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a 2>&1 | tail -5 || true
-    # Step 4: Rebuild ALL DKMS modules for the backports kernel (ZFS, etc.)
+    # Step 4: Register and build ALL DKMS modules for the backports kernel
+    # zfs-dkms postinst fails in chroot (no /dev/null during dpkg) so ZFS is never
+    # registered. We must explicitly add + build it before autoinstall.
     if [ -n "$deb_kernel" ]; then
-        info "  Rebuilding all DKMS modules for kernel $deb_kernel..."
+        # Register ZFS in DKMS if source exists but not registered
+        local zfs_src_dir
+        zfs_src_dir=$(find "$ROOTFS_DIR/usr/src" -maxdepth 1 -name 'zfs-*' -type d | head -1)
+        if [ -n "$zfs_src_dir" ] && \
+           [ ! -d "$ROOTFS_DIR/var/lib/dkms/zfs" ]; then
+            local zfs_ver
+            zfs_ver=$(basename "$zfs_src_dir" | grep -oP 'zfs-\K.*')
+            info "  Registering ZFS $zfs_ver in DKMS..."
+            chroot "$ROOTFS_DIR" env PATH="$chroot_path" TMPDIR=/tmp \
+                dkms add -m zfs -v "$zfs_ver" 2>&1 | tail -3 || true
+        fi
+        info "  Building all DKMS modules for kernel $deb_kernel..."
         chroot "$ROOTFS_DIR" env PATH="$chroot_path" TMPDIR=/tmp \
             dkms autoinstall -k "$deb_kernel" 2>&1 | tail -10 || true
     fi
@@ -660,6 +702,15 @@ NVSRC
         fi
     fi
     info "  NVIDIA drivers installed from backports"
+
+    # Regenerate modules.dep for all kernels (DKMS in chroot may skip depmod)
+    for kdir in "$ROOTFS_DIR"/lib/modules/*/; do
+        local kname
+        kname=$(basename "$kdir")
+        if [ -d "$kdir/kernel" ]; then
+            chroot "$ROOTFS_DIR" depmod "$kname" 2>/dev/null || true
+        fi
+    done
 
     # Configure system
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
@@ -779,8 +830,9 @@ KBD
     chroot "$ROOTFS_DIR" systemctl enable NetworkManager.service >/dev/null 2>&1 || true
     info "  NetworkManager enabled"
     # Enable anklume services in chroot
-    chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-start.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-aa-teardown.service >/dev/null 2>&1 || true
     # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
     # Use manual symlink (systemctl mask may not work without running systemd)
     ln -sf /dev/null "$ROOTFS_DIR/etc/systemd/system/tmp.mount" 2>/dev/null || true
@@ -934,8 +986,35 @@ INJECT_PYEOF
 
     # Remove chroot-only files and restore diverted binaries before creating squashfs
     rm -f "$ROOTFS_DIR/usr/sbin/policy-rc.d"
-    rm -f "$ROOTFS_DIR/sbin/apparmor_parser"
-    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --remove /sbin/apparmor_parser 2>/dev/null || true
+    rm -f "$ROOTFS_DIR/usr/sbin/apparmor_parser"
+    chroot "$ROOTFS_DIR" dpkg-divert --local --rename --remove /usr/sbin/apparmor_parser 2>/dev/null || true
+    # Safety net: if apparmor_parser is still missing after diversion restore,
+    # recover it from the .distrib backup or extract from the cached .deb
+    if [ ! -x "$ROOTFS_DIR/usr/sbin/apparmor_parser" ]; then
+        # Try 1: the .distrib file left by dpkg-divert --rename
+        if [ -f "$ROOTFS_DIR/usr/sbin/apparmor_parser.distrib" ]; then
+            warn "  apparmor_parser missing — restoring from .distrib backup"
+            mv "$ROOTFS_DIR/usr/sbin/apparmor_parser.distrib" \
+               "$ROOTFS_DIR/usr/sbin/apparmor_parser"
+        else
+            # Try 2: extract binary from cached .deb (in chroot, dpkg-deb is available)
+            warn "  apparmor_parser missing — extracting from cached .deb"
+            chroot "$ROOTFS_DIR" bash -c '
+                deb=$(find /var/cache/apt/archives/ -name "apparmor_*.deb" -print -quit 2>/dev/null)
+                if [ -n "$deb" ]; then
+                    dpkg-deb --fsys-tarfile "$deb" | tar -xf - ./usr/sbin/apparmor_parser 2>/dev/null
+                fi
+            ' || true
+        fi
+        # Final check
+        if [ -x "$ROOTFS_DIR/usr/sbin/apparmor_parser" ]; then
+            info "  apparmor_parser restored successfully"
+            # Fix dpkg state: mark apparmor as configured
+            chroot "$ROOTFS_DIR" dpkg --configure apparmor 2>/dev/null || true
+        else
+            warn "  apparmor_parser could NOT be restored — AppArmor will not work"
+        fi
+    fi
 
     # Unmount pseudo-filesystems before creating squashfs
     umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
@@ -1062,12 +1141,21 @@ PACCONF
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" pacman -Sy --noconfirm \
         $extra_pkgs 2>&1 | tail -10
+    # Purge SDDM if pulled in as a dep of plasma-desktop (terminal-first boot)
+    if chroot "$ROOTFS_DIR" pacman -Q sddm &>/dev/null; then
+        chroot "$ROOTFS_DIR" pacman -Rns --noconfirm sddm 2>&1 | tail -3 || true
+        info "  Purged sddm (terminal-first: user types startde)"
+    fi
+    # Mask all display managers
+    for dm in sddm gdm lightdm; do
+        chroot "$ROOTFS_DIR" systemctl mask "$dm.service" 2>/dev/null || true
+    done
     info "  Extra packages installed via chroot pacman (nvidia-dkms, dev tools, desktop=$DESKTOP)"
 
     # Install Python packages not in Arch repos
     chroot "$ROOTFS_DIR" pip install --break-system-packages \
-        behave uvicorn 2>&1 | tail -3
-    info "  Python pip packages installed (behave, uvicorn)"
+        behave uvicorn libtmux 2>&1 | tail -3
+    info "  Python pip packages installed (behave, uvicorn, libtmux)"
 
     # Configure hostname
     echo "anklume" > "$ROOTFS_DIR/etc/hostname"
@@ -1194,8 +1282,9 @@ AGENT
         || echo "root:100000:1000000000" >> "$ROOTFS_DIR/etc/subgid"
     info "  Incus daemon enabled + subuid/subgid configured"
     # Enable anklume services in chroot
-    chroot "$ROOTFS_DIR" systemctl enable anklume-first-boot.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-start.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-aa-teardown.service >/dev/null 2>&1 || true
     # incus-agent: don't enable — not useful in live ISO (no virtiofs config channel)
     # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
     chroot "$ROOTFS_DIR" systemctl mask tmp.mount >/dev/null 2>&1 || true
@@ -1280,6 +1369,32 @@ bootstrap_rootfs() {
         mkdir -p "$ROOTFS_DIR"
         tar -xf "$cache_file" -C "$ROOTFS_DIR"
         ok "Rootfs restored from cache ($(du -sh "$cache_file" | cut -f1))"
+        # Always re-rsync the anklume framework (cache may have stale scripts)
+        mkdir -p "$ROOTFS_DIR/opt/anklume"
+        rsync -a --exclude='.git' --exclude='images/' --exclude='iso-cache/' \
+            --exclude='.venv' --exclude='__pycache__' --exclude='*.iso' \
+            --exclude='pretty.output' --exclude='temp.txt' \
+            "$PROJECT_ROOT/" "$ROOTFS_DIR/opt/anklume/"
+        info "  anklume framework files updated in cached rootfs"
+        # Re-install systemd services from updated framework
+        if [ -d "$PROJECT_ROOT/host/boot/systemd" ]; then
+            cp "$PROJECT_ROOT/host/boot/systemd"/*.service \
+                "$ROOTFS_DIR/etc/systemd/system/" 2>/dev/null || true
+            # Enable new services (existing ones already enabled in cache)
+            for svc in "$PROJECT_ROOT/host/boot/systemd"/*.service; do
+                svc_name="$(basename "$svc")"
+                chroot "$ROOTFS_DIR" systemctl enable "$svc_name" >/dev/null 2>&1 || true
+            done
+            info "  systemd services updated from framework"
+        fi
+        # Regenerate modules.dep (DKMS in chroot may have skipped depmod)
+        for kdir in "$ROOTFS_DIR"/lib/modules/*/; do
+            local kname
+            kname=$(basename "$kdir")
+            if [ -d "$kdir/kernel" ]; then
+                chroot "$ROOTFS_DIR" depmod "$kname" 2>/dev/null || true
+            fi
+        done
         return
     fi
 

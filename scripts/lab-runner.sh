@@ -97,7 +97,7 @@ cmd_check() {
         _advance_step "$lab_dir" "$lab_id" "$lab_yml" "$current_step" "$total_steps"
     else
         echo -e "${RED}FAIL${RESET} - Step $((current_step + 1)) not yet complete."
-        echo "  Use 'make lab-hint L=$num' for help."
+        echo "  Use 'anklume lab hint $num' for help."
     fi
 }
 
@@ -139,7 +139,7 @@ cmd_reset() {
     lab_dir=$(find_lab_dir "$num")
     lab_id=$(basename "$lab_dir")
     rm -rf "${STATE_DIR:?}/$lab_id"
-    echo -e "${GREEN}Lab $num reset.${RESET} Run 'make lab-start L=$num' to begin again."
+    echo -e "${GREEN}Lab $num reset.${RESET} Run 'anklume lab start $num' to begin again."
 }
 
 cmd_solution() {
@@ -165,6 +165,9 @@ LAB_NUM=""
 for arg in "$@"; do
     if [[ "$arg" =~ ^L=(.+)$ ]]; then
         LAB_NUM="${BASH_REMATCH[1]}"
+    elif [[ -z "$LAB_NUM" && "$arg" =~ ^[0-9]+$ ]]; then
+        # Accept bare number as positional argument (from CLI)
+        LAB_NUM="$arg"
     fi
 done
 
@@ -176,19 +179,19 @@ fi
 case "$COMMAND" in
     list)       cmd_list ;;
     start)
-        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: lab-runner.sh start L=01"
+        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: anklume lab start 01"
         cmd_start "$LAB_NUM" ;;
     check)
-        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: lab-runner.sh check L=01"
+        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: anklume lab check 01"
         cmd_check "$LAB_NUM" ;;
     hint)
-        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: lab-runner.sh hint L=01"
+        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: anklume lab hint 01"
         cmd_hint "$LAB_NUM" ;;
     reset)
-        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: lab-runner.sh reset L=01"
+        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: anklume lab reset 01"
         cmd_reset "$LAB_NUM" ;;
     solution)
-        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: lab-runner.sh solution L=01"
+        [[ -n "$LAB_NUM" ]] || die "Lab number required. Usage: anklume lab solution 01"
         cmd_solution "$LAB_NUM" ;;
     *)
         echo "Usage: lab-runner.sh <list|start|check|hint|reset|solution> [L=<num>]"

@@ -6,11 +6,13 @@ Feature: Web factory
     When I run "python3 -c 'from scripts.web import create_app; a = create_app(); assert a.title == "anklume"'"
     Then exit code is 0
 
+  @requires.web_factory
   Scenario: Web factory creates FastAPI app with custom title
     Given "python3" is available
     When I run "python3 -c 'from scripts.web import create_app; a = create_app("X"); assert a.title == "X"'"
     Then exit code is 0
 
+  @requires.web_factory
   Scenario: Web factory returns FastAPI instance
     Given "python3" is available
     When I run "python3 -c 'from fastapi import FastAPI; from scripts.web import create_app; assert isinstance(create_app(), FastAPI)'"

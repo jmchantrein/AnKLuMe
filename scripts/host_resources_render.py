@@ -5,8 +5,13 @@ Separated from host_resources.py (collectors) per 200-line limit.
 
 import html
 import json
+import sys
+from pathlib import Path
 
-from scripts.cli._helpers import format_bytes
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "cli"))
+
+from _helpers import format_bytes  # noqa: E402
 
 
 def _fmt_mib(mib: int) -> str:

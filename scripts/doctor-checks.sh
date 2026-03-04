@@ -7,11 +7,22 @@
 # ── Instance checks (no privilege needed) ───────────────────
 
 check_incus_running() {
-    if incus list --format csv -c n &>/dev/null; then
-        result_ok "Incus daemon reachable"
-    else
-        result_err "Incus daemon not reachable"
-    fi
+    # Retry up to 5 seconds — on live ISO, Incus may still be starting
+    local attempt=0 err_msg
+    while [ $attempt -lt 5 ]; do
+        if err_msg="$(incus list --format csv -c n 2>&1)"; then
+            result_ok "Incus daemon reachable"
+            return 0
+        fi
+        # Distinguish permission errors from daemon not running
+        if echo "$err_msg" | grep -qi "permission"; then
+            result_err "Incus daemon running but user lacks permission (add to incus-admin group)"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    result_err "Incus daemon not reachable (after ${attempt}s)"
 }
 
 check_anklume_running() {
@@ -19,8 +30,11 @@ check_anklume_running() {
     status="$(incus list anklume-instance --project anklume --format csv -c s 2>/dev/null)" || status=""
     if [[ "$status" == *"RUNNING"* ]]; then
         result_ok "anklume-instance is running"
+    elif [[ -z "$status" ]]; then
+        # Instance does not exist — expected on dev hosts without infrastructure
+        result_warn "anklume-instance not found (no anklume infrastructure deployed)"
     else
-        result_err "anklume-instance not running (status: ${status:-unknown})"
+        result_err "anklume-instance not running (status: ${status})"
     fi
 }
 
@@ -86,6 +100,18 @@ check_ip_drift() {
 # ── Dependency checks ───────────────────────────────────────
 
 check_container_deps() {
+    # Skip if anklume-instance does not exist (dev host without infrastructure)
+    local inst_status
+    inst_status="$(incus list anklume-instance --project anklume --format csv -c s 2>/dev/null)" || inst_status=""
+    if [[ -z "$inst_status" ]]; then
+        result_warn "anklume-instance not found — skipping dependency checks"
+        return 0
+    fi
+    if [[ "$inst_status" != *"RUNNING"* ]]; then
+        result_warn "anklume-instance not running — skipping dependency checks"
+        return 0
+    fi
+
     local missing=()
     for dep in tmux python3 make; do
         if ! incus exec anklume-instance --project anklume -- \

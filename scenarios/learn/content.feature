@@ -1,3 +1,4 @@
+@requires.guide_imports
 Feature: Content model
   Unified content model for guide chapters and educational labs.
   Bridges guide_chapters.py + guide_strings.py into structured

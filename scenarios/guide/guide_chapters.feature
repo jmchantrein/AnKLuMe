@@ -1,3 +1,4 @@
+@requires.guide_imports
 Feature: Guide chapter content
   Each chapter explains, demonstrates, and invites interaction.
 

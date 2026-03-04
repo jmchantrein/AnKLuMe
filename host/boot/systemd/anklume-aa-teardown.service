@@ -1,0 +1,18 @@
+[Unit]
+Description=Disable AppArmor for anklume Live ISO
+# Only on live ISO boot — overlayfs breaks AppArmor profile generation
+ConditionKernelCommandLine=boot=anklume
+Before=incus.service
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+# Teardown AppArmor profiles if the module somehow loaded despite apparmor=0.
+# Do NOT mount tmpfs over /sys/kernel/security/apparmor — that makes Incus
+# think AppArmor is active and forkstart fails trying to create profiles.
+ExecStart=/bin/sh -c "aa-teardown 2>/dev/null || true; if [ -d /sys/kernel/security/apparmor ]; then umount /sys/kernel/security/apparmor 2>/dev/null || true; fi"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

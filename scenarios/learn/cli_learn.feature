@@ -1,3 +1,4 @@
+@requires.learn_cli
 Feature: Learn CLI
   CLI commands for the interactive learning platform. Provides start,
   setup, and teardown commands.

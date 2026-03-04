@@ -50,7 +50,7 @@ def dev() -> None:
 
 @app.command()
 def sanitize(
-    text: Annotated[str | None, typer.Argument(help="Text to sanitize (or stdin)")] = None,
+    text: Annotated[str | None, typer.Option("--text", "-t", help="Text to sanitize (or stdin)")] = None,
     file: Annotated[Path | None, typer.Option("--file", "-f", help="File to sanitize")] = None,
     patterns: Annotated[Path | None, typer.Option("--patterns", "-p", help="Custom patterns file")] = None,
     json_output: Annotated[bool, typer.Option("--json", help="JSON output with redaction details")] = False,

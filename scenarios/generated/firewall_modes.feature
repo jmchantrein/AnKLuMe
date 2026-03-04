@@ -1,4 +1,5 @@
 # Matrix: FM-001, FM-002
+@requires.generator
 Feature: Firewall Modes — auto-creation and defense in depth
 
   Scenario: firewall_mode vm auto-creates anklume-firewall

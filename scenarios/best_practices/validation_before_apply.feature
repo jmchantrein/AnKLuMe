@@ -1,4 +1,5 @@
 # Matrix: PG-001
+@requires.generator
 Feature: Validation before apply
   Best practice: always run make lint after make sync to catch issues
   before deploying infrastructure.

@@ -1,3 +1,4 @@
+@requires.learn_setup_syntax
 Feature: Learn setup script
   Shell script for creating and destroying the anklume-learn container
   and demo infrastructure in the Incus learn project.

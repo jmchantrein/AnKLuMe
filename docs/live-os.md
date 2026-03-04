@@ -234,6 +234,47 @@ sudo sync
 
 **Image size:** ~4 GB (includes EFI, 2x OS slots, persist partition)
 
+### Testing with QEMU
+
+**Important:** The hybrid ISO requires **UEFI boot** (OVMF) for the
+GRUB menu to appear. BIOS-mode QEMU hangs without reaching GRUB.
+
+**Interactive GUI test** (UEFI, opens a window):
+```bash
+cp /usr/share/edk2/x64/OVMF_VARS.4m.fd /tmp/ovmf_vars.fd
+qemu-system-x86_64 \
+  -m 8192 -smp 4 -enable-kvm \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
+  -drive if=pflash,format=raw,file=/tmp/ovmf_vars.fd \
+  -cdrom images/anklume-debian-kde.iso -boot d \
+  -device virtio-net-pci,netdev=net0 -netdev user,id=net0 \
+  -display gtk -vga virtio
+```
+
+**Headless serial test** (bypasses GRUB via direct kernel boot):
+```bash
+mkdir -p /tmp/qemu-test/mnt
+sudo mount -o loop,ro images/anklume-debian-kde.iso /tmp/qemu-test/mnt
+cp /tmp/qemu-test/mnt/boot/vmlinuz /tmp/qemu-test/vmlinuz
+cp /tmp/qemu-test/mnt/boot/initrd.img /tmp/qemu-test/initrd.img
+sudo umount /tmp/qemu-test/mnt
+
+timeout 300 qemu-system-x86_64 \
+  -m 8192 -smp 4 -enable-kvm \
+  -cdrom images/anklume-debian-kde.iso -boot d \
+  -kernel /tmp/qemu-test/vmlinuz -initrd /tmp/qemu-test/initrd.img \
+  -append "ro boot=anklume anklume.boot_mode=iso anklume.toram=1 anklume.desktop=kde console=ttyS0,115200n8" \
+  -display none -serial stdio -no-reboot \
+  -device virtio-net-pci,netdev=net0 -netdev user,id=net0
+```
+
+**Notes:**
+- 8 GB RAM minimum for toram mode (squashfs ~3.9G needs >5.2G tmpfs)
+- OVMF firmware path may vary: check `/usr/share/edk2/x64/` or
+  `/usr/share/OVMF/`
+- The serial test uses `-kernel`/`-initrd` to bypass GRUB (no serial
+  output from GRUB), so BIOS mode works for that case only
+
 ## First Boot Wizard
 
 First boot detects if the system has never been initialized:

@@ -126,6 +126,23 @@ def console_cmd() -> None:
 
 
 @app.command()
+def gui() -> None:
+    """Start the desktop environment."""
+    import subprocess
+
+    from scripts.cli._helpers import PROJECT_ROOT
+
+    script = PROJECT_ROOT / "host" / "boot" / "desktop" / "start-desktop.sh"
+    if not script.exists():
+        console.print("[red]start-desktop.sh not found (not on live ISO?).[/red]")
+        raise typer.Exit(1)
+    try:
+        subprocess.run(["bash", str(script)], check=True)
+    except subprocess.CalledProcessError as e:
+        raise typer.Exit(e.returncode) from None
+
+
+@app.command()
 def dashboard() -> None:
     """Open web dashboard."""
     run_make("dashboard")

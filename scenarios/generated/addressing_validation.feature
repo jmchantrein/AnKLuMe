@@ -1,4 +1,5 @@
 # Matrix: AD-001 to AD-004
+@requires.generator
 Feature: Addressing Convention — trust-zone-aware IP addressing
 
   Scenario: base_octet must be 10

@@ -1,4 +1,5 @@
 # Matrix: PD-001, PD-002
+@requires.generator
 Feature: Persistent Data — per-machine host bind mounts
 
   Scenario: Persistent data generates pd- prefixed devices

@@ -1,4 +1,5 @@
 # Matrix: PG-001, PG-002
+@requires.generator
 Feature: Sync idempotency
   Best practice: make sync is idempotent — running it twice produces
   the same result. User content outside managed sections is preserved.

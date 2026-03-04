@@ -1,9 +1,7 @@
 [Unit]
-Description=anklume First Boot Wizard
-ConditionPathExists=!/mnt/anklume-persist/pool.conf
-# Only run in non-graphical mode (tty-only boot).
-# On graphical desktops, the welcome wizard handles first-boot.
-ConditionPathExists=!/usr/bin/sddm
+Description=anklume Setup — storage, framework & bootstrap
+# Only run on live ISO boot (terminal-first: no display manager)
+ConditionKernelCommandLine=boot=anklume
 After=local-fs.target network-online.target incus.service
 Wants=network-online.target
 Requires=incus.service
@@ -11,7 +9,7 @@ Conflicts=getty@tty2.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/anklume/scripts/first-boot.sh
+ExecStart=/opt/anklume/scripts/start.sh
 StandardInput=tty
 StandardOutput=journal+console
 StandardError=journal+console

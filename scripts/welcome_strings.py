@@ -25,10 +25,16 @@ STRINGS = {
             "Vos conteneurs, données et configuration survivront aux redémarrages."
         ),
         "persist_no_disk": "Aucun disque supplémentaire détecté.",
-        "persist_no_script": "first-boot.sh introuvable.",
+        "persist_no_disk_explain": (
+            "La persistance nécessite un disque ou une partition dédiée.\n"
+            "Aucun disque supplémentaire n'a été trouvé sur cette machine.\n"
+            "Vous pouvez brancher un disque USB ou utiliser le mode Exploration."
+        ),
+        "persist_fallback_explore": "Passer en mode Exploration à la place ?",
+        "persist_no_script": "start.sh introuvable.",
         "persist_confirm": "Lancer la configuration maintenant ?",
-        "persist_running": "Lancement de first-boot.sh...",
-        "persist_skip": "Passé. Lancez manuellement : sudo /opt/anklume/scripts/first-boot.sh",
+        "persist_running": "Lancement de la configuration...",
+        "persist_skip": "Passé. Lancez manuellement : sudo /opt/anklume/scripts/start.sh",
         "persist_success": "Configuration de la persistance terminée avec succès.",
         "persist_error": "Erreur lors de la configuration de la persistance.",
         "explore_title": "MODE EXPLORATION",
@@ -105,10 +111,16 @@ STRINGS = {
             "Your containers, data and config will survive reboots."
         ),
         "persist_no_disk": "No additional disk detected.",
-        "persist_no_script": "first-boot.sh not found.",
+        "persist_no_disk_explain": (
+            "Persistence requires a dedicated disk or partition.\n"
+            "No additional disk was found on this machine.\n"
+            "You can plug in a USB disk or use Explore mode instead."
+        ),
+        "persist_fallback_explore": "Switch to Explore mode instead?",
+        "persist_no_script": "start.sh not found.",
         "persist_confirm": "Run setup now?",
-        "persist_running": "Running first-boot.sh...",
-        "persist_skip": "Skipped. Run manually: sudo /opt/anklume/scripts/first-boot.sh",
+        "persist_running": "Running start.sh...",
+        "persist_skip": "Skipped. Run manually: sudo /opt/anklume/scripts/start.sh",
         "persist_success": "Persistence setup completed successfully.",
         "persist_error": "Error during persistence setup.",
         "explore_title": "EXPLORE MODE",

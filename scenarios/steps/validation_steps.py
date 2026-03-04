@@ -135,6 +135,46 @@ def infra_with_invalid_sv_consumer(context, consumer):
     dst.write_text(yaml.dump(infra, sort_keys=False))
 
 
+@given('infra.yml with duplicate machine "{name}" in two domains')
+def infra_with_duplicate_machine(context, name):
+    """Create infra.yml with a duplicate machine name across domains."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+        "domains": {
+            "dom-a": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    name: {"type": "lxc"},
+                },
+            },
+            "dom-b": {
+                "trust_level": "semi-trusted",
+                "machines": {
+                    name: {"type": "lxc"},
+                },
+            },
+        },
+    }
+    dst = context.sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
+@given("infra.yml with no domains section")
+def infra_with_no_domains(context):
+    """Create infra.yml without a domains section."""
+    infra = {
+        "project_name": "scenario-test",
+        "global": {
+            "addressing": {"base_octet": 10, "zone_base": 100},
+        },
+    }
+    dst = context.sandbox.project_dir / "infra.yml"
+    dst.write_text(yaml.dump(infra, sort_keys=False))
+
+
 @given('infra.yml with shared_volume relative path "{path}"')
 def infra_with_relative_sv_path(context, path):
     """Create infra.yml with a relative shared_volume path."""
