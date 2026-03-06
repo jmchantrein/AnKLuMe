@@ -49,7 +49,7 @@ class TestIntrospect:
 
     def test_known_top_level_commands_present(self, cli_tree):
         names = {c["name"] for c in cli_tree["commands"]}
-        for expected in ("sync", "flush", "doctor", "guide"):
+        for expected in ("sync", "flush", "doctor", "console"):
             assert expected in names, f"Missing top-level command: {expected}"
 
     def test_known_groups_present(self, cli_tree):

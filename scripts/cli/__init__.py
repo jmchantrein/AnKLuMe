@@ -5,11 +5,9 @@ from typing import Annotated
 import typer
 
 from scripts.cli._helpers import (
-    PROJECT_ROOT,
     console,
     get_mode,
-    is_live_os,
-    run_cmd,
+    is_host,
     run_make,
     run_script,
 )
@@ -86,6 +84,81 @@ def sync(
 
 
 @app.command()
+def init(
+    lang: Annotated[
+        str, typer.Option("--lang", "-l", help="Language (en/fr)")
+    ] = "en",
+) -> None:
+    """Create a starter infra.yml in the current directory."""
+    from pathlib import Path
+
+    infra_path = Path("infra.yml")
+    if infra_path.exists():
+        console.print(f"[yellow]infra.yml already exists at {infra_path.resolve()}[/yellow]")
+        raise typer.Exit(0)
+
+    if lang == "fr":
+        content = (
+            "# infra.yml — Source de verite de votre infrastructure\n"
+            "# Modifiez ce fichier puis: anklume sync && anklume domain apply\n\n"
+            "project_name: mon-infra\n\n"
+            "global:\n"
+            "  addressing:\n"
+            "    base_octet: 10\n"
+            "    zone_base: 100\n"
+            '  default_os_image: "images:debian/13"\n\n'
+            "domains:\n"
+            "  pro:\n"
+            '    description: "Espace professionnel"\n'
+            "    trust_level: semi-trusted\n"
+            "    machines:\n"
+            "      pro-dev:\n"
+            '        description: "Developpement"\n'
+            "        type: lxc\n"
+            "        roles: [base_system]\n\n"
+            "  perso:\n"
+            '    description: "Espace personnel"\n'
+            "    trust_level: trusted\n"
+            "    machines:\n"
+            "      perso-desktop:\n"
+            '        description: "Bureau personnel"\n'
+            "        type: lxc\n"
+            "        roles: [base_system]\n"
+        )
+    else:
+        content = (
+            "# infra.yml — Source of truth for your infrastructure\n"
+            "# Edit this file then: anklume sync && anklume domain apply\n\n"
+            "project_name: my-infra\n\n"
+            "global:\n"
+            "  addressing:\n"
+            "    base_octet: 10\n"
+            "    zone_base: 100\n"
+            '  default_os_image: "images:debian/13"\n\n'
+            "domains:\n"
+            "  work:\n"
+            '    description: "Professional workspace"\n'
+            "    trust_level: semi-trusted\n"
+            "    machines:\n"
+            "      work-dev:\n"
+            '        description: "Development"\n'
+            "        type: lxc\n"
+            "        roles: [base_system]\n\n"
+            "  personal:\n"
+            '    description: "Personal space"\n'
+            "    trust_level: trusted\n"
+            "    machines:\n"
+            "      personal-desktop:\n"
+            '        description: "Personal desktop"\n'
+            "        type: lxc\n"
+            "        roles: [base_system]\n"
+        )
+
+    infra_path.write_text(content)
+    console.print(f"[green]Created {infra_path.resolve()}[/green]")
+
+
+@app.command()
 def flush(
     force: Annotated[
         bool, typer.Option("--force", help="Force destruction")
@@ -103,14 +176,6 @@ def upgrade() -> None:
     """Safe framework update with conflict detection."""
     run_script("upgrade.sh")
 
-
-@app.command()
-def guide() -> None:
-    """Interactive onboarding guide."""
-    if is_live_os():
-        run_cmd(["python3", str(PROJECT_ROOT / "scripts" / "welcome.py")])
-    else:
-        run_script("guide.sh")
 
 
 @app.command()
@@ -138,6 +203,23 @@ def gui() -> None:
         raise typer.Exit(1)
     try:
         subprocess.run(["bash", str(script)], check=True)
+    except subprocess.CalledProcessError as e:
+        raise typer.Exit(e.returncode) from None
+
+
+@app.command()
+def connect() -> None:
+    """Connect to anklume-instance (host only)."""
+    import subprocess
+
+    if not is_host():
+        console.print("[yellow]Already inside a container.[/yellow]")
+        raise typer.Exit(0)
+    try:
+        subprocess.run(
+            ["incus", "exec", "anklume-instance", "--", "bash", "-l"],
+            check=True,
+        )
     except subprocess.CalledProcessError as e:
         raise typer.Exit(e.returncode) from None
 

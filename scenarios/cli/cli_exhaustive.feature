@@ -18,7 +18,6 @@ Feature: CLI exhaustive — every subcommand responds to --help
       | sync      |
       | flush     |
       | upgrade   |
-      | guide     |
       | doctor    |
       | console   |
       | dashboard |
@@ -243,7 +242,6 @@ Feature: CLI exhaustive — every subcommand responds to --help
       | apply   |
       | reset   |
       | plugins |
-      | config  |
 
   # ── backup subcommands ──────────────────────────────────────
 
@@ -506,7 +504,6 @@ Feature: CLI exhaustive — every subcommand responds to --help
       | dev      | nesting        | --mode         | ANKLUME_MODE=dev python3 -m scripts.cli dev nesting --help     |
       | dev      | nesting        | --max-depth    | ANKLUME_MODE=dev python3 -m scripts.cli dev nesting --help     |
       | mode     | accessibility  | --palette      | python3 -m scripts.cli mode accessibility --help               |
-      | desktop  | apply          | --engine       | python3 -m scripts.cli desktop apply --help                    |
       | llm      | sanitize       | --json         | python3 -m scripts.cli llm sanitize --help                     |
       | stt      | logs           | --lines        | python3 -m scripts.cli stt logs --help                         |
       | learn    | start          | --port         | python3 -m scripts.cli learn start --help                      |
@@ -533,11 +530,6 @@ Feature: CLI exhaustive — every subcommand responds to --help
   @requires.cli_help
   Scenario: upgrade --help exits 0
     When I run "python3 -m scripts.cli upgrade --help"
-    Then exit code is 0
-
-  @requires.cli_help
-  Scenario: guide --help exits 0
-    When I run "python3 -m scripts.cli guide --help"
     Then exit code is 0
 
   @requires.cli_help

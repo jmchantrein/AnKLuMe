@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=anklume Learn
+Comment=Open anklume learning platform in browser
+Exec=/opt/anklume/host/boot/desktop/open-learn.sh
+Terminal=false
+X-KDE-autostart-phase=2

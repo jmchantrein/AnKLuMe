@@ -97,7 +97,7 @@ The raw format (`--format raw`) produces a GPT disk image for direct
 
 - Full-disk encryption of data disk using LUKS2
 - Passphrase or keyfile protected (configurable during first-boot)
-- Opens to `/dev/mapper/anklume-data-<pool-name>`
+- Opens to `/dev/mapper/anklume-<pool-name>`
 - ZFS/BTRFS mounted on top
 
 **What it protects:** All user data, Incus container filesystems, persistent storage
@@ -598,7 +598,7 @@ sudo reboot
 **A:** Passphrase incorrect or key file missing. Options:
 
 1. Reboot and try passphrase again
-2. Use different key file: `sudo cryptsetup luksOpen /dev/nvme0n1 anklume-data --key-file ~/.backup-key`
+2. Use different key file: `sudo cryptsetup luksOpen /dev/nvme0n1 anklume --key-file ~/.backup-key`
 3. Add recovery key from backup (if available)
 
 ### Q: Data mount fails: "zpool import failed"
@@ -610,10 +610,10 @@ sudo reboot
 ls -la /dev/mapper/anklume-*
 
 # List pools on device
-sudo zpool import -d /dev/mapper/anklume-data
+sudo zpool import -d /dev/mapper/anklume
 
 # If found, import manually
-sudo zpool import -d /dev/mapper/anklume-data pool-name
+sudo zpool import -d /dev/mapper/anklume pool-name
 
 # Verify mount
 mount | grep anklume
@@ -634,9 +634,9 @@ mount | grep anklume
 **A:** One or more services failed. Check:
 
 ```bash
-sudo systemctl status anklume-data-mount.service
+sudo systemctl status anklume-mount.service
 sudo systemctl status anklume-first-boot.service
-sudo journalctl -u anklume-data-mount -n 50
+sudo journalctl -u anklume-mount -n 50
 ```
 
 Common causes:

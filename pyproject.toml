@@ -9,7 +9,7 @@ dependencies = ["typer[all]>=0.12", "pyyaml>=6.0", "fastapi>=0.115", "uvicorn>=0
 anklume = "scripts.cli:app"
 
 [project.optional-dependencies]
-test = ["pytest", "pyyaml", "hypothesis", "behave"]
+test = ["pytest", "pytest-xdist", "pyyaml", "hypothesis", "behave"]
 docs = ["mkdocs-material", "mkdocs-static-i18n>=1.2"]
 live-test = [
     "vncdotool>=1.2",

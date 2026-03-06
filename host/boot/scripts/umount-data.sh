@@ -3,7 +3,7 @@
 # Usage: umount-data.sh
 #
 # This script safely unmounts the encrypted data partition and closes the
-# LUKS device. It is called by anklume-data-mount.service during system shutdown.
+# LUKS device. It is called by anklume-mount.service during system shutdown.
 #
 # Behavior:
 #   1. Detects pool type (ZFS or BTRFS) from /mnt/anklume-persist/pool.conf
@@ -16,7 +16,7 @@ set -euo pipefail
 # ── Constants ──────────────────────────────────────────────
 
 PERSIST_MNT="/mnt/anklume-persist"
-DATA_MNT="/mnt/anklume-data"
+DATA_MNT="/mnt/anklume"
 POOL_CONF="$PERSIST_MNT/pool.conf"
 
 # ── Logging helpers (ANSI colors) ──────────────────────────

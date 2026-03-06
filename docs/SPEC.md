@@ -642,11 +642,11 @@ via Incus disk devices.
 
 ```yaml
 global:
-  shared_volumes_base: /mnt/anklume-data/shares  # Default: /srv/anklume/shares
+  shared_volumes_base: /mnt/anklume/shares  # Default: /srv/anklume/shares
 
 shared_volumes:
   docs:
-    source: /mnt/anklume-data/shares/docs  # Optional, default: <base>/<name>
+    source: /mnt/anklume/shares/docs  # Optional, default: <base>/<name>
     path: /shared/docs                      # Optional, default: /shared/<name>
     shift: true                             # Optional, default: true
     propagate: false                        # Optional, default: false

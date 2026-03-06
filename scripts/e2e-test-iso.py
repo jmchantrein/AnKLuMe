@@ -195,7 +195,7 @@ else
 fi
 
 # Incus pool exists
-if sudo incus storage show anklume-data >/dev/null 2>&1; then
+if sudo incus storage show anklume >/dev/null 2>&1; then
     pass "incus pool exists"
 else
     fail "incus pool missing"
@@ -203,7 +203,7 @@ else
 fi
 
 # Incus pool driver
-drv=$(sudo incus storage show anklume-data 2>/dev/null | grep '^driver:' | awk '{{print $2}}')
+drv=$(sudo incus storage show anklume 2>/dev/null | grep '^driver:' | awk '{{print $2}}')
 if [ "$drv" = "{backend}" ]; then
     pass "incus driver=$drv"
 else
@@ -214,9 +214,9 @@ fi
     if backend == "zfs":
         script += """
 # ZFS pool online
-if sudo zpool list anklume-data 2>/dev/null | grep -q ONLINE; then
+if sudo zpool list anklume 2>/dev/null | grep -q ONLINE; then
     pass "ZFS pool ONLINE"
-    sudo zpool list anklume-data
+    sudo zpool list anklume
 else
     fail "ZFS pool not online"
     sudo zpool list 2>&1
@@ -225,9 +225,9 @@ fi
     elif backend == "btrfs":
         script += """
 # BTRFS mounted
-if mount | grep -q anklume-data; then
+if mount | grep -q anklume; then
     pass "BTRFS mounted"
-    mount | grep anklume-data
+    mount | grep anklume
 else
     fail "BTRFS not mounted"
 fi
@@ -450,15 +450,15 @@ else
 fi
 
 # 5. Verify pool is functional (import manually if start.sh timed out on bootstrap)
-if ! sudo incus storage show anklume-data >/dev/null 2>&1; then
+if ! sudo incus storage show anklume >/dev/null 2>&1; then
     sudo modprobe zfs 2>/dev/null || true
-    sudo zpool import anklume-data 2>/dev/null || sudo zpool import -f anklume-data 2>/dev/null || true
+    sudo zpool import anklume 2>/dev/null || sudo zpool import -f anklume 2>/dev/null || true
 fi
-if sudo incus storage show anklume-data >/dev/null 2>&1; then
+if sudo incus storage show anklume >/dev/null 2>&1; then
     pass "incus pool exists after reboot"
-elif command -v zpool >/dev/null 2>&1 && sudo zpool list anklume-data 2>/dev/null | grep -q ONLINE; then
+elif command -v zpool >/dev/null 2>&1 && sudo zpool list anklume 2>/dev/null | grep -q ONLINE; then
     pass "ZFS pool online (Incus ref may need re-create)"
-elif command -v btrfs >/dev/null 2>&1 && sudo btrfs filesystem show anklume-data 2>/dev/null | grep -q "Label"; then
+elif command -v btrfs >/dev/null 2>&1 && sudo btrfs filesystem show anklume 2>/dev/null | grep -q "Label"; then
     pass "BTRFS filesystem found"
 else
     fail "pool not found after reboot"
@@ -504,7 +504,7 @@ def test_reboot(iso_path, backend, disk_size_gb=150):
 
         # Verify pool was created AND understand where the data went
         verify = send_and_wait(child,
-            "sudo incus storage show anklume-data >/dev/null 2>&1 && echo POOL_OK || echo POOL_FAIL",
+            "sudo incus storage show anklume >/dev/null 2>&1 && echo POOL_OK || echo POOL_FAIL",
             "POOLCHECK_DONE")
 
         if "POOL_OK" in clean(verify):
@@ -526,9 +526,9 @@ def test_reboot(iso_path, backend, disk_size_gb=150):
 
         # Clean shutdown: export/unmount, sync, then poweroff
         if backend == "zfs":
-            send_and_wait(child, "sudo zpool export anklume-data 2>&1 || true", "EXPORT_DONE")
+            send_and_wait(child, "sudo zpool export anklume 2>&1 || true", "EXPORT_DONE")
         elif backend == "btrfs":
-            send_and_wait(child, "sudo umount /mnt/anklume-data 2>&1 || true", "UMOUNT_DONE")
+            send_and_wait(child, "sudo umount /mnt/anklume 2>&1 || true", "UMOUNT_DONE")
         send_and_wait(child, "sync; sleep 2", "SYNC_DONE")
         child.sendline("sudo poweroff")
         try:

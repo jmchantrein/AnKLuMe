@@ -64,7 +64,7 @@ anklume Live OS permet de faire fonctionner une infrastructure compartimentee de
 
 - Chiffrement complet du disque de donnees avec LUKS2
 - Protection par phrase de passe ou fichier de cle (configurable au premier demarrage)
-- Ouvre vers `/dev/mapper/anklume-data-<pool-name>`
+- Ouvre vers `/dev/mapper/anklume-<pool-name>`
 - ZFS/BTRFS monte par-dessus
 
 **Ce que cela protege :** Toutes les donnees utilisateur, systemes de fichiers des conteneurs Incus, stockage persistant
@@ -495,7 +495,7 @@ sudo reboot
 **R :** Phrase de passe incorrecte ou fichier de cle manquant. Options :
 
 1. Redemarrer et reessayer la phrase de passe
-2. Utiliser un fichier de cle different : `sudo cryptsetup luksOpen /dev/nvme0n1 anklume-data --key-file ~/.backup-key`
+2. Utiliser un fichier de cle different : `sudo cryptsetup luksOpen /dev/nvme0n1 anklume --key-file ~/.backup-key`
 3. Ajouter une cle de recuperation depuis une sauvegarde (si disponible)
 
 ### Q : Le montage des donnees echoue : "zpool import failed"
@@ -507,10 +507,10 @@ sudo reboot
 ls -la /dev/mapper/anklume-*
 
 # List pools on device
-sudo zpool import -d /dev/mapper/anklume-data
+sudo zpool import -d /dev/mapper/anklume
 
 # If found, import manually
-sudo zpool import -d /dev/mapper/anklume-data pool-name
+sudo zpool import -d /dev/mapper/anklume pool-name
 
 # Verify mount
 mount | grep anklume
@@ -531,9 +531,9 @@ mount | grep anklume
 **R :** Un ou plusieurs services ont echoue. Verifier :
 
 ```bash
-sudo systemctl status anklume-data-mount.service
+sudo systemctl status anklume-mount.service
 sudo systemctl status anklume-first-boot.service
-sudo journalctl -u anklume-data-mount -n 50
+sudo journalctl -u anklume-mount -n 50
 ```
 
 Causes frequentes :

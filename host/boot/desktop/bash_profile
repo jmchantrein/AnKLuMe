@@ -1,6 +1,5 @@
 # shellcheck shell=bash
-# anklume: terminal-first boot with optional desktop via `startde`
-# Parsed parameter: anklume.desktop=<sway|labwc|kde|1>
+# anklume: auto-start KDE Plasma after setup wizard
 # Only activates on tty1 with no existing Wayland session
 
 # CLI autocompletion for anklume (Typer-based)
@@ -26,22 +25,12 @@ fi
 unset _current_tty
 
 if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
-    # Setup wizard: run on live ISO if not already configured
-    if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null && \
-       [ ! -f /run/anklume-start.done ]; then
-        echo ""
-        echo "  ╔══════════════════════════════════════════════════════════════╗"
-        echo "  ║  anklume Setup                                              ║"
-        echo "  ╚══════════════════════════════════════════════════════════════╝"
-        echo ""
-        # Stop the background service (it's blocking on tty2 waiting for input)
+    # On live ISO: stop the background service (it blocks tty2 waiting for input)
+    if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then
         sudo systemctl stop anklume-start.service 2>/dev/null || true
-        # Run wizard interactively on this tty
-        sudo /opt/anklume/scripts/start.sh
-        touch /run/anklume-start.done 2>/dev/null || true
     fi
 
-    # Parse anklume.desktop=<de> from kernel cmdline
+    # Check if KDE is requested via kernel cmdline (anklume.desktop=kde)
     ANKLUME_DE=""
     for param in $(cat /proc/cmdline); do
         case "$param" in
@@ -50,18 +39,26 @@ if [ "$(tty)" = "/dev/tty1" ] && [ -z "$WAYLAND_DISPLAY" ]; then
     done
     export ANKLUME_DE
 
-    # Define startde function — launches the desktop environment
-    startde() {
-        if [ -x /opt/anklume/host/boot/desktop/start-desktop.sh ]; then
-            /opt/anklume/host/boot/desktop/start-desktop.sh
-        else
-            echo "start-desktop.sh not found"
+    # Auto-launch KDE Plasma (no manual startde needed)
+    if [ "$ANKLUME_DE" = "kde" ]; then
+        # Auto-resume storage pool if previously configured (silent, fast)
+        # Skip if LUKS is enabled — needs interactive password
+        if [ -f /mnt/anklume-persist/pool.conf ] && \
+           ! grep -q 'LUKS_ENABLED=true' /mnt/anklume-persist/pool.conf 2>/dev/null; then
+            sudo /opt/anklume/scripts/start.sh --yes >/dev/null 2>&1 &
+            disown
         fi
-    }
-    export -f startde
+        # Launch open-learn.sh in background (waits for KDE, then opens browser)
+        if [ ! -f ~/.anklume/welcome-done ]; then
+            /opt/anklume/host/boot/desktop/open-learn.sh &
+            disown
+        fi
+        clear  # Remove console artifacts before KDE starts
+        exec /opt/anklume/host/boot/desktop/start-desktop.sh
+    fi
 
-    # Splash: show ASCII art + random quote + startde hint
-    if [ -n "$ANKLUME_DE" ] && [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
+    # Console mode (no anklume.desktop= on cmdline): show splash only
+    if [ -x /opt/anklume/host/boot/desktop/anklume-splash.sh ]; then
         /opt/anklume/host/boot/desktop/anklume-splash.sh
     fi
 fi

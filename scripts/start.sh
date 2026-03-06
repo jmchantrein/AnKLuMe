@@ -51,7 +51,7 @@ declare -r BOOTSTRAP_IMAGE="${BOOTSTRAP_IMAGE:-$(
         *)      echo "images:debian/12/amd64" ;;
     esac
 )}"
-declare -r POOL_NAME="anklume-data"
+declare -r POOL_NAME="anklume"
 # shellcheck disable=SC2034  # referenced in sourced scripts
 declare -r INCUS_DIR="/var/lib/incus"
 declare -r LUKS_NAME="anklume-crypt"
@@ -96,8 +96,16 @@ cleanup_lock() {
 # info(), ok(), warn(), err() provided by live-os-lib.sh
 success() { ok "$@"; }
 
+_is_french() {
+    local lang="${LANG:-}"
+    [[ "$lang" == fr* ]] && return 0
+    grep -q 'KEYMAP=fr' /etc/vconsole.conf 2>/dev/null && return 0
+    return 1
+}
+
 prompt_yes_no() {
     local prompt="$1"
+    local default_yes="${2:-false}"
     local response
 
     if [[ "$CONFIRM_YES" == "true" ]]; then
@@ -105,12 +113,24 @@ prompt_yes_no() {
         return 0
     fi
 
+    local hint="(y/n)"
+    if _is_french; then
+        hint="(O/n)"
+        [[ "$default_yes" == "true" ]] && hint="(O/n, défaut: O)"
+    else
+        [[ "$default_yes" == "true" ]] && hint="(Y/n, default: Y)"
+    fi
+
     while true; do
-        read -r -p "${prompt} (y/n): " response
+        read -r -p "${prompt} ${hint}: " response
+        # Default to yes if requested and user just presses Enter
+        if [[ -z "$response" && "$default_yes" == "true" ]]; then
+            return 0
+        fi
         case "${response}" in
-            [yY]) return 0 ;;
+            [yYoO]) return 0 ;;
             [nN]) return 1 ;;
-            *) echo "Please answer y or n" ;;
+            *) echo "Please answer y/o or n" ;;
         esac
     done
 }
@@ -657,7 +677,11 @@ resume_existing_pool() {
         # pool.conf found — read the saved configuration
         # shellcheck source=/dev/null
         source /mnt/anklume-persist/pool.conf 2>/dev/null
-        info "Existing anklume configuration found:"
+        if _is_french; then
+            info "Configuration anklume existante détectée :"
+        else
+            info "Existing anklume configuration found:"
+        fi
         echo "  Backend:    ${POOL_BACKEND:-unknown}"
         echo "  Pool:       ${POOL_NAME:-unknown}"
         echo "  Device:     ${POOL_DEVICE:-none}"
@@ -665,7 +689,13 @@ resume_existing_pool() {
         echo ""
 
         if [[ "$CONFIRM_YES" != "true" ]]; then
-            if ! prompt_yes_no "Resume this configuration?"; then
+            local resume_prompt
+            if _is_french; then
+                resume_prompt="Reprendre cette configuration ?"
+            else
+                resume_prompt="Resume this configuration?"
+            fi
+            if ! prompt_yes_no "$resume_prompt" "true"; then
                 return 1
             fi
         fi
@@ -727,7 +757,11 @@ resume_existing_pool() {
     fi
 
     # Detected via blkid — disk has an existing filesystem
-    info "Existing anklume pool detected on $DISK:"
+    if _is_french; then
+        info "Pool anklume existant détecté sur $DISK :"
+    else
+        info "Existing anklume pool detected on $DISK:"
+    fi
     case "$detected" in
         luks)  echo "  Type: LUKS-encrypted volume" ;;
         zfs)   echo "  Type: ZFS pool" ;;
@@ -736,7 +770,13 @@ resume_existing_pool() {
     echo ""
 
     if [[ "$CONFIRM_YES" != "true" ]]; then
-        if ! prompt_yes_no "Resume this existing pool?"; then
+        local blkid_prompt
+        if _is_french; then
+            blkid_prompt="Reprendre ce pool existant ?"
+        else
+            blkid_prompt="Resume this existing pool?"
+        fi
+        if ! prompt_yes_no "$blkid_prompt" "true"; then
             warn "User chose not to resume. Proceeding to fresh setup."
             return 1
         fi
@@ -851,7 +891,19 @@ configure_incus_storage() {
         zfs)
             incus_source="$POOL_NAME"
             info "Creating Incus ZFS storage pool..."
-            incus storage create "$POOL_NAME" zfs source="$incus_source" 2>&1 || create_rc=$?
+            # On reboot (live ISO), Incus is fresh but the ZFS pool already
+            # exists with its datasets. Use the existing pool as-is.
+            if zpool list "$POOL_NAME" &>/dev/null; then
+                incus storage create "$POOL_NAME" zfs source="$incus_source" 2>&1 || {
+                    # If datasets already exist (e.g. containers/), try
+                    # referencing the pool without letting Incus create datasets
+                    warn "Standard create failed, trying with existing datasets..."
+                    incus storage create "$POOL_NAME" zfs source="$incus_source" \
+                        zfs.pool_name="$POOL_NAME" 2>&1 || create_rc=$?
+                }
+            else
+                incus storage create "$POOL_NAME" zfs source="$incus_source" 2>&1 || create_rc=$?
+            fi
             if [[ $create_rc -ne 0 ]]; then
                 die "Failed to create Incus ZFS storage pool (exit code $create_rc)"
             fi
@@ -925,22 +977,30 @@ copy_framework() {
         die "anklume repository not found at: $ANKLUME_REPO"
     fi
 
-    # Determine destination based on backend
-    local dest_dir=""
+    # All backends: mount persistent storage on /home/anklume/data
+    # Uses a subdirectory to preserve the home directory (desktop files, .config, etc.)
+    local dest_dir="/home/anklume/data"
 
     case "$BACKEND" in
         zfs)
-            # For ZFS, create a dataset with a mountpoint
-            dest_dir="/${POOL_NAME}/anklume"
-            zfs create -o mountpoint="$dest_dir" "${POOL_NAME}/anklume" 2>/dev/null || {
+            # Create a ZFS dataset mounted on /home/anklume/data
+            mkdir -p "$dest_dir"
+            zfs create -o mountpoint="$dest_dir" "${POOL_NAME}/data" 2>/dev/null || {
                 # Dataset may already exist; ensure mountpoint exists
                 mkdir -p "$dest_dir" 2>/dev/null || true
             }
             ;;
         btrfs)
-            dest_dir="$POOL_MOUNT_POINT/anklume"
-            if [[ ! -d "$dest_dir" ]]; then
-                mkdir -p "$dest_dir" || die "Failed to create framework directory"
+            # Create a BTRFS subvolume, bind-mount to /home/anklume/data
+            local subvol_path="$POOL_MOUNT_POINT/@data"
+            if [[ ! -d "$subvol_path" ]]; then
+                btrfs subvolume create "$subvol_path" || die "Failed to create BTRFS subvolume"
+            fi
+            mkdir -p "$dest_dir"
+            if ! mountpoint -q "$dest_dir" 2>/dev/null; then
+                mount -o subvol=@data "$POOL_MOUNT_POINT" "$dest_dir" 2>/dev/null || \
+                    mount --bind "$subvol_path" "$dest_dir" || \
+                    die "Failed to mount BTRFS subvolume on $dest_dir"
             fi
             ;;
         dir)
@@ -950,7 +1010,7 @@ copy_framework() {
             ;;
     esac
 
-    info "Saving framework to persistent storage..."
+    info "Saving framework to persistent storage ($dest_dir)..."
     # Use rsync or tar to preserve permissions
     if command -v rsync &>/dev/null; then
         rsync -a --exclude='.git' --exclude='.venv' "$ANKLUME_REPO/" "$dest_dir/" || \
@@ -962,6 +1022,11 @@ copy_framework() {
             die "Failed to copy framework with tar"
     fi
 
+    # Ensure anklume user owns their home
+    if id anklume &>/dev/null; then
+        chown -R anklume:anklume "$dest_dir"
+    fi
+
     success "Framework copied to $dest_dir"
 }
 
@@ -971,23 +1036,39 @@ bootstrap_incus() {
         die "Incus storage pool $POOL_NAME not found"
     fi
 
-    local container_name="anklume-bootstrap"
+    local container_name="anklume-instance"
 
     # Check if container already exists
-    if incus list | grep -q "$container_name"; then
+    if incus list --format csv -c n 2>/dev/null | grep -q "^${container_name}$"; then
         warn "Container $container_name already exists, skipping bootstrap"
         return 0
     fi
 
-    info "Launching bootstrap container..."
+    info "Launching anklume-instance..."
     if ! incus launch "$BOOTSTRAP_IMAGE" "$container_name" \
         -s "$POOL_NAME" \
         -c limits.memory=2GiB \
-        -c limits.cpu=2; then
+        -c limits.cpu=2 \
+        -c security.nesting=true; then
         # Show container start log for diagnostics
         incus info "$container_name" --show-log 2>&1 | tail -20 || true
-        die "Failed to launch bootstrap container"
+        die "Failed to launch anklume-instance"
     fi
+
+    # Mount Incus socket into the container (ADR-004)
+    incus config device add "$container_name" incus-socket proxy \
+        connect=unix:/var/lib/incus/unix.socket \
+        listen=unix:/var/run/incus/unix.socket \
+        bind=container 2>/dev/null || true
+
+    # Mount the framework read-only
+    local framework_dir="/home/anklume/data"
+    if [[ "$BACKEND" == "dir" ]]; then
+        framework_dir="$ANKLUME_REPO"
+    fi
+    incus config device add "$container_name" anklume-repo disk \
+        source="$framework_dir" \
+        path=/opt/anklume 2>/dev/null || true
 
     # Wait for container to be ready
     local wait_count=0
@@ -1003,11 +1084,39 @@ bootstrap_incus() {
         warn "Container did not become ready within 30 seconds"
     fi
 
-    # Initialize basic container configuration
-    incus exec "$container_name" -- apt update -y >/dev/null 2>&1 || true
-    incus exec "$container_name" -- apt install -y curl git >/dev/null 2>&1 || true
+    # Install essentials
+    info "Installing packages in $container_name (this may take a minute)..."
+    incus exec "$container_name" -- sh -c \
+        "apt update -y && apt install -y python3 python3-pip git curl" >/dev/null 2>&1 || true
+    incus exec "$container_name" -- sh -c \
+        "pip3 install --root-user-action=ignore --break-system-packages typer pyyaml rich 2>&1 | tail -3" || true
 
-    success "Bootstrap container ready"
+    # Create anklume CLI wrapper (uses PYTHONPATH, no pip build needed)
+    incus exec "$container_name" -- sh -c \
+        'printf "#!/bin/sh\nPYTHONPATH=/opt/anklume exec python3 -m scripts.cli \"\$@\"\n" > /usr/local/bin/anklume && chmod +x /usr/local/bin/anklume'
+
+    # Set working directory to /opt/anklume on login
+    incus exec "$container_name" -- sh -c \
+        'grep -q "cd /opt/anklume" /root/.bashrc 2>/dev/null || echo "cd /opt/anklume" >> /root/.bashrc'
+
+    success "anklume-instance ready"
+}
+
+
+enter_instance() {
+    # Replace the terminal shell with anklume-instance bash.
+    # The host web server (read-only) keeps running — it serves the
+    # learning platform UI while the terminal lands inside the container.
+    local container_name="${1:-anklume-instance}"
+
+    if ! incus list --format csv -c n 2>/dev/null | grep -q "^${container_name}$"; then
+        return
+    fi
+
+    echo ""
+    success "anklume-instance ready — terminal switching to container"
+    echo ""
+    exec incus exec "$container_name" -- bash -l
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1110,9 +1219,9 @@ main() {
             echo "║  anklume Setup Complete (resumed)                        ║"
             echo "╠════════════════════════════════════════════════════════════╣"
             echo "║  Storage: $BACKEND pool '$POOL_NAME' ready"
-            echo "║  Next: run 'anklume guide' to get started                 ║"
             echo "╚════════════════════════════════════════════════════════════╝"
             echo ""
+            enter_instance
             return 0
         fi
     fi
@@ -1202,11 +1311,10 @@ main() {
     if [[ "$LUKS_ENABLED" == "true" ]]; then
     echo "║  Encryption: LUKS enabled"
     fi
-    echo "║  Container: anklume-bootstrap running"
-    echo "╠════════════════════════════════════════════════════════════╣"
-    echo "║  Next: run 'anklume guide' to get started                 ║"
+    echo "║  Container: anklume-instance running"
     echo "╚════════════════════════════════════════════════════════════╝"
     echo ""
+    enter_instance
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

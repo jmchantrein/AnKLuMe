@@ -343,9 +343,9 @@ def build_phases(distro: str) -> list[Phase]:
         Test("NVIDIA modules present (skip in QEMU)",
              "test -d /sys/module/nvidia 2>/dev/null && echo PASS || "
              "(find /lib/modules/ -name 'nvidia.ko*' 2>/dev/null | grep -q nvidia && echo PASS || echo PASS)"),
-        Test("startde defined in bash_profile",
-             "grep -q 'startde()' /home/anklume/.bash_profile 2>/dev/null "
-             "|| grep -q 'startde()' /opt/anklume/host/boot/desktop/bash_profile 2>/dev/null "
+        Test("KDE auto-start in bash_profile",
+             "grep -q 'exec /opt/anklume/host/boot/desktop/start-desktop.sh' /home/anklume/.bash_profile 2>/dev/null "
+             "|| grep -q 'exec /opt/anklume/host/boot/desktop/start-desktop.sh' /opt/anklume/host/boot/desktop/bash_profile 2>/dev/null "
              "&& echo PASS || echo FAIL"),
     ])
     # KDE/Desktop config

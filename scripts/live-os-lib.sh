@@ -39,7 +39,7 @@ PERSIST_SIZE_MB=100
 # ── Mount point constants ──────────────────────────────────
 
 PERSIST_MNT="/mnt/anklume-persist"
-DATA_MNT="/mnt/anklume-data"
+DATA_MNT="/mnt/anklume"
 
 # ── Config file paths ──────────────────────────────────────
 

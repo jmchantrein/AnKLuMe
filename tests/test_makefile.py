@@ -91,7 +91,7 @@ class TestMakefileTargetPresence:
         "test", "test-generator", "test-roles",
         "matrix-coverage",
         "flush", "upgrade", "import-infra",
-        "guide", "quickstart",
+        "quickstart",
         "init", "help",
         "ai-switch", "ai-test",
         "agent-fix", "agent-develop",
@@ -168,7 +168,7 @@ class TestMakefileTargetHelp:
         documented = _extract_documented_targets(content)
         # The help target uses grep for '##' lines, so all documented targets appear
         assert len(documented) > 20, f"Expected 20+ documented targets, got {len(documented)}"
-        essential = ["sync", "lint", "apply", "test", "help", "guide", "init"]
+        essential = ["sync", "lint", "apply", "test", "help", "init"]
         for target in essential:
             assert target in documented, f"Target '{target}' missing from documented targets"
 
@@ -211,16 +211,6 @@ class TestMakefileTargetHelp:
                 f"Target '{target}' has ## comment but not in documented targets"
             )
 
-    def test_help_mentions_make_guide_in_getting_started(self):
-        """make help mentions 'make guide' in the GETTING STARTED section."""
-        content = _parse_makefile()
-        # Find the GETTING STARTED section (ends at next category header)
-        getting_started_match = re.search(
-            r"GETTING STARTED.*?(?=CORE WORKFLOW|\Z)", content, re.DOTALL
-        )
-        assert getting_started_match, "GETTING STARTED section not found"
-        section = getting_started_match.group(0)
-        assert "guide" in section, "'guide' not mentioned in GETTING STARTED section"
 
 
 # ── TestMakefileTargetDependencies ───────────────────────────
@@ -477,13 +467,6 @@ class TestMakefileRecipes:
             "import-infra should call scripts/import-infra.sh"
         )
 
-    def test_guide_calls_script(self):
-        """guide calls scripts/guide.sh with STEP and AUTO handling."""
-        content = _parse_makefile()
-        recipe = _get_recipe(content, "guide")
-        assert "guide.sh" in recipe, "guide should call scripts/guide.sh"
-        assert "STEP" in recipe, "guide should handle STEP variable"
-        assert "AUTO" in recipe, "guide should handle AUTO variable"
 
 
 # ── TestMakefileShellSetting ─────────────────────────────

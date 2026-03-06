@@ -12,6 +12,7 @@ from rich.console import Console
 console = Console()
 
 _learn_incus_cache: bool | None = None
+_intensive_cache: bool | None = None
 
 # Project root: two levels up from scripts/cli/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -51,6 +52,37 @@ def is_learn_incus() -> bool:
         except FileNotFoundError:
             _learn_incus_cache = False
     return _learn_incus_cache
+
+
+def is_intensive() -> bool:
+    """Check if intensive dev mode is enabled (~/.anklume/intensive)."""
+    global _intensive_cache  # noqa: PLW0603
+    if _intensive_cache is None:
+        try:
+            _intensive_cache = (
+                Path.home() / ".anklume" / "intensive"
+            ).read_text().strip() == "on"
+        except FileNotFoundError:
+            _intensive_cache = False
+    return _intensive_cache
+
+
+def is_host() -> bool:
+    """Return True if running on the host, False if inside a container."""
+    try:
+        virt = subprocess.run(
+            ["systemd-detect-virt", "--container"],
+            capture_output=True, text=True, check=False,
+        )
+        # Exit 0 + output means we're in a container
+        return virt.returncode != 0
+    except FileNotFoundError:
+        # Fallback: check cgroup for container markers
+        try:
+            cgroup = Path("/proc/1/cgroup").read_text()
+            return "incus" not in cgroup and "lxc" not in cgroup
+        except OSError:
+            return True
 
 
 def format_bytes(n: int) -> str:

@@ -50,22 +50,10 @@ Feature: Gate scenarios — critical prerequisites for dependent features
     When I run "python3 -m py_compile scripts/cli/learn.py"
     Then exit code is 0
 
-  @gate.ws_terminal
-  Scenario: WebSocket terminal module compiles
+@gate.content_model
+  Scenario: Content model imports and guide loads
     Given "python3" is available
-    When I run "python3 -m py_compile scripts/web/ws_terminal.py"
-    Then exit code is 0
-
-  @gate.pty_module
-  Scenario: PTY manager module compiles
-    Given "python3" is available
-    When I run "python3 -m py_compile scripts/web/pty_manager.py"
-    Then exit code is 0
-
-  @gate.content_model
-  Scenario: Content model loads guide chapters
-    Given "python3" is available
-    When I run "python3 -c 'from scripts.web.content import load_guide_sections; s = load_guide_sections(); assert len(s[0].pages) == 8'"
+    When I run "python3 -c 'from scripts.web.content import load_guide_sections, load_lab; s = load_guide_sections(); assert len(s) == 1 and len(s[0].pages) == 8'"
     Then exit code is 0
 
   @gate.platform_server
@@ -88,17 +76,6 @@ Feature: Gate scenarios — critical prerequisites for dependent features
     When I run "cd scripts && python3 -c 'import welcome'"
     Then exit code is 0
 
-  @gate.guide_help
-  Scenario: Guide script shows help
-    Given "bash" is available
-    When I run "bash scripts/guide.sh --help"
-    Then exit code is 0
-
-  @gate.guide_lib
-  Scenario: Guide lib is sourceable
-    Given "bash" is available
-    When I run "bash -c 'source scripts/guide-lib.sh'"
-    Then exit code is 0
 
   # ── Live ISO scripts ─────────────────────────────────────
 

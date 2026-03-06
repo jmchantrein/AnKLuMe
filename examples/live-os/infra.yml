@@ -99,10 +99,10 @@ domains:
 # This will be automatically created on the encrypted data disk during first-boot
 storage:
   # Primary storage pool for container filesystems
-  pool_name: anklume-data
+  pool_name: anklume
   pool_type: zfs          # ZFS enables snapshots, compression, dedup
   compression: zstd       # Fast, high-ratio compression
-  mount_point: /var/lib/incus/storage-pools/anklume-data
+  mount_point: /var/lib/incus/storage-pools/anklume
 
 
 # Networking: Isolation rules between domains

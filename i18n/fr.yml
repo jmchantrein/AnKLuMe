@@ -4,7 +4,6 @@
 # Format: target_name: "Description en français"
 
 # ── Getting started ──────────────────────────────────────
-guide: "Tutoriel interactif pas-à-pas"
 learn: "Plateforme d'apprentissage avec terminal intégré (PORT=8890)"
 learn-setup: "Créer le conteneur anklume-learn et l'infrastructure de démo"
 learn-teardown: "Détruire le conteneur anklume-learn"

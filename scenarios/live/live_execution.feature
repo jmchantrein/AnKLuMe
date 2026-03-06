@@ -76,11 +76,11 @@ Feature: Live ISO — real execution tests
     And output contains "PASS"
 
   # ══════════════════════════════════════════════════════════════
-  # G. bash_profile — startde is NOT auto-launched
+  # G. bash_profile — KDE auto-start is guarded
   # ══════════════════════════════════════════════════════════════
 
   @requires.start_exec
-  Scenario: bash_profile defines startde but never auto-launches desktop
+  Scenario: bash_profile KDE auto-start is guarded by ANKLUME_DE check
     When I run "bash scripts/test-start.sh bash-profile-no-auto" and it may fail
     Then exit code is 0
     And output contains "PASS"

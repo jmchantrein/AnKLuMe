@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # mount-data.sh — Mount LUKS-encrypted data partition (ZFS or BTRFS)
-# Called by: anklume-data-mount.service
+# Called by: anklume-mount.service
 #
 # This script:
 #   1. Ensures persist partition is mounted
@@ -72,7 +72,7 @@ main() {
 
     # Step 3: Open LUKS encrypted partition
     info "Step 3: Opening LUKS partition $data_device..."
-    local luks_mapper_name="anklume-data-${pool_name}"
+    local luks_mapper_name="anklume-${pool_name}"
 
     # Check if already open
     if [ -e "/dev/mapper/$luks_mapper_name" ]; then

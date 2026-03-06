@@ -338,10 +338,3 @@ Feature: CLI workflows — multi-command integration chains
     Then exit code is 0
     When I run "python3 -m scripts.cli desktop reset --help"
     Then exit code is 0
-
-  @requires.cli_help
-  Scenario: desktop plugins → desktop config help chain
-    When I run "python3 -m scripts.cli desktop plugins --help"
-    Then exit code is 0
-    When I run "python3 -m scripts.cli desktop config --help"
-    Then exit code is 0

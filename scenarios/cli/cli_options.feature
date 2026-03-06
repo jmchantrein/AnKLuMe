@@ -373,11 +373,8 @@ Feature: CLI options — combinatorial coverage of complex commands
     And output contains "<option>"
 
     Examples:
-      | subcmd  | option   |
-      | apply   | --engine |
-      | reset   | --engine |
-      | plugins | plugins  |
-      | config  | config   |
+      | subcmd  | option  |
+      | plugins | plugins |
 
   # ══════════════════════════════════════════════════════════════
   # A4.14 — backup subcommand options

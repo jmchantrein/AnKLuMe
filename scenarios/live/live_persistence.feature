@@ -587,9 +587,9 @@ Feature: Live ISO persistence — start.sh exhaustive coverage
   # ══════════════════════════════════════════════════════════════
 
   @requires.start_syntax
-  Scenario: POOL_NAME is anklume-data
+  Scenario: POOL_NAME is anklume
     Given the script "scripts/start.sh" source is loaded
-    Then the script sets "POOL_NAME" to "anklume-data"
+    Then the script sets "POOL_NAME" to "anklume"
 
   @requires.start_syntax
   Scenario: LUKS_NAME constant is anklume-crypt

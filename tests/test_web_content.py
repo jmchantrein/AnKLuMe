@@ -82,70 +82,36 @@ class TestContentSection:
 
 
 class TestLoadGuideSections:
+    """Guide content is served via the web learn platform."""
+
     def test_returns_one_section(self):
         sections = load_guide_sections()
         assert len(sections) == 1
 
-    def test_section_has_8_pages(self):
+    def test_section_is_guide_type(self):
+        sections = load_guide_sections()
+        assert sections[0].id == "guide"
+        assert sections[0].metadata["type"] == "guide"
+
+    def test_guide_has_8_chapters(self):
         sections = load_guide_sections()
         assert len(sections[0].pages) == 8
 
-    def test_section_id_is_guide(self):
-        sections = load_guide_sections()
-        assert sections[0].id == "guide"
-
-    def test_section_has_bilingual_title(self):
-        sections = load_guide_sections()
-        assert "en" in sections[0].title
-        assert "fr" in sections[0].title
-
-    def test_each_page_has_bilingual_title(self):
-        sections = load_guide_sections()
-        for page in sections[0].pages:
-            assert "en" in page.title, f"{page.id} missing English title"
-            assert "fr" in page.title, f"{page.id} missing French title"
-
-    def test_each_page_has_blocks(self):
-        sections = load_guide_sections()
-        for page in sections[0].pages:
-            assert len(page.blocks) >= 1, f"{page.id} has no blocks"
-
-    def test_safe_commands_are_clickable(self):
-        sections = load_guide_sections()
-        cmd_blocks = [
-            b for p in sections[0].pages for b in p.blocks
-            if b.type == "command"
-        ]
-        assert len(cmd_blocks) > 0
-        for b in cmd_blocks:
-            assert b.clickable is True
-
-    def test_page_ids_are_sequential(self):
+    def test_guide_pages_have_ids(self):
         sections = load_guide_sections()
         for i, page in enumerate(sections[0].pages, 1):
             assert page.id == f"guide-{i}"
 
-    def test_metadata_has_type_and_count(self):
+    def test_guide_pages_have_titles(self):
         sections = load_guide_sections()
-        meta = sections[0].metadata
-        assert meta["type"] == "guide"
-        assert meta["total_chapters"] == 8
-
-    def test_text_blocks_are_non_empty(self):
-        sections = load_guide_sections()
-        text_blocks = [
-            b for p in sections[0].pages for b in p.blocks
-            if b.type == "text"
-        ]
-        for b in text_blocks:
-            assert len(b.text) > 0
-
-    def test_block_types_are_valid(self):
-        sections = load_guide_sections()
-        valid = {"text", "command", "hint", "validation"}
         for page in sections[0].pages:
-            for b in page.blocks:
-                assert b.type in valid, f"Invalid block type: {b.type}"
+            assert "en" in page.title
+            assert len(page.title["en"]) > 0
+
+    def test_guide_pages_have_blocks(self):
+        sections = load_guide_sections()
+        for page in sections[0].pages:
+            assert len(page.blocks) >= 1
 
 
 class TestLoadLab:

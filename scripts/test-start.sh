@@ -174,15 +174,14 @@ test_bash_profile_no_autolaunch() {
         echo "FAIL: bash_profile not found"
         exit 1
     fi
-    # Check for any line that would auto-launch the desktop
-    # Allowed: function definition (startde() {), export -f startde
-    # Forbidden: bare "startde" call, "exec startde", "exec startplasma"
-    if grep -qE '^\s*(exec\s+)?(startde|startplasma|sway)\s*$' "$profile"; then
-        echo "FAIL: bash_profile auto-launches desktop"
-        grep -nE '^\s*(exec\s+)?(startde|startplasma|sway)\s*$' "$profile"
+    # KDE auto-launches via exec start-desktop.sh (guarded by ANKLUME_DE=kde)
+    # Forbidden: bare unguarded "exec startplasma" or "exec sway" calls
+    if grep -qE '^\s*exec\s+(startplasma|sway)\s*$' "$profile"; then
+        echo "FAIL: bash_profile has unguarded exec of DE"
+        grep -nE '^\s*exec\s+(startplasma|sway)\s*$' "$profile"
         exit 1
     fi
-    echo "PASS: bash_profile defines startde() but never calls it"
+    echo "PASS: bash_profile KDE auto-start is guarded by ANKLUME_DE check"
     exit 0
 }
 

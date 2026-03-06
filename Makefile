@@ -25,7 +25,7 @@ define require_container
 			echo "    cd /root/anklume" >&2; \
 			echo "    make $(1)" >&2; \
 			echo "" >&2; \
-			echo "  Or run the interactive guide: make guide" >&2; \
+			echo "  Or run: anklume --help" >&2; \
 			echo "" >&2; \
 			exit 1; \
 		fi; \
@@ -640,17 +640,7 @@ import-infra: ## Generate infra.yml from existing Incus state
 	@scripts/import-infra.sh $(if $(O),-o $(O))
 
 # ── Getting Started ──────────────────────────────────────
-guide: ## Interactive capability tour (CHAPTER=N, SETUP=1, AUTO=1)
-	@if grep -q 'boot=anklume' /proc/cmdline 2>/dev/null; then \
-		python3 scripts/welcome.py --tui; \
-	else \
-		scripts/guide.sh \
-			$(if $(CHAPTER),--chapter $(CHAPTER)) \
-			$(if $(SETUP),--setup) \
-			$(if $(STEP),--step $(STEP)) \
-			$(if $(AUTO),--auto) \
-			$(if $(LANG),--lang $(LANG)); \
-	fi
+
 
 learn: ## Learning platform with split-pane terminal (PORT=8890)
 	python3 scripts/platform_server.py --port $(or $(PORT),8890)
@@ -729,7 +719,6 @@ else
 	@printf "  \033[1manklume\033[0m — Infrastructure Compartmentalization\n"
 	@printf "\n"
 	@printf "  \033[1;32mGETTING STARTED\033[0m\n"
-	@printf "    \033[36m%-22s\033[0m %s\n" "make guide" "Interactive step-by-step tutorial"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make quickstart" "Copy example infra.yml and sync"
 	@printf "    \033[36m%-22s\033[0m %s\n" "make init" "Install Ansible dependencies"
 	@printf "\n"
@@ -832,4 +821,4 @@ help-all: ## Show all available targets
         mcp-dev-start mcp-dev-stop mcp-dev-status mcp-dev-logs \
         lab-list lab-start lab-check lab-hint lab-reset lab-solution \
         mode-student mode-user mode-dev \
-        guide learn learn-setup learn-teardown quickstart init install-hooks help help-all
+        learn learn-setup learn-teardown quickstart init install-hooks help help-all

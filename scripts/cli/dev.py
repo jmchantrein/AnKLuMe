@@ -4,9 +4,43 @@ from typing import Annotated
 
 import typer
 
-from scripts.cli._helpers import PROJECT_ROOT, run_cmd, run_make, run_script
+from scripts.cli._helpers import PROJECT_ROOT, console, is_intensive, run_cmd, run_make, run_script
 
 app = typer.Typer(name="dev", help="Development, testing, and code quality tools.", hidden=True)
+
+
+def _changed_test_files() -> list[str]:
+    """Detect test files related to git-changed source files."""
+    import subprocess as sp
+
+    result = sp.run(
+        ["git", "diff", "--name-only", "HEAD"],
+        capture_output=True, text=True, check=False,
+        cwd=str(PROJECT_ROOT),
+    )
+    changed = result.stdout.strip().splitlines() if result.returncode == 0 else []
+    # Also include untracked files
+    result2 = sp.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True, text=True, check=False,
+        cwd=str(PROJECT_ROOT),
+    )
+    if result2.returncode == 0:
+        changed.extend(result2.stdout.strip().splitlines())
+
+    test_files = set()
+    for path in changed:
+        if path.startswith("tests/") and path.endswith(".py"):
+            test_files.add(path)
+        elif path.startswith("scripts/"):
+            # Map scripts/X.py → tests/test_X.py
+            from pathlib import PurePosixPath
+
+            stem = PurePosixPath(path).stem
+            candidate = PROJECT_ROOT / "tests" / f"test_{stem}.py"
+            if candidate.is_file():
+                test_files.add(str(candidate.relative_to(PROJECT_ROOT)))
+    return sorted(test_files)
 
 
 @app.command()
@@ -15,18 +49,34 @@ def test(
     roles: Annotated[bool, typer.Option("--roles", help="Run Molecule role tests")] = False,
     role: Annotated[str | None, typer.Option("--role", "-r", help="Test a specific role")] = None,
     sandboxed: Annotated[bool, typer.Option("--sandboxed", help="Run tests in sandbox VM")] = False,
+    fast: Annotated[bool, typer.Option("--fast", "-f", help="Parallel execution (pytest-xdist)")] = False,
+    changed: Annotated[bool, typer.Option("--changed", "-c", help="Only test files related to git changes")] = False,
+    full: Annotated[bool, typer.Option("--full", help="Force verbose mode (override intensive)")] = False,
 ) -> None:
     """Run tests (pytest + Molecule)."""
     if sandboxed:
         run_make("test-sandboxed")
-    elif role:
+        return
+    if role:
         run_cmd(["molecule", "test", "-s", "default"], cwd=str(PROJECT_ROOT / "roles" / role))
-    elif generator:
-        run_cmd(["python3", "-m", "pytest", "tests/", "-v", "--tb=short"], cwd=str(PROJECT_ROOT))
-    elif roles:
+        return
+    if roles:
         run_script("run-tests.sh", "roles")
-    else:
-        run_cmd(["python3", "-m", "pytest", "tests/", "-v", "--tb=short"], cwd=str(PROJECT_ROOT))
+        return
+
+    # Determine test files
+    test_targets = ["tests/"]
+    if changed:
+        test_targets = _changed_test_files()
+        if not test_targets:
+            console.print("[green]No test files affected by current changes.[/green]")
+            return
+
+    # Determine pytest flags: --fast or intensive mode (unless --full overrides)
+    use_parallel = (fast or is_intensive()) and not full
+    pytest_args = ["-n", "auto", "-x", "-q", "--tb=short"] if use_parallel else ["-v", "--tb=short"]
+
+    run_cmd(["python3", "-m", "pytest", *test_targets, *pytest_args], cwd=str(PROJECT_ROOT))
 
 
 @app.command()
@@ -87,6 +137,11 @@ def scenario(
         run_make("scenario-test-best")
     elif bad:
         run_make("scenario-test-bad")
+    elif is_intensive():
+        run_cmd(
+            ["python3", "-m", "behave", "scenarios/", "--no-capture", "-v", "--stop"],
+            cwd=str(PROJECT_ROOT),
+        )
     else:
         run_make("scenario-test")
 
@@ -185,6 +240,120 @@ def runner(
         from scripts.cli._helpers import console
 
         console.print(f"[red]Unknown action:[/red] {action}. Use: create, destroy")
+        raise typer.Exit(1)
+
+
+@app.command()
+def intensive(
+    state: Annotated[str | None, typer.Argument(help="on or off (omit to show status)")] = None,
+) -> None:
+    """Toggle intensive development mode (parallel tests, fail-fast)."""
+    from pathlib import Path
+
+    flag_file = Path.home() / ".anklume" / "intensive"
+
+    if state is None:
+        current = "on" if is_intensive() else "off"
+        console.print(f"Intensive mode: [bold]{current}[/bold]")
+        if current == "on":
+            console.print("[dim]  pytest: -n auto -x -q --tb=short[/dim]")
+            console.print("[dim]  behave: --stop[/dim]")
+        return
+
+    if state not in ("on", "off"):
+        console.print(f"[red]Invalid state:[/red] {state}. Use: on, off")
+        raise typer.Exit(1)
+
+    flag_file.parent.mkdir(parents=True, exist_ok=True)
+    flag_file.write_text(state + "\n")
+    if state == "on":
+        console.print("[green]Intensive mode ON[/green] — parallel tests, fail-fast")
+    else:
+        console.print("[yellow]Intensive mode OFF[/yellow] — verbose sequential tests")
+
+
+@app.command("9p")
+def ninep(
+    action: Annotated[str, typer.Argument(help="mount, umount, status, push, or restart")],
+    service: Annotated[str | None, typer.Argument(help="Service to restart (e.g. platform_server)")] = None,
+) -> None:
+    """Hot-reload development via 9p virtfs (run inside the VM).
+
+    The host shares the project read-only via QEMU -virtfs.
+    Run these commands inside the VM to mount, push changes,
+    and restart services — no ISO rebuild, no SSH.
+
+    \b
+    Actions:
+      mount    Mount 9p share at /mnt/anklume
+      umount   Unmount the 9p share
+      status   Show mount status and diff vs embedded copy
+      push     Copy changed files from 9p mount to /opt/anklume
+      restart  Restart a service (e.g. platform_server)
+    """
+    import subprocess as sp
+
+    mount_point = "/mnt/anklume"
+    target_dir = "/opt/anklume"
+
+    if action == "mount":
+        run_cmd(["sudo", "mkdir", "-p", mount_point])
+        run_cmd(["sudo", "mount", "-t", "9p", "-o", "trans=virtio,ro",
+                 "anklume-src", mount_point])
+        console.print(f"[green]9p share mounted at {mount_point}[/green]")
+    elif action == "umount":
+        run_cmd(["sudo", "umount", mount_point], check=False)
+        console.print("[yellow]9p share unmounted[/yellow]")
+    elif action == "status":
+        rc = sp.run(["mountpoint", "-q", mount_point],
+                    capture_output=True, check=False).returncode
+        if rc == 0:
+            console.print(f"[green]9p: mounted at {mount_point}[/green]")
+            # Show diff summary
+            result = sp.run(
+                ["diff", "-rq", "--exclude=__pycache__", "--exclude=.git",
+                 f"{mount_point}/scripts", f"{target_dir}/scripts"],
+                capture_output=True, text=True, check=False,
+            )
+            if result.stdout.strip():
+                console.print("[yellow]Changed files:[/yellow]")
+                for line in result.stdout.strip().splitlines():
+                    console.print(f"  {line}")
+            else:
+                console.print("[dim]No differences[/dim]")
+        else:
+            console.print("[red]9p: not mounted[/red]")
+    elif action == "push":
+        rc = sp.run(["mountpoint", "-q", mount_point],
+                    capture_output=True, check=False).returncode
+        if rc != 0:
+            console.print("[red]Not mounted. Run: anklume dev 9p mount[/red]")
+            raise typer.Exit(1)
+        run_cmd(["sudo", "rsync", "-a", "--exclude=__pycache__",
+                 "--exclude=.git",
+                 f"{mount_point}/scripts/", f"{target_dir}/scripts/"])
+        run_cmd(["sudo", "rsync", "-a",
+                 f"{mount_point}/host/", f"{target_dir}/host/"])
+        console.print(f"[green]Pushed scripts/ and host/ to {target_dir}[/green]")
+    elif action == "restart":
+        if not service:
+            console.print("[red]Specify a service (e.g. platform_server)[/red]")
+            raise typer.Exit(1)
+        sp.run(["sudo", "pkill", "-f", service],
+               capture_output=True, check=False)
+        import time
+        time.sleep(0.5)
+        sp.Popen(
+            ["sudo", "python3", f"{target_dir}/scripts/{service}.py",
+             "--host", "0.0.0.0", "--port", "8890"],
+            stdout=sp.DEVNULL, stderr=sp.DEVNULL,
+        )
+        console.print(f"[green]{service} restarted[/green]")
+    else:
+        console.print(
+            f"[red]Unknown action:[/red] {action}. "
+            "Use: mount, umount, status, push, restart",
+        )
         raise typer.Exit(1)
 
 

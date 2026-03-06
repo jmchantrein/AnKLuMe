@@ -150,7 +150,7 @@ class TestI18nFormat:
 
         # Targets from the categorized help (user mode)
         user_targets = [
-            "guide", "quickstart", "init",
+            "quickstart", "init",
             "sync", "sync-dry", "apply", "apply-limit", "check",
             "nftables", "doctor",
             "snapshot", "restore", "rollback", "rollback-list",

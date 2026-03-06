@@ -1,5 +1,5 @@
 #!/bin/bash
-# anklume-splash.sh — Display ASCII art header + random quote + startde hint
+# anklume-splash.sh — Display ASCII art header + random quote + anklume gui hint
 # Called from bash_profile on login (terminal-first mode)
 # Bilingual: auto-detects French from $LANG
 
@@ -47,9 +47,11 @@ fi
 
 # Bilingual hints
 if [ "$SPLASH_LANG" = "fr" ]; then
-    printf '\n\033[0;36m  Lancez \033[1manklume guide\033[0;36m pour commencer\033[0m\n'
-    printf '\033[0;33m  Tapez \033[1mstartde\033[0;33m pour lancer le bureau graphique\033[0m\n\n'
+    printf '\n\033[0;36m  Tapez \033[1manklume --help\033[0;36m pour la liste des commandes\033[0m\n'
+    printf '\033[0;36m  Tapez \033[1manklume learn start\033[0;36m pour les labs en web\033[0m\n'
+    printf '\033[0;36m  Tapez \033[1manklume console\033[0;36m pour la console par domaine\033[0m\n\n'
 else
-    printf '\n\033[0;36m  Run \033[1manklume guide\033[0;36m to start the setup wizard\033[0m\n'
-    printf '\033[0;33m  Type \033[1mstartde\033[0;33m to launch the desktop environment\033[0m\n\n'
+    printf '\n\033[0;36m  Type \033[1manklume --help\033[0;36m for all commands\033[0m\n'
+    printf '\033[0;36m  Type \033[1manklume learn start\033[0;36m for web-rendered labs\033[0m\n'
+    printf '\033[0;36m  Type \033[1manklume console\033[0;36m for the domain console\033[0m\n\n'
 fi

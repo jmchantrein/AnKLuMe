@@ -17,7 +17,7 @@ from scripts.cli import app
 # ── Complete CLI tree definition ──────────────────────────────────
 
 TOPLEVEL_COMMANDS = [
-    "console", "dashboard", "doctor", "flush", "guide", "sync", "upgrade",
+    "console", "dashboard", "doctor", "flush", "sync", "upgrade",
 ]
 
 GROUPS = {
@@ -30,7 +30,7 @@ GROUPS = {
     "network": ["deploy", "rules", "status"],
     "portal": ["copy", "list", "open", "pull", "push"],
     "app": ["export", "list", "remove"],
-    "desktop": ["apply", "config", "plugins", "reset"],
+    "desktop": ["apply", "plugins", "reset"],
     "llm": ["bench", "dev", "patterns", "sanitize", "status", "switch"],
     "stt": ["logs", "restart", "status", "test"],
     "system": ["resources"],
@@ -45,9 +45,9 @@ GROUPS = {
     ],
     "docs": ["build", "serve"],
     "dev": [
-        "audit", "bdd-stubs", "chain-test", "cli-tree",
-        "generate-scenarios", "graph", "lint", "matrix", "nesting",
-        "runner", "scenario", "smoke", "syntax", "test",
+        "9p", "audit", "bdd-stubs", "chain-test", "cli-tree",
+        "generate-scenarios", "graph", "intensive", "lint", "matrix",
+        "nesting", "runner", "scenario", "smoke", "syntax", "test",
         "test-report", "test-summary",
     ],
     "telemetry": ["clear", "off", "on", "report", "status"],

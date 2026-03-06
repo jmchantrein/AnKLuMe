@@ -6,6 +6,13 @@ Shared between dashboard, guide, and learning platform.
 
 import html
 import re
+import sys
+from pathlib import Path
+
+# Ensure scripts/ is in sys.path for sibling imports
+_scripts_dir = str(Path(__file__).resolve().parent.parent)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 HTMX_CDN = "https://unpkg.com/htmx.org@2.0.4"
 XTERM_CDN = "https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0"
@@ -20,9 +27,10 @@ def page_wrap(
     extra_js: str = "",
     *,
     xterm: bool = False,
+    lang: str = "en",
 ) -> str:
     """Wrap body in a complete HTML page with theme CSS."""
-    from scripts.web.theme import BASE_CSS
+    from web.theme import BASE_CSS
 
     xterm_head = ""
     if xterm:
@@ -33,7 +41,8 @@ def page_wrap(
             f'<script src="{XTERM_FIT_CDN}/lib/addon-fit.js"></script>\n'
         )
     return (
-        f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">\n'
+        f'<!DOCTYPE html><html lang="{html.escape(lang)}">'
+        f'<head><meta charset="utf-8">\n'
         f"<title>{html.escape(title)}</title>\n"
         f'<script src="{HTMX_CDN}"></script>\n'
         f"{xterm_head}"

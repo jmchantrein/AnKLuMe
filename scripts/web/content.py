@@ -1,13 +1,19 @@
 """Unified content model for guide and labs.
 
 Bridges guide_chapters.py + guide_strings.py into a structured model
-that both the guide and future labs can share for rendering.
+that the learning platform uses for rendering.
 """
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# Ensure scripts/ is in sys.path for sibling imports
+_scripts_dir = str(Path(__file__).resolve().parent.parent)
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 
 @dataclass
@@ -46,41 +52,40 @@ def load_guide_sections() -> list[ContentSection]:
     Bridges guide_chapters.py and guide_strings.py into the
     unified content model.
     """
-    from scripts.guide_chapters import CHAPTERS
-    from scripts.guide_strings import STRINGS
+    from guide_chapters import CHAPTERS
+    from guide_strings import STRINGS
 
     pages = []
     for ch in CHAPTERS:
         cid = ch["id"]
-        blocks: list[ContentBlock] = []
-
-        # Explanation text
+        # Store blocks per language for rendering
+        blocks_by_lang: dict[str, list[ContentBlock]] = {}
         for lang_key in ("en", "fr"):
+            lang_blocks: list[ContentBlock] = []
             explain = STRINGS[lang_key].get(f"ch{cid}_explain", "")
-            if explain and lang_key == "en":
-                blocks.append(ContentBlock(type="text", text=explain))
+            if explain:
+                lang_blocks.append(ContentBlock(type="text", text=explain))
+            if ch["safe_for_web"]:
+                for cmd in ch["demo_commands"]:
+                    lang_blocks.append(ContentBlock(
+                        type="command", text=cmd, clickable=True,
+                    ))
+            recap = STRINGS[lang_key].get(f"ch{cid}_recap", "")
+            if recap:
+                lang_blocks.append(ContentBlock(type="text", text=recap))
+            blocks_by_lang[lang_key] = lang_blocks
 
-        # Demo commands (clickable in the terminal)
-        if ch["safe_for_web"]:
-            for cmd in ch["demo_commands"]:
-                blocks.append(ContentBlock(
-                    type="command", text=cmd, clickable=True,
-                ))
-
-        # Recap text
-        recap = STRINGS["en"].get(f"ch{cid}_recap", "")
-        if recap:
-            blocks.append(ContentBlock(type="text", text=recap))
-
-        pages.append(ContentPage(
+        page = ContentPage(
             id=f"guide-{cid}",
             title=ch["title"],
-            blocks=blocks,
-        ))
+            blocks=blocks_by_lang["en"],  # default
+        )
+        page._blocks_by_lang = blocks_by_lang  # type: ignore[attr-defined]
+        pages.append(page)
 
     return [ContentSection(
         id="guide",
-        title={"en": "anklume Capability Tour", "fr": "Découverte d'anklume"},
+        title={"en": "Getting Started with anklume", "fr": "Prise en main d'anklume"},
         pages=pages,
         metadata={"type": "guide", "total_chapters": len(pages)},
     )]
@@ -90,7 +95,6 @@ def load_lab(lab_dir: Path) -> ContentSection:
     """Load a lab directory into a ContentSection.
 
     Reads lab.yml + steps/*.md and converts to the unified model.
-    Placeholder for Phase 2 (labs web).
     """
     import yaml
 

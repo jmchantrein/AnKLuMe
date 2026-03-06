@@ -6,7 +6,7 @@ This module tests all scripts and configurations for the anklume live OS phase:
   - start.sh (initial setup)
   - live-update.sh (A/B updates)
   - Initramfs hooks (anklume-toram, anklume-verity)
-  - Systemd services (anklume-start.service, anklume-data-mount.service)
+  - Systemd services (anklume-start.service, anklume-mount.service)
   - Boot scripts (mount-data.sh, umount-data.sh)
   - Makefile targets (build-image, live-update, live-status)
 """
@@ -27,7 +27,7 @@ LIVE_UPDATE = Path(__file__).resolve().parent.parent / "scripts" / "live-update.
 TORAM_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "initramfs" / "anklume-toram"
 VERITY_HOOK = Path(__file__).resolve().parent.parent / "host" / "boot" / "initramfs" / "anklume-verity"
 START_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-start.service"
-DATA_MOUNT_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-data-mount.service"
+DATA_MOUNT_SERVICE = Path(__file__).resolve().parent.parent / "host" / "boot" / "systemd" / "anklume-mount.service"
 MOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts" / "mount-data.sh"
 UMOUNT_DATA = Path(__file__).resolve().parent.parent / "host" / "boot" / "scripts" / "umount-data.sh"
 MAKEFILE = Path(__file__).resolve().parent.parent / "Makefile"
@@ -59,7 +59,7 @@ def mock_persist_dir(tmp_path):
     persist = tmp_path / "mnt" / "anklume-persist"
     persist.mkdir(parents=True, exist_ok=True)
     (persist / "pool.conf").write_text(
-        "pool_name=anklume-data\npool_type=zfs\npool_uuid=12345-uuid\ndata_device=/dev/sda4\n"
+        "pool_name=anklume\npool_type=zfs\npool_uuid=12345-uuid\ndata_device=/dev/sda4\n"
     )
     (persist / "ab-state").write_text("A\n")
     (persist / "boot-count").write_text("0\n")
@@ -168,7 +168,7 @@ class TestLiveOsLibStructure:
     def test_data_mount_constant(self):
         """Verify DATA_MNT constant."""
         assert "DATA_MNT" in self.content
-        assert "/mnt/anklume-data" in self.content
+        assert "/mnt/anklume" in self.content
 
     # Config paths
     def test_pool_conf_path(self):
@@ -531,13 +531,13 @@ class TestSystemdServices:
         assert "[Service]" in content
         assert "[Install]" in content
 
-    def test_start_condition_path_not_exists(self):
-        """Verify start service runs only if persist not initialized."""
+    def test_start_condition_kernel_cmdline(self):
+        """Verify start service runs only on live ISO boot."""
         if not START_SERVICE.exists():
             pytest.skip(f"File not found: {START_SERVICE}")
 
         content = START_SERVICE.read_text()
-        assert "ConditionPathExists=!/mnt/anklume-persist/pool.conf" in content
+        assert "ConditionKernelCommandLine=boot=anklume" in content
 
     def test_start_wanted_by(self):
         """Verify start service is wanted by multi-user.target."""
@@ -548,7 +548,7 @@ class TestSystemdServices:
         assert "WantedBy=multi-user.target" in content
 
     def test_data_mount_service_exists(self):
-        """Verify anklume-data-mount.service exists."""
+        """Verify anklume-mount.service exists."""
         if not DATA_MOUNT_SERVICE.exists():
             pytest.skip(f"File not found: {DATA_MOUNT_SERVICE}")
         assert DATA_MOUNT_SERVICE.exists()

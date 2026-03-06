@@ -592,11 +592,11 @@ domaines entiers) via des peripheriques disque Incus.
 
 ```yaml
 global:
-  shared_volumes_base: /mnt/anklume-data/shares  # Defaut : /srv/anklume/shares
+  shared_volumes_base: /mnt/anklume/shares  # Defaut : /srv/anklume/shares
 
 shared_volumes:
   docs:
-    source: /mnt/anklume-data/shares/docs  # Optionnel, defaut : <base>/<nom>
+    source: /mnt/anklume/shares/docs  # Optionnel, defaut : <base>/<nom>
     path: /shared/docs                      # Optionnel, defaut : /shared/<nom>
     shift: true                             # Optionnel, defaut : true
     propagate: false                        # Optionnel, defaut : false

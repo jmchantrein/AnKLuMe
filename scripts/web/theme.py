@@ -69,18 +69,28 @@ pre.terminal {
 # ── Terminal split-pane CSS (learning platform) ─────────────
 
 TERMINAL_CSS = """\
+body { padding: 0 !important; margin: 0 !important; overflow: hidden; }
+.split-wrapper {
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+}
 .learn-layout {
-  display: flex; height: calc(100vh - 120px); gap: 0;
+  display: flex; flex: 1; min-height: 0;
 }
 .learn-content {
-  flex: 1; overflow-y: auto; padding: 20px;
-  border-right: 1px solid var(--border);
+  width: 50%; overflow-y: auto; padding: 20px;
+  min-width: 200px;
 }
+.split-handle {
+  width: 6px; background: var(--border); cursor: col-resize;
+  flex-shrink: 0; transition: background 0.2s;
+}
+.split-handle:hover, .split-handle.dragging { background: var(--accent); }
 .learn-terminal {
-  flex: 1; min-width: 400px; background: #000;
-  display: flex; flex-direction: column;
+  flex: 1; background: #000; overflow: hidden; min-width: 200px;
 }
-.learn-terminal .xterm { flex: 1; }
+#terminal {
+  width: 100%; height: 100%;
+}
 .cmd-block {
   display: flex; align-items: center; gap: 8px;
   background: #010409; border: 1px solid var(--border);
@@ -96,7 +106,26 @@ TERMINAL_CSS = """\
 .learn-nav {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 20px; border-top: 1px solid var(--border);
-  background: var(--card);
+  background: var(--card); flex-shrink: 0;
+}
+.fullscreen-bar {
+  display: flex; gap: 4px; align-items: center;
+}
+.fs-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+.fs-btn:hover { color: var(--accent); border-color: var(--accent); }
+.learn-content.fullscreen, .learn-terminal.fullscreen {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 1000;
+}
+.learn-content.fullscreen { background: var(--bg); padding: 40px; }
+.learn-terminal.fullscreen { background: #000; }
+.fs-close {
+  position: fixed; top: 10px; right: 16px; z-index: 1001;
+  background: var(--card); border: 1px solid var(--border); color: var(--accent);
+  border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 13px;
 }
 """
 
@@ -176,14 +205,14 @@ def accessible_css(settings: dict | None = None) -> str:
     """Return extra CSS for accessibility (dyslexia, high-contrast)."""
     if settings is None:
         try:
-            from scripts.accessibility import load_accessibility
+            from accessibility import load_accessibility
             settings = load_accessibility()
         except (ImportError, OSError):
             return ""
     parts = []
     if settings.get("dyslexia_mode"):
         try:
-            from scripts.accessibility import get_dyslexia_css
+            from accessibility import get_dyslexia_css
             parts.append(get_dyslexia_css())
         except (ImportError, KeyError):
             pass

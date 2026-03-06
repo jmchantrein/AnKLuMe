@@ -8,7 +8,7 @@
 #   --base DISTRO     Base distribution (default: debian)
 #   --arch ARCH       Architecture (default: amd64)
 #   --size SIZE_GB    Total image size in GB (default: 4, raw only)
-#   --desktop DE      Desktop environment: all, sway, labwc, kde, minimal (default: all)
+#   --desktop DE      Desktop: kde (default) or minimal (console only)
 #   --mirror URL      APT mirror URL
 #   --no-verity       Skip dm-verity setup
 #   --cache-rootfs DIR  Cache rootfs tarball for faster rebuilds
@@ -30,7 +30,7 @@ FORMAT="iso"
 BASE="debian"
 ARCH="amd64"
 IMAGE_SIZE_GB=4
-DESKTOP="all"
+DESKTOP="kde"
 MIRROR=""
 NO_VERITY=false
 LIVE_USER="anklume"
@@ -82,8 +82,7 @@ usage() {
     echo "  --base DISTRO     Base distribution (default: debian, arch)"
     echo "  --arch ARCH       Architecture (default: amd64)"
     echo "  --size SIZE_GB    Total image size in GB (default: 4, raw format only)"
-    echo "  --desktop DE      Desktop environment (default: all)"
-    echo "                    all=sway+labwc+kde, sway, labwc, kde, minimal=console only"
+    echo "  --desktop DE      Desktop: kde (default) or minimal (console only)"
     echo "  --mirror URL      APT mirror URL"
     echo "  --no-verity       Skip dm-verity setup"
     echo "  --cache-rootfs DIR  Cache rootfs tarball (skip bootstrap on rebuild)"
@@ -92,7 +91,7 @@ usage() {
     echo ""
     echo "Examples:"
     echo "  $(basename "$0") --output anklume.iso --base arch"
-    echo "  $(basename "$0") --output anklume.iso --desktop sway"
+    echo "  $(basename "$0") --output anklume.iso --desktop minimal"
     echo "  $(basename "$0") --cache-rootfs /home/user/iso-cache  # fast rebuild"
     echo "  $(basename "$0") --format raw --output anklume.img --size 6"
     exit 0
@@ -380,8 +379,10 @@ BASHRC_COMPLETION
     mkdir -p "$rootfs/$user_home/.config/foot"
     cp "$desktop_dir/foot.ini" "$rootfs/$user_home/.config/foot/foot.ini"
 
-    # Splash script and quotes (English + French)
+    # Splash script, open-learn helper, and quotes (English + French)
     cp "$desktop_dir/anklume-splash.sh" "$rootfs/opt/anklume/host/boot/desktop/anklume-splash.sh" 2>/dev/null || true
+    cp "$desktop_dir/open-learn.sh" "$rootfs/opt/anklume/host/boot/desktop/open-learn.sh" 2>/dev/null || true
+    chmod +x "$rootfs/opt/anklume/host/boot/desktop/open-learn.sh" 2>/dev/null || true
     cp "$desktop_dir/quotes.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.txt" 2>/dev/null || true
     cp "$desktop_dir/quotes.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/quotes.fr.txt" 2>/dev/null || true
 
@@ -389,10 +390,8 @@ BASHRC_COMPLETION
     cp "$desktop_dir/KEYBINDINGS.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.txt" 2>/dev/null || true
     cp "$desktop_dir/KEYBINDINGS.fr.txt" "$rootfs/opt/anklume/host/boot/desktop/KEYBINDINGS.fr.txt" 2>/dev/null || true
 
-    # KDE autostart: welcome guide on first boot
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
-        mkdir -p "$rootfs/$user_home/.config/autostart"
-        cp "$desktop_dir/anklume-welcome.desktop" "$rootfs/$user_home/.config/autostart/anklume-welcome.desktop" 2>/dev/null || true
+    # KDE config (skip for minimal/console-only)
+    if [ "$DESKTOP" != "minimal" ]; then
         # Suppress KDE plasma-welcome wizard and KWallet popup
         if [ -f "$desktop_dir/plasma-welcomerc" ]; then
             cp "$desktop_dir/plasma-welcomerc" "$rootfs/$user_home/.config/plasma-welcomerc"
@@ -405,35 +404,21 @@ BASHRC_COMPLETION
             mkdir -p "$rootfs/$user_home/Desktop"
             cp "$desktop_dir/anklume.desktop" "$rootfs/$user_home/Desktop/anklume.desktop"
             chmod +x "$rootfs/$user_home/Desktop/anklume.desktop"
-            # Pre-trust the desktop icon so KDE doesn't show a warning popup
             mkdir -p "$rootfs/$user_home/.local/share/trusted-desktop-files"
+        fi
+        # KDE autostart: open learn platform in browser on first login
+        if [ -f "$desktop_dir/anklume-learn.desktop" ]; then
+            mkdir -p "$rootfs/$user_home/.config/autostart"
+            cp "$desktop_dir/anklume-learn.desktop" "$rootfs/$user_home/.config/autostart/"
+        fi
+        # README on desktop
+        if [ -f "$desktop_dir/README-anklume.md" ]; then
+            cp "$desktop_dir/README-anklume.md" "$rootfs/$user_home/Desktop/"
         fi
     fi
 
-    # sway config
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
-        mkdir -p "$rootfs/$user_home/.config/sway"
-        cp "$desktop_dir/sway-config" "$rootfs/$user_home/.config/sway/config"
-        # Create empty domains conf for include directive
-        touch "$rootfs/$user_home/.config/sway/anklume-domains.conf"
-    fi
-
-    # labwc config
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
-        mkdir -p "$rootfs/$user_home/.config/labwc"
-        cp "$desktop_dir/labwc-rc.xml" "$rootfs/$user_home/.config/labwc/rc.xml"
-        cp "$desktop_dir/labwc-menu.xml" "$rootfs/$user_home/.config/labwc/menu.xml"
-        cp "$desktop_dir/labwc-autostart" "$rootfs/$user_home/.config/labwc/autostart"
-        chmod +x "$rootfs/$user_home/.config/labwc/autostart"
-        cp "$desktop_dir/labwc-environment" "$rootfs/$user_home/.config/labwc/environment"
-        # waybar config
-        mkdir -p "$rootfs/$user_home/.config/waybar"
-        cp "$desktop_dir/waybar-config.jsonc" "$rootfs/$user_home/.config/waybar/config"
-        cp "$desktop_dir/waybar-style.css" "$rootfs/$user_home/.config/waybar/style.css"
-    fi
-
     # KDE Plasma keyboard layout (Wayland ignores /etc/default/keyboard)
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+    if [ "$DESKTOP" != "minimal" ]; then
         mkdir -p "$rootfs/$user_home/.config"
         cat > "$rootfs/$user_home/.config/kxkbrc" << KXKB
 [Layout]
@@ -532,15 +517,9 @@ bootstrap_rootfs_debian() {
     # Incus: Debian Trixie ships incus in official repos
     # dnsmasq-base is required for managed bridges (DHCP/DNS) — not a hard dep of incus
     packages="$packages incus dnsmasq-base"
-    # Wayland desktop — conditional on $DESKTOP
-    packages="$packages foot wl-clipboard xwayland"
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
-        packages="$packages sway fuzzel i3status"
-    fi
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
-        packages="$packages labwc waybar fuzzel"
-    fi
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+    # KDE Plasma desktop — conditional on $DESKTOP
+    if [ "$DESKTOP" != "minimal" ]; then
+        packages="$packages foot wl-clipboard xwayland"
         packages="$packages plasma-desktop kwin-wayland dolphin konsole"
     fi
     # Web browser
@@ -548,6 +527,13 @@ bootstrap_rootfs_debian() {
     # Dev/lint/test tools
     packages="$packages ansible-lint yamllint shellcheck"
     packages="$packages python3-pytest python3-hypothesis python3-pexpect"
+    # ttyd: web terminal (not in Trixie, install static binary)
+    if [ ! -f "$ROOTFS_DIR/usr/local/bin/ttyd" ]; then
+        info "  Installing ttyd static binary..."
+        curl -sL "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64" \
+            -o "$ROOTFS_DIR/usr/local/bin/ttyd"
+        chmod +x "$ROOTFS_DIR/usr/local/bin/ttyd"
+    fi
     chroot "$ROOTFS_DIR" apt-get update -qq
     # shellcheck disable=SC2086
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
@@ -559,12 +545,12 @@ bootstrap_rootfs_debian() {
     chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive PATH="$chroot_path" \
         dpkg --configure -a --force-all 2>&1 | tail -5 || true
     # Purge SDDM if pulled in as a recommended dep of plasma-desktop.
-    # anklume is terminal-first: user types `startde` to launch the desktop.
+    # anklume is terminal-first: user types `anklume gui` to launch the desktop.
     # SDDM auto-enables itself on install and would bypass the setup wizard.
     if chroot "$ROOTFS_DIR" dpkg -l sddm 2>/dev/null | grep -q '^ii'; then
         chroot "$ROOTFS_DIR" env DEBIAN_FRONTEND=noninteractive \
             apt-get remove --purge -y sddm 2>&1 | tail -3 || true
-        info "  Purged sddm (terminal-first: user types startde)"
+        info "  Purged sddm (terminal-first: user types anklume gui)"
     fi
     # Mask all display managers to prevent any from being pulled in later
     for dm in sddm gdm3 lightdm; do
@@ -725,6 +711,7 @@ HOSTS
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
 # anklume Live OS — root is overlay (squashfs ro + tmpfs rw)
 # No entries needed; systemd auto-mounts /proc /sys /dev /run
+devpts /dev/pts devpts defaults,gid=5,mode=620,ptmxmode=000 0 0
 FSTAB
     info "  Hostname, hosts and fstab configured"
 
@@ -831,7 +818,7 @@ KBD
     info "  NetworkManager enabled"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-start.service >/dev/null 2>&1 || true
-    chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-mount.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-aa-teardown.service >/dev/null 2>&1 || true
     # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
     # Use manual symlink (systemctl mask may not work without running systemd)
@@ -1077,12 +1064,9 @@ PACCONF
     # NOTE: CachyOS pacstrap can't resolve some vanilla Arch packages (nvidia,
     # python-uvicorn, etc.) — those are installed via chroot pacman below.
     # Build conditional package list for desktop
-    local desktop_pkgs="foot wl-clipboard xorg-xwayland"
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "sway" ]; then
-        desktop_pkgs="$desktop_pkgs sway fuzzel i3status"
-    fi
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "labwc" ]; then
-        desktop_pkgs="$desktop_pkgs labwc waybar fuzzel"
+    local desktop_pkgs=""
+    if [ "$DESKTOP" != "minimal" ]; then
+        desktop_pkgs="foot wl-clipboard xorg-xwayland"
     fi
     # KDE is installed via chroot pacman below (large dep tree)
 
@@ -1134,8 +1118,8 @@ PACCONF
 
     # Install packages that CachyOS pacstrap can't resolve from vanilla repos
     # Using chroot pacman (vanilla Arch inside rootfs) to install them
-    local extra_pkgs="nvidia-open-dkms nvidia-utils egl-wayland python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff"
-    if [ "$DESKTOP" = "all" ] || [ "$DESKTOP" = "kde" ]; then
+    local extra_pkgs="nvidia-open-dkms nvidia-utils egl-wayland python-typer python-rich python-fastapi python-pytest python-hypothesis python-pexpect ansible-lint yamllint shellcheck ruff ttyd"
+    if [ "$DESKTOP" != "minimal" ]; then
         extra_pkgs="$extra_pkgs plasma-desktop dolphin konsole"
     fi
     # shellcheck disable=SC2086
@@ -1144,7 +1128,7 @@ PACCONF
     # Purge SDDM if pulled in as a dep of plasma-desktop (terminal-first boot)
     if chroot "$ROOTFS_DIR" pacman -Q sddm &>/dev/null; then
         chroot "$ROOTFS_DIR" pacman -Rns --noconfirm sddm 2>&1 | tail -3 || true
-        info "  Purged sddm (terminal-first: user types startde)"
+        info "  Purged sddm (terminal-first: user types anklume gui)"
     fi
     # Mask all display managers
     for dm in sddm gdm lightdm; do
@@ -1171,6 +1155,7 @@ HOSTS
     cat > "$ROOTFS_DIR/etc/fstab" << 'FSTAB'
 # anklume Live OS — root is overlay (squashfs ro + tmpfs rw)
 # No entries needed; systemd auto-mounts /proc /sys /dev /run
+devpts /dev/pts devpts defaults,gid=5,mode=620,ptmxmode=000 0 0
 FSTAB
     info "  fstab configured"
 
@@ -1283,7 +1268,7 @@ AGENT
     info "  Incus daemon enabled + subuid/subgid configured"
     # Enable anklume services in chroot
     chroot "$ROOTFS_DIR" systemctl enable anklume-start.service >/dev/null 2>&1 || true
-    chroot "$ROOTFS_DIR" systemctl enable anklume-data-mount.service >/dev/null 2>&1 || true
+    chroot "$ROOTFS_DIR" systemctl enable anklume-mount.service >/dev/null 2>&1 || true
     chroot "$ROOTFS_DIR" systemctl enable anklume-aa-teardown.service >/dev/null 2>&1 || true
     # incus-agent: don't enable — not useful in live ISO (no virtiofs config channel)
     # Mask tmp.mount — /tmp is writable via overlay, no separate tmpfs needed
@@ -1321,6 +1306,24 @@ PRESET
     fi
 
     # Generate initramfs with explicit kernel version
+    # Ensure pseudo-filesystems are mounted (mkinitcpio needs /dev, /proc, /sys)
+    # Force remount — stale mounts from earlier steps may not work
+    umount "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
+    umount "$ROOTFS_DIR/dev" 2>/dev/null || true
+    umount "$ROOTFS_DIR/sys" 2>/dev/null || true
+    umount "$ROOTFS_DIR/proc" 2>/dev/null || true
+    mount --bind /proc "$ROOTFS_DIR/proc" || warn "mount /proc failed"
+    mount --bind /sys "$ROOTFS_DIR/sys" || warn "mount /sys failed"
+    mount --bind /dev "$ROOTFS_DIR/dev" || warn "mount /dev failed"
+    mount --bind /dev/pts "$ROOTFS_DIR/dev/pts" || warn "mount /dev/pts failed"
+    # Verify /dev/fd is accessible (mkinitcpio checks this)
+    if chroot "$ROOTFS_DIR" test -e /dev/fd; then
+        info "  /dev/fd accessible in chroot"
+    else
+        warn "  /dev/fd NOT accessible — creating symlink"
+        ln -sf /proc/self/fd "$ROOTFS_DIR/dev/fd" 2>/dev/null || true
+    fi
+
     # Unset TMPDIR: host's TMPDIR (e.g. /home/user/tmp) doesn't exist in chroot
     if [ -n "$kver" ]; then
         if ! env -u TMPDIR chroot "$ROOTFS_DIR" mkinitcpio -k "$kver" -g /boot/initramfs-linux.img 2>&1; then
@@ -1716,10 +1719,6 @@ submenu "Options avancees / Advanced options" {
         linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=kde anklume.verity_hash=$VERITY_HASH modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
     }
-    menuentry "anklume Live — $base_label (sway)" {
-        linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.desktop=sway anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
-        initrd /boot/initrd.img
-    }
     menuentry "anklume Live — $base_label (Console)" {
         linux /boot/vmlinuz ro boot=anklume apparmor=0 anklume.boot_mode=iso anklume.slot=A anklume.toram=1 anklume.verity_hash=$VERITY_HASH console=tty0 console=ttyS0,115200n8
         initrd /boot/initrd.img
@@ -1769,7 +1768,7 @@ GRUBCFG
             --output="$staging/EFI/BOOT/BOOTX64.EFI"
             --locales=""
             --fonts=""
-            --install-modules="normal search search_fs_uuid search_fs_file search_label iso9660 part_gpt part_msdos fat ext2 linux gzio keylayouts at_keyboard"
+            --install-modules="normal search search_fs_uuid search_fs_file search_label iso9660 part_gpt part_msdos fat ext2 linux gzio keylayouts at_keyboard all_video"
             "boot/grub/grub.cfg=$staging/boot/grub/grub.cfg"
         )
         # Embed keyboard layout if generated
@@ -1808,7 +1807,7 @@ GRUBCFG
             -o "$bios_img" \
             -p /boot/grub \
             --prefix=/boot/grub \
-            biosdisk iso9660 part_msdos \
+            normal search search_label iso9660 biosdisk part_msdos part_gpt fat ext2 linux gzio all_video keylayouts at_keyboard \
             2>/dev/null || warn "grub-mkimage for BIOS failed"
         info "  GRUB BIOS image created"
     else
@@ -1835,8 +1834,13 @@ GRUBCFG
 
     # BIOS boot (El Torito) if available
     if [ -n "$grub_bios_dir" ] && [ -f "$grub_bios_dir/cdboot.img" ] && [ -f "$grub_bios_dir/boot.img" ]; then
-        cp "$grub_bios_dir/cdboot.img" "$staging/boot/grub/cdboot.img"
+        # Concatenate cdboot.img (sector 0 stub) + core.img to create a bootable ElTorito image
+        cat "$grub_bios_dir/cdboot.img" "$bios_img" > "$staging/boot/grub/cdboot.img"
         cp "$grub_bios_dir/boot.img" "$staging/boot/grub/boot.img"
+        # Copy GRUB BIOS modules so the core image can load normal.mod etc.
+        mkdir -p "$staging/boot/grub/i386-pc"
+        cp "$grub_bios_dir"/*.mod "$staging/boot/grub/i386-pc/"
+        cp "$grub_bios_dir"/*.lst "$staging/boot/grub/i386-pc/" 2>/dev/null || true
         # BIOS must be the first El Torito entry for hybrid MBR
         xorriso_args=(
             -as mkisofs

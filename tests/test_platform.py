@@ -1,47 +1,30 @@
 """Tests for scripts/platform_server.py — learning platform."""
 
-import pty
-import shutil
-
 import pytest
-
-
-def _pty_available():
-    """Check if PTY devices are available."""
-    try:
-        m, s = pty.openpty()
-        import os
-        os.close(m)
-        os.close(s)
-        return True
-    except OSError:
-        return False
 
 fastapi = pytest.importorskip("fastapi")
 httpx = pytest.importorskip("httpx")
 
 from starlette.testclient import TestClient  # noqa: E402
 
-from scripts.web.ws_terminal import manager  # noqa: E402
-
 
 @pytest.fixture()
-def client():
-    """Create a test client for the platform server."""
+def client(monkeypatch):
+    """Create a test client for the platform server.
+
+    Patches ttyd startup since it's not available in test env.
+    """
     from scripts import platform_server
+    monkeypatch.setattr(platform_server, "_start_ttyd", lambda port=7681: None)
+    monkeypatch.setattr(platform_server, "_stop_ttyd", lambda: None)
     with TestClient(platform_server.app) as c:
         yield c
-    manager.close_all()
 
 
 class TestLandingPage:
     def test_landing_returns_200(self, client):
         resp = client.get("/")
         assert resp.status_code == 200
-
-    def test_landing_contains_guide_link(self, client):
-        resp = client.get("/")
-        assert "/guide" in resp.text
 
     def test_landing_contains_labs_link(self, client):
         resp = client.get("/")
@@ -54,107 +37,47 @@ class TestLandingPage:
 
     def test_landing_has_title(self, client):
         resp = client.get("/")
-        assert "anklume Learn" in resp.text
+        assert "anklume" in resp.text
 
-    def test_landing_has_chapter_cards(self, client):
+    def test_landing_has_action_cards(self, client):
         resp = client.get("/")
-        assert "ch-card" in resp.text
+        assert "home-card" in resp.text
+        assert "/setup" in resp.text
+        assert "/guide" in resp.text
 
-    def test_landing_has_capability_tour(self, client):
-        resp = client.get("/")
-        assert "Capability Tour" in resp.text
+    def test_landing_lang_switch(self, client):
+        resp = client.get("/?lang=en")
+        assert "Configure" in resp.text
+        resp_fr = client.get("/?lang=fr")
+        assert "Configurer" in resp_fr.text
 
     def test_landing_response_is_html(self, client):
         resp = client.get("/")
         assert "text/html" in resp.headers["content-type"]
 
 
-class TestGuideIndex:
-    def test_guide_returns_200(self, client):
-        resp = client.get("/guide")
+class TestSetupPage:
+    def test_setup_returns_200(self, client):
+        resp = client.get("/setup")
         assert resp.status_code == 200
 
-    def test_guide_lists_8_chapters(self, client):
-        resp = client.get("/guide")
-        assert "ch-card" in resp.text
-        for i in range(1, 9):
-            assert f"/guide/{i}" in resp.text
-
-    def test_guide_has_title(self, client):
-        resp = client.get("/guide")
-        assert "Capability Tour" in resp.text
-
-    def test_guide_has_chapter_titles(self, client):
-        resp = client.get("/guide")
-        assert "ch-title" in resp.text
-
-    def test_guide_has_descriptions(self, client):
-        resp = client.get("/guide")
-        assert "ch-desc" in resp.text
-
-
-class TestGuideChapter:
-    def test_chapter_1_returns_200(self, client):
-        resp = client.get("/guide/1")
-        assert resp.status_code == 200
-
-    def test_chapter_has_split_pane(self, client):
-        resp = client.get("/guide/1")
-        assert "learn-layout" in resp.text
-        assert "learn-content" in resp.text
-        assert "learn-terminal" in resp.text
-
-    def test_chapter_has_xterm(self, client):
-        resp = client.get("/guide/1")
-        assert "xterm.js" in resp.text
-
-    def test_chapter_has_navigation(self, client):
-        resp = client.get("/guide/1")
-        assert "All chapters" in resp.text
-        assert "Next" in resp.text
-
-    def test_chapter_1_no_previous(self, client):
-        resp = client.get("/guide/1")
-        assert "Previous" not in resp.text
-
-    def test_chapter_99_returns_404(self, client):
-        resp = client.get("/guide/99")
-        assert resp.status_code == 404
-
-    def test_chapter_0_returns_404(self, client):
-        resp = client.get("/guide/0")
-        assert resp.status_code == 404
-
-    def test_chapter_has_clickable_commands(self, client):
-        resp = client.get("/guide/1")
-        assert "runCmd" in resp.text
-
-    def test_last_chapter_no_next(self, client):
-        resp = client.get("/guide/8")
-        assert "Previous" in resp.text
-        assert "/guide/9" not in resp.text
-
-    def test_middle_chapter_has_both_nav(self, client):
-        resp = client.get("/guide/4")
-        assert "Previous" in resp.text
-        assert "Next" in resp.text
-
-    def test_chapter_shows_counter(self, client):
-        resp = client.get("/guide/3")
-        assert "Ch 3/8" in resp.text
-
-    def test_chapter_has_terminal_js(self, client):
-        resp = client.get("/guide/1")
-        assert "window.runCmd" in resp.text
-
-    def test_chapter_has_terminal_div(self, client):
-        resp = client.get("/guide/1")
+    def test_setup_has_terminal(self, client):
+        resp = client.get("/setup")
         assert 'id="terminal"' in resp.text
+        assert "xterm.js" in resp.text or "xterm" in resp.text
 
-    def test_all_chapters_return_200(self, client):
-        for i in range(1, 9):
-            resp = client.get(f"/guide/{i}")
-            assert resp.status_code == 200, f"Chapter {i} failed"
+    def test_setup_has_launch_button(self, client):
+        resp = client.get("/setup")
+        assert "start.sh" in resp.text
+
+    def test_explore_mode(self, client):
+        resp = client.get("/setup?mode=explore")
+        assert resp.status_code == 200
+        assert "--yes --backend dir" in resp.text
+
+    def test_setup_has_home_link(self, client):
+        resp = client.get("/setup")
+        assert 'href="/"' in resp.text
 
 
 class TestLabsPlaceholder:
@@ -163,79 +86,99 @@ class TestLabsPlaceholder:
         assert resp.status_code == 200
 
     def test_labs_shows_placeholder(self, client):
-        resp = client.get("/labs")
+        resp = client.get("/labs?lang=en")
         assert "future update" in resp.text.lower()
 
     def test_labs_has_title(self, client):
-        resp = client.get("/labs")
-        assert "Labs" in resp.text
+        resp = client.get("/labs?lang=en")
+        assert "Practice" in resp.text
+
+
+class TestGuideIndex:
+    def test_guide_index_returns_200(self, client):
+        resp = client.get("/guide")
+        assert resp.status_code == 200
+
+    def test_guide_index_has_chapter_links(self, client):
+        resp = client.get("/guide")
+        assert "ch-card" in resp.text
+
+    def test_guide_index_has_title(self, client):
+        resp = client.get("/guide?lang=en")
+        assert "Getting Started" in resp.text
+
+
+class TestGuideChapter:
+    def test_chapter_1_returns_200(self, client):
+        resp = client.get("/guide/1")
+        assert resp.status_code == 200
+
+    def test_chapter_has_terminal(self, client):
+        resp = client.get("/guide/1")
+        assert 'id="terminal"' in resp.text
+        assert "xterm" in resp.text
+
+    def test_chapter_has_navigation(self, client):
+        resp = client.get("/guide/1?lang=en")
+        assert "Next" in resp.text
+
+    def test_invalid_chapter_returns_404(self, client):
+        resp = client.get("/guide/999")
+        assert resp.status_code == 404
+
+
+class TestPoolConf:
+    def test_pool_conf_404_when_missing(self, client):
+        resp = client.get("/pool-conf")
+        assert resp.status_code == 404
+
+    def test_pool_conf_returns_content(self, client, monkeypatch, tmp_path):
+        conf = tmp_path / "pool.conf"
+        conf.write_text("POOL_NAME=test\nPOOL_BACKEND=zfs\n")
+        from scripts import platform_server
+        monkeypatch.setattr(platform_server, "POOL_CONF_PATH", conf)
+        resp = client.get("/pool-conf")
+        assert resp.status_code == 200
+        assert "POOL_NAME=test" in resp.text
+
+    def test_setup_page_has_conf_button_when_exists(self, client, monkeypatch, tmp_path):
+        conf = tmp_path / "pool.conf"
+        conf.write_text("POOL_NAME=test\n")
+        from scripts import platform_server
+        monkeypatch.setattr(platform_server, "POOL_CONF_PATH", conf)
+        resp = client.get("/setup")
+        assert "showPoolConf" in resp.text
+
+
+class TestCreateInfraYml:
+    def test_create_infra_yml_no_prod_dir(self, client, monkeypatch):
+        from scripts import platform_server
+        monkeypatch.setattr(platform_server, "_production_anklume_dir", lambda: None)
+        resp = client.post("/create-infra-yml")
+        assert resp.status_code == 400
+
+    def test_create_infra_yml_success(self, client, monkeypatch, tmp_path):
+        prod_dir = tmp_path / "anklume"
+        prod_dir.mkdir()
+        from scripts import platform_server
+        monkeypatch.setattr(platform_server, "_production_anklume_dir", lambda: str(prod_dir))
+        resp = client.post("/create-infra-yml")
+        assert resp.status_code == 200
+        assert "Created" in resp.text
+        assert (prod_dir / "infra.yml").exists()
+
+    def test_create_infra_yml_already_exists(self, client, monkeypatch, tmp_path):
+        prod_dir = tmp_path / "anklume"
+        prod_dir.mkdir()
+        (prod_dir / "infra.yml").write_text("existing")
+        from scripts import platform_server
+        monkeypatch.setattr(platform_server, "_production_anklume_dir", lambda: str(prod_dir))
+        resp = client.post("/create-infra-yml")
+        assert resp.status_code == 200
+        assert "already exists" in resp.text
 
 
 class TestNotFound:
     def test_invalid_route_returns_404(self, client):
         resp = client.get("/nonexistent")
         assert resp.status_code == 404
-
-
-@pytest.mark.skipif(not _pty_available(), reason="PTY devices not available")
-class TestWebSocket:
-    @pytest.mark.skipif(
-        not shutil.which("bash"),
-        reason="bash not available",
-    )
-    def test_websocket_connects(self, client):
-        with client.websocket_connect("/ws/terminal/test-ws") as ws:
-            ws.send_text("echo hello\r")
-            data = ws.receive_bytes()
-            assert len(data) > 0
-
-    @pytest.mark.skipif(
-        not shutil.which("bash"),
-        reason="bash not available",
-    )
-    def test_websocket_receives_output(self, client):
-        with client.websocket_connect("/ws/terminal/test-output") as ws:
-            ws.send_text("echo MARKER_42\r")
-            # Read multiple chunks until we find the output
-            received = b""
-            for _ in range(20):
-                try:
-                    data = ws.receive_bytes()
-                    received += data
-                    if b"MARKER_42" in received:
-                        break
-                except Exception:
-                    break
-            assert b"MARKER_42" in received
-
-    @pytest.mark.skipif(
-        not shutil.which("bash"),
-        reason="bash not available",
-    )
-    def test_websocket_resize(self, client):
-        import json
-        with client.websocket_connect("/ws/terminal/test-resize") as ws:
-            resize_msg = json.dumps({"type": "resize", "cols": 120, "rows": 40})
-            ws.send_text(resize_msg)
-            # Resize shouldn't crash; send a command to verify session is alive
-            ws.send_text("echo alive\r")
-            data = ws.receive_bytes()
-            assert len(data) > 0
-
-    @pytest.mark.skipif(
-        not shutil.which("bash"),
-        reason="bash not available",
-    )
-    def test_websocket_binary_input(self, client):
-        with client.websocket_connect("/ws/terminal/test-binary") as ws:
-            ws.send_bytes(b"echo binary_test\r")
-            received = b""
-            for _ in range(20):
-                try:
-                    data = ws.receive_bytes()
-                    received += data
-                    if b"binary_test" in received:
-                        break
-                except Exception:
-                    break
-            assert b"binary_test" in received

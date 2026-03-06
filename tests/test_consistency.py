@@ -159,8 +159,6 @@ _SCRIPT_TEST_EXCEPTIONS = {
     "desktop_config.py",          # Tested via test_desktop.py
     "generate-bdd-stubs.py",      # Dev tool, tested indirectly
     "generate-dep-scenarios.py",  # Dev tool, tested indirectly
-    "guide_chapters.py",          # Data module for guide
-    "guide_strings.py",           # Data module for guide
     "help-i18n.py",               # i18n helper, tested via test_student_mode
     "live-os-test-graphical.py",  # E2E test runner (not testable itself)
     "live-os-test-interactive.py",  # E2E test runner
@@ -172,7 +170,10 @@ _SCRIPT_TEST_EXCEPTIONS = {
     "platform_server.py",         # Tested via test_platform.py
     "qemu-screenshot.py",         # E2E test utility
     "run-behavioral-tests.py",    # Test runner wrapper
-    "welcome.py",                 # Live OS only, tested via test_guide
+    "e2e-test-iso.py",            # E2E test runner
+    "guide_chapters.py",          # Data module for guide content
+    "guide_strings.py",           # Data module for guide i18n strings
+    "welcome.py",                 # Live OS only, tested via test_welcome
     "welcome_strings.py",         # Data module for welcome
 }
 
@@ -201,8 +202,6 @@ _SHELL_NO_STRICT = {
     "doctor-checks.sh",   # Sourced library
     "doctor-network.sh",  # Sourced library
     "domain-lib.sh",      # Sourced library
-    "guide-lib.sh",       # Sourced library
-    "guide-setup.sh",     # Sourced library
     "lab-lib.sh",         # Sourced library
     "live-os-lib.sh",     # Sourced library
 }
@@ -212,8 +211,6 @@ _SHELL_LIB_SCRIPTS = {
     "doctor-checks.sh",
     "doctor-network.sh",
     "domain-lib.sh",
-    "guide-lib.sh",
-    "guide-setup.sh",
     "lab-lib.sh",
     "live-os-lib.sh",
 }

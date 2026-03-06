@@ -269,11 +269,12 @@ def show_next_steps(s: dict, lang: str) -> None:
         for line in kb:
             print(f"  {line}")
         print()
-    print(f"  {s['next_guide']}")
     print(f"  {s['next_help']}")
     print(f"  {s['next_console']}")
     if "next_labs" in s:
         print(f"  {s['next_labs']}")
+    if "next_learn" in s:
+        print(f"  {s['next_learn']}")
 
 # ── TUI (rich) ──
 def tui_main() -> None:
