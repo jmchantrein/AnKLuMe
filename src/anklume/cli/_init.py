@@ -9,7 +9,7 @@ _ANKLUME_YML = {
 # anklume.yml — Global configuration
 # Domain files go in domains/
 
-project: my-infra
+schema_version: 1
 
 defaults:
   os_image: images:debian/13
@@ -18,12 +18,15 @@ defaults:
 addressing:
   base: "10.100"
   zone_step: 10
+
+nesting:
+  prefix: true
 """,
     "fr": """\
 # anklume.yml — Configuration globale
 # Les fichiers domaine vont dans domains/
 
-project: mon-infra
+schema_version: 1
 
 defaults:
   os_image: images:debian/13
@@ -32,6 +35,9 @@ defaults:
 addressing:
   base: "10.100"
   zone_step: 10
+
+nesting:
+  prefix: true
 """,
 }
 
@@ -127,7 +133,7 @@ def run_init(directory: str, *, lang: str = "fr") -> None:
     (project_dir / "policies.yml").write_text(policies_content)
 
     # Répertoire rôles personnalisés
-    roles_dir = project_dir / "roles_custom"
+    roles_dir = project_dir / "ansible_roles_custom"
     roles_dir.mkdir(exist_ok=True)
     (roles_dir / ".gitkeep").touch()
 

@@ -1,4 +1,4 @@
-# SPEC.md — anklume v2
+# SPEC.md — anklume
 
 ## 1. Vision
 
@@ -8,8 +8,8 @@ utilisant les mécanismes natifs du noyau Linux (KVM/LXC),
 orchestrés par Incus et nftables.
 
 L'utilisateur décrit ses domaines dans des fichiers YAML (un par
-domaine, style docker-compose), lance `anklume apply`, et obtient
-des environnements isolés et reproductibles.
+domaine, style docker-compose), lance `anklume apply all`, et
+obtient des environnements isolés et reproductibles.
 
 **Principe de design : minimiser la friction.** Des défauts sensés
 éliminent la configuration quand l'utilisateur n'a pas d'opinion.
@@ -20,7 +20,6 @@ Les messages d'erreur expliquent quoi faire, pas juste ce qui a
 
 - **Sysadmins** — compartimentalisation de poste de travail
 - **Étudiants** — apprentissage de l'administration système
-- **Enseignants** — déploiement de labs réseau pour N étudiants
 - **Power users** — isolation type QubesOS sans les contraintes
 - **Utilisateurs soucieux de leur vie privée** — routage via
   des passerelles isolées (Tor, VPN)
@@ -35,23 +34,44 @@ Les messages d'erreur expliquent quoi faire, pas juste ce qui a
 ## 2. Installation et utilisation
 
 ```bash
-pip install anklume          # ou : pipx install anklume
-anklume init mon-infra       # crée un répertoire projet
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe
+uv sync
+
+uv run anklume init mon-infra
 cd mon-infra
-vim domains/pro.yml          # décrire un domaine
-anklume apply                # déployer vers Incus
+vim domains/pro.yml
+uv run anklume apply all
 ```
+
+### Mode développement
+
+```bash
+uv sync --group dev
+uv run anklume dev setup       # prépare l'environnement de dev
+uv run anklume dev lint
+uv run anklume dev test
+```
+
+`anklume dev setup` prépare l'environnement de développement :
+nesting Incus vérifié, dépendances Ansible, conteneur de test,
+hooks git, etc.
 
 ### Répertoire projet (créé par `anklume init`)
 
 ```
 mon-infra/
-  anklume.yml       # Config globale (projet, addressing, défauts)
+  anklume.yml       # Config globale (addressing, défauts, schema_version)
   domains/          # Un fichier YAML par domaine
     pro.yml
     perso.yml
   policies.yml      # Politiques réseau inter-domaines (optionnel)
-  roles_custom/     # Rôles Ansible utilisateur (optionnel)
+  ansible/          # Provisioning Ansible (généré + personnalisable)
+    inventory/      # Inventaire (généré depuis domains/)
+    group_vars/     # Variables par domaine
+    host_vars/      # Variables par machine
+    site.yml        # Playbook principal
+  ansible_roles_custom/  # Rôles Ansible utilisateur (optionnel)
 ```
 
 ## 3. Concepts clés
@@ -87,24 +107,44 @@ Posture de sécurité d'un domaine, encodée dans l'adressage IP :
 
 Depuis `10.140.0.5`, un admin sait : zone 140 = 100+40 = untrusted.
 
-## 4. Modèle source de vérité (PSOT)
+## 4. Modèle source de vérité (PSOT) — stateless
 
 ```
 domains/*.yml ──[anklume apply]──> Incus (projets, réseaux, instances)
                                  ──> Ansible (provisioning)
 ```
 
-- Les fichiers domaine sont la vérité structurelle (quoi créer)
-- Ansible est utilisé uniquement pour le provisioning (quoi installer)
-- Pas d'étape intermédiaire `sync` — Python pilote Incus directement
+- Les fichiers domaine sont la première source de vérité (quoi créer)
+- Incus est la source de vérité secondaire (état réel)
+- `anklume apply` réconcilie : lit le désiré (YAML), interroge le réel
+  (Incus), applique les différences
+- Pas de state file — le système est stateless par design
+- Ansible est utilisé pour le provisioning (quoi installer)
+- Python pilote Incus directement (pas d'étape intermédiaire)
 - Les fichiers domaine sont commités dans git
+
+### Dry-run
+
+`anklume apply --dry-run` affiche les changements prévus sans les
+appliquer. Montre les créations, modifications et suppressions
+pour chaque ressource (projet, réseau, instance).
+
+### Gestion d'erreurs
+
+En cas d'échec partiel (ex: domaine 3/5 échoue), anklume :
+- continue les domaines indépendants (best-effort)
+- rapporte clairement les succès et les échecs
+- un `anklume apply` suivant reprend depuis l'état réel (idempotent)
+
+Pas de rollback automatique : les domaines réussis restent en place.
+L'utilisateur corrige et relance.
 
 ## 5. Format des fichiers
 
 ### `anklume.yml` (config globale)
 
 ```yaml
-project: mon-infra
+schema_version: 1
 
 defaults:
   os_image: images:debian/13
@@ -113,7 +153,14 @@ defaults:
 addressing:
   base: "10.100"
   zone_step: 10
+
+nesting:
+  prefix: true        # préfixer les ressources Incus par le niveau
 ```
+
+`schema_version` permet la migration automatique quand le format
+évolue. `anklume apply` vérifie la version et propose la migration
+si nécessaire.
 
 ### `domains/<nom>.yml` (un domaine)
 
@@ -177,13 +224,13 @@ policies:
 | `type` | lxc | lxc ou vm |
 | `ip` | auto | Auto-assigné depuis le sous-réseau |
 | `ephemeral` | hérité | Hérite du domaine |
-| `gpu` | false | Passthrough GPU |
+| `gpu` | false | Passthrough GPU (pour Ollama, STT, etc.) |
 | `profiles` | [default] | Profils Incus à appliquer |
 | `roles` | [] | Rôles Ansible pour le provisioning |
 | `config` | {} | Config Incus (overrides) |
 | `persistent` | {} | Volumes persistants (`nom: chemin`) |
 | `vars` | {} | Variables Ansible pour cette machine |
-| `weight` | 1 | Poids d'allocation de ressources |
+| `weight` | 1 | Poids pour l'allocation de ressources (voir resource_policy) |
 
 ### Convention d'adressage
 
@@ -221,13 +268,16 @@ policies:
     bidirectional: false   # défaut false
 ```
 
+`bidirectional` contrôle qui peut initier la connexion :
+- `false` (défaut) : seul `from` peut initier vers `to`
+- `true` : les deux parties peuvent initier la connexion
+
 ### Contraintes de validation
 
 - Noms de domaine : uniques, DNS-safe (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 - Noms de machines : globalement uniques (après préfixage)
 - IPs : globalement uniques, dans le bon sous-réseau
 - Profils référencés par une machine doivent exister dans son domaine
-- GPU : exclusif par défaut (une seule instance GPU sauf override)
 - `trust_level` : admin, trusted, semi-trusted, untrusted, disposable
 
 ## 6. Commandes CLI
@@ -237,8 +287,9 @@ policies:
 | Commande | Description |
 |----------|-------------|
 | `anklume init [dir]` | Créer un nouveau projet |
-| `anklume apply` | Déployer toute l'infrastructure |
-| `anklume apply <domaine>` | Déployer un seul domaine |
+| `anklume apply all` | Déployer toute l'infrastructure |
+| `anklume apply all --dry-run` | Afficher les changements sans appliquer |
+| `anklume apply domain <nom>` | Déployer un seul domaine |
 | `anklume status` | Afficher l'état des instances |
 | `anklume destroy` | Détruire (respecte ephemeral) |
 | `anklume destroy --force` | Tout détruire |
@@ -258,62 +309,168 @@ policies:
 
 | Commande | Description |
 |----------|-------------|
+| `anklume dev setup` | Préparer l'environnement de dev |
 | `anklume dev lint` | Tous les validateurs |
 | `anklume dev test` | pytest + behave |
 
 ## 7. Modèle d'exécution
 
-### Deux contextes
-
-1. **Hôte** — où l'utilisateur lance les commandes CLI, où Incus tourne
-2. **anklume-instance** — conteneur avec socket Incus, Ansible, le
-   framework. Où les opérations d'infrastructure s'exécutent réellement.
-
-La CLI détecte le contexte et délègue de manière transparente :
+La CLI tourne directement sur l'hôte. Dépendances gérées par `uv`.
+Incus et Ansible sont appelés via `subprocess`.
 
 ```
-anklume apply
-  ├─ Détecte : exécution sur l'hôte
-  ├─ Vérifie : anklume-instance existe et tourne
-  ├─ Délègue : incus exec anklume-instance -- anklume apply
-  └─ Retransmet la sortie à l'utilisateur
+anklume apply all
+  ├─ Lit anklume.yml + domains/*.yml
+  ├─ Vérifie schema_version (migration si nécessaire)
+  ├─ Valide (noms, IPs, contraintes)
+  ├─ Interroge Incus (état réel)
+  ├─ Calcule le diff (désiré vs réel)
+  ├─ [--dry-run] Affiche le plan et s'arrête
+  ├─ Crée snapshots automatiques (instances existantes modifiées)
+  ├─ Crée/met à jour les ressources Incus (projets, réseaux, instances)
+  └─ Lance Ansible pour le provisioning des instances
 ```
 
-### Bootstrap
+### Prérequis sur l'hôte
 
-`anklume apply` sur un système vierge :
-1. Crée `anklume-instance` (si inexistant)
-2. Monte le socket Incus en lecture/écriture
-3. Installe le framework dans le conteneur
-4. Lance `anklume apply` à l'intérieur
+- Python 3.11+ avec uv
+- Incus installé et configuré
+- Ansible (optionnel, pour le provisioning)
 
-## 8. Live ISO (concern séparé)
+### Sur la Live ISO
 
-La Live ISO est un produit éducatif/démo construit au-dessus
-d'anklume. Elle vit dans `live/` et n'est pas requise pour
-l'utilisation normale.
+Tout est pré-installé dans le squashfs. L'utilisateur lance
+`anklume apply all` directement après le boot.
 
-### Flow de boot
+## 8. Nesting Incus
 
+Support du nesting LXC pour les architectures multi-niveaux
+(conteneurs dans conteneurs).
+
+### Préfixe de nesting
+
+Quand `nesting.prefix: true` (défaut), les ressources Incus sont
+préfixées par le niveau de profondeur pour éviter les collisions :
+
+| Ressource | Hôte (L0) | Niveau 1 | Niveau 2 |
+|-----------|-----------|----------|----------|
+| Projet Incus | `pro` | `001-pro` | `002-pro` |
+| Bridge réseau | `net-pro` | `001-net-pro` | `002-net-pro` |
+| Instance | `pro-dev` | `001-pro-dev` | `002-pro-dev` |
+
+Format du préfixe : `{level:03d}-`
+
+Les chemins Ansible (inventory, group_vars, host_vars) restent
+sans préfixe — ils sont locaux à chaque niveau.
+
+### Fichiers de contexte
+
+Chaque instance reçoit 4 fichiers dans `/etc/anklume/` pour
+déterminer son niveau de nesting :
+
+| Fichier | Description |
+|---------|-------------|
+| `absolute_level` | Profondeur depuis l'hôte physique (L0=0, L1=1, ...) |
+| `relative_level` | Reset à 0 à chaque frontière VM |
+| `vm_nested` | `true` si une VM existe dans la chaîne d'ancêtres |
+| `yolo` | Mode override pour bypasser les checks de sécurité |
+
+### Sécurité par niveau
+
+| Niveau | Configuration |
+|--------|---------------|
+| L1 (dans l'hôte) | `security.nesting=true` + syscalls intercept (unprivileged) |
+| L2+ (dans conteneur) | `security.privileged=true` + `security.nesting=true` |
+
+L2+ utilise des conteneurs privilegiés à l'intérieur de conteneurs
+unprivileged — sûr par design (recommandation stgraber).
+
+## 9. Resource policy
+
+Allocation automatique des ressources CPU/mémoire aux instances,
+configurable dans `anklume.yml` :
+
+```yaml
+resource_policy:
+  host_reserve:
+    cpu: "20%"           # réserve hôte (pourcentage ou nombre absolu)
+    memory: "20%"        # réserve hôte (pourcentage ou taille absolue)
+  mode: proportional     # proportional ou equal
+  cpu_mode: allowance    # allowance (%) ou count (vCPUs fixes)
+  memory_enforce: soft   # soft (ballooning cgroups) ou hard (limite stricte)
+  overcommit: false      # true = warning au lieu d'erreur si total > disponible
 ```
-Boot ISO → tty1 → bash_profile → KDE Plasma
-  └─ Le navigateur ouvre la plateforme d'apprentissage (/setup)
-```
 
-### Plateforme web
+La distribution utilise le champ `weight` de chaque machine :
+- `weight: 3` → reçoit 3x la part d'une machine `weight: 1`
+- Les machines avec des limites explicites dans `config` sont
+  exclues de l'auto-allocation pour ces ressources
 
-- Serveur FastAPI sur l'hôte (lecture seule)
-- UI split-pane : contenu à gauche, terminal à droite (ttyd)
-- Guide interactif, labs, configuration de persistance
-- Bilingue (fr/en)
+Détection hardware : `incus info --resources --format json`,
+fallback sur `/proc/cpuinfo` + `/proc/meminfo`.
 
-### La Live ISO n'est PAS le framework
+## 10. Snapshots
 
-Le builder ISO (`live/build.sh`) empaquète anklume + dépendances
-dans une image bootable. Les changements au framework (`src/`)
-nécessitent un rebuild ISO uniquement pour tester la Live ISO.
+Snapshots automatiques et manuels pour la sécurité des données.
 
-## 9. Leçons du POC
+### Snapshots automatiques
+
+Avant et après chaque modification d'une instance par `anklume apply` :
+- **Pré-apply** : snapshot de l'état avant modification
+- **Post-apply** : snapshot de l'état après modification réussie
+
+Convention de nommage : `anklume-{pre|post}-{timestamp}`
+
+### Snapshots manuels
+
+- `anklume snapshot create` — snapshot de toutes les instances
+- `anklume snapshot create <instance>` — snapshot d'une instance
+- `anklume snapshot restore <nom>` — restaurer un snapshot
+- `anklume snapshot list` — lister les snapshots disponibles
+
+## 11. Fonctionnalités additionnelles
+
+### Intégration IA
+
+Support natif de LLM locaux/externes :
+- Ollama (local, GPU passthrough)
+- OpenRouter (cloud, tokenisation)
+- STT (Speaches, coexistence GPU)
+
+### Live ISO — OS immuable avec persistance chiffrée
+
+La Live ISO fournit un OS immuable prêt à l'emploi pour anklume.
+Boot en RAM (squashfs), données pérennisées sur disque chiffré
+(ZFS ou BTRFS). Elle vit dans `live/`.
+
+**Objectif** : démarrer anklume sur n'importe quelle machine sans
+installer de distribution. L'OS est en lecture seule (immuable),
+seules les données utilisateur (domaines, instances, configs)
+persistent sur un volume chiffré.
+
+**Architecture** :
+- Boot ISO → squashfs en RAM → KDE Plasma
+- Détection automatique du disque de persistance (ZFS/BTRFS chiffré)
+- Sans disque de persistance : mode RAM-only (éphémère)
+- Si disque présent : montage automatique, reprise de l'infra
+
+**Contraintes sur le core** :
+- Les chemins de données d'anklume doivent être configurables
+- Le storage backend d'Incus doit pouvoir vivre sur le volume
+  chiffré (ZFS pool ou BTRFS subvolume)
+- `anklume apply all` idempotent (survit aux redémarrages)
+
+### Schema versioning
+
+`schema_version` dans `anklume.yml` suit le format des fichiers.
+Quand anklume détecte une version antérieure :
+- affiche les changements nécessaires
+- propose la migration automatique (`anklume apply` ou `anklume migrate`)
+- refuse de continuer sur un schéma incompatible sans migration
+
+## 12. Historique
+
+La branche `poc` contient le prototype initial. Décisions retenues :
 
 ### Garder
 - Adressage par niveau de confiance (IPs lisibles)
@@ -322,16 +479,19 @@ nécessitent un rebuild ISO uniquement pour tester la Live ISO.
 - Bilingue fr/en
 - Plateforme web pour l'apprentissage
 - ttyd pour le terminal web
+- Nesting Incus (préfixes, contexte, sécurité par niveau)
+- Resource policy (allocation CPU/mémoire par poids)
+- STT (Speaches)
+- Intégration IA (LLM) local/externe, OpenRouter, tokenisation
 
 ### Abandonner
 - Makefile comme backend
-- `anklume sync` (étape intermédiaire inutile)
-- `incus exec anklume-instance` manuel
-- Fichiers Ansible générés comme source de vérité secondaire
+- `anklume sync` (étape intermédiaire)
+- anklume-instance (conteneur de management)
 - `infra.yml` monolithique (remplacé par `domains/*.yml`)
 - 200+ lignes de HTML inline dans Python
 
 ### Changer
 - CLI → Python directement (plus de scripts bash intermédiaires)
-- Délégation transparente host ↔ container
-- Framework séparé du projet utilisateur
+- Exécution directe sur l'hôte (uv)
+- Installation par `git clone` + `uv sync`

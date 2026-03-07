@@ -1,36 +1,34 @@
-# anklume v2
+# anklume
 
 Framework de compartimentalisation d'infrastructure déclaratif.
 Isolation avec Incus (LXC/KVM) + nftables, sur n'importe quel Linux.
+Provisioning des instances via Ansible (intégré, optionnel pour l'utilisateur).
 
 ## Règles non-négociables
 
-1. **anklume est un outil installé** — comme docker ou terraform.
-   `anklume init`, pas `git clone`. Le projet utilisateur est indépendant.
 2. **Modèle PSOT** — les fichiers domaine (`domains/*.yml`) sont la
    source de vérité. `anklume apply` déploie directement vers Incus.
-   Pas d'étape intermédiaire `sync`.
 3. **La CLI est la seule interface** — pas de Makefile. Toute opération
    passe par une commande CLI (`anklume <nom> <verbe>`).
-4. **DRY + KISS** — un fichier = une responsabilité. Pas de fichier
-   de plus de 200 lignes. Pas d'abstraction prématurée.
-5. **Spec-driven, test-driven** — spec d'abord, test ensuite, code après.
+4. **DRY + KISS** — un fichier = une responsabilité.
+5. **Spec-driven, test-driven** — spec d'abord, tests exhaustifs ensuite(unitaires, E2E et Behavior), code après.
 6. **Incus via CLI** — `subprocess` + `incus --format json` +
-   idempotence manuelle. Pas de modules Ansible natifs.
+   idempotence manuelle.
 7. **Français par défaut** — docs, commentaires, UI en français.
    Code (variables, fonctions, CLI) en anglais (convention universelle).
+8. **Prévoir internationalisation (i18n)**
 
 ## Structure du projet
 
 ```
-src/anklume/        # Package Python (pip installable)
+src/anklume/        # Package Python
   cli/              # Commandes CLI (Typer)
   engine/           # Moteur PSOT (domains/*.yml → Incus)
   provisioner/      # Interface Ansible pour le provisioning
   i18n/             # Traductions
-live/               # Live ISO (concern séparé)
+live/               # Live ISO — OS immuable avec persistance chiffrée (ZFS/BTRFS)
   boot/             # Scripts de boot, systemd, grub
-  platform/         # Plateforme web d'apprentissage (FastAPI)
+platform/           # Plateforme web (FastAPI) (concern séparé) #REDONDANTS AVEC LABS ...
 tests/              # pytest + behave
 labs/               # Labs éducatifs
 docs/               # SPEC, ARCHITECTURE
@@ -40,21 +38,27 @@ docs/               # SPEC, ARCHITECTURE
 
 ```
 mon-infra/
-  anklume.yml       # Config globale
-  domains/          # Un fichier par domaine (docker-compose style)
+  anklume.yml               # Config globale
+  domains/                  # Un fichier par domaine (docker-compose style)
     pro.yml
     perso.yml
     ai-tools.yml
-  policies.yml      # Politiques réseau (optionnel)
-  roles_custom/     # Rôles Ansible utilisateur (optionnel)
+  policies.yml              # Politiques réseau (optionnel)
+  ansible/                  # Provisioning Ansible (généré + personnalisable)
+    inventory/              # Inventaire (généré depuis domains/)
+    group_vars/             # Variables par domaine
+    host_vars/              # Variables par machine
+    site.yml                # Playbook principal
+  ansible_roles_custom/     # Rôles Ansible utilisateur (optionnel)
 ```
+
 
 ## Commandes
 
 ```bash
 anklume init [dir]        # Créer un nouveau projet
-anklume apply             # Déployer toute l'infrastructure
-anklume apply <domaine>   # Déployer un seul domaine
+anklume apply all             # Déployer toute l'infrastructure
+anklume apply domain <nom>    # Déployer un seul domaine
 anklume status            # Afficher l'état de l'infrastructure
 anklume destroy           # Détruire (respecte les flags ephemeral)
 anklume dev lint          # Tous les validateurs
@@ -79,12 +83,38 @@ domains/*.yml ──[anklume apply]──> Incus (projets, réseaux, instances)
                                  ──> Ansible (provisioning des instances)
 ```
 
-Pas d'étape `sync`. Python lit les domaines, crée les ressources
+Python lit les domaines, crée les ressources
 Incus directement, puis lance Ansible pour le provisioning.
 
-La CLI tourne sur l'hôte. Les opérations nécessitant Incus/Ansible
-sont déléguées de manière transparente à `anklume-instance`.
-L'utilisateur ne tape jamais `incus exec anklume-instance`.
+La CLI tourne directement sur l'hôte. Dépendances gérées par `uv`.
+Incus et Ansible sont appelés via `subprocess`.
+
+## Démarrage de session (après chaque /clear)
+
+**OBLIGATOIRE** — à chaque nouvelle session, avant toute action :
+
+1. Lire `docs/ROADMAP.md` pour connaître l'état courant et les priorités
+2. Vérifier `git diff HEAD` et `git log --oneline -5` :
+   - Si des fichiers ont été modifiés par l'utilisateur (non commités),
+     **les analyser en priorité** : ce sont des corrections ou des
+     orientations. Adapter la compréhension du projet en conséquence.
+   - Si CLAUDE.md a changé, relire les sections modifiées.
+3. Mettre à jour `docs/ROADMAP.md` si une étape est terminée
+4. Résumer brièvement à l'utilisateur : état, modifications détectées,
+   prochaine action proposée
+
+### Apprentissage des modifications manuelles
+
+Quand l'utilisateur modifie un fichier entre deux sessions :
+- **Code modifié** → c'est une correction. Comprendre pourquoi et
+  appliquer le pattern dans le code futur.
+- **CLAUDE.md modifié** → c'est une directive. L'appliquer
+  immédiatement et sans discussion.
+- **Spec/Architecture modifiée** → c'est une réorientation.
+  Vérifier la cohérence avec le code existant.
+
+Ne jamais ignorer une modification manuelle. Ne jamais revenir
+silencieusement à l'ancienne version.
 
 ## Fichiers de contexte
 
@@ -93,3 +123,4 @@ Toujours chargé : ce fichier (CLAUDE.md)
 À lire sur demande (outil Read) :
 - `docs/SPEC.md` — spécification complète
 - `docs/ARCHITECTURE.md` — décisions d'architecture
+- `docs/ROADMAP.md` — état courant et prochaines étapes

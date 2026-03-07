@@ -12,6 +12,15 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+# Sous-commandes groupées
+apply_app = typer.Typer(help="Déployer l'infrastructure.")
+dev_app = typer.Typer(help="Outils de développement.")
+instance_app = typer.Typer(help="Gestion des instances.")
+
+app.add_typer(apply_app, name="apply")
+app.add_typer(dev_app, name="dev")
+app.add_typer(instance_app, name="instance")
+
 
 def _version_callback(value: bool) -> None:
     if value:
@@ -23,10 +32,19 @@ def _version_callback(value: bool) -> None:
 def main(
     version: Annotated[
         bool | None,
-        typer.Option("--version", "-V", help="Afficher la version", callback=_version_callback, is_eager=True),
+        typer.Option(
+            "--version",
+            "-V",
+            help="Afficher la version",
+            callback=_version_callback,
+            is_eager=True,
+        ),
     ] = None,
 ) -> None:
     """anklume — isolation compartimentée avec Incus."""
+
+
+# --- anklume init ---
 
 
 @app.command()
@@ -41,14 +59,6 @@ def init(
 
 
 @app.command()
-def apply(
-    domain: Annotated[str | None, typer.Argument(help="Domaine unique à déployer")] = None,
-) -> None:
-    """Déployer l'infrastructure vers Incus."""
-    typer.echo("apply : pas encore implémenté")
-
-
-@app.command()
 def status() -> None:
     """Afficher l'état de l'infrastructure."""
     typer.echo("status : pas encore implémenté")
@@ -56,7 +66,81 @@ def status() -> None:
 
 @app.command()
 def destroy(
-    force: Annotated[bool, typer.Option("--force", help="Détruire aussi les instances protégées")] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Détruire aussi les instances protégées"),
+    ] = False,
 ) -> None:
     """Détruire l'infrastructure."""
     typer.echo("destroy : pas encore implémenté")
+
+
+# --- anklume apply <all|domaine> ---
+
+
+@apply_app.command("all")
+def apply_all() -> None:
+    """Déployer tous les domaines."""
+    typer.echo("apply all : pas encore implémenté")
+
+
+@apply_app.command("domain")
+def apply_domain(
+    name: Annotated[str, typer.Argument(help="Nom du domaine à déployer")],
+) -> None:
+    """Déployer un domaine spécifique."""
+    typer.echo(f"apply domain {name} : pas encore implémenté")
+
+
+# --- anklume dev <setup|lint|test> ---
+
+
+@dev_app.command("setup")
+def dev_setup() -> None:
+    """Préparer l'environnement de développement anklume."""
+    typer.echo("dev setup : pas encore implémenté")
+
+
+@dev_app.command("lint")
+def dev_lint() -> None:
+    """Lancer tous les validateurs (ruff)."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "src/", "tests/"],
+    )
+    if result.returncode == 0:
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "format", "--check", "src/", "tests/"],
+        )
+    raise typer.Exit(result.returncode)
+
+
+@dev_app.command("test")
+def dev_test() -> None:
+    """Lancer pytest."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "-v"],
+    )
+    raise typer.Exit(result.returncode)
+
+
+# --- anklume instance <list|shell> ---
+
+
+@instance_app.command("list")
+def instance_list() -> None:
+    """Lister toutes les instances."""
+    typer.echo("instance list : pas encore implémenté")
+
+
+@instance_app.command("shell")
+def instance_shell(
+    name: Annotated[str, typer.Argument(help="Nom de l'instance")],
+) -> None:
+    """Ouvrir un shell dans une instance."""
+    typer.echo(f"instance shell {name} : pas encore implémenté")
