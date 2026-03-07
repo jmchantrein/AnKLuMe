@@ -1,8 +1,7 @@
 # Roadmap anklume
 
-## Phase actuelle : 1 — Squelette et spécifications
+## Phase 1 — Squelette et spécifications ✅
 
-### Terminé
 - [x] Archiver le prototype (branche `poc` sur GitHub)
 - [x] Reset main avec squelette propre
 - [x] CLAUDE.md, SPEC.md, ARCHITECTURE.md rédigés
@@ -13,27 +12,27 @@
 - [x] Analyse critique architecture + mise à jour docs (nesting POC,
       resource policy, snapshots, dry-run, schema versioning, stateless)
 
+## Phase 2 — Moteur PSOT ✅
+
+- [x] Parser les fichiers domaine (`domains/*.yml`)
+- [x] Valider (noms, IPs, trust levels, contraintes)
+- [x] Calcul d'adressage automatique
+- [x] Vérification `schema_version` + migration
+- [x] Tests unitaires exhaustifs pour le moteur (80 tests)
+
+## Phase actuelle : 3 — Incus driver
+
 ### En cours
-- [ ] Valider la structure finale avec l'utilisateur
-- [ ] Premier test unitaire (validation d'un fichier domaine)
-
-### Prochaines phases
-
-#### Phase 2 — Moteur PSOT
-- [ ] Parser les fichiers domaine (`domains/*.yml`)
-- [ ] Valider (noms, IPs, trust levels, contraintes)
-- [ ] Calcul d'adressage automatique
-- [ ] Vérification `schema_version` + migration
-- [ ] Tests unitaires exhaustifs pour le moteur
-
-#### Phase 3 — Incus driver
 - [ ] `engine/incus_driver.py` — wrapper typé autour de subprocess
+- [ ] Réconciliateur (`engine/reconciler.py`) — diff désiré vs réel
 - [ ] Créer projets Incus depuis les domaines
 - [ ] Créer réseaux (bridges) avec adressage
 - [ ] Créer instances (LXC/VM)
 - [ ] Réconciliation stateless (lire état Incus → comparer → appliquer)
 - [ ] `--dry-run` (afficher le plan sans appliquer)
 - [ ] `anklume apply all` / `anklume apply domain <nom>` fonctionnels
+
+### Prochaines phases
 
 #### Phase 4 — Snapshots
 - [ ] Snapshots automatiques pré/post-apply

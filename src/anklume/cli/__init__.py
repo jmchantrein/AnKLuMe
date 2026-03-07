@@ -79,17 +79,30 @@ def destroy(
 
 
 @apply_app.command("all")
-def apply_all() -> None:
+def apply_all(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Afficher le plan sans appliquer"),
+    ] = False,
+) -> None:
     """Déployer tous les domaines."""
-    typer.echo("apply all : pas encore implémenté")
+    from anklume.cli._apply import run_apply
+
+    run_apply(dry_run=dry_run)
 
 
 @apply_app.command("domain")
 def apply_domain(
     name: Annotated[str, typer.Argument(help="Nom du domaine à déployer")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Afficher le plan sans appliquer"),
+    ] = False,
 ) -> None:
     """Déployer un domaine spécifique."""
-    typer.echo(f"apply domain {name} : pas encore implémenté")
+    from anklume.cli._apply import run_apply
+
+    run_apply(domain_name=name, dry_run=dry_run)
 
 
 # --- anklume dev <setup|lint|test> ---

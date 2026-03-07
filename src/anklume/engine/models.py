@@ -12,6 +12,9 @@ TRUST_LEVELS = {
     "disposable": 50,
 }
 
+MACHINE_TYPES = {"lxc", "vm"}
+PROTOCOLS = {"tcp", "udp"}
+
 SCHEMA_VERSION = 1
 
 
@@ -32,6 +35,11 @@ class Machine:
     persistent: dict[str, str] = field(default_factory=dict)
     vars: dict = field(default_factory=dict)
     weight: int = 1
+
+    @property
+    def incus_type(self) -> str:
+        """Type Incus : 'virtual-machine' ou 'container'."""
+        return "virtual-machine" if self.type == "vm" else "container"
 
 
 @dataclass
@@ -56,6 +64,11 @@ class Domain:
     profiles: dict[str, Profile] = field(default_factory=dict)
     subnet: str | None = None
     gateway: str | None = None
+
+    @property
+    def network_name(self) -> str:
+        """Nom du bridge réseau Incus pour ce domaine."""
+        return f"net-{self.name}"
 
 
 @dataclass

@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field
 
 from anklume.engine.models import (
+    MACHINE_TYPES,
+    PROTOCOLS,
     SCHEMA_VERSION,
     TRUST_LEVELS,
     Infrastructure,
@@ -127,7 +129,7 @@ def _check_machine_names(infra: Infrastructure, result: ValidationResult) -> Non
 
 
 def _check_machine_types(infra: Infrastructure, result: ValidationResult) -> None:
-    valid_types = {"lxc", "vm"}
+    valid_types = MACHINE_TYPES
     for domain_name, domain in infra.domains.items():
         for machine_name, machine in domain.machines.items():
             if machine.type not in valid_types:
@@ -209,7 +211,7 @@ def _check_policies(infra: Infrastructure, result: ValidationResult) -> None:
                 f"'to: {policy.to_target}' ne correspond à aucun domaine ou machine.",
                 f"Cibles disponibles : {', '.join(sorted(valid_targets))}",
             )
-        if policy.protocol not in {"tcp", "udp"}:
+        if policy.protocol not in PROTOCOLS:
             result.add(
                 loc,
                 f"protocole '{policy.protocol}' invalide.",

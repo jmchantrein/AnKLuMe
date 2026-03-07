@@ -323,12 +323,128 @@ anklume apply all
   ├─ Lit anklume.yml + domains/*.yml
   ├─ Vérifie schema_version (migration si nécessaire)
   ├─ Valide (noms, IPs, contraintes)
-  ├─ Interroge Incus (état réel)
-  ├─ Calcule le diff (désiré vs réel)
+  ├─ Calcule l'adressage automatique
+  ├─ Interroge Incus via IncusDriver (état réel)
+  ├─ Réconcilie : calcule le diff (désiré vs réel)
+  ├─ Produit un plan d'actions ordonnées
   ├─ [--dry-run] Affiche le plan et s'arrête
-  ├─ Crée snapshots automatiques (instances existantes modifiées)
-  ├─ Crée/met à jour les ressources Incus (projets, réseaux, instances)
-  └─ Lance Ansible pour le provisioning des instances
+  ├─ Exécute le plan (créations, mises à jour, démarrages)
+  └─ Rapporte les succès et échecs par domaine
+```
+
+### 7.1 Incus driver (`engine/incus_driver.py`)
+
+Seul module autorisé à appeler `subprocess` pour Incus.
+Contrat : entrées/sorties typées, pas de logique métier.
+
+#### Appels CLI encapsulés
+
+| Méthode | Commande Incus |
+|---------|---------------|
+| `project_list()` | `incus project list --format json` |
+| `project_create(name, desc)` | `incus project create <name> -c features.images=false -c features.profiles=false` |
+| `project_exists(name)` | Vérifie dans `project_list()` |
+| `network_list(project)` | `incus network list --project <p> --format json` |
+| `network_create(name, project, config)` | `incus network create <name> --project <p> --type bridge` + config |
+| `network_exists(name, project)` | Vérifie dans `network_list()` |
+| `instance_list(project)` | `incus list --project <p> --format json` |
+| `instance_create(name, project, image, ...)` | `incus init <image> <name> --project <p>` + profiles + config |
+| `instance_start(name, project)` | `incus start <name> --project <p>` |
+| `instance_stop(name, project)` | `incus stop <name> --project <p>` |
+| `instance_delete(name, project)` | `incus delete <name> --project <p>` |
+
+#### Gestion d'erreurs
+
+`IncusError(command, returncode, stderr)` — levée quand la CLI
+retourne un code non-zéro. Le message inclut la commande complète
+et la sortie stderr pour le diagnostic.
+
+#### Configuration du projet Incus
+
+Chaque domaine crée un projet Incus avec :
+- `features.images=false` — utilise les images du projet default
+- `features.profiles=false` — utilise les profils du projet default
+
+### 7.2 Réconciliateur (`engine/reconciler.py`)
+
+Compare l'état désiré (Infrastructure) avec l'état réel (Incus)
+et produit un plan d'actions ordonnées.
+
+#### Actions de réconciliation
+
+```python
+@dataclass
+class Action:
+    verb: str        # "create" | "start" | "stop" | "delete" | "skip"
+    resource: str    # "project" | "network" | "instance"
+    target: str      # nom de la ressource
+    project: str     # projet Incus concerné
+    detail: str      # description lisible
+```
+
+#### Ordre d'exécution
+
+Le plan est ordonné par dépendances :
+1. Créer les projets manquants
+2. Créer les réseaux manquants
+3. Créer les instances manquantes
+4. Démarrer les instances arrêtées
+5. (Suppression : Phase 9, avec `anklume destroy`)
+
+#### Logique de réconciliation par domaine
+
+Pour chaque domaine activé (`enabled: true`) :
+
+**Projet** :
+- Si le projet n'existe pas → `Action("create", "project", ...)`
+- Si le projet existe → rien (skip)
+
+**Réseau** :
+- Nom du bridge : `net-{domain_name}`
+- Config : `ipv4.address={gateway}/24`, `ipv4.nat=true`
+- Si le réseau n'existe pas → `Action("create", "network", ...)`
+- Si le réseau existe → rien (skip)
+
+**Instances** :
+- Pour chaque machine du domaine :
+  - Si l'instance n'existe pas → `Action("create", "instance", ...)` + `Action("start", "instance", ...)`
+  - Si l'instance existe et est Stopped → `Action("start", "instance", ...)`
+  - Si l'instance existe et est Running → rien (skip)
+
+#### Instance Incus : configuration
+
+Chaque instance est créée avec :
+- Image : `defaults.os_image` (ex: `images:debian/13`)
+- Type : `container` (LXC) ou `virtual-machine` (VM)
+- Profils : ceux déclarés dans le YAML
+- Config Incus : `config` du YAML + protection delete si non-éphémère
+
+Protection delete : `security.protection.delete=true` si
+`ephemeral=false` (ADR-011).
+
+#### Dry-run
+
+`reconcile(infra, driver, dry_run=True)` retourne le plan sans
+l'exécuter. Le plan est affiché à l'utilisateur avec un résumé :
+```
+[dry-run] Domaine pro :
+  + Créer projet : pro
+  + Créer réseau : net-pro (10.120.0.254/24)
+  + Créer instance : pro-dev (lxc, images:debian/13)
+  + Démarrer instance : pro-dev
+```
+
+#### Gestion d'erreurs
+
+Best-effort par domaine : si un domaine échoue, les autres
+continuent. Le résultat final rapporte succès/échecs.
+
+```python
+@dataclass
+class ReconcileResult:
+    actions: list[Action]         # toutes les actions planifiées
+    executed: list[Action]        # actions exécutées avec succès
+    errors: list[tuple[Action, str]]  # (action, message d'erreur)
 ```
 
 ### Prérequis sur l'hôte
