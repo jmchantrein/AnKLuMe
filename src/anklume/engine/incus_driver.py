@@ -199,6 +199,12 @@ class IncusDriver:
     def snapshot_delete(self, instance: str, project: str, name: str) -> None:
         self._run(["snapshot", "delete", instance, name, "--project", project])
 
+    # --- Info ---
+
+    def host_resources(self) -> dict:
+        """Retourne les ressources hardware de l'hôte via `incus info --resources`."""
+        return self._run_json(["info", "--resources"])
+
     # --- Exec ---
 
     def instance_exec(

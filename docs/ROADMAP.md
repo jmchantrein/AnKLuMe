@@ -83,11 +83,18 @@
 - [x] Tests unitaires : 47 tests nesting + zéro régression réconciliateur
 - [x] 280 tests unitaires au total, zéro régression
 
-## Phase 8 — Resource policy
-- [ ] Détection hardware (CPU, mémoire)
-- [ ] Allocation proportionnelle/égale par poids
-- [ ] Réserve hôte, overcommit
-- [ ] Modes CPU (allowance vs count) et mémoire (soft vs hard)
+## Phase 8 — Resource policy ✅
+
+- [x] SPEC §9 détaillé (détection, réserve, algorithme, modes, overcommit, intégration, CLI)
+- [x] `engine/resources.py` — détection hardware (Incus + fallback /proc/)
+- [x] Allocation proportionnelle/égale par poids (`weight`)
+- [x] Réserve hôte (pourcentage ou absolu), overcommit (warning vs erreur)
+- [x] Modes CPU : allowance (%) et count (vCPUs fixes)
+- [x] Modes mémoire : soft (ballooning) et hard (limite stricte)
+- [x] Exclusion des machines avec config explicite (par ressource)
+- [x] `apply_resource_config` enrichit machine.config avant réconciliation
+- [x] Tests unitaires : 44 tests resource policy
+- [x] 325 tests unitaires au total, zéro régression
 
 ## Phase 9 — Status et destroy
 - [ ] `anklume status` (état réel vs déclaré)

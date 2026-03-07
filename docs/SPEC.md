@@ -617,13 +617,149 @@ resource_policy:
   overcommit: false      # true = warning au lieu d'erreur si total > disponible
 ```
 
-La distribution utilise le champ `weight` de chaque machine :
-- `weight: 3` → reçoit 3x la part d'une machine `weight: 1`
-- Les machines avec des limites explicites dans `config` sont
-  exclues de l'auto-allocation pour ces ressources
+### 9.1 Détection hardware
 
-Détection hardware : `incus info --resources --format json`,
-fallback sur `/proc/cpuinfo` + `/proc/meminfo`.
+Sources de détection (dans l'ordre de priorité) :
+
+1. **`incus info --resources --format json`** — source principale.
+   Retourne `cpu.total` (threads logiques) et `memory.total` (octets).
+2. **Fallback `/proc/`** — si Incus indisponible :
+   - `/proc/cpuinfo` → compte des lignes `processor`
+   - `/proc/meminfo` → `MemTotal` en kB → converti en octets
+
+Le résultat est un `HardwareInfo(cpu_threads: int, memory_bytes: int)`.
+
+### 9.2 Réserve hôte
+
+La réserve hôte déduit des ressources avant allocation aux instances.
+
+Formats acceptés :
+- **Pourcentage** : `"20%"` → 20% du total hardware
+- **Absolu CPU** : `"4"` → 4 threads
+- **Absolu mémoire** : `"4GB"`, `"4096MB"` → taille fixe
+  Suffixes : `KB`, `MB`, `GB`, `TB` (puissances de 1024)
+
+```
+available_cpu = total_cpu - reserve_cpu
+available_memory = total_memory - reserve_memory
+```
+
+### 9.3 Exclusion des machines avec config explicite
+
+Avant l'allocation, les machines avec des limites explicites dans
+`config` sont exclues pour la ressource concernée :
+
+- `limits.cpu` défini → exclue de l'allocation CPU
+- `limits.memory` défini → exclue de l'allocation mémoire
+
+Leur consommation est déduite du pool disponible :
+```
+allocatable_cpu = available_cpu - sum(explicit_cpu)
+allocatable_memory = available_memory - sum(explicit_memory)
+```
+
+Si une machine a `limits.cpu` mais pas `limits.memory`, elle est
+exclue uniquement pour le CPU et participe à l'allocation mémoire.
+
+### 9.4 Algorithme d'allocation
+
+Deux modes via `resource_policy.mode` :
+
+**`proportional`** (défaut) — par poids :
+```
+part_cpu[i] = allocatable_cpu × weight[i] / sum(weights)
+part_memory[i] = allocatable_memory × weight[i] / sum(weights)
+```
+
+**`equal`** — parts égales (weight ignoré) :
+```
+part_cpu[i] = allocatable_cpu / N
+part_memory[i] = allocatable_memory / N
+```
+
+### 9.5 Modes CPU
+
+Via `resource_policy.cpu_mode` :
+
+- **`allowance`** (défaut) — pourcentage CPU (`limits.cpu.allowance`
+  dans Incus). Ex : 4 threads sur 16 total → `"25%"`.
+- **`count`** — nombre fixe de vCPUs (`limits.cpu` dans Incus).
+  Arrondi à l'entier supérieur (minimum 1).
+
+### 9.6 Modes mémoire
+
+Via `resource_policy.memory_enforce` :
+
+- **`soft`** (défaut) — `limits.memory.soft` dans Incus.
+  Ballooning cgroups : la mémoire est partagée élastiquement.
+- **`hard`** — `limits.memory` dans Incus.
+  Limite stricte, l'instance est tuée (OOM) si dépassée.
+
+Les valeurs sont formatées en `MB` (arrondi à l'entier supérieur,
+minimum 64MB).
+
+### 9.7 Overcommit
+
+Si `overcommit: false` (défaut) et que la somme des allocations
+(explicites + calculées) dépasse le total hardware, **erreur**.
+
+Si `overcommit: true`, **warning** au lieu d'erreur. L'allocation
+est appliquée malgré le dépassement.
+
+### 9.8 Intégration au réconciliateur
+
+Le calcul d'allocation est exécuté **avant** la réconciliation.
+La fonction `compute_resource_allocation` enrichit le `config` de
+chaque `Machine` avec les clés `limits.*` calculées.
+
+Pipeline :
+```
+parse → validate → compute_resources → reconcile → snapshot → provision
+```
+
+Si `resource_policy` est `None` dans `GlobalConfig`, le calcul est
+sauté (aucune limite appliquée).
+
+### 9.9 CLI
+
+```
+anklume resource show    # Affiche l'allocation calculée (tableau)
+```
+
+Colonnes : instance, weight, CPU (mode), mémoire (enforce), source
+(auto/explicit).
+
+### 9.10 Module
+
+`engine/resources.py` — fonctions pures (sauf détection hardware) :
+
+```python
+@dataclass
+class HardwareInfo:
+    cpu_threads: int
+    memory_bytes: int
+
+@dataclass
+class ResourceAllocation:
+    instance_name: str
+    cpu_value: str        # "25%" ou "4" selon cpu_mode
+    cpu_key: str          # "limits.cpu.allowance" ou "limits.cpu"
+    memory_value: str     # "512MB"
+    memory_key: str       # "limits.memory.soft" ou "limits.memory"
+    source: str           # "auto" ou "explicit"
+
+def detect_hardware() -> HardwareInfo
+def detect_hardware_fallback() -> HardwareInfo
+def parse_reserve(value: str, total: int) -> int
+def compute_resource_allocation(
+    infra: Infrastructure,
+    hardware: HardwareInfo,
+) -> list[ResourceAllocation]
+def apply_resource_config(
+    infra: Infrastructure,
+    allocations: list[ResourceAllocation],
+) -> None  # modifie machine.config en place
+```
 
 ## 10. Snapshots
 
