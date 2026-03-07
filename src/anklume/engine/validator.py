@@ -87,6 +87,9 @@ def _check_schema_version(infra: Infrastructure, result: ValidationResult) -> No
         )
 
 
+_MAX_DOMAIN_NAME_LEN = 11  # net-{name} <= 15 chars (limite interface Linux)
+
+
 def _check_domain_names(infra: Infrastructure, result: ValidationResult) -> None:
     for name in infra.domains:
         if not _DNS_SAFE.match(name):
@@ -94,6 +97,12 @@ def _check_domain_names(infra: Infrastructure, result: ValidationResult) -> None
                 f"domains/{name}.yml",
                 f"nom de domaine '{name}' invalide.",
                 "Utiliser uniquement [a-z0-9-], commençant et finissant par un alphanumérique.",
+            )
+        elif len(name) > _MAX_DOMAIN_NAME_LEN:
+            result.add(
+                f"domains/{name}.yml",
+                f"nom de domaine '{name}' trop long ({len(name)} chars, max {_MAX_DOMAIN_NAME_LEN}).",
+                "Le nom du bridge réseau (net-<nom>) est limité à 15 caractères par Linux.",
             )
 
 

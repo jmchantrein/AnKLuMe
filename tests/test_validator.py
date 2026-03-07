@@ -133,6 +133,29 @@ class TestDomainNameValidation:
         )
         assert not result.valid
 
+    def test_name_too_long_for_bridge(self):
+        long_name = "a" * 12  # > 11 chars → net-{name} > 15
+        result = validate(
+            _minimal_infra(
+                domains={
+                    long_name: Domain(name=long_name, description="T"),
+                }
+            )
+        )
+        assert not result.valid
+        assert any("trop long" in str(e) for e in result.errors)
+
+    def test_max_length_name_ok(self):
+        name = "a" * 11  # net-{name} = 15 chars, OK
+        result = validate(
+            _minimal_infra(
+                domains={
+                    name: Domain(name=name, description="T"),
+                }
+            )
+        )
+        assert result.valid
+
 
 class TestTrustLevelValidation:
     def test_invalid_trust_level(self):

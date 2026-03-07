@@ -102,7 +102,7 @@ class IncusDriver:
             "features.profiles=false",
         ]
         if description:
-            args.extend(["-c", f"description={description}"])
+            args.extend(["--description", description])
         self._run(args)
 
     def project_exists(self, name: str) -> bool:
