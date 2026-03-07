@@ -301,6 +301,83 @@ class TestInstanceDelete:
 
 
 # ============================================================
+# Snapshots
+# ============================================================
+
+
+class TestSnapshotCreate:
+    def test_creates_snapshot(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_ok()) as mock:
+            driver.snapshot_create("pro-dev", "pro", "anklume-pre-20260307-143022")
+        cmd = mock.call_args[0][0]
+        assert "snapshot" in cmd
+        assert "create" in cmd
+        assert "pro-dev" in cmd
+        assert "anklume-pre-20260307-143022" in cmd
+        assert "--project" in cmd
+
+    def test_error_raises(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_fail(stderr="not found")):
+            with pytest.raises(IncusError):
+                driver.snapshot_create("pro-dev", "pro", "snap1")
+
+
+class TestSnapshotList:
+    def test_returns_snapshots(self, driver: IncusDriver) -> None:
+        from anklume.engine.incus_driver import IncusSnapshot
+
+        raw = [
+            {"name": "anklume-pre-20260307-143022", "created_at": "2026-03-07T14:30:22Z"},
+            {"name": "anklume-post-20260307-143025", "created_at": "2026-03-07T14:30:25Z"},
+        ]
+        with patch("subprocess.run", return_value=_json_ok(raw)) as mock:
+            result = driver.snapshot_list("pro-dev", "pro")
+        assert len(result) == 2
+        assert isinstance(result[0], IncusSnapshot)
+        assert result[0].name == "anklume-pre-20260307-143022"
+        assert result[0].created_at == "2026-03-07T14:30:22Z"
+        cmd = mock.call_args[0][0]
+        assert "snapshot" in cmd
+        assert "list" in cmd
+        assert "pro-dev" in cmd
+        assert "--project" in cmd
+
+    def test_empty(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_json_ok([])):
+            result = driver.snapshot_list("pro-dev", "pro")
+        assert result == []
+
+
+class TestSnapshotRestore:
+    def test_restores(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_ok()) as mock:
+            driver.snapshot_restore("pro-dev", "pro", "snap1")
+        cmd = mock.call_args[0][0]
+        assert "snapshot" in cmd
+        assert "restore" in cmd
+        assert "pro-dev" in cmd
+        assert "snap1" in cmd
+        assert "--project" in cmd
+
+    def test_error_raises(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_fail(stderr="snapshot not found")):
+            with pytest.raises(IncusError):
+                driver.snapshot_restore("pro-dev", "pro", "nonexistent")
+
+
+class TestSnapshotDelete:
+    def test_deletes(self, driver: IncusDriver) -> None:
+        with patch("subprocess.run", return_value=_ok()) as mock:
+            driver.snapshot_delete("pro-dev", "pro", "snap1")
+        cmd = mock.call_args[0][0]
+        assert "snapshot" in cmd
+        assert "delete" in cmd
+        assert "pro-dev" in cmd
+        assert "snap1" in cmd
+        assert "--project" in cmd
+
+
+# ============================================================
 # IncusError
 # ============================================================
 

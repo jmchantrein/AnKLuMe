@@ -1,3 +1,3 @@
-"""anklume — Declarative infrastructure compartmentalization framework."""
+"""anklume — framework déclaratif de compartimentalisation d'infrastructure."""
 
-__version__ = "2.0.0-dev"
+__version__ = "0.1.0-dev"

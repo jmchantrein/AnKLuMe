@@ -1,0 +1,15 @@
+# Rôle dev-tools — outils de développement
+---
+- name: Installer les outils de développement
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - git
+      - python3
+      - python3-pip
+      - python3-venv
+      - vim
+      - tmux
+      - jq
+    state: present
+    update_cache: true

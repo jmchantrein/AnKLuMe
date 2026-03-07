@@ -1,0 +1,12 @@
+# Rôle desktop — KDE Plasma et configuration bureau
+---
+- name: Installer KDE Plasma (minimal)
+  ansible.builtin.apt:
+    name:
+      - kde-plasma-desktop
+      - sddm
+      - konsole
+      - dolphin
+      - fonts-noto
+    state: present
+    update_cache: true

@@ -289,6 +289,7 @@ policies:
 | `anklume init [dir]` | Créer un nouveau projet |
 | `anklume apply all` | Déployer toute l'infrastructure |
 | `anklume apply all --dry-run` | Afficher les changements sans appliquer |
+| `anklume apply all --no-provision` | Déployer sans provisioning Ansible |
 | `anklume apply domain <nom>` | Déployer un seul domaine |
 | `anklume status` | Afficher l'état des instances |
 | `anklume destroy` | Détruire (respecte ephemeral) |
@@ -300,8 +301,10 @@ policies:
 |----------|-------------|
 | `anklume instance list` | Lister les instances |
 | `anklume instance shell <nom>` | Shell dans une instance |
-| `anklume snapshot create` | Snapshotter toutes les instances |
-| `anklume snapshot restore <nom>` | Restaurer un snapshot |
+| `anklume snapshot create [instance]` | Snapshotter toutes les instances ou une seule |
+| `anklume snapshot create --name X` | Snapshot avec nom personnalisé |
+| `anklume snapshot list [instance]` | Lister les snapshots |
+| `anklume snapshot restore <inst> <snap>` | Restaurer un snapshot |
 | `anklume network rules` | Générer les règles nftables |
 | `anklume network deploy` | Appliquer les règles sur l'hôte |
 
@@ -328,7 +331,10 @@ anklume apply all
   ├─ Réconcilie : calcule le diff (désiré vs réel)
   ├─ Produit un plan d'actions ordonnées
   ├─ [--dry-run] Affiche le plan et s'arrête
+  ├─ Snapshots pré-apply (instances existantes à modifier)
   ├─ Exécute le plan (créations, mises à jour, démarrages)
+  ├─ Snapshots post-apply (instances modifiées/créées)
+  ├─ [sauf --no-provision] Provisioning Ansible (roles)
   └─ Rapporte les succès et échecs par domaine
 ```
 
@@ -528,23 +534,251 @@ fallback sur `/proc/cpuinfo` + `/proc/meminfo`.
 ## 10. Snapshots
 
 Snapshots automatiques et manuels pour la sécurité des données.
+Basés sur les snapshots natifs d'Incus (instantanés, copy-on-write).
+
+### Convention de nommage
+
+| Type | Format | Exemple |
+|------|--------|---------|
+| Auto pré-apply | `anklume-pre-{YYYYMMDD-HHMMSS}` | `anklume-pre-20260307-143022` |
+| Auto post-apply | `anklume-post-{YYYYMMDD-HHMMSS}` | `anklume-post-20260307-143025` |
+| Manuel (défaut) | `anklume-snap-{YYYYMMDD-HHMMSS}` | `anklume-snap-20260307-150000` |
+| Manuel (nommé) | nom fourni par l'utilisateur | `avant-migration` |
 
 ### Snapshots automatiques
 
-Avant et après chaque modification d'une instance par `anklume apply` :
-- **Pré-apply** : snapshot de l'état avant modification
-- **Post-apply** : snapshot de l'état après modification réussie
+Intégrés au pipeline `anklume apply` :
 
-Convention de nommage : `anklume-{pre|post}-{timestamp}`
+1. **Pré-apply** : avant toute modification, snapshot de chaque instance
+   existante dans les domaines concernés. Les instances nouvellement
+   créées sont ignorées (rien à sauvegarder).
+2. **Post-apply** : après application réussie, snapshot de chaque
+   instance modifiée ou démarrée.
 
-### Snapshots manuels
+Les auto-snapshots sont créés silencieusement. En cas d'échec du
+snapshot, un warning est affiché mais l'apply continue (best-effort).
 
-- `anklume snapshot create` — snapshot de toutes les instances
-- `anklume snapshot create <instance>` — snapshot d'une instance
-- `anklume snapshot restore <nom>` — restaurer un snapshot
-- `anklume snapshot list` — lister les snapshots disponibles
+En `--dry-run`, aucun snapshot n'est créé.
 
-## 11. Fonctionnalités additionnelles
+### Commandes CLI
+
+```
+anklume snapshot create [instance]           # Toutes les instances ou une seule
+anklume snapshot create [instance] --name X  # Nom personnalisé
+anklume snapshot list [instance]             # Lister les snapshots
+anklume snapshot restore <instance> <snap>   # Restaurer un snapshot
+```
+
+#### `anklume snapshot create [instance]`
+
+Sans argument : snapshot toutes les instances running de tous les
+domaines activés. Avec un nom d'instance (nom complet, ex: `pro-dev`) :
+snapshot uniquement cette instance.
+
+L'option `--name` permet de donner un nom personnalisé au snapshot.
+Sans `--name`, le nom est généré automatiquement (`anklume-snap-{ts}`).
+
+#### `anklume snapshot list [instance]`
+
+Sans argument : liste les snapshots de toutes les instances, groupés
+par domaine/instance. Avec un nom d'instance : liste uniquement ses
+snapshots.
+
+Affichage :
+```
+pro-dev:
+  anklume-pre-20260307-143022   (2026-03-07 14:30:22)
+  anklume-post-20260307-143025  (2026-03-07 14:30:25)
+  avant-migration               (2026-03-07 15:00:00)
+```
+
+#### `anklume snapshot restore <instance> <snapshot>`
+
+Restaure un snapshot nommé sur une instance. L'instance est arrêtée
+avant la restauration si elle est running, puis redémarrée.
+
+### Résolution d'instance
+
+Les commandes snapshot acceptent le nom complet de l'instance
+(ex: `pro-dev`). Le projet Incus est déduit automatiquement en
+cherchant l'instance dans tous les projets anklume.
+
+### Driver Incus — méthodes snapshot
+
+| Méthode | Commande Incus |
+|---------|---------------|
+| `snapshot_create(instance, project, name)` | `incus snapshot create <inst> <name> --project <p>` |
+| `snapshot_list(instance, project)` | `incus snapshot list <inst> --project <p> --format json` |
+| `snapshot_restore(instance, project, name)` | `incus snapshot restore <inst> <name> --project <p>` |
+| `snapshot_delete(instance, project, name)` | `incus snapshot delete <inst> <name> --project <p>` |
+
+## 11. Provisioner Ansible
+
+Après la réconciliation Incus, anklume provisionne les instances via
+Ansible. Le provisioning installe les logiciels et configure les
+services à l'intérieur des instances créées.
+
+### Vue d'ensemble
+
+Le provisioning est déclenché automatiquement par `anklume apply`
+après la création/démarrage des instances. Seules les machines avec
+`roles: [...]` non vide sont provisionnées. Si aucune machine n'a
+de rôle, le provisioning est ignoré silencieusement.
+
+Pipeline complet :
+```
+anklume apply all
+  ├─ ... réconciliation Incus ...
+  ├─ Snapshots post-apply
+  ├─ Attente de la disponibilité des instances
+  ├─ Génère inventaire + playbook Ansible
+  ├─ Exécute ansible-playbook
+  └─ Rapporte succès/échecs provisioning
+```
+
+### Prérequis
+
+- Ansible installé sur l'hôte (`ansible-playbook` dans le PATH)
+- Si Ansible absent : warning affiché, provisioning ignoré (pas d'erreur)
+
+### Connexion aux instances
+
+Connexion via `incus exec` — pas de SSH requis. Le provisioner
+embarque un plugin de connexion Ansible minimaliste
+(`provisioner/plugins/connection/anklume_incus.py`) qui encapsule :
+
+| Opération | Commande Incus |
+|-----------|---------------|
+| `exec_command(cmd)` | `incus exec <inst> --project <p> -- sh -c <cmd>` |
+| `put_file(src, dest)` | `incus file push <src> <inst>/<dest> --project <p>` |
+| `fetch_file(src, dest)` | `incus file pull <inst>/<src> <dest> --project <p>` |
+
+Zéro dépendance externe (pas de `community.general` requis).
+
+### Fichiers générés
+
+Tout est généré dans `ansible/` du projet utilisateur :
+
+| Fichier | Contenu |
+|---------|---------|
+| `ansible/inventory/<domain>.yml` | Inventaire par domaine |
+| `ansible/host_vars/<machine>.yml` | Variables machine (depuis `vars:` du YAML) |
+| `ansible/site.yml` | Playbook assignant les rôles par machine |
+
+Les fichiers générés portent un en-tête :
+```yaml
+# Généré par anklume — sera écrasé au prochain apply
+```
+
+### Inventaire
+
+Un fichier YAML par domaine. Les machines sans rôles sont quand même
+inventoriées (elles seront juste ignorées par le playbook).
+
+```yaml
+# ansible/inventory/pro.yml
+all:
+  children:
+    pro:
+      hosts:
+        pro-dev:
+          ansible_connection: anklume_incus
+          anklume_incus_project: pro
+        pro-desktop:
+          ansible_connection: anklume_incus
+          anklume_incus_project: pro
+```
+
+### Variables machine
+
+Générées uniquement si `vars:` est défini dans le domaine YAML.
+
+```yaml
+# ansible/host_vars/pro-dev.yml
+custom_packages:
+  - nodejs
+  - docker.io
+```
+
+### Playbook (site.yml)
+
+Un play par machine ayant des rôles. `become: true` par défaut
+(provisioning requiert root).
+
+```yaml
+# ansible/site.yml
+---
+- hosts: pro-dev
+  become: true
+  roles:
+    - base
+    - dev-tools
+
+- hosts: pro-desktop
+  become: true
+  roles:
+    - base
+    - desktop
+```
+
+### Rôles embarqués
+
+Stockés dans `src/anklume/provisioner/roles/` :
+
+| Rôle | Description |
+|------|-------------|
+| `base` | Paquets essentiels (curl, ca-certificates, sudo), locale fr |
+| `desktop` | KDE Plasma, Wayland, polices |
+| `dev-tools` | Build tools, git, python3, outils de développement |
+
+Les rôles embarqués sont minimalistes et Debian-centric.
+
+### Rôles personnalisés
+
+Les rôles dans `ansible_roles_custom/` du projet utilisateur sont
+prioritaires sur les rôles embarqués (même nom = override).
+
+L'ordre de recherche des rôles :
+1. `ansible_roles_custom/` (projet utilisateur)
+2. `src/anklume/provisioner/roles/` (rôles embarqués)
+
+### Flag `--no-provision`
+
+`anklume apply --no-provision` exécute la réconciliation Incus
+sans le provisioning Ansible. Utile pour débugger ou quand
+Ansible n'est pas nécessaire.
+
+### Attente de disponibilité
+
+Avant de lancer Ansible, le provisioner attend que chaque instance
+soit accessible via `incus exec`. Timeout de 30 secondes par instance.
+Les instances non-accessibles sont exclues du provisioning avec un
+warning.
+
+### Gestion d'erreurs
+
+- Ansible absent : warning, provisioning ignoré
+- Échec sur un domaine : logué, les autres domaines continuent
+- Le résultat du provisioning est rapporté séparément des résultats
+  de réconciliation Incus
+
+### Module `provisioner/`
+
+```
+src/anklume/provisioner/
+    __init__.py             # provision(infra, driver, project_dir)
+    inventory.py            # Génération de l'inventaire
+    playbook.py             # Génération du playbook
+    runner.py               # Exécution ansible-playbook
+    roles/                  # Rôles embarqués
+        base/tasks/main.yml
+        desktop/tasks/main.yml
+        dev-tools/tasks/main.yml
+    plugins/connection/
+        anklume_incus.py    # Plugin de connexion Incus
+```
+
+## 12. Fonctionnalités additionnelles
 
 ### Intégration IA
 

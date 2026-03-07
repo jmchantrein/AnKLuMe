@@ -34,17 +34,30 @@
 
 ## Prochaines phases
 
-#### Phase 4 — Snapshots
-- [ ] Snapshots automatiques pré/post-apply
-- [ ] `anklume snapshot create [instance]`
-- [ ] `anklume snapshot list`
-- [ ] `anklume snapshot restore <nom>`
+## Phase 4 — Snapshots ✅
 
-#### Phase 5 — Provisioner Ansible
-- [ ] Générer inventaire + group_vars + host_vars
-- [ ] Lancer `ansible-playbook` sur les instances créées
-- [ ] Rôles embarqués (base, desktop, dev-tools)
-- [ ] Support `ansible_roles_custom/` utilisateur
+- [x] `IncusSnapshot` dataclass + méthodes driver (create, list, restore, delete)
+- [x] Module `engine/snapshot.py` — logique métier snapshots
+- [x] Snapshots automatiques pré/post-apply (intégrés au pipeline)
+- [x] `anklume snapshot create [instance] [--name X]`
+- [x] `anklume snapshot list [instance]`
+- [x] `anklume snapshot restore <instance> <snapshot>`
+- [x] Tests unitaires : 27 tests snapshot + 7 tests driver snapshot
+- [x] SPEC.md §10 détaillé (nommage, CLI, résolution, driver)
+
+## Phase 5 — Provisioner Ansible ✅
+
+- [x] SPEC §11 détaillé (inventaire, playbook, connexion, rôles, CLI)
+- [x] `provisioner/inventory.py` — génération inventaire YAML par domaine
+- [x] `provisioner/playbook.py` — génération site.yml + host_vars
+- [x] `provisioner/runner.py` — exécution ansible-playbook via subprocess
+- [x] Plugin de connexion `anklume_incus` (incus exec, sans dépendance externe)
+- [x] Rôles embarqués (base, desktop, dev-tools)
+- [x] Support `ansible_roles_custom/` utilisateur (prioritaire sur builtin)
+- [x] `--no-provision` flag sur `anklume apply`
+- [x] Intégré au pipeline apply (après snapshots post-apply)
+- [x] Tests unitaires : 39 tests provisioner
+- [x] 205 tests unitaires au total, zéro régression
 
 #### Phase 6 — Réseau et sécurité
 - [ ] Parser `policies.yml`
@@ -52,10 +65,10 @@
 - [ ] `anklume network rules` / `anklume network deploy`
 
 #### Phase 7 — Nesting Incus
+- [x] Tests de nesting (LXC dans LXC, 5 niveaux validés)
 - [ ] Préfixe de nesting (`{level:03d}-`)
 - [ ] Fichiers de contexte (`/etc/anklume/`)
 - [ ] Sécurité par niveau (L1 unprivileged, L2+ privilegié)
-- [ ] Tests de nesting (LXC dans LXC, VM dans LXC)
 
 #### Phase 8 — Resource policy
 - [ ] Détection hardware (CPU, mémoire)

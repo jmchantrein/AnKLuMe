@@ -9,5 +9,9 @@ build/
 *.iso
 *.sha256
 .env
+
+# Fichiers utilisateur (créés par anklume init)
+# Ne pas commiter les projets d'infra dans le repo du framework
+ansible_roles_custom/
 roles_custom/
 roles_vendor/

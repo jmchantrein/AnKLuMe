@@ -6,53 +6,74 @@ from pathlib import Path
 
 import typer
 
-from anklume.engine.addressing import assign_addresses
+from anklume.cli._common import load_infra
 from anklume.engine.incus_driver import IncusDriver
-from anklume.engine.parser import ParseError, parse_project
 from anklume.engine.reconciler import ReconcileResult, reconcile
-from anklume.engine.validator import validate
+from anklume.engine.snapshot import create_auto_snapshots
 
 
 def run_apply(
     *,
     domain_name: str | None = None,
     dry_run: bool = False,
+    no_provision: bool = False,
 ) -> None:
-    """Exécute le pipeline apply : parse → validate → address → reconcile."""
+    """Pipeline apply : parse → validate → reconcile → snapshot → provision."""
     project_dir = Path.cwd()
+    infra = load_infra(project_dir)
 
-    # 1. Parser
-    try:
-        infra = parse_project(project_dir)
-    except ParseError as e:
-        typer.echo(f"Erreur de parsing : {e}", err=True)
-        raise typer.Exit(1) from None
-
-    # 2. Filtrer un domaine spécifique si demandé
+    # Filtrer un domaine spécifique si demandé
     if domain_name:
         if domain_name not in infra.domains:
             typer.echo(f"Domaine inconnu : {domain_name}", err=True)
             raise typer.Exit(1)
         infra.domains = {domain_name: infra.domains[domain_name]}
 
-    # 3. Valider
-    result = validate(infra)
-    if not result.valid:
-        typer.echo(str(result), err=True)
-        raise typer.Exit(1)
-
-    # 4. Adressage
-    assign_addresses(infra)
-
-    # 5. Réconcilier
     driver = IncusDriver()
+
+    # Pré-fetch des projets existants (un seul appel subprocess pour tout le pipeline)
+    existing_projects = {p.name for p in driver.project_list()}
+
+    # Snapshots pré-apply (instances existantes)
+    if not dry_run:
+        pre = create_auto_snapshots(
+            driver,
+            infra,
+            "pre",
+            existing_projects=existing_projects,
+        )
+        if pre:
+            typer.echo(f"Snapshots pré-apply : {len(pre)} créé(s)")
+
     reconcile_result = reconcile(infra, driver, dry_run=dry_run)
 
-    # 6. Afficher le résultat
+    # Snapshots post-apply — refetch des projets (reconcile a pu en créer)
+    if not dry_run and reconcile_result.executed:
+        post_projects = {p.name for p in driver.project_list()}
+        post = create_auto_snapshots(
+            driver, infra, "post", existing_projects=post_projects,
+        )
+        if post:
+            typer.echo(f"Snapshots post-apply : {len(post)} créé(s)")
+
+    # Afficher le résultat de la réconciliation
     _print_result(reconcile_result, dry_run=dry_run)
 
     if not reconcile_result.success:
         raise typer.Exit(1)
+
+    # Provisioning Ansible
+    if not dry_run and not no_provision:
+        from anklume.provisioner import provision
+
+        prov_result = provision(infra, project_dir)
+        if prov_result.skipped:
+            if prov_result.skip_reason and "ansible" in prov_result.skip_reason.lower():
+                typer.echo(f"⚠ {prov_result.skip_reason}")
+        elif prov_result.success:
+            typer.echo("Provisioning Ansible terminé.")
+        else:
+            typer.echo(f"Provisioning échoué : {prov_result.error}", err=True)
 
 
 def _print_result(result: ReconcileResult, *, dry_run: bool) -> None:

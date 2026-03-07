@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from tests.incus_helpers import cleanup_project
+
 from anklume.engine.incus_driver import (
     IncusDriver,
     IncusNetwork,
@@ -113,61 +115,7 @@ def _cleanup_bdd_projects():
     projects = json.loads(result.stdout)
     for p in projects:
         if p["name"].startswith("bdd-"):
-            _cleanup_project(p["name"])
-
-
-def _cleanup_project(name: str) -> None:
-    """Nettoyer un projet : arrêter/supprimer instances, réseaux, projet."""
-    # Supprimer les instances
-    result = subprocess.run(
-        ["incus", "list", "--project", name, "--format", "json"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        instances = json.loads(result.stdout)
-        for inst in instances:
-            inst_name = inst["name"]
-            # Retirer la protection delete si présente
-            subprocess.run(
-                [
-                    "incus",
-                    "config",
-                    "set",
-                    inst_name,
-                    "security.protection.delete=false",
-                    "--project",
-                    name,
-                ],
-                capture_output=True,
-            )
-            if inst["status"] == "Running":
-                subprocess.run(
-                    ["incus", "stop", inst_name, "--project", name, "--force"],
-                    capture_output=True,
-                )
-            subprocess.run(
-                ["incus", "delete", inst_name, "--project", name, "--force"],
-                capture_output=True,
-            )
-
-    # Supprimer les réseaux
-    result = subprocess.run(
-        ["incus", "network", "list", "--project", name, "--format", "json"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        networks = json.loads(result.stdout)
-        for net in networks:
-            if net.get("managed"):
-                subprocess.run(
-                    ["incus", "network", "delete", net["name"], "--project", name],
-                    capture_output=True,
-                )
-
-    # Supprimer le projet
-    subprocess.run(["incus", "project", "delete", name], capture_output=True)
+            cleanup_project(p["name"])
 
 
 def after_scenario(context, scenario):

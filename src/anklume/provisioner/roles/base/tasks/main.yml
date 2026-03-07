@@ -1,0 +1,21 @@
+# Rôle base — paquets essentiels et configuration système
+---
+- name: Mettre à jour le cache APT
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Installer les paquets essentiels
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+      - sudo
+      - locales
+      - apt-transport-https
+    state: present
+
+- name: Configurer la locale fr_FR.UTF-8
+  ansible.builtin.locale_gen:
+    name: fr_FR.UTF-8
+    state: present

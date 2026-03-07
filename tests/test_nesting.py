@@ -9,12 +9,13 @@ Prérequis : Incus installé sur l'hôte, accès internet.
 
 from __future__ import annotations
 
-import json
 import subprocess
 import textwrap
 import time
 
 import pytest
+
+from .incus_helpers import cleanup_project, incus_run
 
 NEST_PROJECT = "e2e-nest"
 MAX_DEPTH = 5
@@ -34,7 +35,7 @@ apt-get update -qq > /dev/null 2>&1
 if ! apt-get install -y -qq incus > /dev/null 2>&1; then
     echo "Incus absent des repos par défaut, ajout du repo Zabbly..."
     apt-get install -y -qq curl gpg > /dev/null 2>&1
-    curl -fsSL https://pkgs.zabbly.com/key.asc | gpg --dearmor \
+    curl -fsSL https://pkgs.zabbly.com/key.asc | gpg --dearmor \\
         -o /etc/apt/keyrings/zabbly.gpg
     cat > /etc/apt/sources.list.d/zabbly-incus-stable.sources <<REPO
 Enabled: yes
@@ -56,8 +57,8 @@ if [ "$LEVEL" -lt "$MAX_LEVEL" ]; then
     NEXT=$((LEVEL + 1))
     echo "=== Nesting level $LEVEL: creating level $NEXT container ==="
 
-    incus launch images:debian/13 "nest-l${NEXT}" \
-        -c security.nesting=true \
+    incus launch images:debian/13 "nest-l${NEXT}" \\
+        -c security.nesting=true \\
         -c security.privileged=true
 
     # Attendre que le conteneur soit accessible
@@ -82,83 +83,12 @@ echo "=== Nesting level $LEVEL: OK ==="
 """)
 
 
-def _incus_json(args: list[str]) -> list | dict:
-    result = subprocess.run(
-        ["incus", *args, "--format", "json"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return []
-    return json.loads(result.stdout)
-
-
-def _incus_run(args: list[str], timeout: int = 120) -> None:
-    result = subprocess.run(
-        ["incus", *args],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    if result.returncode != 0:
-        pytest.fail(f"incus {' '.join(args)} a échoué : {result.stderr}")
-
-
-def _project_exists(name: str) -> bool:
-    projects = _incus_json(["project", "list"])
-    return any(p["name"] == name for p in projects)
-
-
-def _cleanup_nest():
-    """Nettoyer le projet de nesting."""
-    if not _project_exists(NEST_PROJECT):
-        return
-
-    instances = _incus_json(["list", "--project", NEST_PROJECT])
-    for inst in instances:
-        name = inst["name"]
-        subprocess.run(
-            [
-                "incus",
-                "config",
-                "set",
-                name,
-                "security.protection.delete=false",
-                "--project",
-                NEST_PROJECT,
-            ],
-            capture_output=True,
-        )
-        if inst["status"] == "Running":
-            subprocess.run(
-                ["incus", "stop", name, "--project", NEST_PROJECT, "--force"],
-                capture_output=True,
-            )
-        subprocess.run(
-            ["incus", "delete", name, "--project", NEST_PROJECT, "--force"],
-            capture_output=True,
-        )
-
-    networks = _incus_json(["network", "list", "--project", NEST_PROJECT])
-    for net in networks:
-        if net.get("managed"):
-            subprocess.run(
-                ["incus", "network", "delete", net["name"], "--project", NEST_PROJECT],
-                capture_output=True,
-            )
-
-    subprocess.run(
-        ["incus", "project", "delete", NEST_PROJECT],
-        capture_output=True,
-    )
-
-
 @pytest.fixture()
 def nest_env(tmp_path):
     """Fixture pour le test de nesting — cleanup avant et après."""
-    _cleanup_nest()
+    cleanup_project(NEST_PROJECT)
     yield tmp_path
-    _cleanup_nest()
+    cleanup_project(NEST_PROJECT)
 
 
 class TestNesting:
@@ -170,7 +100,7 @@ class TestNesting:
         path = nest_env
 
         # 1. Créer le projet Incus
-        _incus_run(
+        incus_run(
             [
                 "project",
                 "create",
@@ -183,7 +113,7 @@ class TestNesting:
         )
 
         # 2. Créer le conteneur level 1 avec nesting
-        _incus_run(
+        incus_run(
             [
                 "launch",
                 "images:debian/13",
@@ -204,7 +134,7 @@ class TestNesting:
         script_path = path / "nest-setup.sh"
         script_path.write_text(_NEST_SCRIPT)
 
-        _incus_run(
+        incus_run(
             [
                 "file",
                 "push",
@@ -214,7 +144,7 @@ class TestNesting:
                 NEST_PROJECT,
             ]
         )
-        _incus_run(
+        incus_run(
             [
                 "exec",
                 "nest-l1",

@@ -70,6 +70,11 @@ class Domain:
         """Nom du bridge réseau Incus pour ce domaine."""
         return f"net-{self.name}"
 
+    @property
+    def sorted_machines(self) -> list[Machine]:
+        """Machines triées par full_name."""
+        return sorted(self.machines.values(), key=lambda m: m.full_name)
+
 
 @dataclass
 class Policy:
@@ -144,3 +149,11 @@ class Infrastructure:
     config: GlobalConfig
     domains: dict[str, Domain]
     policies: list[Policy]
+
+    @property
+    def enabled_domains(self) -> list[Domain]:
+        """Domaines actifs, triés par nom."""
+        return sorted(
+            (d for d in self.domains.values() if d.enabled),
+            key=lambda d: d.name,
+        )

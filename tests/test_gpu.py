@@ -15,6 +15,8 @@ import time
 
 import pytest
 
+from .incus_helpers import cleanup_project, incus_run
+
 GPU_PROJECT = "e2e-gpu"
 GPU_INSTANCE = "e2e-gpu-bench"
 BENCH_MODEL = "qwen2:0.5b"
@@ -29,29 +31,6 @@ def _has_gpu() -> bool:
         text=True,
     )
     return result.returncode == 0
-
-
-def _incus_json(args: list[str]) -> list | dict:
-    result = subprocess.run(
-        ["incus", *args, "--format", "json"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return []
-    return json.loads(result.stdout)
-
-
-def _incus_run(args: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
-    result = subprocess.run(
-        ["incus", *args],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    if result.returncode != 0:
-        pytest.fail(f"incus {' '.join(args)} a échoué : {result.stderr}")
-    return result
 
 
 def _incus_exec(args: list[str], timeout: int = 300) -> subprocess.CompletedProcess:
@@ -70,11 +49,6 @@ def _incus_exec(args: list[str], timeout: int = 300) -> subprocess.CompletedProc
         text=True,
         timeout=timeout,
     )
-
-
-def _project_exists(name: str) -> bool:
-    projects = _incus_json(["project", "list"])
-    return any(p["name"] == name for p in projects)
 
 
 def _flush_vram() -> None:
@@ -121,50 +95,6 @@ def _flush_vram() -> None:
         pass  # pas d'Ollama actif, rien à décharger
 
 
-def _cleanup_gpu():
-    """Nettoyer le projet GPU."""
-    if not _project_exists(GPU_PROJECT):
-        return
-
-    instances = _incus_json(["list", "--project", GPU_PROJECT])
-    for inst in instances:
-        name = inst["name"]
-        subprocess.run(
-            [
-                "incus",
-                "config",
-                "set",
-                name,
-                "security.protection.delete=false",
-                "--project",
-                GPU_PROJECT,
-            ],
-            capture_output=True,
-        )
-        if inst["status"] == "Running":
-            subprocess.run(
-                ["incus", "stop", name, "--project", GPU_PROJECT, "--force"],
-                capture_output=True,
-            )
-        subprocess.run(
-            ["incus", "delete", name, "--project", GPU_PROJECT, "--force"],
-            capture_output=True,
-        )
-
-    networks = _incus_json(["network", "list", "--project", GPU_PROJECT])
-    for net in networks:
-        if net.get("managed"):
-            subprocess.run(
-                ["incus", "network", "delete", net["name"], "--project", GPU_PROJECT],
-                capture_output=True,
-            )
-
-    subprocess.run(
-        ["incus", "project", "delete", GPU_PROJECT],
-        capture_output=True,
-    )
-
-
 @pytest.fixture()
 def gpu_env():
     """Fixture pour le test GPU — cleanup + flush VRAM."""
@@ -172,11 +102,11 @@ def gpu_env():
         pytest.skip("Aucun GPU NVIDIA détecté")
 
     _flush_vram()
-    _cleanup_gpu()
+    cleanup_project(GPU_PROJECT)
 
     yield
 
-    _cleanup_gpu()
+    cleanup_project(GPU_PROJECT)
 
 
 class TestGPUBenchmark:
@@ -187,7 +117,7 @@ class TestGPUBenchmark:
     def test_ollama_benchmark(self, gpu_env):
         """Crée un conteneur GPU, installe Ollama, benchmark d'inférence."""
         # 1. Créer le projet
-        _incus_run(
+        incus_run(
             [
                 "project",
                 "create",
@@ -200,7 +130,7 @@ class TestGPUBenchmark:
         )
 
         # 2. Créer le conteneur avec NVIDIA runtime + GPU device
-        _incus_run(
+        incus_run(
             [
                 "launch",
                 "images:debian/13",
@@ -215,7 +145,7 @@ class TestGPUBenchmark:
         )
 
         # 3. Ajouter le GPU physique
-        _incus_run(
+        incus_run(
             [
                 "config",
                 "device",

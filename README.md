@@ -4,14 +4,33 @@ Framework déclaratif de compartimentalisation d'infrastructure.
 
 Isolation avec Incus (LXC/KVM) + nftables, sur n'importe quel Linux.
 
+## Installation
+
+```bash
+# Prérequis : uv (https://docs.astral.sh/uv/getting-started/installation/)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe
+uv sync
+```
+
 ## Démarrage rapide
 
 ```bash
-pip install anklume
-anklume init mon-infra
+uv run anklume init mon-infra
 cd mon-infra
 vim domains/pro.yml
-anklume apply
+uv run anklume apply all
+```
+
+## Développement
+
+```bash
+uv sync --group dev
+uv run anklume dev setup
+uv run anklume dev lint
+uv run anklume dev test
 ```
 
 ## Concepts
@@ -21,12 +40,13 @@ anklume apply
 - **Niveau de confiance** — posture de sécurité encodée dans l'adressage IP
 
 Chaque domaine est décrit dans son propre fichier YAML (`domains/<nom>.yml`),
-style docker-compose. `anklume apply` déploie vers Incus.
+style docker-compose. `anklume apply all` déploie vers Incus.
 
 ## Documentation
 
 - [SPEC.md](docs/SPEC.md) — spécification complète
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — décisions d'architecture
+- [ROADMAP.md](docs/ROADMAP.md) — état courant et prochaines étapes
 
 ## Licence
 

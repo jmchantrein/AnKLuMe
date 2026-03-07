@@ -40,6 +40,14 @@ class IncusNetwork:
 
 
 @dataclass
+class IncusSnapshot:
+    """Snapshot d'une instance Incus."""
+
+    name: str
+    created_at: str = ""
+
+
+@dataclass
 class IncusInstance:
     """État d'une instance Incus."""
 
@@ -184,6 +192,9 @@ class IncusDriver:
     def snapshot_restore(self, instance: str, project: str, name: str) -> None:
         self._run(["snapshot", "restore", instance, name, "--project", project])
 
-    def snapshot_list(self, instance: str, project: str) -> list[str]:
+    def snapshot_list(self, instance: str, project: str) -> list[IncusSnapshot]:
         data = self._run_json(["snapshot", "list", instance, "--project", project])
-        return [s["name"] for s in data]
+        return [IncusSnapshot(name=s["name"], created_at=s.get("created_at", "")) for s in data]
+
+    def snapshot_delete(self, instance: str, project: str, name: str) -> None:
+        self._run(["snapshot", "delete", instance, name, "--project", project])

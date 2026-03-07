@@ -16,10 +16,12 @@ app = typer.Typer(
 apply_app = typer.Typer(help="Déployer l'infrastructure.")
 dev_app = typer.Typer(help="Outils de développement.")
 instance_app = typer.Typer(help="Gestion des instances.")
+snapshot_app = typer.Typer(help="Gestion des snapshots.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
+app.add_typer(snapshot_app, name="snapshot")
 
 
 def _version_callback(value: bool) -> None:
@@ -84,11 +86,15 @@ def apply_all(
         bool,
         typer.Option("--dry-run", help="Afficher le plan sans appliquer"),
     ] = False,
+    no_provision: Annotated[
+        bool,
+        typer.Option("--no-provision", help="Ignorer le provisioning Ansible"),
+    ] = False,
 ) -> None:
     """Déployer tous les domaines."""
     from anklume.cli._apply import run_apply
 
-    run_apply(dry_run=dry_run)
+    run_apply(dry_run=dry_run, no_provision=no_provision)
 
 
 @apply_app.command("domain")
@@ -98,11 +104,15 @@ def apply_domain(
         bool,
         typer.Option("--dry-run", help="Afficher le plan sans appliquer"),
     ] = False,
+    no_provision: Annotated[
+        bool,
+        typer.Option("--no-provision", help="Ignorer le provisioning Ansible"),
+    ] = False,
 ) -> None:
     """Déployer un domaine spécifique."""
     from anklume.cli._apply import run_apply
 
-    run_apply(domain_name=name, dry_run=dry_run)
+    run_apply(domain_name=name, dry_run=dry_run, no_provision=no_provision)
 
 
 # --- anklume dev <setup|lint|test> ---
@@ -157,3 +167,47 @@ def instance_shell(
 ) -> None:
     """Ouvrir un shell dans une instance."""
     typer.echo(f"instance shell {name} : pas encore implémenté")
+
+
+# --- anklume snapshot <create|list|restore> ---
+
+
+@snapshot_app.command("create")
+def snapshot_create(
+    instance: Annotated[
+        str | None,
+        typer.Argument(help="Nom de l'instance (toutes si omis)"),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", "-n", help="Nom personnalisé du snapshot"),
+    ] = None,
+) -> None:
+    """Créer un snapshot."""
+    from anklume.cli._snapshot import run_snapshot_create
+
+    run_snapshot_create(instance=instance, name=name)
+
+
+@snapshot_app.command("list")
+def snapshot_list(
+    instance: Annotated[
+        str | None,
+        typer.Argument(help="Nom de l'instance (toutes si omis)"),
+    ] = None,
+) -> None:
+    """Lister les snapshots."""
+    from anklume.cli._snapshot import run_snapshot_list
+
+    run_snapshot_list(instance=instance)
+
+
+@snapshot_app.command("restore")
+def snapshot_restore(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    snapshot: Annotated[str, typer.Argument(help="Nom du snapshot")],
+) -> None:
+    """Restaurer un snapshot sur une instance."""
+    from anklume.cli._snapshot import run_snapshot_restore
+
+    run_snapshot_restore(instance=instance, snapshot=snapshot)
