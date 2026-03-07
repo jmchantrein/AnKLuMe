@@ -33,6 +33,17 @@ class Machine:
     vars: dict = field(default_factory=dict)
     weight: int = 1
 
+    @property
+    def incus_type(self) -> str:
+        """Type Incus : 'virtual-machine' ou 'container'."""
+        return "virtual-machine" if self.type == "vm" else "container"
+
+    def is_ephemeral(self, domain: Domain) -> bool:
+        """Résout l'éphémérité : machine > domaine > False."""
+        if self.ephemeral is not None:
+            return self.ephemeral
+        return domain.ephemeral
+
 
 @dataclass
 class Profile:
@@ -56,6 +67,11 @@ class Domain:
     profiles: dict[str, Profile] = field(default_factory=dict)
     subnet: str | None = None
     gateway: str | None = None
+
+    @property
+    def network_name(self) -> str:
+        """Nom du bridge réseau Incus pour ce domaine."""
+        return f"net-{self.name}"
 
 
 @dataclass

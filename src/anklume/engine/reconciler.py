@@ -7,13 +7,10 @@ IncusDriver, produit un plan d'actions ordonnées, et l'exécute
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 
 from anklume.engine.incus_driver import IncusDriver, IncusError
 from anklume.engine.models import Domain, Infrastructure, Machine
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -54,13 +51,15 @@ def reconcile(
     """
     result = ReconcileResult()
 
-    # Traiter chaque domaine activé, dans l'ordre alphabétique
+    # Cache la liste des projets une seule fois (évite N appels subprocess)
+    existing_projects = {p.name for p in driver.project_list()}
+
     for domain_name in sorted(infra.domains):
         domain = infra.domains[domain_name]
         if not domain.enabled:
             continue
 
-        domain_actions = _plan_domain(domain, infra, driver)
+        domain_actions = _plan_domain(domain, infra, driver, existing_projects)
         result.actions.extend(domain_actions)
 
         if not dry_run:
@@ -73,14 +72,15 @@ def _plan_domain(
     domain: Domain,
     infra: Infrastructure,
     driver: IncusDriver,
+    existing_projects: set[str],
 ) -> list[Action]:
     """Calcule les actions nécessaires pour un domaine."""
     actions: list[Action] = []
     project_name = domain.name
-    network_name = f"net-{domain.name}"
+    project_is_new = project_name not in existing_projects
 
     # 1. Projet
-    if not driver.project_exists(project_name):
+    if project_is_new:
         actions.append(
             Action(
                 verb="create",
@@ -91,12 +91,11 @@ def _plan_domain(
             )
         )
 
-    # 2. Réseau
-    try:
-        net_exists = driver.network_exists(network_name, project_name)
-    except IncusError:
-        # Le projet n'existe pas encore, donc le réseau non plus
+    # 2. Réseau — short-circuit si le projet n'existe pas encore
+    if project_is_new:
         net_exists = False
+    else:
+        net_exists = driver.network_exists(domain.network_name, project_name)
 
     if not net_exists:
         gateway = domain.gateway or "auto"
@@ -104,17 +103,17 @@ def _plan_domain(
             Action(
                 verb="create",
                 resource="network",
-                target=network_name,
+                target=domain.network_name,
                 project=project_name,
-                detail=f"Créer réseau {network_name} ({gateway}/24, nat=true)",
+                detail=f"Créer réseau {domain.network_name} ({gateway}/24, nat=true)",
             )
         )
 
-    # 3. Instances
-    try:
+    # 3. Instances — short-circuit si le projet n'existe pas encore
+    if project_is_new:
+        existing_instances: dict[str, object] = {}
+    else:
         existing_instances = {i.name: i for i in driver.instance_list(project_name)}
-    except IncusError:
-        existing_instances = {}
 
     for machine_name in sorted(domain.machines):
         machine = domain.machines[machine_name]
@@ -132,9 +131,7 @@ def _plan_domain(
                         detail=f"Démarrer instance {full_name}",
                     )
                 )
-            # Running → rien à faire
         else:
-            # Créer + démarrer
             detail = _instance_create_detail(machine, infra, domain)
             actions.append(
                 Action(
@@ -164,16 +161,13 @@ def _instance_create_detail(
     domain: Domain,
 ) -> str:
     """Génère la description détaillée pour la création d'une instance."""
-    instance_type = "virtual-machine" if machine.type == "vm" else "container"
     image = infra.config.defaults.os_image
     parts = [
         f"Créer instance {machine.full_name}",
-        f"({instance_type}, {image})",
+        f"({machine.incus_type}, {image})",
     ]
 
-    # Protection delete (ADR-011)
-    ephemeral = machine.ephemeral if machine.ephemeral is not None else domain.ephemeral
-    if not ephemeral:
+    if not machine.is_ephemeral(domain):
         parts.append("security.protection.delete=true")
 
     if machine.profiles and machine.profiles != ["default"]:
@@ -194,7 +188,6 @@ def _execute_domain_actions(
 
     for action in actions:
         if domain_failed:
-            # Arrêter ce domaine si une action précédente a échoué
             result.errors.append((action, "Ignoré suite à une erreur précédente"))
             continue
 
@@ -229,24 +222,18 @@ def _execute_action(
             msg = f"Machine introuvable : {action.target}"
             raise IncusError(command=["reconcile"], returncode=1, stderr=msg)
 
-        instance_type = "virtual-machine" if machine.type == "vm" else "container"
         config = dict(machine.config)
-
-        # Protection delete (ADR-011)
-        ephemeral = machine.ephemeral if machine.ephemeral is not None else domain.ephemeral
-        if not ephemeral:
+        if not machine.is_ephemeral(domain):
             config["security.protection.delete"] = "true"
-
-        network_name = f"net-{domain.name}"
 
         driver.instance_create(
             name=machine.full_name,
             project=action.project,
             image=infra.config.defaults.os_image,
-            instance_type=instance_type,
+            instance_type=machine.incus_type,
             profiles=machine.profiles,
             config=config,
-            network=network_name,
+            network=domain.network_name,
         )
 
     elif action.verb == "start" and action.resource == "instance":
