@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+.ruff_cache/
+.pytest_cache/
+*.iso
+*.sha256
+.env
+roles_custom/
+roles_vendor/
