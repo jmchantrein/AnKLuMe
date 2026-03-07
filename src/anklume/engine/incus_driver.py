@@ -198,3 +198,12 @@ class IncusDriver:
 
     def snapshot_delete(self, instance: str, project: str, name: str) -> None:
         self._run(["snapshot", "delete", instance, name, "--project", project])
+
+    # --- Exec ---
+
+    def instance_exec(
+        self, instance: str, project: str, command: list[str]
+    ) -> subprocess.CompletedProcess:
+        """Exécute une commande dans une instance."""
+        args = ["exec", instance, "--project", project, "--", *command]
+        return self._run(args)

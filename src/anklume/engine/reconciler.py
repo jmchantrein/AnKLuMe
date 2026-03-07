@@ -7,10 +7,20 @@ IncusDriver, produit un plan d'actions ordonnées, et l'exécute
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from anklume.engine.incus_driver import IncusDriver, IncusError
-from anklume.engine.models import Domain, Infrastructure, Machine
+from anklume.engine.models import Domain, Infrastructure, Machine, NestingConfig
+from anklume.engine.nesting import (
+    NestingContext,
+    context_files_for_instance,
+    nesting_security_config,
+    prefix_name,
+    unprefix_name,
+)
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -19,8 +29,8 @@ class Action:
 
     verb: str  # "create" | "start" | "stop" | "delete" | "skip"
     resource: str  # "project" | "network" | "instance"
-    target: str  # nom de la ressource
-    project: str  # projet Incus concerné
+    target: str  # nom de la ressource (préfixé si nesting)
+    project: str  # projet Incus concerné (préfixé si nesting)
     detail: str  # description lisible
 
 
@@ -42,6 +52,7 @@ def reconcile(
     driver: IncusDriver,
     *,
     dry_run: bool = False,
+    nesting_context: NestingContext | None = None,
 ) -> ReconcileResult:
     """Réconcilie l'infrastructure désirée avec l'état réel Incus.
 
@@ -49,9 +60,9 @@ def reconcile(
     sans l'exécuter. Sinon, exécute action par action.
     Best-effort par domaine : si un domaine échoue, les autres continuent.
     """
+    ctx = nesting_context or NestingContext()
     result = ReconcileResult()
 
-    # Cache la liste des projets une seule fois (évite N appels subprocess)
     existing_projects = {p.name for p in driver.project_list()}
 
     for domain_name in sorted(infra.domains):
@@ -59,11 +70,13 @@ def reconcile(
         if not domain.enabled:
             continue
 
-        domain_actions = _plan_domain(domain, infra, driver, existing_projects)
+        domain_actions = _plan_domain(domain, infra, driver, existing_projects, ctx)
         result.actions.extend(domain_actions)
 
         if not dry_run:
-            _execute_domain_actions(domain_actions, domain, infra, driver, result)
+            _execute_domain_actions(
+                domain_actions, domain, infra, driver, result, ctx
+            )
 
     return result
 
@@ -73,10 +86,14 @@ def _plan_domain(
     infra: Infrastructure,
     driver: IncusDriver,
     existing_projects: set[str],
+    ctx: NestingContext,
 ) -> list[Action]:
     """Calcule les actions nécessaires pour un domaine."""
     actions: list[Action] = []
-    project_name = domain.name
+    nesting_cfg = infra.config.nesting
+
+    project_name = prefix_name(domain.name, ctx, nesting_cfg)
+    network_name = prefix_name(domain.network_name, ctx, nesting_cfg)
     project_is_new = project_name not in existing_projects
 
     # 1. Projet
@@ -91,11 +108,11 @@ def _plan_domain(
             )
         )
 
-    # 2. Réseau — short-circuit si le projet n'existe pas encore
+    # 2. Réseau
     if project_is_new:
         net_exists = False
     else:
-        net_exists = driver.network_exists(domain.network_name, project_name)
+        net_exists = driver.network_exists(network_name, project_name)
 
     if not net_exists:
         gateway = domain.gateway or "auto"
@@ -103,13 +120,13 @@ def _plan_domain(
             Action(
                 verb="create",
                 resource="network",
-                target=domain.network_name,
+                target=network_name,
                 project=project_name,
-                detail=f"Créer réseau {domain.network_name} ({gateway}/24, nat=true)",
+                detail=f"Créer réseau {network_name} ({gateway}/24, nat=true)",
             )
         )
 
-    # 3. Instances — short-circuit si le projet n'existe pas encore
+    # 3. Instances
     if project_is_new:
         existing_instances: dict[str, object] = {}
     else:
@@ -117,27 +134,27 @@ def _plan_domain(
 
     for machine_name in sorted(domain.machines):
         machine = domain.machines[machine_name]
-        full_name = machine.full_name
+        incus_name = prefix_name(machine.full_name, ctx, nesting_cfg)
 
-        if full_name in existing_instances:
-            instance = existing_instances[full_name]
+        if incus_name in existing_instances:
+            instance = existing_instances[incus_name]
             if instance.status == "Stopped":
                 actions.append(
                     Action(
                         verb="start",
                         resource="instance",
-                        target=full_name,
+                        target=incus_name,
                         project=project_name,
-                        detail=f"Démarrer instance {full_name}",
+                        detail=f"Démarrer instance {incus_name}",
                     )
                 )
         else:
-            detail = _instance_create_detail(machine, infra, domain)
+            detail = _instance_create_detail(machine, infra, incus_name)
             actions.append(
                 Action(
                     verb="create",
                     resource="instance",
-                    target=full_name,
+                    target=incus_name,
                     project=project_name,
                     detail=detail,
                 )
@@ -146,9 +163,9 @@ def _plan_domain(
                 Action(
                     verb="start",
                     resource="instance",
-                    target=full_name,
+                    target=incus_name,
                     project=project_name,
-                    detail=f"Démarrer instance {full_name}",
+                    detail=f"Démarrer instance {incus_name}",
                 )
             )
 
@@ -158,12 +175,12 @@ def _plan_domain(
 def _instance_create_detail(
     machine: Machine,
     infra: Infrastructure,
-    domain: Domain,
+    incus_name: str,
 ) -> str:
     """Génère la description détaillée pour la création d'une instance."""
     image = infra.config.defaults.os_image
     parts = [
-        f"Créer instance {machine.full_name}",
+        f"Créer instance {incus_name}",
         f"({machine.incus_type}, {image})",
     ]
 
@@ -182,9 +199,11 @@ def _execute_domain_actions(
     infra: Infrastructure,
     driver: IncusDriver,
     result: ReconcileResult,
+    ctx: NestingContext,
 ) -> None:
     """Exécute les actions d'un domaine. Best-effort."""
     domain_failed = False
+    created_machines: dict[str, Machine] = {}
 
     for action in actions:
         if domain_failed:
@@ -192,8 +211,22 @@ def _execute_domain_actions(
             continue
 
         try:
-            _execute_action(action, domain, infra, driver)
+            _execute_action(action, domain, infra, driver, ctx)
             result.executed.append(action)
+
+            if action.verb == "create" and action.resource == "instance":
+                machine = _find_machine(
+                    action.target, domain, infra.config.nesting, ctx
+                )
+                created_machines[action.target] = machine
+
+            if action.verb == "start" and action.resource == "instance":
+                machine = created_machines.get(action.target)
+                if machine is not None:
+                    _inject_context_files(
+                        action.target, action.project, machine, driver, ctx
+                    )
+
         except (IncusError, ValueError) as e:
             result.errors.append((action, str(e)))
             domain_failed = True
@@ -204,6 +237,7 @@ def _execute_action(
     domain: Domain,
     infra: Infrastructure,
     driver: IncusDriver,
+    ctx: NestingContext,
 ) -> None:
     """Exécute une action unique."""
     if action.verb == "create" and action.resource == "project":
@@ -217,23 +251,26 @@ def _execute_action(
         driver.network_create(action.target, action.project, config=config)
 
     elif action.verb == "create" and action.resource == "instance":
-        machine = domain.machines.get(action.target.removeprefix(f"{domain.name}-"))
-        if not machine:
-            msg = f"Machine introuvable : {action.target}"
-            raise ValueError(msg)
+        machine = _find_machine(
+            action.target, domain, infra.config.nesting, ctx
+        )
 
-        config = dict(machine.config)
+        # Config de sécurité nesting (base), puis config explicite (override)
+        config = dict(nesting_security_config(ctx.absolute_level))
         if not machine.ephemeral:
             config["security.protection.delete"] = "true"
+        config.update(machine.config)
+
+        network_name = prefix_name(domain.network_name, ctx, infra.config.nesting)
 
         driver.instance_create(
-            name=machine.full_name,
+            name=action.target,
             project=action.project,
             image=infra.config.defaults.os_image,
             instance_type=machine.incus_type,
             profiles=machine.profiles,
             config=config,
-            network=domain.network_name,
+            network=network_name,
         )
 
     elif action.verb == "start" and action.resource == "instance":
@@ -248,3 +285,47 @@ def _execute_action(
     else:
         msg = f"Action inconnue : {action.verb}/{action.resource}"
         raise ValueError(msg)
+
+
+def _find_machine(
+    incus_name: str,
+    domain: Domain,
+    nesting_cfg: NestingConfig,
+    ctx: NestingContext,
+) -> Machine:
+    """Retrouve la Machine depuis le nom Incus (potentiellement préfixé)."""
+    logical_name = unprefix_name(incus_name, ctx, nesting_cfg)
+    short_name = logical_name.removeprefix(f"{domain.name}-")
+    machine = domain.machines.get(short_name)
+    if not machine:
+        msg = f"Machine introuvable : {incus_name}"
+        raise ValueError(msg)
+    return machine
+
+
+def _inject_context_files(
+    incus_name: str,
+    project: str,
+    machine: Machine,
+    driver: IncusDriver,
+    ctx: NestingContext,
+) -> None:
+    """Injecte les fichiers de contexte /etc/anklume/ dans une instance.
+
+    Best-effort : si l'injection échoue, un warning est loggé.
+    Batch en une seule commande shell pour minimiser les appels subprocess.
+    """
+    files = context_files_for_instance(ctx, machine.type)
+
+    # Batch : mkdir + écriture des 4 fichiers en une seule commande
+    parts = ["mkdir -p /etc/anklume"]
+    for filename, value in files.items():
+        parts.append(f"printf '%s' '{value}' > /etc/anklume/{filename}")
+    script = " && ".join(parts)
+
+    try:
+        driver.instance_exec(incus_name, project, ["sh", "-c", script])
+    except IncusError:
+        log.warning(
+            "Injection des fichiers de contexte échouée pour %s", incus_name
+        )

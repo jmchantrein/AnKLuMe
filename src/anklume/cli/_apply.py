@@ -8,6 +8,7 @@ import typer
 
 from anklume.cli._common import load_infra
 from anklume.engine.incus_driver import IncusDriver
+from anklume.engine.nesting import detect_nesting_context
 from anklume.engine.reconciler import ReconcileResult, reconcile
 from anklume.engine.snapshot import create_auto_snapshots
 
@@ -30,6 +31,7 @@ def run_apply(
         infra.domains = {domain_name: infra.domains[domain_name]}
 
     driver = IncusDriver()
+    nesting_ctx = detect_nesting_context()
 
     # Pré-fetch des projets existants (un seul appel subprocess pour tout le pipeline)
     existing_projects = {p.name for p in driver.project_list()}
@@ -45,7 +47,9 @@ def run_apply(
         if pre:
             typer.echo(f"Snapshots pré-apply : {len(pre)} créé(s)")
 
-    reconcile_result = reconcile(infra, driver, dry_run=dry_run)
+    reconcile_result = reconcile(
+        infra, driver, dry_run=dry_run, nesting_context=nesting_ctx
+    )
 
     # Snapshots post-apply — refetch des projets (reconcile a pu en créer)
     if not dry_run and reconcile_result.executed:

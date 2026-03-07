@@ -17,11 +17,13 @@ apply_app = typer.Typer(help="Déployer l'infrastructure.")
 dev_app = typer.Typer(help="Outils de développement.")
 instance_app = typer.Typer(help="Gestion des instances.")
 snapshot_app = typer.Typer(help="Gestion des snapshots.")
+network_app = typer.Typer(help="Réseau et sécurité nftables.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
 app.add_typer(snapshot_app, name="snapshot")
+app.add_typer(network_app, name="network")
 
 
 def _version_callback(value: bool) -> None:
@@ -211,3 +213,22 @@ def snapshot_restore(
     from anklume.cli._snapshot import run_snapshot_restore
 
     run_snapshot_restore(instance=instance, snapshot=snapshot)
+
+
+# --- anklume network <rules|deploy> ---
+
+
+@network_app.command("rules")
+def network_rules() -> None:
+    """Générer et afficher les règles nftables."""
+    from anklume.cli._network import run_network_rules
+
+    run_network_rules()
+
+
+@network_app.command("deploy")
+def network_deploy() -> None:
+    """Appliquer les règles nftables sur l'hôte."""
+    from anklume.cli._network import run_network_deploy
+
+    run_network_deploy()

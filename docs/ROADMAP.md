@@ -32,8 +32,6 @@
 - [x] `anklume apply all` / `anklume apply domain <nom>` fonctionnels
 - [x] Tests E2E pytest (7 scénarios) + BDD E2E behave (8 scénarios)
 
-## Prochaines phases
-
 ## Phase 4 — Snapshots ✅
 
 - [x] `IncusSnapshot` dataclass + méthodes driver (create, list, restore, delete)
@@ -59,24 +57,39 @@
 - [x] Tests unitaires : 39 tests provisioner
 - [x] 205 tests unitaires au total, zéro régression
 
-#### Phase 6 — Réseau et sécurité
-- [ ] Parser `policies.yml`
-- [ ] Générer règles nftables
-- [ ] `anklume network rules` / `anklume network deploy`
+## Phase 6 — Réseau et sécurité nftables ✅
 
-#### Phase 7 — Nesting Incus
+- [x] Parser `policies.yml` (existant depuis Phase 2 — parser.py + validator.py)
+- [x] SPEC §12 détaillé (philosophie, structure nftables, résolution cibles, CLI)
+- [x] `engine/nftables.py` — génération ruleset nftables (drop-all + allow sélectif)
+- [x] Résolution de cibles : domaine (bridge), machine (bridge + IP), host (commentaire)
+- [x] Support : bidirectionnel, UDP, ports "all", domaines désactivés
+- [x] `anklume network rules` — affiche le ruleset sur stdout
+- [x] `anklume network deploy` — applique via `nft -f`
+- [x] Tests unitaires : 30 tests nftables
+- [x] 233 tests unitaires au total, zéro régression
+
+## Phase 7 — Nesting Incus ✅
+
 - [x] Tests de nesting (LXC dans LXC, 5 niveaux validés)
-- [ ] Préfixe de nesting (`{level:03d}-`)
-- [ ] Fichiers de contexte (`/etc/anklume/`)
-- [ ] Sécurité par niveau (L1 unprivileged, L2+ privilegié)
+- [x] SPEC §8 détaillé (détection, préfixes, contexte, sécurité, module)
+- [x] `engine/nesting.py` — NestingContext, préfixes, sécurité, fichiers de contexte
+- [x] Détection du contexte via `/etc/anklume/` (absolute_level, relative_level, vm_nested, yolo)
+- [x] Préfixe de nesting (`{level:03d}-`) intégré au réconciliateur
+- [x] Fichiers de contexte injectés dans les instances après démarrage
+- [x] Sécurité par niveau (L0→L1 unprivileged+syscalls, L1+→L2+ privilegié)
+- [x] Config explicite machine override la config nesting
+- [x] `instance_exec` ajouté au driver Incus
+- [x] Tests unitaires : 47 tests nesting + zéro régression réconciliateur
+- [x] 280 tests unitaires au total, zéro régression
 
-#### Phase 8 — Resource policy
+## Phase 8 — Resource policy
 - [ ] Détection hardware (CPU, mémoire)
 - [ ] Allocation proportionnelle/égale par poids
 - [ ] Réserve hôte, overcommit
 - [ ] Modes CPU (allowance vs count) et mémoire (soft vs hard)
 
-#### Phase 9 — Status et destroy
+## Phase 9 — Status et destroy
 - [ ] `anklume status` (état réel vs déclaré)
 - [ ] `anklume destroy` (avec protection ephemeral)
 

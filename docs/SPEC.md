@@ -469,10 +469,30 @@ Tout est pré-installé dans le squashfs. L'utilisateur lance
 Support du nesting LXC pour les architectures multi-niveaux
 (conteneurs dans conteneurs).
 
+### Détection du contexte de nesting
+
+Au démarrage, anklume lit son contexte de nesting depuis les fichiers
+dans `/etc/anklume/`. Si le répertoire ou les fichiers sont absents,
+le niveau est 0 (hôte physique).
+
+```python
+@dataclass
+class NestingContext:
+    absolute_level: int = 0    # 0 = hôte, 1 = L1, 2 = L2, ...
+    relative_level: int = 0    # reset à 0 après frontière VM
+    vm_nested: bool = False    # true si VM dans la chaîne d'ancêtres
+    yolo: bool = False         # override des checks de sécurité
+```
+
+`detect_nesting_context()` lit `/etc/anklume/absolute_level` etc.
+et retourne un `NestingContext`. Fonction pure (fichiers injectés
+par le niveau parent).
+
 ### Préfixe de nesting
 
-Quand `nesting.prefix: true` (défaut), les ressources Incus sont
-préfixées par le niveau de profondeur pour éviter les collisions :
+Quand `nesting.prefix: true` (défaut) ET `absolute_level > 0`,
+les ressources Incus sont préfixées par le niveau de profondeur
+pour éviter les collisions de noms entre niveaux :
 
 | Ressource | Hôte (L0) | Niveau 1 | Niveau 2 |
 |-----------|-----------|----------|----------|
@@ -482,30 +502,104 @@ préfixées par le niveau de profondeur pour éviter les collisions :
 
 Format du préfixe : `{level:03d}-`
 
+À L0 (hôte), aucun préfixe — même avec `nesting.prefix: true`.
+Le préfixe sert uniquement aux niveaux imbriqués pour éviter les
+collisions avec les ressources du niveau parent.
+
 Les chemins Ansible (inventory, group_vars, host_vars) restent
 sans préfixe — ils sont locaux à chaque niveau.
 
+#### Application du préfixe
+
+```python
+def prefix_name(name: str, context: NestingContext, nesting_config: NestingConfig) -> str:
+    if nesting_config.prefix and context.absolute_level > 0:
+        return f"{context.absolute_level:03d}-{name}"
+    return name
+```
+
+Le préfixe est appliqué dans le réconciliateur, sur les noms
+de ressources Incus : projets, réseaux et instances.
+
 ### Fichiers de contexte
 
-Chaque instance reçoit 4 fichiers dans `/etc/anklume/` pour
-déterminer son niveau de nesting :
+Chaque instance créée par anklume reçoit 4 fichiers dans
+`/etc/anklume/` pour que le prochain niveau puisse déterminer
+son contexte de nesting :
 
-| Fichier | Description |
-|---------|-------------|
-| `absolute_level` | Profondeur depuis l'hôte physique (L0=0, L1=1, ...) |
-| `relative_level` | Reset à 0 à chaque frontière VM |
-| `vm_nested` | `true` si une VM existe dans la chaîne d'ancêtres |
-| `yolo` | Mode override pour bypasser les checks de sécurité |
+| Fichier | Contenu | Exemple L1 |
+|---------|---------|------------|
+| `absolute_level` | parent.absolute_level + 1 | `1` |
+| `relative_level` | parent.relative_level + 1 (reset si VM) | `1` |
+| `vm_nested` | `true` si instance VM ou parent.vm_nested | `false` |
+| `yolo` | hérité du parent | `false` |
+
+Pour `relative_level` : si l'instance créée est de type VM,
+`relative_level` est remis à 0 (frontière VM). Sinon, il est
+incrémenté de 1 par rapport au parent.
+
+Pour `vm_nested` : `true` si l'instance créée est une VM, ou si
+le parent a déjà `vm_nested: true`.
+
+#### Injection dans les instances
+
+Après le démarrage d'une instance, le réconciliateur :
+1. Crée `/etc/anklume/` via `incus exec -- mkdir -p /etc/anklume`
+2. Écrit chaque fichier via `incus exec -- sh -c 'echo VALUE > /etc/anklume/FILE'`
+
+Injection best-effort : si l'instance refuse les commandes (VM pas
+encore bootée, image sans shell), un warning est affiché et le
+pipeline continue.
+
+### Driver Incus — méthodes nesting
+
+| Méthode | Commande Incus |
+|---------|---------------|
+| `instance_exec(inst, project, cmd)` | `incus exec <inst> --project <p> -- <cmd...>` |
 
 ### Sécurité par niveau
 
-| Niveau | Configuration |
-|--------|---------------|
-| L1 (dans l'hôte) | `security.nesting=true` + syscalls intercept (unprivileged) |
-| L2+ (dans conteneur) | `security.privileged=true` + `security.nesting=true` |
+La configuration de sécurité des instances créées dépend du niveau
+courant d'anklume :
 
-L2+ utilise des conteneurs privilegiés à l'intérieur de conteneurs
+| Niveau courant | Instances créées | Configuration |
+|----------------|------------------|---------------|
+| L0 (hôte) | L1 | `security.nesting=true`, `security.syscalls.intercept.mknod=true`, `security.syscalls.intercept.setxattr=true` |
+| L1+ (conteneur) | L2+ | `security.nesting=true`, `security.privileged=true` |
+
+L1 : instances unprivileged avec nesting activé et interception
+des syscalls nécessaires au fonctionnement d'Incus à l'intérieur.
+
+L2+ : conteneurs privilegiés à l'intérieur de conteneurs
 unprivileged — sûr par design (recommandation stgraber).
+
+```python
+def nesting_security_config(level: int) -> dict[str, str]:
+    if level == 0:
+        return {
+            "security.nesting": "true",
+            "security.syscalls.intercept.mknod": "true",
+            "security.syscalls.intercept.setxattr": "true",
+        }
+    return {
+        "security.nesting": "true",
+        "security.privileged": "true",
+    }
+```
+
+La config de sécurité nesting est fusionnée (merge) avec la config
+explicite de la machine. La config explicite a priorité (override).
+
+### Module `engine/nesting.py`
+
+```python
+detect_nesting_context() -> NestingContext
+prefix_name(name, context, nesting_config) -> str
+nesting_security_config(level) -> dict[str, str]
+context_files_for_instance(parent: NestingContext, machine_type: str) -> dict[str, str]
+```
+
+Fonctions pures (sauf `detect_nesting_context` qui lit le filesystem).
 
 ## 9. Resource policy
 
@@ -778,7 +872,127 @@ src/anklume/provisioner/
         anklume_incus.py    # Plugin de connexion Incus
 ```
 
-## 12. Fonctionnalités additionnelles
+## 12. Réseau et sécurité nftables
+
+Isolation réseau entre domaines via nftables sur l'hôte.
+
+### Philosophie
+
+- **Drop-all par défaut** : tout trafic inter-domaines bloqué
+- **Allow sélectif** : exceptions déclarées dans `policies.yml`
+- **Intra-domaine autorisé** : trafic sur le même bridge libre
+- **Table dédiée** : `inet anklume` isolée des autres règles nftables
+
+### Structure nftables
+
+```nft
+table inet anklume
+flush table inet anklume
+
+table inet anklume {
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        ct state established,related accept
+
+        # Intra-domaine
+        iifname "net-pro" oifname "net-pro" accept
+        iifname "net-perso" oifname "net-perso" accept
+
+        # Politiques inter-domaines
+        # Pro accède à Ollama et Open WebUI
+        iifname "net-pro" oifname "net-ai-tools" tcp dport { 3000, 11434 } accept
+    }
+}
+```
+
+La table `inet anklume` est flushée puis recréée à chaque deploy
+(idempotent). Les autres tables nftables restent intactes.
+
+### Résolution des cibles
+
+Chaque cible d'une politique (`from`/`to`) est résolue en identifiants
+nftables :
+
+| Cible | Type | Filtrage nftables |
+|-------|------|-------------------|
+| `pro` (domaine) | bridge | `iifname/oifname "net-pro"` |
+| `pro-dev` (machine) | bridge + IP | bridge + `ip saddr/daddr <ip>` |
+| `host` | — | Commentaire informatif |
+
+**Domaine** : résolu par le nom du bridge (`net-{domain}`).
+
+**Machine** : résolu par le bridge du domaine parent + l'IP de la
+machine. Permet un filtrage plus fin que le domaine.
+
+**Host** : les politiques `from: host` ou `to: host` sont validées
+mais génèrent un commentaire informatif dans le ruleset. Le trafic
+hôte↔domaines reste libre (l'hôte est le plan de management).
+
+### Génération des règles
+
+Pour chaque politique dans `policies.yml` :
+
+1. Résoudre `from_target` → bridge source + IP optionnelle
+2. Résoudre `to_target` → bridge destination + IP optionnelle
+3. Générer la règle nftables :
+   - `iifname` (bridge source)
+   - `ip saddr` (si machine source)
+   - `oifname` (bridge destination)
+   - `ip daddr` (si machine destination)
+   - `<protocol> dport { <ports> }` (sauf `ports: "all"` ou `[]`)
+   - `accept`
+4. Si `bidirectional: true`, générer la règle inverse
+
+Les ports sont triés numériquement dans les sets nftables.
+
+### Domaines désactivés
+
+Les domaines avec `enabled: false` sont exclus du ruleset :
+- Pas de règle intra-domaine
+- Les politiques les référençant génèrent un commentaire `[ignoré]`
+
+### Commandes CLI
+
+```
+anklume network rules     # Affiche le ruleset nftables sur stdout
+anklume network deploy    # Applique le ruleset via nft -f
+```
+
+#### `anklume network rules`
+
+Génère le ruleset depuis l'infrastructure courante et l'affiche
+sur stdout. Permet de vérifier les règles avant de les appliquer.
+
+#### `anklume network deploy`
+
+Génère le ruleset et l'applique sur l'hôte via `nft -f`.
+Requiert les privilèges root. Si nftables (`nft`) n'est pas
+installé, affiche une erreur.
+
+### Prérequis
+
+- `nft` installé sur l'hôte (pour `network deploy`)
+- Adressage calculé (les politiques ciblant des machines nécessitent
+  des IPs assignées)
+
+### Module `engine/nftables.py`
+
+```python
+generate_ruleset(infra: Infrastructure) -> str
+```
+
+Fonction pure : prend une Infrastructure (avec adresses assignées),
+retourne le ruleset nftables complet sous forme de string.
+
+### Gestion d'erreurs
+
+- `nft` absent : erreur explicite sur `network deploy`
+- Politique référençant un domaine désactivé : commentaire `[ignoré]`
+- Politique `host` : commentaire informatif `[hôte]`
+- Échec `nft -f` : message d'erreur nftables affiché
+
+## 13. Fonctionnalités additionnelles
 
 ### Intégration IA
 
@@ -818,7 +1032,7 @@ Quand anklume détecte une version antérieure :
 - propose la migration automatique (`anklume apply` ou `anklume migrate`)
 - refuse de continuer sur un schéma incompatible sans migration
 
-## 12. Historique
+## 14. Historique
 
 La branche `poc` contient le prototype initial. Décisions retenues :
 
