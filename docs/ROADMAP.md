@@ -20,19 +20,19 @@
 - [x] Vérification `schema_version` + migration
 - [x] Tests unitaires exhaustifs pour le moteur (80 tests)
 
-## Phase actuelle : 3 — Incus driver
+## Phase 3 — Incus driver ✅
 
-### En cours
-- [ ] `engine/incus_driver.py` — wrapper typé autour de subprocess
-- [ ] Réconciliateur (`engine/reconciler.py`) — diff désiré vs réel
-- [ ] Créer projets Incus depuis les domaines
-- [ ] Créer réseaux (bridges) avec adressage
-- [ ] Créer instances (LXC/VM)
-- [ ] Réconciliation stateless (lire état Incus → comparer → appliquer)
-- [ ] `--dry-run` (afficher le plan sans appliquer)
-- [ ] `anklume apply all` / `anklume apply domain <nom>` fonctionnels
+- [x] `engine/incus_driver.py` — wrapper typé autour de subprocess
+- [x] Réconciliateur (`engine/reconciler.py`) — diff désiré vs réel
+- [x] Créer projets Incus depuis les domaines
+- [x] Créer réseaux (bridges) avec adressage
+- [x] Créer instances (LXC/VM)
+- [x] Réconciliation stateless (lire état Incus → comparer → appliquer)
+- [x] `--dry-run` (afficher le plan sans appliquer)
+- [x] `anklume apply all` / `anklume apply domain <nom>` fonctionnels
+- [x] Tests E2E pytest (7 scénarios) + BDD E2E behave (8 scénarios)
 
-### Prochaines phases
+## Prochaines phases
 
 #### Phase 4 — Snapshots
 - [ ] Snapshots automatiques pré/post-apply

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -15,25 +18,31 @@ from anklume.engine.incus_driver import (
 
 def before_scenario(context, scenario):
     """Prépare un contexte propre pour chaque scénario."""
+    context.e2e = "e2e" in scenario.tags or "e2e" in scenario.feature.tags
     context.tmpdir = Path(tempfile.mkdtemp())
     context.domains = {}
-    context.driver = MagicMock(spec=IncusDriver)
     context.result = None
     context.exit_code = 0
 
-    # État Incus simulé
-    context.existing_projects = []
-    context.existing_networks = {}  # project -> [IncusNetwork]
-    context.existing_instances = {}  # project -> [IncusInstance]
+    if context.e2e:
+        context.driver = IncusDriver()
+        _cleanup_bdd_projects()
+    else:
+        context.driver = MagicMock(spec=IncusDriver)
 
-    # Historique des appels pour vérification
-    context.created_projects = []
-    context.created_networks = []
-    context.created_instances = []
-    context.started_instances = []
-    context.fail_project_create = set()
+        # État Incus simulé
+        context.existing_projects = []
+        context.existing_networks = {}  # project -> [IncusNetwork]
+        context.existing_instances = {}  # project -> [IncusInstance]
 
-    _setup_driver_mock(context)
+        # Historique des appels pour vérification
+        context.created_projects = []
+        context.created_networks = []
+        context.created_instances = []
+        context.started_instances = []
+        context.fail_project_create = set()
+
+        _setup_driver_mock(context)
 
 
 def _setup_driver_mock(context):
@@ -91,8 +100,79 @@ def _setup_driver_mock(context):
     driver.instance_start.side_effect = instance_start
 
 
+def _cleanup_bdd_projects():
+    """Nettoyer tous les projets bdd-* dans Incus."""
+    result = subprocess.run(
+        ["incus", "project", "list", "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return
+
+    projects = json.loads(result.stdout)
+    for p in projects:
+        if p["name"].startswith("bdd-"):
+            _cleanup_project(p["name"])
+
+
+def _cleanup_project(name: str) -> None:
+    """Nettoyer un projet : arrêter/supprimer instances, réseaux, projet."""
+    # Supprimer les instances
+    result = subprocess.run(
+        ["incus", "list", "--project", name, "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        instances = json.loads(result.stdout)
+        for inst in instances:
+            inst_name = inst["name"]
+            # Retirer la protection delete si présente
+            subprocess.run(
+                [
+                    "incus",
+                    "config",
+                    "set",
+                    inst_name,
+                    "security.protection.delete=false",
+                    "--project",
+                    name,
+                ],
+                capture_output=True,
+            )
+            if inst["status"] == "Running":
+                subprocess.run(
+                    ["incus", "stop", inst_name, "--project", name, "--force"],
+                    capture_output=True,
+                )
+            subprocess.run(
+                ["incus", "delete", inst_name, "--project", name, "--force"],
+                capture_output=True,
+            )
+
+    # Supprimer les réseaux
+    result = subprocess.run(
+        ["incus", "network", "list", "--project", name, "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        networks = json.loads(result.stdout)
+        for net in networks:
+            if net.get("managed"):
+                subprocess.run(
+                    ["incus", "network", "delete", net["name"], "--project", name],
+                    capture_output=True,
+                )
+
+    # Supprimer le projet
+    subprocess.run(["incus", "project", "delete", name], capture_output=True)
+
+
 def after_scenario(context, scenario):
     """Nettoyage après chaque scénario."""
-    import shutil
+    if getattr(context, "e2e", False):
+        _cleanup_bdd_projects()
 
     shutil.rmtree(context.tmpdir, ignore_errors=True)

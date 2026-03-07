@@ -101,7 +101,8 @@ def _check_domain_names(infra: Infrastructure, result: ValidationResult) -> None
         elif len(name) > _MAX_DOMAIN_NAME_LEN:
             result.add(
                 f"domains/{name}.yml",
-                f"nom de domaine '{name}' trop long ({len(name)} chars, max {_MAX_DOMAIN_NAME_LEN}).",
+                f"nom de domaine '{name}' trop long "
+                f"({len(name)} chars, max {_MAX_DOMAIN_NAME_LEN}).",
                 "Le nom du bridge réseau (net-<nom>) est limité à 15 caractères par Linux.",
             )
 
