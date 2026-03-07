@@ -7,13 +7,18 @@ Prérequis : Incus installé et configuré sur l'hôte.
 """
 
 import json
+import os
 import subprocess
 
 import pytest
 import yaml
 
 from anklume.cli._apply import run_apply
+from anklume.cli._init import run_init
+from anklume.engine.addressing import assign_addresses
 from anklume.engine.incus_driver import IncusDriver
+from anklume.engine.parser import parse_project
+from anklume.engine.reconciler import reconcile
 
 
 def _incus_json(args: list[str]) -> list | dict:
@@ -258,9 +263,6 @@ class TestE2EIdempotence:
 
         # Second apply — doit être idempotent
         driver = IncusDriver()
-        from anklume.engine.addressing import assign_addresses
-        from anklume.engine.parser import parse_project
-        from anklume.engine.reconciler import reconcile
 
         infra = parse_project(path)
         assign_addresses(infra)
@@ -353,3 +355,60 @@ class TestE2EStoppedInstance:
         # Second apply — doit redémarrer
         run_apply(dry_run=False)
         assert _instance_status(full_name, project_name) == "Running"
+
+
+@pytest.fixture()
+def e2e_workflow(tmp_path, monkeypatch):
+    """Crée un projet via anklume init et nettoie après."""
+    project_name = "e2e-wflow"
+    monkeypatch.chdir(tmp_path)
+    _cleanup_project(project_name)
+
+    yield tmp_path, project_name
+
+    _cleanup_project(project_name)
+
+
+class TestE2EDevWorkflow:
+    """Workflow complet : init → configurer → apply → vérifier."""
+
+    def test_init_configure_apply(self, e2e_workflow):
+        path, project_name = e2e_workflow
+        project_dir = path / "infra"
+
+        # 1. anklume init
+        run_init(str(project_dir))
+
+        # 2. Remplacer le domaine par défaut par un nom E2E-safe
+        (project_dir / "domains" / "pro.yml").unlink()
+        (project_dir / "domains" / f"{project_name}.yml").write_text(
+            yaml.dump(
+                {
+                    "description": "E2E workflow test",
+                    "trust_level": "semi-trusted",
+                    "machines": {
+                        "dev": {"description": "Development", "type": "lxc"},
+                    },
+                }
+            )
+        )
+
+        # 3. Apply depuis le répertoire projet
+        os.chdir(project_dir)
+        run_apply(dry_run=False)
+
+        # 4. Vérifier les ressources Incus
+        full_name = f"{project_name}-dev"
+        assert _project_exists(project_name)
+        assert _network_exists(f"net-{project_name}", project_name)
+        assert _instance_exists(full_name, project_name)
+        assert _instance_status(full_name, project_name) == "Running"
+
+        # 5. Idempotence — second apply ne change rien
+        driver = IncusDriver()
+        infra = parse_project(project_dir)
+        assign_addresses(infra)
+        result = reconcile(infra, driver, dry_run=True)
+        assert len(result.actions) == 0, (
+            f"Second apply devrait être idempotent : {[a.detail for a in result.actions]}"
+        )

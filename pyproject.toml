@@ -1,12 +1,12 @@
 [project]
 name = "anklume"
-version = "2.0.0-dev"
-description = "Declarative infrastructure compartmentalization framework"
+version = "0.1.0-dev"
+description = "Framework déclaratif de compartimentalisation d'infrastructure"
 readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.11"
 authors = [
-    { name = "Jean-Michel Chantrein", email = "jmchantrein@users.noreply.github.com" },
+    { name = "Jean-Michel Chantrein", email = "jean-mathieu.chantrein@univ-angers.fr" },
 ]
 dependencies = [
     "typer>=0.12",
@@ -14,19 +14,22 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
-[project.optional-dependencies]
-live = [
-    "fastapi>=0.115",
-    "uvicorn>=0.30",
-]
+[dependency-groups]
 dev = [
     "pytest>=8.0",
     "behave>=1.2",
     "ruff>=0.8",
 ]
+live = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
 
 [project.scripts]
 anklume = "anklume.cli:app"
+
+[tool.uv]
+package = true
 
 [tool.ruff]
 target-version = "py311"
@@ -35,15 +38,22 @@ src = ["src", "tests", "live/platform"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "RUF"]
-ignore = ["S603", "S607"]  # subprocess calls are intentional
+ignore = ["S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # assert is fine in tests
+"tests/*" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "slow: tests lents (nesting, GPU)",
+    "gpu: tests nécessitant un GPU NVIDIA",
+]
 
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anklume"]
