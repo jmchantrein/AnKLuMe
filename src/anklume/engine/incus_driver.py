@@ -2,13 +2,24 @@
 
 Ce module encapsule tous les appels à la CLI Incus. Le reste du moteur
 utilise ce driver, jamais subprocess directement.
-
-Phase 3 — squelette avec interface typée.
 """
 
 from __future__ import annotations
 
+import json
+import subprocess
 from dataclasses import dataclass, field
+
+
+class IncusError(Exception):
+    """Erreur lors d'un appel à la CLI Incus."""
+
+    def __init__(self, command: list[str], returncode: int, stderr: str) -> None:
+        self.command = command
+        self.returncode = returncode
+        self.stderr = stderr
+        cmd_str = " ".join(command)
+        super().__init__(f"Commande échouée ({returncode}): {cmd_str}\n{stderr}")
 
 
 @dataclass
@@ -43,27 +54,91 @@ class IncusInstance:
 class IncusDriver:
     """Interface typée vers la CLI Incus.
 
-    Toutes les méthodes lèvent NotImplementedError jusqu'à
-    l'implémentation en Phase 3.
+    Toutes les méthodes encapsulent un appel subprocess vers `incus`.
     """
 
+    def _run(
+        self,
+        args: list[str],
+        *,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess:
+        """Exécute une commande incus et retourne le résultat."""
+        cmd = ["incus", *args]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
+        if check and result.returncode != 0:
+            raise IncusError(cmd, result.returncode, result.stderr)
+        return result
+
+    def _run_json(self, args: list[str]) -> list | dict:
+        """Exécute une commande incus et parse la sortie JSON."""
+        result = self._run([*args, "--format", "json"])
+        return json.loads(result.stdout)
+
+    # --- Projets ---
+
     def project_list(self) -> list[IncusProject]:
-        raise NotImplementedError
+        data = self._run_json(["project", "list"])
+        return [IncusProject(name=p["name"], description=p.get("description", "")) for p in data]
 
     def project_create(self, name: str, description: str = "") -> None:
-        raise NotImplementedError
+        args = [
+            "project",
+            "create",
+            name,
+            "-c",
+            "features.images=false",
+            "-c",
+            "features.profiles=false",
+        ]
+        if description:
+            args.extend(["-c", f"description={description}"])
+        self._run(args)
 
     def project_exists(self, name: str) -> bool:
-        raise NotImplementedError
+        return any(p.name == name for p in self.project_list())
+
+    # --- Réseaux ---
 
     def network_list(self, project: str) -> list[IncusNetwork]:
-        raise NotImplementedError
+        data = self._run_json(["network", "list", "--project", project])
+        return [
+            IncusNetwork(
+                name=n["name"],
+                type=n.get("type", "bridge"),
+                config=n.get("config", {}),
+            )
+            for n in data
+        ]
 
     def network_create(self, name: str, project: str, config: dict | None = None) -> None:
-        raise NotImplementedError
+        args = ["network", "create", name, "--project", project, "--type", "bridge"]
+        for key, value in (config or {}).items():
+            args.extend([f"{key}={value}"])
+        self._run(args)
+
+    def network_exists(self, name: str, project: str) -> bool:
+        return any(n.name == name for n in self.network_list(project))
+
+    # --- Instances ---
 
     def instance_list(self, project: str) -> list[IncusInstance]:
-        raise NotImplementedError
+        data = self._run_json(["list", "--project", project])
+        return [
+            IncusInstance(
+                name=i["name"],
+                status=i.get("status", "Unknown"),
+                type=i.get("type", "container"),
+                project=project,
+                profiles=i.get("profiles", []),
+                config=i.get("config", {}),
+            )
+            for i in data
+        ]
 
     def instance_create(
         self,
@@ -73,23 +148,36 @@ class IncusDriver:
         instance_type: str = "container",
         profiles: list[str] | None = None,
         config: dict | None = None,
+        network: str | None = None,
     ) -> None:
-        raise NotImplementedError
+        args = ["init", image, name, "--project", project]
+        if instance_type == "virtual-machine":
+            args.append("--vm")
+        if network:
+            args.extend(["--network", network])
+        for profile in profiles or []:
+            args.extend(["-p", profile])
+        for key, value in (config or {}).items():
+            args.extend(["-c", f"{key}={value}"])
+        self._run(args)
 
     def instance_start(self, name: str, project: str) -> None:
-        raise NotImplementedError
+        self._run(["start", name, "--project", project])
 
     def instance_stop(self, name: str, project: str) -> None:
-        raise NotImplementedError
+        self._run(["stop", name, "--project", project])
 
     def instance_delete(self, name: str, project: str) -> None:
-        raise NotImplementedError
+        self._run(["delete", name, "--project", project])
+
+    # --- Snapshots ---
 
     def snapshot_create(self, instance: str, project: str, name: str) -> None:
-        raise NotImplementedError
+        self._run(["snapshot", "create", instance, name, "--project", project])
 
     def snapshot_restore(self, instance: str, project: str, name: str) -> None:
-        raise NotImplementedError
+        self._run(["snapshot", "restore", instance, name, "--project", project])
 
     def snapshot_list(self, instance: str, project: str) -> list[str]:
-        raise NotImplementedError
+        data = self._run_json(["snapshot", "list", instance, "--project", project])
+        return [s["name"] for s in data]

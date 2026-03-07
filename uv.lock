@@ -4,7 +4,7 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "anklume"
-version = "0.1.0.dev0"
+version = "2.0.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
@@ -12,7 +12,7 @@ dependencies = [
     { name = "typer" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 dev = [
     { name = "behave" },
     { name = "pytest" },
@@ -25,21 +25,16 @@ live = [
 
 [package.metadata]
 requires-dist = [
+    { name = "behave", marker = "extra == 'dev'", specifier = ">=1.2" },
+    { name = "fastapi", marker = "extra == 'live'", specifier = ">=0.115" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
     { name = "typer", specifier = ">=0.12" },
+    { name = "uvicorn", marker = "extra == 'live'", specifier = ">=0.30" },
 ]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "behave", specifier = ">=1.2" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "ruff", specifier = ">=0.8" },
-]
-live = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "uvicorn", specifier = ">=0.30" },
-]
+provides-extras = ["live", "dev"]
 
 [[package]]
 name = "annotated-doc"
