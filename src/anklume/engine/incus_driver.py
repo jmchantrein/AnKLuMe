@@ -76,8 +76,14 @@ class IncusDriver:
 
     def _run_json(self, args: list[str]) -> list | dict:
         """Exécute une commande incus et parse la sortie JSON."""
-        result = self._run([*args, "--format", "json"])
-        return json.loads(result.stdout)
+        cmd = [*args, "--format", "json"]
+        result = self._run(cmd)
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            raise IncusError(
+                ["incus", *cmd], 0, f"JSON invalide: {e}\nSortie: {result.stdout[:500]}"
+            ) from None
 
     # --- Projets ---
 

@@ -8,7 +8,7 @@ import typer
 
 from anklume.engine.addressing import assign_addresses
 from anklume.engine.incus_driver import IncusDriver
-from anklume.engine.parser import parse_project
+from anklume.engine.parser import ParseError, parse_project
 from anklume.engine.reconciler import ReconcileResult, reconcile
 from anklume.engine.validator import validate
 
@@ -24,7 +24,7 @@ def run_apply(
     # 1. Parser
     try:
         infra = parse_project(project_dir)
-    except Exception as e:
+    except ParseError as e:
         typer.echo(f"Erreur de parsing : {e}", err=True)
         raise typer.Exit(1) from None
 

@@ -12,6 +12,9 @@ TRUST_LEVELS = {
     "disposable": 50,
 }
 
+MACHINE_TYPES = {"lxc", "vm"}
+PROTOCOLS = {"tcp", "udp"}
+
 SCHEMA_VERSION = 1
 
 
@@ -37,12 +40,6 @@ class Machine:
     def incus_type(self) -> str:
         """Type Incus : 'virtual-machine' ou 'container'."""
         return "virtual-machine" if self.type == "vm" else "container"
-
-    def is_ephemeral(self, domain: Domain) -> bool:
-        """Résout l'éphémérité : machine > domaine > False."""
-        if self.ephemeral is not None:
-            return self.ephemeral
-        return domain.ephemeral
 
 
 @dataclass

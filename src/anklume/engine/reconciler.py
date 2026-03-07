@@ -167,7 +167,7 @@ def _instance_create_detail(
         f"({machine.incus_type}, {image})",
     ]
 
-    if not machine.is_ephemeral(domain):
+    if not machine.ephemeral:
         parts.append("security.protection.delete=true")
 
     if machine.profiles and machine.profiles != ["default"]:
@@ -194,7 +194,7 @@ def _execute_domain_actions(
         try:
             _execute_action(action, domain, infra, driver)
             result.executed.append(action)
-        except IncusError as e:
+        except (IncusError, ValueError) as e:
             result.errors.append((action, str(e)))
             domain_failed = True
 
@@ -220,10 +220,10 @@ def _execute_action(
         machine = domain.machines.get(action.target.removeprefix(f"{domain.name}-"))
         if not machine:
             msg = f"Machine introuvable : {action.target}"
-            raise IncusError(command=["reconcile"], returncode=1, stderr=msg)
+            raise ValueError(msg)
 
         config = dict(machine.config)
-        if not machine.is_ephemeral(domain):
+        if not machine.ephemeral:
             config["security.protection.delete"] = "true"
 
         driver.instance_create(
@@ -244,3 +244,7 @@ def _execute_action(
 
     elif action.verb == "delete" and action.resource == "instance":
         driver.instance_delete(action.target, action.project)
+
+    else:
+        msg = f"Action inconnue : {action.verb}/{action.resource}"
+        raise ValueError(msg)
