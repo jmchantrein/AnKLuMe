@@ -30,6 +30,16 @@ def run_apply(
             raise typer.Exit(1)
         infra.domains = {domain_name: infra.domains[domain_name]}
 
+    # GPU passthrough : détection et enrichissement des profils
+    from anklume.engine.gpu import apply_gpu_profiles, validate_gpu_machines
+
+    gpu_info = apply_gpu_profiles(infra)
+    gpu_errors = validate_gpu_machines(infra, gpu_info)
+    if gpu_errors:
+        for err in gpu_errors:
+            typer.echo(f"GPU : {err}", err=True)
+        raise typer.Exit(1)
+
     driver = IncusDriver()
     nesting_ctx = detect_nesting_context()
 

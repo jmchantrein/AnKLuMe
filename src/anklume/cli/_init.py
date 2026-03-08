@@ -78,6 +78,43 @@ machines:
 """,
 }
 
+_AI_TOOLS_DOMAIN = {
+    "en": """\
+# ai-tools domain — AI services (GPU, LLM, STT)
+# Uncomment 'enabled: true' when a GPU is available.
+description: "AI services"
+trust_level: trusted
+enabled: false
+
+machines:
+  gpu-server:
+    description: "LLM and STT server with GPU"
+    type: lxc
+    gpu: true
+    roles: [base, ollama_server, stt_server]
+    vars:
+      ollama_default_model: ""
+      stt_language: "en"
+""",
+    "fr": """\
+# Domaine ai-tools — services IA (GPU, LLM, STT)
+# Activer enabled: true quand un GPU est disponible.
+description: "Services IA"
+trust_level: trusted
+enabled: false
+
+machines:
+  gpu-server:
+    description: "Serveur LLM et STT avec GPU"
+    type: lxc
+    gpu: true
+    roles: [base, ollama_server, stt_server]
+    vars:
+      ollama_default_model: ""
+      stt_language: "fr"
+""",
+}
+
 _POLICIES_EXAMPLE = {
     "en": """\
 # Network policies — inter-domain access rules
@@ -88,6 +125,10 @@ policies: []
   #   to: ai-tools
   #   ports: [11434]
   #   description: "Work accesses Ollama"
+  # - from: work
+  #   to: ai-tools
+  #   ports: [8000]
+  #   description: "Work accesses Speaches (STT)"
 """,
     "fr": """\
 # Politiques réseau — règles d'accès inter-domaines
@@ -98,6 +139,10 @@ policies: []
   #   to: ai-tools
   #   ports: [11434]
   #   description: "Pro accède à Ollama"
+  # - from: pro
+  #   to: ai-tools
+  #   ports: [8000]
+  #   description: "Pro accède à Speaches (STT)"
 """,
 }
 
@@ -127,6 +172,10 @@ def run_init(directory: str, *, lang: str = "fr") -> None:
     domain_name = "work" if lang == "en" else "pro"
     domain_content = _DOMAIN_EXAMPLE.get(lang, _DOMAIN_EXAMPLE["fr"])
     (domains_dir / f"{domain_name}.yml").write_text(domain_content)
+
+    # Domaine ai-tools (désactivé par défaut)
+    ai_content = _AI_TOOLS_DOMAIN.get(lang, _AI_TOOLS_DOMAIN["fr"])
+    (domains_dir / "ai-tools.yml").write_text(ai_content)
 
     # Créer policies.yml
     policies_content = _POLICIES_EXAMPLE.get(lang, _POLICIES_EXAMPLE["fr"])

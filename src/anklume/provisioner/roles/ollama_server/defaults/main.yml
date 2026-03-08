@@ -1,0 +1,6 @@
+# Rôle ollama_server — variables par défaut
+---
+ollama_port: 11434
+ollama_host: "0.0.0.0"
+ollama_default_model: ""
+ollama_gpu_enabled: true

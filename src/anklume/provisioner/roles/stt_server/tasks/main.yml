@@ -1,0 +1,93 @@
+# Rôle stt_server — installation et configuration Speaches (STT)
+---
+- name: Installer les dépendances système Speaches
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+      - git
+      - python3
+      - python3-venv
+      - ffmpeg
+    state: present
+    update_cache: true
+
+- name: Installer uv (gestionnaire de paquets Python)
+  ansible.builtin.shell:
+    cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
+    creates: /root/.local/bin/uv
+
+- name: Cloner Speaches
+  ansible.builtin.git:
+    repo: https://github.com/speaches-ai/speaches.git
+    dest: /opt/speaches
+    version: main
+    update: true
+
+- name: Installer Speaches via uv
+  ansible.builtin.shell:
+    cmd: /root/.local/bin/uv sync
+    chdir: /opt/speaches
+  changed_when: true
+
+- name: Détecter la présence GPU (nvidia-smi)
+  ansible.builtin.command:
+    cmd: nvidia-smi --query-gpu=name --format=csv,noheader
+  register: gpu_check
+  changed_when: false
+  failed_when: false
+
+- name: Déterminer le device et compute_type
+  ansible.builtin.set_fact:
+    stt_actual_device: >-
+      {{ (stt_device == 'auto') | ternary(
+        (gpu_check.rc == 0) | ternary('cuda', 'cpu'),
+        stt_device
+      ) }}
+    stt_actual_compute_type: >-
+      {{ (stt_compute_type == 'auto') | ternary(
+        (gpu_check.rc == 0) | ternary('float16', 'int8'),
+        stt_compute_type
+      ) }}
+
+- name: Créer la configuration systemd Speaches
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/speaches.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Speaches STT Server
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/opt/speaches
+      ExecStart=/root/.local/bin/uv run speaches \
+        --host {{ stt_host }} \
+        --port {{ stt_port }}
+      Restart=always
+      RestartSec=3
+      Environment="WHISPER__MODEL={{ stt_model }}"
+      Environment="WHISPER__INFERENCE_DEVICE={{ stt_actual_device }}"
+      Environment="WHISPER__COMPUTE_TYPE={{ stt_actual_compute_type }}"
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Redémarrer Speaches
+
+- name: Activer et démarrer Speaches
+  ansible.builtin.systemd:
+    name: speaches
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Attendre que Speaches soit prêt
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ stt_port }}/v1/models"
+    method: GET
+  register: stt_health
+  retries: 60
+  delay: 3
+  until: stt_health.status == 200

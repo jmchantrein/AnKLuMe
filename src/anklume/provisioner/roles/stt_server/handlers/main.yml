@@ -1,0 +1,7 @@
+# Rôle stt_server — handlers
+---
+- name: Redémarrer Speaches
+  ansible.builtin.systemd:
+    name: speaches
+    state: restarted
+    daemon_reload: true

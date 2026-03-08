@@ -1,0 +1,8 @@
+# Rôle stt_server — variables par défaut
+---
+stt_port: 8000
+stt_host: "0.0.0.0"
+stt_model: "base"
+stt_language: "fr"
+stt_device: "auto"
+stt_compute_type: "auto"

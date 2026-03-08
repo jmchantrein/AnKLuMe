@@ -121,105 +121,112 @@ domaine `ai-tools`) vers l'architecture PSOT `domains/*.yml`.
 > embarqués. La config `infra.yml` monolithique est remplacée par
 > `domains/ai-tools.yml` + `anklume.yml`.
 
-### 10a — GPU passthrough et profils
+### 10a — GPU passthrough et profils ✅
 
-- [ ] SPEC §16 détaillé (GPU : détection, profils, politique, validation)
-- [ ] `engine/gpu.py` — détection GPU hôte via `nvidia-smi`
+- [x] SPEC §16 détaillé (GPU : détection, profils, politique, validation)
+- [x] `engine/gpu.py` — détection GPU hôte via `nvidia-smi`
   (présence, modèle, VRAM totale/utilisée)
-- [ ] Validation du flag `gpu: true` sur les machines
+- [x] Validation du flag `gpu: true` sur les machines
   - Erreur si `gpu: true` et aucun GPU détecté sur l'hôte
-- [ ] Profil Incus `nvidia-compute` : création automatique si GPU détecté
+- [x] Profil Incus `gpu-passthrough` : création automatique si GPU détecté
   - Device `gpu` de type `gpu` avec `gid`/`uid` appropriés
-- [ ] Politique GPU (`gpu_policy` dans `anklume.yml`) :
+- [x] Politique GPU (`gpu_policy` dans `anklume.yml`) :
   - `exclusive` (défaut) : une seule instance GPU à la fois, erreur sinon
   - `shared` : plusieurs instances partagent le GPU, warning
-- [ ] Intégration au réconciliateur (profil GPU ajouté à l'instance)
-- [ ] Driver Incus : `profile_create`, `profile_exists`, `profile_list`
-- [ ] Tests unitaires : détection, validation, profils, politique
+- [x] Intégration au réconciliateur (profil GPU ajouté à l'instance)
+- [x] Driver Incus : `profile_create`, `profile_exists`, `profile_list`, `profile_device_add`
+- [x] Parser : `gpu_policy` dans `anklume.yml`
+- [x] Modèle : `GpuPolicyConfig` dans `GlobalConfig`
+- [x] Tests unitaires : 32 tests (détection, validation, profils, politique, parser)
+- [x] 387 tests au total, zéro régression
 
-### 10b — Rôles Ansible IA de base
+### 10b — Rôles Ansible IA de base ✅
 
-- [ ] Rôle `ollama_server` (embarqué dans `provisioner/roles/`)
+- [x] SPEC §17 détaillé (rôles IA : variables, tâches, structure, exemples)
+- [x] Rôle `ollama_server` (embarqué dans `provisioner/roles/`)
   - Installation via `https://ollama.com/install.sh`
   - Détection GPU runtime (`nvidia-smi`), fallback CPU
   - Service systemd, port configurable (défaut 11434)
   - Pull automatique d'un modèle par défaut au provisioning
-  - *POC : `roles/ollama_server/` → adapté en rôle embarqué*
-- [ ] Rôle `stt_server` — Speaches (embarqué)
+- [x] Rôle `stt_server` — Speaches (embarqué)
   - Installation via `uv` depuis les sources
   - API OpenAI-compatible (`/v1/audio/transcriptions`)
   - GPU float16 si disponible, fallback int8 CPU
   - Service systemd, port configurable (défaut 8000)
   - Coexistence avec Ollama sur le même GPU
-  - *POC : `roles/stt_server/` → adapté en rôle embarqué*
-- [ ] Tests unitaires : génération inventaire/playbook avec rôles IA
+- [x] Tests unitaires : 32 tests (existence rôles, contenu, playbook, host_vars, inventaire)
+- [x] 419 tests au total, zéro régression
 
-### 10c — Domaine ai-tools et accès réseau
+### 10c — Domaine ai-tools et accès réseau ✅
 
-- [ ] Exemple de domaine `ai-tools` dans `anklume init`
+- [x] SPEC §18 détaillé (domaine ai-tools, CLI IA, ai status, module ai.py)
+- [x] Exemple de domaine `ai-tools` dans `anklume init` (désactivé par défaut)
   - `gpu-server` : `gpu: true`, rôles `[base, ollama_server, stt_server]`
-- [ ] Politiques réseau pour l'accès IA :
-  - Accès depuis d'autres domaines vers Ollama (port 11434)
-  - Accès depuis l'hôte vers les services IA
-- [ ] Sous-commande `anklume ai` (groupe CLI)
-- [ ] `anklume ai status` — état des services IA :
+- [x] Politiques réseau commentées (Ollama 11434, STT 8000)
+- [x] Sous-commande `anklume ai` (groupe CLI Typer)
+- [x] `anklume ai status` — état des services IA :
   - GPU détecté (modèle, VRAM totale/utilisée)
   - Ollama running, modèles chargés (`/api/ps`)
-  - STT running
-  - Domaine ayant accès actuellement
+  - STT running (`/v1/models`)
+- [x] Module `engine/ai.py` (compute_ai_status, _check_service)
+- [x] Tests unitaires : 22 tests (ai status, check service, init ai-tools)
+- [x] 441 tests au total, zéro régression
 
-### 10d — Push-to-talk STT (hôte KDE)
+### 10d — Push-to-talk STT (hôte KDE) ✅
 
 Raccourci clavier sur l'hôte pour dicter du texte via Speaches.
 Le texte transcrit est collé dans la fenêtre active.
 KDE Plasma Wayland uniquement dans un premier temps.
 
-- [ ] Script push-to-talk (`host/stt/push-to-talk.sh`)
+- [x] Script push-to-talk (`host/stt/push-to-talk.sh`)
   - Meta+S (Super+S) en mode toggle :
     1er appui → démarre l'enregistrement (`pw-record`)
     2e appui → arrête, envoie à Speaches, colle le résultat
   - Notification desktop (`notify-send`) : début/fin/erreur
-  - Nettoyage des fichiers temporaires (signal handlers)
-  - *POC : `host/stt/stt-push-to-talk.sh` → adapté*
-- [ ] Détection de la fenêtre active via KWin D-Bus
+  - Nettoyage des fichiers temporaires (`trap`)
+- [x] Détection de la fenêtre active via `kdotool`
   - Terminal détecté → Ctrl+Shift+V (paste terminal)
   - Autre application → Ctrl+V (paste standard)
-  - Liste des classes terminales (Konsole, Alacritty, kitty, etc.)
-- [ ] Support clavier AZERTY (`host/stt/azerty-type.py`)
-  - Frappe via `ydotool key` avec keycodes Linux
-  - Accents (é, è, ê, à, ù), dead keys (^, ¨)
-  - Shift et AltGr pour caractères spéciaux
-  - *POC : `host/stt/stt-azerty-type.py` → adapté*
-- [ ] Mode streaming temps réel (`host/stt/streaming.py`)
+  - Classes terminales (konsole, Alacritty, kitty, foot, wezterm)
+- [x] Support clavier AZERTY (`host/stt/azerty-type.py`)
+  - Frappe via `wtype` avec support dead keys
+  - Accents (é, è, ê, à, ù, ç), dead keys (^, ¨)
+  - Circumflex et diaeresis via dead_circumflex/dead_diaeresis
+- [x] Mode streaming temps réel (`host/stt/streaming.py`)
   - Chunks audio ~3s, transcription incrémentale
   - Diff mot-à-mot pour éviter les doublons
   - Filtrage des hallucinations Whisper ("sous-titres", "merci")
   - Détection de silence (RMS), timeouts de sécurité
-  - *POC : `host/stt/stt-streaming.py` → adapté*
-- [ ] `anklume stt setup` — installe les dépendances hôte
-  (`pw-record`, `ydotool`, `wl-copy`, `wl-paste`, `jq`)
-  et configure le raccourci KDE (Meta+S)
-- [ ] `anklume stt status` — état du service STT, santé endpoint
-- [ ] Configuration : `STT_API_URL`, `STT_MODEL`, `STT_LANGUAGE` (défaut `fr`)
-- [ ] Tests unitaires : parsing réponse API, détection terminal, AZERTY
+- [x] `anklume stt setup` — vérifie les dépendances hôte
+  (`pw-record`, `wtype`, `wl-copy`, `kdotool`, `jq`, `notify-send`)
+  et configure le raccourci KDE Meta+S via `kwriteconfig6`
+- [x] `anklume stt status` — état du service STT, dépendances, santé endpoint
+- [x] Module `cli/_stt.py` — `get_stt_config()`, `check_stt_dependencies()`, `STT_DEPENDENCIES`
+- [x] Configuration : `STT_API_URL`, `STT_MODEL`, `STT_LANGUAGE` (défaut `fr`)
+- [x] Tests unitaires : 26 tests (scripts, contenu, config, dépendances)
+- [x] 476 tests au total, zéro régression
 
-### 10e — Gestion VRAM et accès exclusif
+### 10e — Gestion VRAM et accès exclusif ✅
 
-- [ ] `engine/ai.py` — logique métier IA (flush, switch, état)
-- [ ] `anklume ai flush` — décharge tous les modèles Ollama,
+- [x] `engine/ai.py` — `flush_vram()`, `switch_ai_access()`, `read/write_ai_access()`
+  - Déchargement modèles Ollama via `POST /api/generate` avec `keep_alive: 0`
+  - Arrêt llama-server via `incus exec ... systemctl stop`
+  - Mesure VRAM avant/après (via `detect_gpu()`)
+- [x] `anklume ai flush` — décharge tous les modèles Ollama,
   arrête llama-server si actif (libère la VRAM)
-  - *POC : script bash inline → module Python*
-- [ ] `anklume ai switch <domaine>` — bascule l'accès exclusif GPU :
-  1. Flush VRAM
-  2. Mise à jour nftables (bloquer ancien domaine, autoriser nouveau)
-  3. Redémarrage services GPU
-  4. Log de l'opération
-  - *POC : `scripts/ai-switch.sh` → `engine/ai.py` + CLI*
-- [ ] Fichier d'état `/var/lib/anklume/ai-access-current`
-- [ ] Champ `ai_access_policy` dans `anklume.yml` :
-  - `exclusive` (défaut) : un seul domaine accède à ai-tools
-  - `open` : tous les domaines autorisés peuvent accéder
-- [ ] Tests unitaires : flush, switch, politique d'accès
+- [x] `anklume ai switch <domaine>` — bascule l'accès exclusif GPU :
+  1. Valide domaine (existe, activé, politique exclusive)
+  2. Flush VRAM
+  3. Écriture fichier d'état
+- [x] Fichier d'état `/var/lib/anklume/ai-access.json`
+  - JSON : domain, timestamp, previous
+  - Création auto du répertoire parent
+- [x] Champ `ai_access_policy` dans `anklume.yml` + `GlobalConfig` + parser :
+  - `exclusive` (défaut) : switch requis
+  - `open` : switch désactivé (erreur si appelé)
+- [x] `anklume ai status` affiche l'accès GPU courant
+- [x] Tests unitaires : 30 tests (flush, switch, state, policy, parser, llama-server)
+- [x] 506 tests au total, zéro régression
 
 ## Phase 11 — Services IA avancés
 

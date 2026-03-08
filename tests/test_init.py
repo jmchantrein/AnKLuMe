@@ -93,5 +93,6 @@ class TestInit:
         infra = parse_project(project)
 
         assert infra.config.schema_version == 1
-        assert len(infra.domains) == 1
+        assert len(infra.domains) == 2  # pro + ai-tools
+        assert "ai-tools" in infra.domains
         assert infra.policies == []

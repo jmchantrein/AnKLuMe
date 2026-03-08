@@ -208,6 +208,33 @@ class IncusDriver:
     def project_delete(self, name: str) -> None:
         self._run(["project", "delete", name])
 
+    # --- Profils ---
+
+    def profile_list(self, project: str) -> list[str]:
+        """Liste les noms de profils dans un projet."""
+        data = self._run_json(["profile", "list", "--project", project])
+        return [p["name"] for p in data]
+
+    def profile_exists(self, name: str, project: str) -> bool:
+        return name in self.profile_list(project)
+
+    def profile_create(self, name: str, project: str) -> None:
+        self._run(["profile", "create", name, "--project", project])
+
+    def profile_device_add(
+        self,
+        profile: str,
+        device: str,
+        dtype: str,
+        config: dict[str, str] | None = None,
+        *,
+        project: str,
+    ) -> None:
+        args = ["profile", "device", "add", profile, device, dtype, "--project", project]
+        for key, value in (config or {}).items():
+            args.append(f"{key}={value}")
+        self._run(args)
+
     # --- Info ---
 
     def host_resources(self) -> dict:

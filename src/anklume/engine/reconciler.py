@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from anklume.engine.gpu import GPU_PROFILE_NAME
 from anklume.engine.incus_driver import IncusDriver, IncusError
 from anklume.engine.models import Domain, Infrastructure, Machine, NestingConfig
 from anklume.engine.nesting import (
@@ -28,7 +29,7 @@ class Action:
     """Une action de réconciliation à exécuter."""
 
     verb: str  # "create" | "start" | "stop" | "delete" | "skip"
-    resource: str  # "project" | "network" | "instance"
+    resource: str  # "project" | "network" | "instance" | "profile"
     target: str  # nom de la ressource (préfixé si nesting)
     project: str  # projet Incus concerné (préfixé si nesting)
     detail: str  # description lisible
@@ -107,6 +108,27 @@ def _plan_domain(
                 detail=f"Créer projet {project_name}",
             )
         )
+
+    # 1b. Profil GPU (si des machines GPU dans ce domaine)
+    has_gpu_machines = any(
+        GPU_PROFILE_NAME in m.profiles for m in domain.machines.values()
+    )
+    if has_gpu_machines:
+        if project_is_new:
+            gpu_profile_exists = False
+        else:
+            gpu_profile_exists = driver.profile_exists(GPU_PROFILE_NAME, project_name)
+
+        if not gpu_profile_exists:
+            actions.append(
+                Action(
+                    verb="create",
+                    resource="profile",
+                    target=GPU_PROFILE_NAME,
+                    project=project_name,
+                    detail=f"Créer profil {GPU_PROFILE_NAME} (GPU passthrough)",
+                )
+            )
 
     # 2. Réseau
     if project_is_new:
@@ -242,6 +264,16 @@ def _execute_action(
     """Exécute une action unique."""
     if action.verb == "create" and action.resource == "project":
         driver.project_create(action.target, description=domain.description)
+
+    elif action.verb == "create" and action.resource == "profile":
+        driver.profile_create(action.target, action.project)
+        driver.profile_device_add(
+            action.target,
+            "gpu",
+            "gpu",
+            {"gid": "44", "uid": "0"},
+            project=action.project,
+        )
 
     elif action.verb == "create" and action.resource == "network":
         config = {}

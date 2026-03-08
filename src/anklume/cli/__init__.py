@@ -18,12 +18,16 @@ dev_app = typer.Typer(help="Outils de développement.")
 instance_app = typer.Typer(help="Gestion des instances.")
 snapshot_app = typer.Typer(help="Gestion des snapshots.")
 network_app = typer.Typer(help="Réseau et sécurité nftables.")
+ai_app = typer.Typer(help="Gestion des services IA.")
+stt_app = typer.Typer(help="Push-to-talk STT.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
 app.add_typer(snapshot_app, name="snapshot")
 app.add_typer(network_app, name="network")
+app.add_typer(ai_app, name="ai")
+app.add_typer(stt_app, name="stt")
 
 
 def _version_callback(value: bool) -> None:
@@ -236,3 +240,51 @@ def network_deploy() -> None:
     from anklume.cli._network import run_network_deploy
 
     run_network_deploy()
+
+
+# --- anklume ai <status|flush|switch> ---
+
+
+@ai_app.command("status")
+def ai_status() -> None:
+    """Afficher l'état des services IA."""
+    from anklume.cli._ai import run_ai_status
+
+    run_ai_status()
+
+
+@ai_app.command("flush")
+def ai_flush() -> None:
+    """Libérer la VRAM GPU (décharger modèles, arrêter llama-server)."""
+    from anklume.cli._ai import run_ai_flush
+
+    run_ai_flush()
+
+
+@ai_app.command("switch")
+def ai_switch(
+    domain: Annotated[str, typer.Argument(help="Domaine cible pour l'accès GPU")],
+) -> None:
+    """Basculer l'accès exclusif GPU vers un domaine."""
+    from anklume.cli._ai import run_ai_switch
+
+    run_ai_switch(domain)
+
+
+# --- anklume stt <setup|status> ---
+
+
+@stt_app.command("setup")
+def stt_setup() -> None:
+    """Installer les dépendances hôte et configurer le raccourci KDE."""
+    from anklume.cli._stt import run_stt_setup
+
+    run_stt_setup()
+
+
+@stt_app.command("status")
+def stt_status() -> None:
+    """Afficher l'état du service STT."""
+    from anklume.cli._stt import run_stt_status
+
+    run_stt_status()

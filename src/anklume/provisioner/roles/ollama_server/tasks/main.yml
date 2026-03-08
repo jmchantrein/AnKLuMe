@@ -1,0 +1,66 @@
+# Rôle ollama_server — installation et configuration Ollama
+---
+- name: Installer les dépendances Ollama
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+    state: present
+    update_cache: true
+
+- name: Installer Ollama via le script officiel
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://ollama.com/install.sh | sh
+    creates: /usr/local/bin/ollama
+
+- name: Détecter la présence GPU (nvidia-smi)
+  ansible.builtin.command:
+    cmd: nvidia-smi --query-gpu=name --format=csv,noheader
+  register: gpu_check
+  changed_when: false
+  failed_when: false
+
+- name: Créer la configuration systemd Ollama
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ollama.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Ollama LLM Server
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/ollama serve
+      Restart=always
+      RestartSec=3
+      Environment="OLLAMA_HOST={{ ollama_host }}:{{ ollama_port }}"
+      {% if gpu_check.rc == 0 and ollama_gpu_enabled %}
+      Environment="OLLAMA_GPU_ENABLED=1"
+      {% endif %}
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Redémarrer Ollama
+
+- name: Activer et démarrer Ollama
+  ansible.builtin.systemd:
+    name: ollama
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Attendre que Ollama soit prêt
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ ollama_port }}/api/tags"
+    method: GET
+  register: ollama_health
+  retries: 30
+  delay: 2
+  until: ollama_health.status == 200
+
+- name: Pull du modèle par défaut
+  ansible.builtin.command:
+    cmd: "ollama pull {{ ollama_default_model }}"
+  when: ollama_default_model | length > 0
+  changed_when: true

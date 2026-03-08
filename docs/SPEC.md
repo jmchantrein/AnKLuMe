@@ -1392,3 +1392,549 @@ La branche `poc` contient le prototype initial. Décisions retenues :
 - CLI → Python directement (plus de scripts bash intermédiaires)
 - Exécution directe sur l'hôte (uv)
 - Installation par `git clone` + `uv sync`
+
+## 16. GPU passthrough et profils
+
+Gestion du GPU pour les instances nécessitant de l'accélération
+matérielle (LLM, STT, calcul). Le flag `gpu: true` sur une machine
+déclenche la détection GPU hôte, la création d'un profil Incus dédié,
+et l'application de la politique d'accès GPU.
+
+### 16.1 Détection GPU hôte
+
+Le module `engine/gpu.py` détecte la présence d'un GPU NVIDIA via
+`nvidia-smi --query-gpu=name,memory.total,memory.used --format=csv,noheader,nounits`.
+
+```python
+@dataclass
+class GpuInfo:
+    detected: bool          # True si nvidia-smi retourne un GPU
+    model: str              # "RTX PRO 5000", "" si absent
+    vram_total_mib: int     # VRAM totale en MiB (0 si absent)
+    vram_used_mib: int      # VRAM utilisée en MiB (0 si absent)
+
+def detect_gpu() -> GpuInfo
+```
+
+Comportement :
+- `nvidia-smi` absent ou échec → `GpuInfo(detected=False, ...)`
+- Parsing CSV : nom, mémoire totale (MiB), mémoire utilisée (MiB)
+- Un seul GPU supporté (première ligne du CSV)
+
+### 16.2 Validation GPU
+
+Le validateur vérifie la cohérence `gpu: true` :
+
+1. **GPU absent** : si une machine a `gpu: true` et `detect_gpu().detected`
+   est `False` → erreur de validation :
+   `"Machine '{name}' requiert un GPU (gpu: true) mais aucun GPU détecté sur l'hôte"`
+
+2. **Politique exclusive** : si `gpu_policy: exclusive` (défaut dans
+   `anklume.yml`) et plusieurs machines ont `gpu: true` dans des domaines
+   différents → erreur :
+   `"Politique GPU exclusive : plusieurs machines GPU détectées ({names}). Utiliser gpu_policy: shared ou retirer gpu: true"`
+
+3. **Politique shared** : si `gpu_policy: shared` et plusieurs machines
+   GPU → warning (pas d'erreur)
+
+### 16.3 Configuration globale
+
+Nouveau champ dans `anklume.yml` :
+
+```yaml
+gpu_policy: exclusive    # exclusive (défaut) ou shared
+```
+
+Modèle :
+
+```python
+@dataclass
+class GpuPolicyConfig:
+    policy: str = "exclusive"  # "exclusive" ou "shared"
+```
+
+Ajouté comme champ optionnel dans `GlobalConfig` :
+
+```python
+@dataclass
+class GlobalConfig:
+    # ... existants ...
+    gpu_policy: GpuPolicyConfig | None = None
+```
+
+Si `gpu_policy` est `None`, le défaut `exclusive` est utilisé
+(toute machine GPU dans l'infra est seule autorisée).
+
+### 16.4 Profil Incus `gpu-passthrough`
+
+Quand un GPU est détecté et qu'au moins une machine a `gpu: true`,
+le réconciliateur crée un profil `gpu-passthrough` dans chaque projet
+contenant une machine GPU :
+
+```
+incus profile create gpu-passthrough --project <projet>
+incus profile device add gpu-passthrough gpu gpu type=gpu gid=44 uid=0
+```
+
+Le profil est ajouté à la liste des profils de la machine :
+`machine.profiles += ["gpu-passthrough"]` (avant la réconciliation).
+
+### 16.5 Driver Incus — méthodes profil
+
+| Méthode | Commande Incus |
+|---------|---------------|
+| `profile_exists(name, project)` | `incus profile list --project <p> --format json` (filtrage) |
+| `profile_create(name, project)` | `incus profile create <name> --project <p>` |
+| `profile_device_add(profile, device, dtype, config, project)` | `incus profile device add <profile> <device> <dtype> [k=v ...] --project <p>` |
+
+### 16.6 Intégration au réconciliateur
+
+Le GPU passthrough s'intègre au pipeline existant, **après** le calcul
+d'adressage et **avant** la réconciliation :
+
+```
+parse → validate → assign_addresses → apply_gpu_profiles → reconcile → ...
+```
+
+La fonction `apply_gpu_profiles` :
+1. Détecte le GPU (`detect_gpu()`)
+2. Pour chaque domaine avec des machines `gpu: true` :
+   - Ajoute `"gpu-passthrough"` aux profils de la machine
+3. Retourne la `GpuInfo` (utilisée par `anklume ai status`)
+
+Le réconciliateur crée le profil Incus lors de `create/project`
+(juste après la création du projet, avant les instances).
+
+### 16.7 Module `engine/gpu.py`
+
+```python
+@dataclass
+class GpuInfo:
+    detected: bool
+    model: str
+    vram_total_mib: int
+    vram_used_mib: int
+
+def detect_gpu() -> GpuInfo
+def validate_gpu_machines(
+    infra: Infrastructure,
+    gpu_info: GpuInfo,
+) -> list[str]  # liste d'erreurs (vide = ok)
+
+def apply_gpu_profiles(infra: Infrastructure) -> GpuInfo
+    # Détecte le GPU, enrichit machine.profiles si gpu: true
+    # Retourne GpuInfo pour usage ultérieur
+```
+
+Fonctions pures (sauf `detect_gpu` qui appelle subprocess).
+
+## 17. Rôles Ansible IA
+
+Rôles embarqués dans `provisioner/roles/` pour le provisioning des
+services IA de base. Ils suivent le pattern des rôles existants
+(base, desktop, dev-tools) : tâches Ansible standards, variables
+configurables via `defaults/main.yml` et surchargeables dans
+`domains/*.yml` via le champ `vars:`.
+
+### 17.1 Rôle `ollama_server`
+
+Installe et configure un serveur Ollama pour l'inférence LLM.
+
+**Variables** (dans `defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `ollama_port` | `11434` | Port d'écoute |
+| `ollama_host` | `0.0.0.0` | Adresse d'écoute |
+| `ollama_default_model` | `""` | Modèle à pull au provisioning (vide = aucun) |
+| `ollama_gpu_enabled` | `true` | Activer le GPU si détecté |
+
+**Tâches** :
+
+1. Installer curl et ca-certificates (prérequis)
+2. Installer Ollama via `curl -fsSL https://ollama.com/install.sh | sh`
+   (idempotent via `creates: /usr/local/bin/ollama`)
+3. Détecter le GPU (`nvidia-smi`, best-effort)
+4. Créer le service systemd `/etc/systemd/system/ollama.service`
+   - `OLLAMA_HOST` configuré via les variables
+   - `OLLAMA_GPU_ENABLED=1` si GPU détecté et `ollama_gpu_enabled: true`
+5. Activer, démarrer le service, attendre qu'il soit prêt (`/api/tags`)
+6. Pull du modèle par défaut (si `ollama_default_model` défini)
+
+**Handlers** : `Redémarrer Ollama` (triggered par changement de config)
+
+**Exemple domaine** :
+```yaml
+machines:
+  gpu-server:
+    description: "Serveur LLM avec GPU"
+    gpu: true
+    roles: [base, ollama_server]
+    vars:
+      ollama_default_model: "qwen2:0.5b"
+      ollama_port: 11434
+```
+
+### 17.2 Rôle `stt_server`
+
+Installe et configure un serveur Speaches (STT — Speech-to-Text).
+API OpenAI-compatible (`/v1/audio/transcriptions`).
+
+**Variables** (dans `defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `stt_port` | `8000` | Port d'écoute |
+| `stt_host` | `0.0.0.0` | Adresse d'écoute |
+| `stt_model` | `base` | Modèle Whisper |
+| `stt_language` | `fr` | Langue de transcription |
+| `stt_device` | `auto` | Device (`auto`, `cuda`, `cpu`) |
+| `stt_compute_type` | `auto` | Type de calcul (`auto`, `float16`, `int8`) |
+
+**Tâches** :
+
+1. Installer les dépendances système (python3, ffmpeg, git)
+2. Installer `uv` (gestionnaire de paquets Python)
+3. Cloner Speaches depuis GitHub
+4. Installer via `uv sync`
+5. Détecter le GPU (`nvidia-smi`, best-effort)
+6. Calculer device et compute_type automatiquement :
+   - GPU détecté → `cuda` + `float16`
+   - GPU absent → `cpu` + `int8`
+7. Créer le service systemd `/etc/systemd/system/speaches.service`
+8. Activer, démarrer, attendre (`/v1/models`)
+
+**Coexistence GPU** : Speaches et Ollama coexistent sur le même GPU.
+Le flag `stt_device: auto` détecte le GPU indépendamment d'Ollama.
+
+**Handlers** : `Redémarrer Speaches`
+
+**Exemple domaine** :
+```yaml
+machines:
+  gpu-server:
+    description: "Serveur LLM + STT"
+    gpu: true
+    roles: [base, ollama_server, stt_server]
+    vars:
+      ollama_default_model: "qwen2:0.5b"
+      stt_model: "base"
+      stt_language: "fr"
+```
+
+### 17.3 Structure des rôles
+
+```
+provisioner/roles/
+  base/           # Phase 5 — paquets essentiels, locale
+  desktop/        # Phase 5 — KDE, outils GUI
+  dev-tools/      # Phase 5 — Python, git, build-essential
+  ollama_server/  # Phase 10b — serveur LLM Ollama
+    defaults/main.yml
+    tasks/main.yml
+    handlers/main.yml
+  stt_server/     # Phase 10b — serveur STT Speaches
+    defaults/main.yml
+    tasks/main.yml
+    handlers/main.yml
+```
+
+## 18. Domaine ai-tools et CLI IA
+
+### 18.1 Domaine ai-tools dans `anklume init`
+
+`anklume init` génère un domaine `ai-tools.yml` d'exemple en plus du
+domaine principal (pro/work). Le domaine est commenté par défaut
+pour éviter les erreurs si aucun GPU n'est disponible.
+
+Fichier `domains/ai-tools.yml` (généré) :
+```yaml
+# Domaine ai-tools — services IA (GPU, LLM, STT)
+# Décommenter si un GPU est disponible sur l'hôte.
+description: "Services IA"
+trust_level: trusted
+enabled: false
+
+machines:
+  gpu-server:
+    description: "Serveur LLM et STT avec GPU"
+    type: lxc
+    gpu: true
+    roles: [base, ollama_server, stt_server]
+    vars:
+      ollama_default_model: ""
+      stt_language: "fr"
+```
+
+Le champ `enabled: false` évite les erreurs GPU au premier `apply`.
+L'utilisateur active le domaine quand il est prêt.
+
+### 18.2 Politiques réseau IA
+
+Le fichier `policies.yml` généré inclut des exemples commentés pour
+l'accès aux services IA :
+
+```yaml
+policies: []
+  # - from: pro
+  #   to: ai-tools
+  #   ports: [11434]
+  #   description: "Pro accède à Ollama"
+  # - from: pro
+  #   to: ai-tools
+  #   ports: [8000]
+  #   description: "Pro accède à Speaches (STT)"
+```
+
+### 18.3 CLI `anklume ai`
+
+Groupe de sous-commandes pour la gestion des services IA.
+
+```
+anklume ai status    # État des services IA
+```
+
+### 18.4 `anklume ai status`
+
+Affiche un diagnostic complet des services IA :
+
+```
+GPU:
+  Détecté : oui (NVIDIA RTX PRO 5000)
+  VRAM : 512 / 24576 MiB
+
+Ollama:
+  État : actif (http://10.100.3.1:11434)
+  Modèles chargés : qwen2:0.5b (3.2 GiB)
+
+STT (Speaches):
+  État : actif (http://10.100.3.1:8000)
+```
+
+Si un service est injoignable : `État : injoignable`.
+Si aucun GPU : `Détecté : non`.
+
+L'URL des services est dérivée du domaine `ai-tools` :
+- L'IP du `gpu-server` dans le domaine `ai-tools` (après adressage)
+- Les ports proviennent des variables ou des defaults des rôles
+
+### 18.5 Module `engine/ai.py`
+
+```python
+@dataclass
+class AiServiceStatus:
+    name: str           # "ollama" ou "stt"
+    reachable: bool
+    url: str
+    detail: str         # info supplémentaire (modèles, version)
+
+@dataclass
+class AiStatus:
+    gpu: GpuInfo
+    services: list[AiServiceStatus]
+
+def compute_ai_status(infra: Infrastructure) -> AiStatus
+```
+
+La détection des services utilise des requêtes HTTP vers les endpoints
+connus (best-effort, timeout court). Pas de dépendance sur Incus.
+
+## 19. Push-to-talk STT (hôte KDE)
+
+Raccourci clavier sur l'hôte pour dicter du texte via Speaches.
+Le texte transcrit est collé dans la fenêtre active.
+KDE Plasma Wayland uniquement.
+
+### 19.1 Script push-to-talk
+
+`host/stt/push-to-talk.sh` — mode toggle Meta+S :
+- 1er appui : démarre l'enregistrement (`pw-record`)
+- 2e appui : arrête, envoie à Speaches, colle le résultat
+
+**Flux** :
+```
+Meta+S (1er) → pw-record /tmp/anklume-stt.wav
+Meta+S (2e)  → kill pw-record
+             → curl -F file=@/tmp/anklume-stt.wav $STT_API_URL/v1/audio/transcriptions
+             → wl-copy <texte>
+             → paste dans fenêtre active
+```
+
+**Détection fenêtre active** via `kdotool getactivewindow getwindowclassname` :
+- Classe terminal (konsole, Alacritty, kitty, foot, wezterm)
+  → `wtype -M ctrl -M shift -k v` (paste terminal)
+- Autre application → `wtype -M ctrl -k v` (paste standard)
+
+**Notifications** : `notify-send` pour début/fin/erreur.
+
+**Nettoyage** : fichier temporaire supprimé via trap.
+
+### 19.2 Support AZERTY
+
+`host/stt/azerty-type.py` — frappe de texte via `wtype` avec support
+des caractères AZERTY. Utilisé quand le paste n'est pas fiable.
+
+Fonctionnalités :
+- Lecture du texte sur stdin, frappe caractère par caractère via `wtype`
+- Accents (é, è, ê, à, ù, ç), dead keys (^, ¨)
+- Gère les caractères spéciaux (shift, altgr)
+
+### 19.3 Mode streaming
+
+`host/stt/streaming.py` — transcription en temps réel :
+- Chunks audio ~3s envoyés en continu
+- Diff mot-à-mot pour éviter les doublons
+- Filtrage des hallucinations Whisper ("sous-titres", "merci")
+- Détection de silence (RMS < seuil), timeouts de sécurité
+
+### 19.4 CLI `anklume stt`
+
+```
+anklume stt setup     # Installe les dépendances hôte + raccourci KDE
+anklume stt status    # État du service STT (santé endpoint)
+```
+
+**`anklume stt setup`** vérifie et installe :
+- `pw-record` (PipeWire)
+- `wtype` (frappe Wayland)
+- `wl-copy` / `wl-paste` (presse-papiers Wayland)
+- `kdotool` (interaction fenêtres KDE)
+- `jq` (parsing JSON)
+- `notify-send` (notifications)
+- Raccourci KDE Meta+S via `kwriteconfig6`
+
+**`anklume stt status`** vérifie :
+- Endpoint STT joignable
+- Dépendances hôte installées
+
+### 19.5 Configuration
+
+Variables d'environnement (dans `~/.config/anklume/stt.env`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `STT_API_URL` | `http://10.100.3.1:8000` | URL du serveur Speaches |
+| `STT_MODEL` | `base` | Modèle Whisper |
+| `STT_LANGUAGE` | `fr` | Langue de transcription |
+
+### 19.6 Structure
+
+```
+host/stt/
+  push-to-talk.sh    # Script toggle Meta+S
+  azerty-type.py     # Frappe AZERTY via wtype
+  streaming.py       # Transcription streaming temps réel
+```
+
+## 20. Gestion VRAM et accès exclusif
+
+Commandes CLI pour libérer la VRAM GPU et basculer l'accès
+exclusif entre domaines. Empêche les conflits GPU quand
+plusieurs domaines utilisent des services IA.
+
+### 20.1 Flush VRAM
+
+`anklume ai flush` — libère toute la VRAM GPU occupée.
+
+**Étapes** :
+1. Lister les modèles Ollama chargés (`GET /api/ps`)
+2. Décharger chaque modèle (`POST /api/generate` avec `keep_alive: 0`)
+3. Arrêter `llama-server` si actif (via `incus exec ... systemctl stop`)
+4. Rapporter le résultat (modèles déchargés, VRAM libérée)
+
+```python
+@dataclass
+class FlushResult:
+    """Résultat d'un flush VRAM."""
+    models_unloaded: list[str]
+    llama_server_stopped: bool
+    vram_before_mib: int
+    vram_after_mib: int
+```
+
+**Erreurs** : si Ollama est injoignable, log warning et continue.
+Le flush est best-effort (chaque étape indépendante).
+
+### 20.2 Switch accès GPU
+
+`anklume ai switch <domaine>` — bascule l'accès exclusif GPU.
+
+**Étapes** :
+1. Vérifier que le domaine cible existe et est activé
+2. Flush VRAM (appel à `flush_vram`)
+3. Écrire le fichier d'état avec le nouveau domaine
+4. Log de l'opération
+
+```
+anklume ai switch pro
+→ Flush VRAM : 2 modèles déchargés, llama-server arrêté
+→ Accès GPU : pro (précédent : ai-tools)
+→ Fichier d'état mis à jour
+```
+
+### 20.3 Fichier d'état
+
+`/var/lib/anklume/ai-access.json` — trace quel domaine a accès au GPU.
+
+```json
+{
+  "domain": "ai-tools",
+  "timestamp": "2026-03-08T14:30:00",
+  "previous": null
+}
+```
+
+**Lecture** : `read_ai_access()` retourne le domaine courant (ou `None`).
+**Écriture** : `write_ai_access(domain)` met à jour le fichier.
+Si le répertoire `/var/lib/anklume/` n'existe pas, il est créé.
+
+### 20.4 Politique d'accès
+
+Champ `ai_access_policy` dans `anklume.yml` :
+
+```yaml
+schema_version: 1
+ai_access_policy: exclusive   # exclusive | open
+```
+
+- **`exclusive`** (défaut) : un seul domaine accède au GPU à la fois.
+  `anklume ai switch` requis pour basculer.
+- **`open`** : tous les domaines autorisés accèdent librement.
+  `anklume ai switch` désactivé (erreur si appelé).
+
+### 20.5 Signatures du module
+
+```python
+# engine/ai.py (ajouts)
+
+@dataclass
+class FlushResult:
+    models_unloaded: list[str]
+    llama_server_stopped: bool
+    vram_before_mib: int
+    vram_after_mib: int
+
+@dataclass
+class AiAccessState:
+    domain: str | None
+    timestamp: str
+    previous: str | None
+
+def flush_vram(infra: Infrastructure) -> FlushResult
+def read_ai_access(state_path: Path | None = None) -> AiAccessState
+def write_ai_access(domain: str, *, state_path: Path | None = None) -> AiAccessState
+def switch_ai_access(infra: Infrastructure, target_domain: str) -> AiAccessState
+
+# models.py (ajout)
+@dataclass
+class GlobalConfig:
+    ai_access_policy: str = "exclusive"  # "exclusive" | "open"
+```
+
+### 20.6 CLI
+
+```
+anklume ai flush     # Libérer la VRAM GPU
+anklume ai switch <domaine>  # Basculer l'accès GPU
+anklume ai status    # (existant) Affiche aussi l'accès courant
+```

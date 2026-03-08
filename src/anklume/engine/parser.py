@@ -12,6 +12,7 @@ from anklume.engine.models import (
     Defaults,
     Domain,
     GlobalConfig,
+    GpuPolicyConfig,
     Infrastructure,
     Machine,
     NestingConfig,
@@ -77,12 +78,22 @@ def _parse_global_config(path: Path) -> GlobalConfig:
             overcommit=rp_raw.get("overcommit", False),
         )
 
+    gpu_policy = None
+    gp_raw = raw.get("gpu_policy")
+    if gp_raw is not None:
+        policy_str = gp_raw if isinstance(gp_raw, str) else str(gp_raw)
+        gpu_policy = GpuPolicyConfig(policy=policy_str)
+
+    ai_access_policy = raw.get("ai_access_policy", "exclusive")
+
     return GlobalConfig(
         schema_version=raw.get("schema_version", SCHEMA_VERSION),
         defaults=defaults,
         addressing=addressing,
         nesting=nesting,
         resource_policy=resource_policy,
+        gpu_policy=gpu_policy,
+        ai_access_policy=ai_access_policy,
     )
 
 

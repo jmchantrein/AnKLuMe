@@ -132,6 +132,13 @@ class ResourcePolicyConfig:
 
 
 @dataclass
+class GpuPolicyConfig:
+    """Configuration de la politique GPU."""
+
+    policy: str = "exclusive"  # "exclusive" ou "shared"
+
+
+@dataclass
 class GlobalConfig:
     """Configuration globale du projet anklume."""
 
@@ -140,6 +147,8 @@ class GlobalConfig:
     addressing: AddressingConfig = field(default_factory=AddressingConfig)
     nesting: NestingConfig = field(default_factory=NestingConfig)
     resource_policy: ResourcePolicyConfig | None = None
+    gpu_policy: GpuPolicyConfig | None = None
+    ai_access_policy: str = "exclusive"  # "exclusive" | "open"
 
 
 @dataclass
