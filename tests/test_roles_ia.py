@@ -183,9 +183,7 @@ class TestPlaybookWithIaRoles:
         domain = make_domain(
             "ai-tools",
             machines={
-                "gpu-server": make_machine(
-                    "gpu-server", "ai-tools", roles=["base", "stt_server"]
-                ),
+                "gpu-server": make_machine("gpu-server", "ai-tools", roles=["base", "stt_server"]),
             },
         )
         infra = make_infra(domains={"ai-tools": domain})
@@ -215,9 +213,7 @@ class TestPlaybookWithIaRoles:
         domain = make_domain(
             "ai-tools",
             machines={
-                "gpu-server": make_machine(
-                    "gpu-server", "ai-tools", roles=["ollama_server"]
-                ),
+                "gpu-server": make_machine("gpu-server", "ai-tools", roles=["ollama_server"]),
             },
         )
         infra = make_infra(domains={"ai-tools": domain})
@@ -295,9 +291,7 @@ class TestHostVarsWithIaVars:
         domain = make_domain(
             "ai-tools",
             machines={
-                "gpu-server": make_machine(
-                    "gpu-server", "ai-tools", roles=["ollama_server"]
-                ),
+                "gpu-server": make_machine("gpu-server", "ai-tools", roles=["ollama_server"]),
             },
         )
         infra = make_infra(domains={"ai-tools": domain})
@@ -316,9 +310,7 @@ class TestInventoryWithIaDomain:
         domain = make_domain(
             "ai-tools",
             machines={
-                "gpu-server": make_machine(
-                    "gpu-server", "ai-tools", roles=["ollama_server"]
-                ),
+                "gpu-server": make_machine("gpu-server", "ai-tools", roles=["ollama_server"]),
             },
         )
         infra = make_infra(domains={"ai-tools": domain})

@@ -96,9 +96,7 @@ def _resolve_target(target: str, infra: Infrastructure) -> _ResolvedTarget | Non
     return None
 
 
-def _append_policy_rules(
-    policy: Policy, infra: Infrastructure, lines: list[str]
-) -> None:
+def _append_policy_rules(policy: Policy, infra: Infrastructure, lines: list[str]) -> None:
     """Ajoute les règles nftables d'une politique aux lignes."""
     src = _resolve_target(policy.from_target, infra)
     dst = _resolve_target(policy.to_target, infra)
@@ -107,34 +105,24 @@ def _append_policy_rules(
 
     # Cible non résolue : commentaire d'avertissement, pas de règle
     if src is None:
-        lines.append(
-            f"        # [erreur] cible '{policy.from_target}' non résolue"
-        )
+        lines.append(f"        # [erreur] cible '{policy.from_target}' non résolue")
         return
     if dst is None:
-        lines.append(
-            f"        # [erreur] cible '{policy.to_target}' non résolue"
-        )
+        lines.append(f"        # [erreur] cible '{policy.to_target}' non résolue")
         return
 
     # Politiques hôte : commentaire informatif uniquement
     if src.is_host or dst.is_host:
         direction = f"{policy.from_target} → {policy.to_target}"
-        lines.append(
-            f"        # [hôte] {direction} — trafic hôte libre, règle non appliquée"
-        )
+        lines.append(f"        # [hôte] {direction} — trafic hôte libre, règle non appliquée")
         return
 
     # Domaine désactivé : commentaire informatif
     if src.is_disabled:
-        lines.append(
-            f"        # [ignoré] domaine '{src.domain_name}' désactivé"
-        )
+        lines.append(f"        # [ignoré] domaine '{src.domain_name}' désactivé")
         return
     if dst.is_disabled:
-        lines.append(
-            f"        # [ignoré] domaine '{dst.domain_name}' désactivé"
-        )
+        lines.append(f"        # [ignoré] domaine '{dst.domain_name}' désactivé")
         return
 
     # Règle forward
@@ -147,9 +135,7 @@ def _append_policy_rules(
         lines.append(f"        {reverse}")
 
 
-def _build_forward_rule(
-    src: _ResolvedTarget, dst: _ResolvedTarget, policy: Policy
-) -> str:
+def _build_forward_rule(src: _ResolvedTarget, dst: _ResolvedTarget, policy: Policy) -> str:
     """Construit une règle nftables forward."""
     parts: list[str] = []
 

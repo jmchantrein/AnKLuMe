@@ -93,9 +93,7 @@ def mock_driver(
     """Crée un IncusDriver mocké."""
     driver = MagicMock(spec=IncusDriver)
     driver.project_list.return_value = projects or []
-    driver.project_exists.side_effect = lambda n: any(
-        p.name == n for p in (projects or [])
-    )
+    driver.project_exists.side_effect = lambda n: any(p.name == n for p in (projects or []))
 
     _networks = networks or {}
     driver.network_list.side_effect = lambda p: _networks.get(p, [])

@@ -40,9 +40,7 @@ def _print_status(status: InfraStatus) -> None:
             else:
                 tag = "[absente]"
 
-            typer.echo(
-                f"  {inst.name:<20s} {inst.machine_type:<5s} {inst.state:<10s} {tag}"
-            )
+            typer.echo(f"  {inst.name:<20s} {inst.machine_type:<5s} {inst.state:<10s} {tag}")
 
     typer.echo(
         f"\nRésumé : {status.projects_found}/{status.projects_total} projets, "

@@ -122,12 +122,16 @@ class TestDestroyNoForce:
             instances={
                 "pro": [
                     IncusInstance(
-                        name="pro-temp", status="Running",
-                        type="container", project="pro",
+                        name="pro-temp",
+                        status="Running",
+                        type="container",
+                        project="pro",
                     ),
                     IncusInstance(
-                        name="pro-stable", status="Running",
-                        type="container", project="pro",
+                        name="pro-stable",
+                        status="Running",
+                        type="container",
+                        project="pro",
                     ),
                 ]
             },
@@ -137,8 +141,7 @@ class TestDestroyNoForce:
 
         # pro-temp supprimée, pro-stable ignorée
         deleted = [
-            a.target for a in result.executed
-            if a.verb == "delete" and a.resource == "instance"
+            a.target for a in result.executed if a.verb == "delete" and a.resource == "instance"
         ]
         assert "pro-temp" in deleted
         assert "pro-stable" not in deleted
@@ -390,9 +393,7 @@ class TestDestroyErrors:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise IncusError(
-                    command=["incus", "stop"], returncode=1, stderr="failed"
-                )
+                raise IncusError(command=["incus", "stop"], returncode=1, stderr="failed")
 
         driver = mock_driver(
             projects=[IncusProject(name="alpha"), IncusProject(name="beta")],
@@ -403,14 +404,18 @@ class TestDestroyErrors:
             instances={
                 "alpha": [
                     IncusInstance(
-                        name="alpha-dev", status="Running",
-                        type="container", project="alpha",
+                        name="alpha-dev",
+                        status="Running",
+                        type="container",
+                        project="alpha",
                     )
                 ],
                 "beta": [
                     IncusInstance(
-                        name="beta-web", status="Running",
-                        type="container", project="beta",
+                        name="beta-web",
+                        status="Running",
+                        type="container",
+                        project="beta",
                     )
                 ],
             },

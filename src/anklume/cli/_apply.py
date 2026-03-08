@@ -57,15 +57,16 @@ def run_apply(
         if pre:
             typer.echo(f"Snapshots pré-apply : {len(pre)} créé(s)")
 
-    reconcile_result = reconcile(
-        infra, driver, dry_run=dry_run, nesting_context=nesting_ctx
-    )
+    reconcile_result = reconcile(infra, driver, dry_run=dry_run, nesting_context=nesting_ctx)
 
     # Snapshots post-apply — refetch des projets (reconcile a pu en créer)
     if not dry_run and reconcile_result.executed:
         post_projects = {p.name for p in driver.project_list()}
         post = create_auto_snapshots(
-            driver, infra, "post", existing_projects=post_projects,
+            driver,
+            infra,
+            "post",
+            existing_projects=post_projects,
         )
         if post:
             typer.echo(f"Snapshots post-apply : {len(post)} créé(s)")

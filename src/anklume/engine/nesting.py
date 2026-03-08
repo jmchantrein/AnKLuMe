@@ -50,9 +50,7 @@ def prefix_name(name: str, context: NestingContext, nesting_config: NestingConfi
     return name
 
 
-def unprefix_name(
-    name: str, context: NestingContext, nesting_config: NestingConfig
-) -> str:
+def unprefix_name(name: str, context: NestingContext, nesting_config: NestingConfig) -> str:
     """Retire le préfixe de nesting d'un nom de ressource Incus."""
     if nesting_config.prefix and context.absolute_level > 0:
         prefix = f"{context.absolute_level:03d}-"
@@ -74,9 +72,7 @@ def nesting_security_config(level: int) -> dict[str, str]:
     }
 
 
-def context_files_for_instance(
-    parent: NestingContext, machine_type: str
-) -> dict[str, str]:
+def context_files_for_instance(parent: NestingContext, machine_type: str) -> dict[str, str]:
     """Génère les fichiers de contexte /etc/anklume/ pour une instance enfant."""
     is_vm = machine_type == "vm"
 

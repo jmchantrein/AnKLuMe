@@ -28,6 +28,7 @@ from anklume.engine.resources import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _machine(name: str, weight: int = 1, config: dict | None = None) -> Machine:
     return Machine(
         name=name,
@@ -65,6 +66,7 @@ def _hw(cpu: int = 16, memory_gb: int = 32) -> HardwareInfo:
 # HardwareInfo
 # ---------------------------------------------------------------------------
 
+
 class TestHardwareInfo:
     def test_basic(self):
         hw = _hw(8, 16)
@@ -75,6 +77,7 @@ class TestHardwareInfo:
 # ---------------------------------------------------------------------------
 # parse_reserve
 # ---------------------------------------------------------------------------
+
 
 class TestParseReserve:
     def test_percentage(self):
@@ -99,6 +102,7 @@ class TestParseReserve:
 # ---------------------------------------------------------------------------
 # parse_memory_value
 # ---------------------------------------------------------------------------
+
 
 class TestParseMemoryValue:
     def test_gb(self):
@@ -127,6 +131,7 @@ class TestParseMemoryValue:
 # ---------------------------------------------------------------------------
 # compute_resource_allocation — proportional mode
 # ---------------------------------------------------------------------------
+
 
 class TestProportionalAllocation:
     def test_equal_weights(self):
@@ -201,6 +206,7 @@ class TestProportionalAllocation:
 # compute_resource_allocation — equal mode
 # ---------------------------------------------------------------------------
 
+
 class TestEqualAllocation:
     def test_equal_ignores_weight(self):
         machines = [_machine("a", weight=5), _machine("b", weight=1)]
@@ -221,6 +227,7 @@ class TestEqualAllocation:
 # ---------------------------------------------------------------------------
 # Machines avec config explicite
 # ---------------------------------------------------------------------------
+
 
 class TestExplicitConfig:
     def test_explicit_cpu_excluded(self):
@@ -291,6 +298,7 @@ class TestExplicitConfig:
 # CPU mode: allowance
 # ---------------------------------------------------------------------------
 
+
 class TestCpuAllowance:
     def test_allowance_percentage(self):
         machines = [_machine("a"), _machine("b")]
@@ -326,6 +334,7 @@ class TestCpuAllowance:
 # ---------------------------------------------------------------------------
 # CPU mode: count
 # ---------------------------------------------------------------------------
+
 
 class TestCpuCount:
     def test_count_minimum_1(self):
@@ -363,6 +372,7 @@ class TestCpuCount:
 # ---------------------------------------------------------------------------
 # Memory enforce modes
 # ---------------------------------------------------------------------------
+
 
 class TestMemoryEnforce:
     def test_soft_key(self):
@@ -408,6 +418,7 @@ class TestMemoryEnforce:
 # ---------------------------------------------------------------------------
 # Overcommit
 # ---------------------------------------------------------------------------
+
 
 class TestOvercommit:
     def test_overcommit_false_raises(self):
@@ -466,6 +477,7 @@ class TestOvercommit:
 # No resource policy → skip
 # ---------------------------------------------------------------------------
 
+
 class TestNoPolicy:
     def test_no_policy_returns_empty(self):
         machines = [_machine("a")]
@@ -477,6 +489,7 @@ class TestNoPolicy:
 # ---------------------------------------------------------------------------
 # Disabled domains excluded
 # ---------------------------------------------------------------------------
+
 
 class TestDisabledDomains:
     def test_disabled_domain_excluded(self):
@@ -498,6 +511,7 @@ class TestDisabledDomains:
 # ---------------------------------------------------------------------------
 # Multi-domain allocation
 # ---------------------------------------------------------------------------
+
 
 class TestMultiDomain:
     def test_two_domains_share_resources(self):
@@ -544,6 +558,7 @@ class TestMultiDomain:
 # ---------------------------------------------------------------------------
 # apply_resource_config
 # ---------------------------------------------------------------------------
+
 
 class TestApplyResourceConfig:
     def test_apply_sets_config(self):
@@ -599,6 +614,7 @@ class TestApplyResourceConfig:
 # detect_hardware — mocked
 # ---------------------------------------------------------------------------
 
+
 class TestDetectHardware:
     def test_detect_via_driver(self):
         mock_driver = _mock_driver(cpu=24, memory=34359738368)
@@ -611,8 +627,10 @@ class TestDetectHardware:
         mock_driver = _mock_driver(fail=True)
         meminfo = "MemTotal:       16384000 kB\n"
 
-        with patch("anklume.engine.resources.os.cpu_count", return_value=4), \
-             patch("builtins.open", return_value=_fake_file(meminfo)):
+        with (
+            patch("anklume.engine.resources.os.cpu_count", return_value=4),
+            patch("builtins.open", return_value=_fake_file(meminfo)),
+        ):
             hw = detect_hardware(driver=mock_driver)
 
         assert hw.cpu_threads == 4
@@ -623,8 +641,10 @@ class TestDetectHardwareFallback:
     def test_fallback_uses_os_cpu_count(self):
         meminfo = "MemTotal:       8192000 kB\nMemFree:        4000000 kB\n"
 
-        with patch("anklume.engine.resources.os.cpu_count", return_value=2), \
-             patch("builtins.open", return_value=_fake_file(meminfo)):
+        with (
+            patch("anklume.engine.resources.os.cpu_count", return_value=2),
+            patch("builtins.open", return_value=_fake_file(meminfo)),
+        ):
             hw = detect_hardware_fallback()
 
         assert hw.cpu_threads == 2
@@ -634,6 +654,7 @@ class TestDetectHardwareFallback:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_single_machine(self):
@@ -691,6 +712,7 @@ class TestEdgeCases:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class _FakeFile:
     def __init__(self, content: str):

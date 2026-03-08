@@ -38,10 +38,7 @@ class DestroyResult:
 
     @property
     def instances_deleted(self) -> int:
-        return sum(
-            1 for a in self.executed
-            if a.verb == "delete" and a.resource == "instance"
-        )
+        return sum(1 for a in self.executed if a.verb == "delete" and a.resource == "instance")
 
 
 def destroy(
@@ -82,9 +79,7 @@ def destroy(
             is_ephemeral = machine.ephemeral if machine.ephemeral is not None else domain.ephemeral
 
             if not is_ephemeral and not force:
-                domain_skipped.append(
-                    (incus_name, "protégée (utiliser --force)")
-                )
+                domain_skipped.append((incus_name, "protégée (utiliser --force)"))
                 all_deleted = False
                 continue
 
@@ -182,8 +177,10 @@ def _execute_action(action: DestroyAction, driver: IncusDriver) -> None:
 
     elif action.verb == "unprotect" and action.resource == "instance":
         driver.instance_config_set(
-            action.target, action.project,
-            "security.protection.delete", "false",
+            action.target,
+            action.project,
+            "security.protection.delete",
+            "false",
         )
 
     elif action.verb == "delete" and action.resource == "instance":

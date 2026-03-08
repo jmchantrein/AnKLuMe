@@ -32,9 +32,7 @@ def run_network_deploy() -> None:
     infra = load_infra()
     ruleset = generate_ruleset(infra)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".nft", delete=False
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".nft", delete=False) as tmp:
         tmp.write(ruleset)
         tmp_path = tmp.name
 

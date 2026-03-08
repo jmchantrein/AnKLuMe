@@ -210,8 +210,10 @@ def compute_resource_allocation(
             mem_val = _format_memory(raw_mem)
             alloc_mem_key = mem_key
 
-        source = "explicit" if is_cpu_explicit and is_mem_explicit else (
-            "auto" if not is_cpu_explicit and not is_mem_explicit else "mixed"
+        source = (
+            "explicit"
+            if is_cpu_explicit and is_mem_explicit
+            else ("auto" if not is_cpu_explicit and not is_mem_explicit else "mixed")
         )
 
         allocations.append(
@@ -246,10 +248,7 @@ def _distribute(
     if total_weight == 0:
         return {m.full_name: 0.0 for m in machines}
 
-    return {
-        m.full_name: total * m.weight / total_weight
-        for m in machines
-    }
+    return {m.full_name: total * m.weight / total_weight for m in machines}
 
 
 def _check_overcommit(
@@ -260,10 +259,7 @@ def _check_overcommit(
 ) -> None:
     """Vérifie le dépassement de ressources (CPU ou mémoire)."""
     if explicit_total > available:
-        msg = (
-            f"Overcommit : explicites ({explicit_total} {unit}) "
-            f"> disponible ({available} {unit})"
-        )
+        msg = f"Overcommit : explicites ({explicit_total} {unit}) > disponible ({available} {unit})"
         if policy.overcommit:
             log.warning(msg)
         else:

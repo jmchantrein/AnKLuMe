@@ -94,8 +94,10 @@ class TestAllSynced:
                 ],
                 "perso": [
                     IncusInstance(
-                        name="perso-web", status="Running",
-                        type="container", project="perso",
+                        name="perso-web",
+                        status="Running",
+                        type="container",
+                        project="perso",
                     )
                 ],
             },

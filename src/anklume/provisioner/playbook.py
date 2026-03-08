@@ -23,11 +23,13 @@ def generate_playbook(infra: Infrastructure) -> list[dict]:
             if not machine.roles:
                 continue
 
-            plays.append({
-                "hosts": machine.full_name,
-                "become": True,
-                "roles": list(machine.roles),
-            })
+            plays.append(
+                {
+                    "hosts": machine.full_name,
+                    "become": True,
+                    "roles": list(machine.roles),
+                }
+            )
 
     return plays
 

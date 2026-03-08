@@ -141,10 +141,7 @@ class TestDetectGpu:
     def test_nvidia_smi_multiple_gpus_takes_first(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = (
-            "NVIDIA RTX 4090, 24576, 100\n"
-            "NVIDIA RTX 3090, 24576, 200\n"
-        )
+        mock_result.stdout = "NVIDIA RTX 4090, 24576, 100\nNVIDIA RTX 3090, 24576, 200\n"
 
         with patch("anklume.engine.gpu.subprocess.run", return_value=mock_result):
             info = detect_gpu()
@@ -187,22 +184,32 @@ class TestValidateGpuMachines:
         assert "aucun GPU" in errors[0]
 
     def test_multiple_gpu_machines_without_gpu(self):
-        infra = _infra([
-            _domain("ai", [
-                _machine("server1", "ai", gpu=True),
-                _machine("server2", "ai", gpu=True),
-            ]),
-        ])
+        infra = _infra(
+            [
+                _domain(
+                    "ai",
+                    [
+                        _machine("server1", "ai", gpu=True),
+                        _machine("server2", "ai", gpu=True),
+                    ],
+                ),
+            ]
+        )
         errors = validate_gpu_machines(infra, _gpu_absent())
         assert len(errors) == 2
 
     def test_exclusive_policy_multiple_gpu_machines_same_domain(self):
         """Politique exclusive : plusieurs machines GPU dans le même domaine = erreur."""
         infra = _infra(
-            [_domain("ai", [
-                _machine("s1", "ai", gpu=True),
-                _machine("s2", "ai", gpu=True),
-            ])],
+            [
+                _domain(
+                    "ai",
+                    [
+                        _machine("s1", "ai", gpu=True),
+                        _machine("s2", "ai", gpu=True),
+                    ],
+                )
+            ],
             gpu_policy=GpuPolicyConfig(policy="exclusive"),
         )
         errors = validate_gpu_machines(infra, _gpu_present())
@@ -245,10 +252,12 @@ class TestValidateGpuMachines:
 
     def test_default_policy_is_exclusive(self):
         """Sans gpu_policy configuré, le défaut est exclusive."""
-        infra = _infra([
-            _domain("ai", [_machine("s1", "ai", gpu=True)]),
-            _domain("ml", [_machine("s2", "ml", gpu=True)]),
-        ])
+        infra = _infra(
+            [
+                _domain("ai", [_machine("s1", "ai", gpu=True)]),
+                _domain("ml", [_machine("s2", "ml", gpu=True)]),
+            ]
+        )
         errors = validate_gpu_machines(infra, _gpu_present())
         assert len(errors) == 1
         assert "exclusive" in errors[0].lower()
@@ -257,10 +266,12 @@ class TestValidateGpuMachines:
         """Domaines désactivés exclus de la validation GPU."""
         d = _domain("ai", [_machine("s1", "ai", gpu=True)])
         d.enabled = False
-        infra = _infra([
-            d,
-            _domain("ml", [_machine("s2", "ml", gpu=True)]),
-        ])
+        infra = _infra(
+            [
+                d,
+                _domain("ml", [_machine("s2", "ml", gpu=True)]),
+            ]
+        )
         errors = validate_gpu_machines(infra, _gpu_present())
         assert errors == []
 
@@ -287,10 +298,17 @@ class TestApplyGpuProfiles:
         assert "gpu-passthrough" in infra.domains["ai"].machines["server"].profiles
 
     def test_non_gpu_machine_unchanged(self):
-        infra = _infra([_domain("ai", [
-            _machine("server", "ai", gpu=True),
-            _machine("web", "ai", gpu=False),
-        ])])
+        infra = _infra(
+            [
+                _domain(
+                    "ai",
+                    [
+                        _machine("server", "ai", gpu=True),
+                        _machine("web", "ai", gpu=False),
+                    ],
+                )
+            ]
+        )
         with patch("anklume.engine.gpu.detect_gpu", return_value=_gpu_present()):
             apply_gpu_profiles(infra)
         assert "gpu-passthrough" not in infra.domains["ai"].machines["web"].profiles
@@ -315,10 +333,12 @@ class TestApplyGpuProfiles:
 
     def test_multiple_domains(self):
         """Profil ajouté aux machines GPU de chaque domaine."""
-        infra = _infra([
-            _domain("ai", [_machine("s1", "ai", gpu=True)]),
-            _domain("ml", [_machine("s2", "ml", gpu=True)]),
-        ])
+        infra = _infra(
+            [
+                _domain("ai", [_machine("s1", "ai", gpu=True)]),
+                _domain("ml", [_machine("s2", "ml", gpu=True)]),
+            ]
+        )
         with patch("anklume.engine.gpu.detect_gpu", return_value=_gpu_present()):
             apply_gpu_profiles(infra)
         assert "gpu-passthrough" in infra.domains["ai"].machines["s1"].profiles
@@ -381,9 +401,7 @@ class TestParserGpuPolicy:
         from anklume.engine.parser import parse_project
 
         # anklume.yml avec gpu_policy
-        (tmp_path / "anklume.yml").write_text(
-            "schema_version: 1\ngpu_policy: shared\n"
-        )
+        (tmp_path / "anklume.yml").write_text("schema_version: 1\ngpu_policy: shared\n")
         (tmp_path / "domains").mkdir()
 
         infra = parse_project(tmp_path)
@@ -402,9 +420,7 @@ class TestParserGpuPolicy:
     def test_parse_gpu_policy_exclusive(self, tmp_path):
         from anklume.engine.parser import parse_project
 
-        (tmp_path / "anklume.yml").write_text(
-            "schema_version: 1\ngpu_policy: exclusive\n"
-        )
+        (tmp_path / "anklume.yml").write_text("schema_version: 1\ngpu_policy: exclusive\n")
         (tmp_path / "domains").mkdir()
 
         infra = parse_project(tmp_path)

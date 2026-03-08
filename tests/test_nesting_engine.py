@@ -347,8 +347,7 @@ class TestReconcilerNestingPrefix:
         result = reconcile(infra, driver, dry_run=True, nesting_context=ctx)
 
         inst_actions = [
-            a for a in result.actions
-            if a.resource == "instance" and a.verb == "create"
+            a for a in result.actions if a.resource == "instance" and a.verb == "create"
         ]
         assert len(inst_actions) == 1
         assert inst_actions[0].target == "001-pro-dev"
@@ -469,9 +468,7 @@ class TestReconcilerContextFiles:
         from anklume.engine.reconciler import reconcile
 
         dev = make_machine("dev", "pro")
-        infra = make_infra(
-            domains={"pro": make_domain("pro", machines={"dev": dev})}
-        )
+        infra = make_infra(domains={"pro": make_domain("pro", machines={"dev": dev})})
         driver = mock_driver()
 
         ctx = NestingContext(absolute_level=0)
@@ -487,9 +484,7 @@ class TestReconcilerContextFiles:
         from anklume.engine.reconciler import reconcile
 
         dev = make_machine("dev", "pro")
-        infra = make_infra(
-            domains={"pro": make_domain("pro", machines={"dev": dev})}
-        )
+        infra = make_infra(domains={"pro": make_domain("pro", machines={"dev": dev})})
         driver = mock_driver()
 
         ctx = NestingContext(absolute_level=0)
@@ -506,9 +501,7 @@ class TestReconcilerContextFiles:
         from anklume.engine.reconciler import reconcile
 
         dev = make_machine("dev", "pro")
-        infra = make_infra(
-            domains={"pro": make_domain("pro", machines={"dev": dev})}
-        )
+        infra = make_infra(domains={"pro": make_domain("pro", machines={"dev": dev})})
         driver = mock_driver()
 
         ctx = NestingContext(absolute_level=0)
@@ -521,9 +514,7 @@ class TestReconcilerContextFiles:
         from anklume.engine.reconciler import reconcile
 
         vm = make_machine("server", "pro", type="vm")
-        infra = make_infra(
-            domains={"pro": make_domain("pro", machines={"server": vm})}
-        )
+        infra = make_infra(domains={"pro": make_domain("pro", machines={"server": vm})})
         driver = mock_driver()
 
         ctx = NestingContext(absolute_level=0)
@@ -539,13 +530,9 @@ class TestReconcilerContextFiles:
         from anklume.engine.reconciler import reconcile
 
         dev = make_machine("dev", "pro")
-        infra = make_infra(
-            domains={"pro": make_domain("pro", machines={"dev": dev})}
-        )
+        infra = make_infra(domains={"pro": make_domain("pro", machines={"dev": dev})})
         driver = mock_driver()
-        driver.instance_exec.side_effect = IncusError(
-            ["incus", "exec"], 1, "error"
-        )
+        driver.instance_exec.side_effect = IncusError(["incus", "exec"], 1, "error")
 
         ctx = NestingContext(absolute_level=0)
         result = reconcile(infra, driver, dry_run=False, nesting_context=ctx)

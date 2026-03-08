@@ -75,9 +75,7 @@ def reconcile(
         result.actions.extend(domain_actions)
 
         if not dry_run:
-            _execute_domain_actions(
-                domain_actions, domain, infra, driver, result, ctx
-            )
+            _execute_domain_actions(domain_actions, domain, infra, driver, result, ctx)
 
     return result
 
@@ -110,9 +108,7 @@ def _plan_domain(
         )
 
     # 1b. Profil GPU (si des machines GPU dans ce domaine)
-    has_gpu_machines = any(
-        GPU_PROFILE_NAME in m.profiles for m in domain.machines.values()
-    )
+    has_gpu_machines = any(GPU_PROFILE_NAME in m.profiles for m in domain.machines.values())
     if has_gpu_machines:
         if project_is_new:
             gpu_profile_exists = False
@@ -237,17 +233,13 @@ def _execute_domain_actions(
             result.executed.append(action)
 
             if action.verb == "create" and action.resource == "instance":
-                machine = _find_machine(
-                    action.target, domain, infra.config.nesting, ctx
-                )
+                machine = _find_machine(action.target, domain, infra.config.nesting, ctx)
                 created_machines[action.target] = machine
 
             if action.verb == "start" and action.resource == "instance":
                 machine = created_machines.get(action.target)
                 if machine is not None:
-                    _inject_context_files(
-                        action.target, action.project, machine, driver, ctx
-                    )
+                    _inject_context_files(action.target, action.project, machine, driver, ctx)
 
         except (IncusError, ValueError) as e:
             result.errors.append((action, str(e)))
@@ -283,9 +275,7 @@ def _execute_action(
         driver.network_create(action.target, action.project, config=config)
 
     elif action.verb == "create" and action.resource == "instance":
-        machine = _find_machine(
-            action.target, domain, infra.config.nesting, ctx
-        )
+        machine = _find_machine(action.target, domain, infra.config.nesting, ctx)
 
         # Config de sécurité nesting (base), puis config explicite (override)
         config = dict(nesting_security_config(ctx.absolute_level))
@@ -358,6 +348,4 @@ def _inject_context_files(
     try:
         driver.instance_exec(incus_name, project, ["sh", "-c", script])
     except IncusError:
-        log.warning(
-            "Injection des fichiers de contexte échouée pour %s", incus_name
-        )
+        log.warning("Injection des fichiers de contexte échouée pour %s", incus_name)

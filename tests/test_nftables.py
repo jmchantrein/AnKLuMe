@@ -10,7 +10,8 @@ from .conftest import make_domain, make_infra, make_machine
 def _effective_lines(ruleset: str, *must_contain: str) -> list[str]:
     """Extrait les lignes de règle effectives (pas commentaires) contenant les termes."""
     return [
-        line for line in ruleset.splitlines()
+        line
+        for line in ruleset.splitlines()
         if all(term in line for term in must_contain)
         and "accept" in line
         and not line.strip().startswith("#")
@@ -62,20 +63,24 @@ class TestIntraDomain:
         assert 'iifname "net-pro" oifname "net-pro" accept' in ruleset
 
     def test_two_domains(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         assert 'iifname "net-pro" oifname "net-pro" accept' in ruleset
         assert 'iifname "net-perso" oifname "net-perso" accept' in ruleset
 
     def test_no_inter_domain_without_policy(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         # Pas de règle cross-bridge
@@ -83,10 +88,12 @@ class TestIntraDomain:
         assert 'net-perso" oifname "net-pro"' not in ruleset
 
     def test_disabled_domain_excluded(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "test": make_domain("test", enabled=False),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "test": make_domain("test", enabled=False),
+            }
+        )
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         assert "net-pro" in ruleset
@@ -102,10 +109,12 @@ class TestDomainToDomainPolicy:
     """Politiques entre domaines."""
 
     def test_basic(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "ai-tools": make_domain("ai-tools"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "ai-tools": make_domain("ai-tools"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Pro accède à Ollama",
@@ -117,15 +126,16 @@ class TestDomainToDomainPolicy:
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         assert (
-            'iifname "net-pro" oifname "net-ai-tools" '
-            "tcp dport { 3000, 11434 } accept"
+            'iifname "net-pro" oifname "net-ai-tools" tcp dport { 3000, 11434 } accept'
         ) in ruleset
 
     def test_udp_protocol(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "dns": make_domain("dns"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "dns": make_domain("dns"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="DNS",
@@ -140,10 +150,12 @@ class TestDomainToDomainPolicy:
         assert "udp dport { 53 }" in ruleset
 
     def test_ports_all(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Tout",
@@ -161,10 +173,12 @@ class TestDomainToDomainPolicy:
 
     def test_ports_empty_list(self):
         """Liste de ports vide = pas de restriction de port."""
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Tout",
@@ -180,10 +194,12 @@ class TestDomainToDomainPolicy:
         assert "dport" not in rule_lines[0]
 
     def test_bidirectional(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Bidirectionnel",
@@ -199,11 +215,13 @@ class TestDomainToDomainPolicy:
         assert 'iifname "net-perso" oifname "net-pro" tcp dport { 8080 } accept' in ruleset
 
     def test_multiple_policies(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-            "ai-tools": make_domain("ai-tools"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+                "ai-tools": make_domain("ai-tools"),
+            }
+        )
         infra.policies = [
             Policy(description="P1", from_target="pro", to_target="ai-tools", ports=[11434]),
             Policy(description="P2", from_target="perso", to_target="ai-tools", ports=[3000]),
@@ -214,10 +232,12 @@ class TestDomainToDomainPolicy:
         assert 'iifname "net-perso" oifname "net-ai-tools"' in ruleset
 
     def test_description_as_comment(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         infra.policies = [
             Policy(description="Accès VPN", from_target="pro", to_target="perso", ports=[1194]),
         ]
@@ -295,7 +315,9 @@ class TestHostPolicy:
         infra.policies = [
             Policy(
                 description="Host accède à Pro",
-                from_target="host", to_target="pro", ports=[22],
+                from_target="host",
+                to_target="pro",
+                ports=[22],
             ),
         ]
         assign_addresses(infra)
@@ -308,7 +330,9 @@ class TestHostPolicy:
         infra.policies = [
             Policy(
                 description="Pro accède à Host",
-                from_target="pro", to_target="host", ports=[53],
+                from_target="pro",
+                to_target="host",
+                ports=[53],
             ),
         ]
         assign_addresses(infra)
@@ -322,7 +346,9 @@ class TestHostPolicy:
         infra.policies = [
             Policy(
                 description="Host → Pro",
-                from_target="host", to_target="pro", ports=[22],
+                from_target="host",
+                to_target="pro",
+                ports=[22],
             ),
         ]
         assign_addresses(infra)
@@ -337,10 +363,12 @@ class TestDisabledDomainPolicy:
     """Politiques référençant des domaines désactivés."""
 
     def test_from_disabled_domain(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "test": make_domain("test", enabled=False),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "test": make_domain("test", enabled=False),
+            }
+        )
         infra.policies = [
             Policy(description="Test → Pro", from_target="test", to_target="pro", ports=[80]),
         ]
@@ -350,10 +378,12 @@ class TestDisabledDomainPolicy:
         assert "désactivé" in ruleset
 
     def test_to_disabled_domain(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "test": make_domain("test", enabled=False),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "test": make_domain("test", enabled=False),
+            }
+        )
         infra.policies = [
             Policy(description="Pro → Test", from_target="pro", to_target="test", ports=[80]),
         ]
@@ -362,14 +392,18 @@ class TestDisabledDomainPolicy:
         assert "ignoré" in ruleset
 
     def test_no_forward_rule_for_disabled(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "test": make_domain("test", enabled=False),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "test": make_domain("test", enabled=False),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Pro → Test",
-                from_target="pro", to_target="test", ports=[80],
+                from_target="pro",
+                to_target="test",
+                ports=[80],
             ),
         ]
         assign_addresses(infra)
@@ -381,14 +415,17 @@ class TestSortedPorts:
     """Les ports sont triés dans les règles."""
 
     def test_ports_sorted(self):
-        infra = make_infra(domains={
-            "pro": make_domain("pro"),
-            "perso": make_domain("perso"),
-        })
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
         infra.policies = [
             Policy(
                 description="Multi",
-                from_target="pro", to_target="perso",
+                from_target="pro",
+                to_target="perso",
                 ports=[8080, 443, 80],
             ),
         ]
@@ -406,7 +443,9 @@ class TestUnresolvedTarget:
         infra.policies = [
             Policy(
                 description="Typo",
-                from_target="inexistant", to_target="pro", ports=[80],
+                from_target="inexistant",
+                to_target="pro",
+                ports=[80],
             ),
         ]
         assign_addresses(infra)
@@ -420,7 +459,9 @@ class TestUnresolvedTarget:
         infra.policies = [
             Policy(
                 description="Typo",
-                from_target="pro", to_target="inexistant", ports=[80],
+                from_target="pro",
+                to_target="inexistant",
+                ports=[80],
             ),
         ]
         assign_addresses(infra)

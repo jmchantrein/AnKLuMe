@@ -88,8 +88,10 @@ def _ai_infra_no_vars() -> Infrastructure:
 class TestAiServiceStatus:
     def test_reachable(self):
         s = AiServiceStatus(
-            name="ollama", reachable=True,
-            url="http://10.100.3.1:11434", detail="ok",
+            name="ollama",
+            reachable=True,
+            url="http://10.100.3.1:11434",
+            detail="ok",
         )
         assert s.reachable is True
         assert s.name == "ollama"
@@ -141,9 +143,7 @@ class TestComputeAiStatus:
             patch("anklume.engine.ai._check_service") as mock_check,
         ):
             mock_check.side_effect = lambda url, _: (
-                ("qwen2:0.5b chargé", True)
-                if "11434" in url
-                else ("", False)
+                ("qwen2:0.5b chargé", True) if "11434" in url else ("", False)
             )
             status = compute_ai_status(infra)
 
@@ -158,9 +158,7 @@ class TestComputeAiStatus:
             patch("anklume.engine.ai._check_service") as mock_check,
         ):
             mock_check.side_effect = lambda url, _: (
-                ("actif", True)
-                if "8000" in url
-                else ("", False)
+                ("actif", True) if "8000" in url else ("", False)
             )
             status = compute_ai_status(infra)
 
@@ -239,9 +237,9 @@ class TestCheckService:
 
         response = MagicMock()
         response.status = 200
-        response.read.return_value = json.dumps({
-            "models": [{"name": "qwen2:0.5b", "size": 3400000000}]
-        }).encode()
+        response.read.return_value = json.dumps(
+            {"models": [{"name": "qwen2:0.5b", "size": 3400000000}]}
+        ).encode()
 
         with patch("anklume.engine.ai.urlopen", return_value=response):
             detail, ok = _check_service("http://10.100.3.1:11434/api/ps", "ollama")

@@ -30,8 +30,10 @@ from anklume.engine.models import (
 
 def _gpu_present(vram_used: int = 4096) -> GpuInfo:
     return GpuInfo(
-        detected=True, model="RTX PRO 5000",
-        vram_total_mib=24576, vram_used_mib=vram_used,
+        detected=True,
+        model="RTX PRO 5000",
+        vram_total_mib=24576,
+        vram_used_mib=vram_used,
     )
 
 
@@ -110,9 +112,11 @@ class TestFlushVram:
         infra = _ai_infra()
         ps_response = MagicMock()
         ps_response.status = 200
-        ps_response.read.return_value = json.dumps({
-            "models": [{"name": "qwen2:0.5b"}, {"name": "llama3:8b"}],
-        }).encode()
+        ps_response.read.return_value = json.dumps(
+            {
+                "models": [{"name": "qwen2:0.5b"}, {"name": "llama3:8b"}],
+            }
+        ).encode()
 
         generate_response = MagicMock()
         generate_response.status = 200
@@ -249,11 +253,15 @@ class TestReadAiAccess:
 
     def test_valid_file(self, tmp_path):
         state_file = tmp_path / "ai-access.json"
-        state_file.write_text(json.dumps({
-            "domain": "ai-tools",
-            "timestamp": "2026-03-08T14:30:00",
-            "previous": None,
-        }))
+        state_file.write_text(
+            json.dumps(
+                {
+                    "domain": "ai-tools",
+                    "timestamp": "2026-03-08T14:30:00",
+                    "previous": None,
+                }
+            )
+        )
         state = read_ai_access(state_path=state_file)
         assert state.domain == "ai-tools"
         assert state.timestamp == "2026-03-08T14:30:00"
@@ -364,8 +372,10 @@ class TestSwitchAiAccess:
             patch("anklume.engine.ai.DEFAULT_STATE_PATH", state_file),
         ):
             mock_flush.return_value = FlushResult(
-                models_unloaded=[], llama_server_stopped=False,
-                vram_before_mib=0, vram_after_mib=0,
+                models_unloaded=[],
+                llama_server_stopped=False,
+                vram_before_mib=0,
+                vram_after_mib=0,
             )
             switch_ai_access(infra, "pro")
 
@@ -396,9 +406,7 @@ class TestParserAiAccessPolicy:
     def test_parse_from_yaml(self, tmp_path):
         from anklume.engine.parser import parse_project
 
-        (tmp_path / "anklume.yml").write_text(
-            "schema_version: 1\nai_access_policy: open\n"
-        )
+        (tmp_path / "anklume.yml").write_text("schema_version: 1\nai_access_policy: open\n")
         (tmp_path / "domains").mkdir()
         infra = parse_project(tmp_path)
         assert infra.config.ai_access_policy == "open"
@@ -430,7 +438,10 @@ class TestStopLlamaServer:
         ):
             mock_exec.return_value = True
             result = _stop_llama_server(
-                "10.100.3.1", 8081, "ai-tools", "ai-tools-gpu-server",
+                "10.100.3.1",
+                8081,
+                "ai-tools",
+                "ai-tools-gpu-server",
             )
 
         assert result is True
@@ -440,7 +451,10 @@ class TestStopLlamaServer:
 
         with patch("anklume.engine.ai.urlopen", side_effect=OSError):
             result = _stop_llama_server(
-                "10.100.3.1", 8081, "ai-tools", "ai-tools-gpu-server",
+                "10.100.3.1",
+                8081,
+                "ai-tools",
+                "ai-tools-gpu-server",
             )
 
         assert result is False
