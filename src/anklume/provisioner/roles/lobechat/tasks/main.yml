@@ -1,0 +1,76 @@
+---
+# Installation et configuration de LobeChat
+
+- name: Installer Node.js (dépendance LobeChat)
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+  changed_when: false
+
+- name: Créer le répertoire de données LobeChat
+  ansible.builtin.file:
+    path: "{{ lobechat_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Cloner LobeChat depuis GitHub
+  ansible.builtin.git:
+    repo: https://github.com/lobehub/lobe-chat.git
+    dest: /opt/lobechat/src
+    version: main
+    depth: 1
+  register: lobechat_clone
+
+- name: Installer les dépendances LobeChat
+  ansible.builtin.shell: |
+    cd /opt/lobechat/src && npm install --legacy-peer-deps
+  when: lobechat_clone.changed
+  changed_when: lobechat_clone.changed
+
+- name: Build LobeChat
+  ansible.builtin.shell: |
+    cd /opt/lobechat/src && npm run build
+  when: lobechat_clone.changed
+  changed_when: lobechat_clone.changed
+
+- name: Configurer le service systemd LobeChat
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/lobechat.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=LobeChat
+      After=network.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/opt/lobechat/src
+      Environment=OLLAMA_PROXY_URL={{ lobechat_ollama_url }}
+      Environment=PORT={{ lobechat_port }}
+      ExecStart=/usr/bin/node /opt/lobechat/src/.next/standalone/server.js
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart lobechat
+
+- name: Démarrer et activer LobeChat
+  ansible.builtin.systemd:
+    name: lobechat
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Attendre que LobeChat soit prêt
+  ansible.builtin.uri:
+    url: "http://localhost:{{ lobechat_port }}"
+    status_code: 200
+  register: lobechat_health
+  until: lobechat_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  failed_when: false

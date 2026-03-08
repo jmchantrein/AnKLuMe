@@ -1938,3 +1938,302 @@ anklume ai flush     # Libérer la VRAM GPU
 anklume ai switch <domaine>  # Basculer l'accès GPU
 anklume ai status    # (existant) Affiche aussi l'accès courant
 ```
+
+## 21. Interfaces de chat
+
+Rôles Ansible embarqués pour déployer des interfaces de chat web
+connectées aux services IA du domaine. Open WebUI (connexion
+directe à Ollama) et LobeChat (multi-providers).
+
+### 21.1 Rôle `open_webui`
+
+Open WebUI — interface web pour interagir avec Ollama.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `open_webui_port` | `3000` | Port HTTP |
+| `open_webui_ollama_url` | `http://localhost:11434` | URL du serveur Ollama |
+| `open_webui_data_dir` | `/opt/open-webui/data` | Répertoire de données |
+
+**Tâches** (`tasks/main.yml`) :
+1. Installer les dépendances système (`python3`, `pip`)
+2. Installer Open WebUI via pip (`open-webui`)
+3. Créer le répertoire de données
+4. Configurer le service systemd (`OLLAMA_BASE_URL`, port)
+5. Démarrer et activer le service
+6. Attendre que le service soit prêt (health check)
+
+**Handler** : `restart open-webui`.
+
+### 21.2 Rôle `lobechat`
+
+LobeChat — client de chat multi-providers (Ollama local, OpenRouter
+cloud).
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `lobechat_port` | `3210` | Port HTTP |
+| `lobechat_ollama_url` | `http://localhost:11434` | URL Ollama |
+| `lobechat_data_dir` | `/opt/lobechat/data` | Répertoire de données |
+
+**Tâches** (`tasks/main.yml`) :
+1. Installer Node.js (via NodeSource)
+2. Cloner LobeChat depuis GitHub
+3. Installer les dépendances et build
+4. Configurer le service systemd
+5. Démarrer et activer le service
+6. Attendre que le service soit prêt
+
+**Handler** : `restart lobechat`.
+
+### 21.3 Machines dans `anklume init`
+
+Le template `ai-tools.yml` généré par `anklume init` inclut
+des machines commentées pour les interfaces de chat :
+
+```yaml
+# ai-webui:
+#   description: "Interface web Ollama (Open WebUI)"
+#   type: lxc
+#   roles: [base, open_webui]
+#   vars:
+#     ollama_host: "gpu-server"
+#     ollama_port: 11434
+```
+
+Les politiques réseau commentées incluent l'accès aux ports
+des interfaces de chat.
+
+### 21.4 Détection des services
+
+Ajout dans `_SERVICE_DEFS` (`engine/ai.py`) pour la détection
+automatique par `anklume ai status` :
+
+```python
+ROLE_OPEN_WEBUI = "open_webui"
+ROLE_LOBECHAT = "lobechat"
+_DEFAULT_OPEN_WEBUI_PORT = 3000
+_DEFAULT_LOBECHAT_PORT = 3210
+```
+
+Les services Open WebUI et LobeChat sont détectés automatiquement
+sur les machines ayant les rôles correspondants, avec health check
+sur le endpoint racine (`/`).
+
+## 22. Proxy de sanitisation LLM
+
+Moteur de détection et remplacement de données sensibles
+avant envoi à un LLM externe. Module Python (`engine/sanitizer.py`)
++ rôle Ansible proxy HTTP.
+
+### 22.1 Patterns détectés
+
+| Catégorie | Exemples | Description |
+|-----------|----------|-------------|
+| IPs privées RFC 1918 | `10.x.x.x`, `192.168.x.x`, `172.16-31.x.x` | Adresses IP internes |
+| Ressources Incus | Projets, bridges, instances | Noms extraits de l'infra |
+| FQDNs internes | `*.internal`, `*.local`, `*.corp` | Domaines réseau privé |
+| Credentials | Bearer tokens, clés API | Patterns `key=...`, `token=...` |
+
+### 22.2 Modes de remplacement
+
+- **`mask`** : remplacement par un placeholder lisible et indexé.
+  `10.120.0.5` → `[IP_REDACTED_1]`, `pro-dev` → `[INSTANCE_REDACTED_1]`
+
+- **`pseudonymize`** : remplacement cohérent dans une session.
+  Même valeur d'entrée produit toujours le même pseudonyme.
+  `10.120.0.5` → `10.ZONE.1.5`
+
+### 22.3 Module `engine/sanitizer.py`
+
+```python
+@dataclass
+class Replacement:
+    """Un remplacement effectué par le sanitizer."""
+    original: str
+    replaced: str
+    category: str       # "ip", "resource", "fqdn", "credential"
+    position: tuple[int, int]  # (start, end) dans le texte original
+
+@dataclass
+class SanitizeResult:
+    """Résultat d'une sanitisation."""
+    text: str
+    replacements: list[Replacement]
+
+def sanitize(
+    text: str,
+    *,
+    infra: Infrastructure | None = None,
+    mode: str = "mask",
+) -> SanitizeResult
+
+def desanitize(
+    text: str,
+    replacements: list[Replacement],
+) -> str
+```
+
+`sanitize()` détecte et remplace toutes les données sensibles.
+`desanitize()` restaure les valeurs originales (pour interpréter
+la réponse du LLM).
+
+### 22.4 Rôle `llm_sanitizer`
+
+Proxy HTTP (port 8089) qui intercepte les requêtes vers les
+APIs LLM cloud. Sanitise les prompts, désanitise les réponses.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `sanitizer_port` | `8089` | Port du proxy |
+| `sanitizer_mode` | `mask` | Mode : `mask`, `pseudonymize` |
+| `sanitizer_upstream_url` | `` | URL du LLM cible |
+| `sanitizer_log_dir` | `/var/log/anklume/sanitizer` | Logs d'audit |
+
+### 22.5 Champ `ai_sanitize` dans le domaine
+
+```yaml
+# domains/pro.yml
+machines:
+  dev:
+    roles: [base]
+    vars:
+      ai_sanitize: true
+```
+
+- `false` (défaut) : sanitisation désactivée
+- `true` : requêtes cloud passent par le proxy
+- `always` : sanitisation active même pour les LLM locaux
+
+## 23. OpenClaw — assistant IA par domaine
+
+Assistant autonome qui monitore l'infrastructure et interagit
+via des canaux de communication. Un OpenClaw par domaine,
+respecte les frontières réseau.
+
+### 23.1 Rôle `openclaw_server`
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `openclaw_port` | `8090` | Port HTTP API |
+| `openclaw_ollama_host` | `localhost` | Hôte Ollama |
+| `openclaw_ollama_port` | `11434` | Port Ollama |
+| `openclaw_channels` | `[]` | Canaux : `telegram`, `signal` |
+| `openclaw_heartbeat_interval` | `30m` | Intervalle heartbeat |
+| `openclaw_data_dir` | `/opt/openclaw/data` | Données (SQLite + RAG) |
+
+**Tâches** :
+1. Installer les dépendances (Python 3, pip, SQLite)
+2. Installer OpenClaw
+3. Créer les répertoires de données
+4. Configurer le service systemd (variables d'environnement)
+5. Démarrer et activer le service
+
+**Handler** : `restart openclaw`.
+
+### 23.2 Configuration dans le domaine
+
+```yaml
+ai-assistant:
+  description: "Assistant IA"
+  type: lxc
+  roles: [base, openclaw_server]
+  vars:
+    openclaw_channels: [telegram]
+    openclaw_heartbeat_interval: 30m
+    openclaw_ollama_host: "gpu-server"
+```
+
+### 23.3 Détection du service
+
+Ajout dans `_SERVICE_DEFS` (`engine/ai.py`) :
+
+```python
+ROLE_OPENCLAW_SERVER = "openclaw_server"
+_DEFAULT_OPENCLAW_PORT = 8090
+```
+
+`anklume ai status` affiche l'état d'OpenClaw automatiquement.
+
+## 24. Développement assisté par IA
+
+Outils CLI et rôles pour intégrer les LLM dans le workflow
+de développement.
+
+### 24.1 `anklume ai test`
+
+Boucle automatique : exécuter les tests, analyser les erreurs
+via un LLM, proposer ou appliquer des corrections.
+
+```python
+@dataclass
+class AiTestConfig:
+    """Configuration de la boucle test IA."""
+    backend: str = "ollama"   # "ollama" | "claude"
+    mode: str = "dry-run"     # "dry-run" | "auto-apply" | "auto-pr"
+    max_retries: int = 3
+    model: str = ""
+
+@dataclass
+class AiTestResult:
+    """Résultat d'une itération de la boucle."""
+    iteration: int
+    tests_passed: bool
+    errors: list[str]
+    fixes_proposed: list[str]
+    fixes_applied: bool
+
+def run_ai_test_loop(
+    config: AiTestConfig,
+    *,
+    project_dir: Path | None = None,
+) -> list[AiTestResult]
+```
+
+**Modes** :
+- `dry-run` (défaut) : analyse + propositions, sans modification
+- `auto-apply` : applique les corrections automatiquement
+- `auto-pr` : crée une PR avec les corrections
+
+**Backends** :
+- `ollama` : LLM local via Ollama API
+- `claude` : Claude API (nécessite `ANTHROPIC_API_KEY`)
+
+### 24.2 Rôle `code_sandbox`
+
+Sandbox isolé pour exécution de code généré par LLM.
+Réseau restreint, filesystem éphémère.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `sandbox_timeout` | `60` | Timeout d'exécution (secondes) |
+| `sandbox_network` | `false` | Accès réseau |
+| `sandbox_ephemeral` | `true` | Filesystem éphémère |
+
+### 24.3 Rôle `opencode_server`
+
+Serveur de coding IA headless.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `opencode_port` | `8091` | Port HTTP |
+| `opencode_ollama_host` | `localhost` | Hôte Ollama |
+| `opencode_data_dir` | `/opt/opencode/data` | Données persistantes |
+
+### 24.4 CLI
+
+```
+anklume ai test [--backend ollama|claude] [--mode dry-run|auto-apply] [--max-retries N]
+```

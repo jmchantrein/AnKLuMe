@@ -1,0 +1,6 @@
+---
+# LLM Sanitizer — proxy de sanitisation des données sensibles
+sanitizer_port: 8089
+sanitizer_mode: mask
+sanitizer_upstream_url: ""
+sanitizer_log_dir: /var/log/anklume/sanitizer

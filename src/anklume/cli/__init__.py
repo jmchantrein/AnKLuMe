@@ -271,6 +271,27 @@ def ai_switch(
     run_ai_switch(domain)
 
 
+@ai_app.command("test")
+def ai_test(
+    backend: Annotated[
+        str,
+        typer.Option("--backend", "-b", help="Backend LLM (ollama ou claude)"),
+    ] = "ollama",
+    mode: Annotated[
+        str,
+        typer.Option("--mode", "-m", help="Mode (dry-run, auto-apply, auto-pr)"),
+    ] = "dry-run",
+    max_retries: Annotated[
+        int,
+        typer.Option("--max-retries", help="Nombre max de tentatives"),
+    ] = 3,
+) -> None:
+    """Boucle test + analyse LLM + correction automatique."""
+    from anklume.cli._ai import run_ai_test
+
+    run_ai_test(backend=backend, mode=mode, max_retries=max_retries)
+
+
 # --- anklume stt <setup|status> ---
 
 

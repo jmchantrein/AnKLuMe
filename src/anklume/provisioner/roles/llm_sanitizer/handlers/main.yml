@@ -1,0 +1,6 @@
+---
+- name: restart llm-sanitizer
+  ansible.builtin.systemd:
+    name: llm-sanitizer
+    state: restarted
+    daemon_reload: true

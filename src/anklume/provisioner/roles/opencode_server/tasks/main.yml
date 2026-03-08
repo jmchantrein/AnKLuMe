@@ -1,0 +1,64 @@
+---
+# Installation et configuration d'OpenCode Server
+
+- name: Installer les dépendances système pour OpenCode
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - git
+    state: present
+    update_cache: true
+
+- name: Installer OpenCode via pip
+  ansible.builtin.pip:
+    name: opencode-server
+    state: present
+  changed_when: false
+
+- name: Créer le répertoire de données OpenCode
+  ansible.builtin.file:
+    path: "{{ opencode_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Configurer le service systemd OpenCode
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/opencode.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=OpenCode Server
+      After=network.target
+
+      [Service]
+      Type=simple
+      Environment=OPENCODE_PORT={{ opencode_port }}
+      Environment=OPENCODE_OLLAMA_HOST={{ opencode_ollama_host }}
+      Environment=OPENCODE_DATA_DIR={{ opencode_data_dir }}
+      ExecStart=/usr/local/bin/opencode-server --port {{ opencode_port }}
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart opencode
+
+- name: Démarrer et activer OpenCode
+  ansible.builtin.systemd:
+    name: opencode
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Attendre que OpenCode soit prêt
+  ansible.builtin.uri:
+    url: "http://localhost:{{ opencode_port }}/health"
+    status_code: 200
+  register: opencode_health
+  until: opencode_health.status == 200
+  retries: 15
+  delay: 3
+  changed_when: false
+  failed_when: false

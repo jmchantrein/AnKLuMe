@@ -1,0 +1,66 @@
+---
+# Installation et configuration d'OpenClaw
+
+- name: Installer les dépendances système pour OpenClaw
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - sqlite3
+    state: present
+    update_cache: true
+
+- name: Installer OpenClaw via pip
+  ansible.builtin.pip:
+    name: openclaw
+    state: present
+  changed_when: false
+
+- name: Créer le répertoire de données OpenClaw
+  ansible.builtin.file:
+    path: "{{ openclaw_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Configurer le service systemd OpenClaw
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/openclaw.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=OpenClaw Assistant IA
+      After=network.target
+
+      [Service]
+      Type=simple
+      Environment=OPENCLAW_PORT={{ openclaw_port }}
+      Environment=OPENCLAW_OLLAMA_HOST={{ openclaw_ollama_host }}
+      Environment=OPENCLAW_OLLAMA_PORT={{ openclaw_ollama_port }}
+      Environment=OPENCLAW_DATA_DIR={{ openclaw_data_dir }}
+      Environment=OPENCLAW_HEARTBEAT_INTERVAL={{ openclaw_heartbeat_interval }}
+      ExecStart=/usr/local/bin/openclaw serve --port {{ openclaw_port }}
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart openclaw
+
+- name: Démarrer et activer OpenClaw
+  ansible.builtin.systemd:
+    name: openclaw
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Attendre que OpenClaw soit prêt
+  ansible.builtin.uri:
+    url: "http://localhost:{{ openclaw_port }}/health"
+    status_code: 200
+  register: openclaw_health
+  until: openclaw_health.status == 200
+  retries: 15
+  delay: 3
+  changed_when: false
+  failed_when: false

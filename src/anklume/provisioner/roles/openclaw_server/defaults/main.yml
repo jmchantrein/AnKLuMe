@@ -1,0 +1,8 @@
+---
+# OpenClaw — assistant IA par domaine
+openclaw_port: 8090
+openclaw_ollama_host: localhost
+openclaw_ollama_port: 11434
+openclaw_channels: []
+openclaw_heartbeat_interval: "30m"
+openclaw_data_dir: /opt/openclaw/data

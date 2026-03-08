@@ -1,0 +1,5 @@
+---
+# Code Sandbox — exécution isolée de code généré par LLM
+sandbox_timeout: 60
+sandbox_network: false
+sandbox_ephemeral: true

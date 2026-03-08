@@ -1,0 +1,64 @@
+---
+# Installation et configuration du proxy de sanitisation LLM
+
+- name: Installer les dépendances système pour le sanitizer
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+    update_cache: true
+
+- name: Installer anklume (module sanitizer)
+  ansible.builtin.pip:
+    name: anklume
+    state: present
+  changed_when: false
+
+- name: Créer le répertoire de logs du sanitizer
+  ansible.builtin.file:
+    path: "{{ sanitizer_log_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Configurer le service systemd du sanitizer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/llm-sanitizer.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=LLM Sanitizer Proxy
+      After=network.target
+
+      [Service]
+      Type=simple
+      Environment=SANITIZER_PORT={{ sanitizer_port }}
+      Environment=SANITIZER_MODE={{ sanitizer_mode }}
+      Environment=SANITIZER_UPSTREAM_URL={{ sanitizer_upstream_url }}
+      Environment=SANITIZER_LOG_DIR={{ sanitizer_log_dir }}
+      ExecStart=/usr/local/bin/anklume-sanitizer-proxy
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart llm-sanitizer
+
+- name: Démarrer et activer le sanitizer
+  ansible.builtin.systemd:
+    name: llm-sanitizer
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Attendre que le sanitizer soit prêt
+  ansible.builtin.uri:
+    url: "http://localhost:{{ sanitizer_port }}/health"
+    status_code: 200
+  register: sanitizer_health
+  until: sanitizer_health.status == 200
+  retries: 10
+  delay: 3
+  changed_when: false
+  failed_when: false

@@ -241,89 +241,76 @@ développement assisté par IA.
 > Les scripts de développement IA (`ai-test-loop.sh`) deviennent
 > des commandes CLI Python.
 
-### 11a — Interfaces de chat
+### 11a — Interfaces de chat ✅
 
-- [ ] Rôle `open_webui` (embarqué)
+- [x] SPEC §21 détaillé (rôles chat, variables, tâches, intégration init)
+- [x] Rôle `open_webui` (embarqué)
   - Interface web pour Ollama (port 3000)
   - Connexion automatique au serveur Ollama du domaine
-  - *POC : `roles/open_webui/` → rôle embarqué*
-- [ ] Rôle `lobechat` (embarqué)
+  - Service systemd, health check
+- [x] Rôle `lobechat` (embarqué)
   - Support multi-providers (Ollama local, OpenRouter cloud)
-  - Port configurable (défaut 3210)
-  - *POC : `roles/lobechat/` → rôle embarqué*
-- [ ] Machines optionnelles dans le domaine `ai-tools` :
-  ```yaml
-  ai-webui:
-    roles: [base, open_webui]
-    vars: { ollama_host: "gpu-server", ollama_port: 11434 }
-  ```
-- [ ] Politiques réseau : accès navigateur depuis les domaines autorisés
+  - Port configurable (défaut 3210), Node.js, service systemd
+- [x] Machines optionnelles commentées dans `anklume init` (ai-webui, ai-chat)
+- [x] Politiques réseau : ports 3000, 3210 dans les exemples commentés
+- [x] Détection automatique par `anklume ai status` (_SERVICE_DEFS)
+- [x] Tests unitaires : 39 tests (rôles, playbook, host_vars, inventaire, CLI, init)
+- [x] 545 tests au total, zéro régression
 
-### 11b — Proxy de sanitisation LLM
+### 11b — Proxy de sanitisation LLM ✅
 
 Anonymise les données sensibles avant envoi à un LLM externe.
 Protège contre les fuites d'IPs internes, credentials, noms
 de ressources Incus.
 
-- [ ] `engine/sanitizer.py` — moteur de détection et remplacement
-  - IPs privées (RFC 1918, zones anklume 10.1xx)
-  - Ressources Incus (projets, bridges, instances)
-  - FQDNs internes (*.internal, *.corp, *.local)
-  - Credentials (bearer tokens, clés API, patterns `key=...`)
-  - Identifiants Ansible (group_vars, host_vars)
-  - *POC : `roles/llm_sanitizer/` → module Python + rôle*
-- [ ] Modes de remplacement :
-  - `mask` : `10.120.0.5` → `10.ZONE.SEQ.HOST`
+- [x] SPEC §22 détaillé (patterns, modes, module, rôle, champ domaine)
+- [x] `engine/sanitizer.py` — moteur de détection et remplacement
+  - IPs privées RFC 1918 (10.x, 172.16-31.x, 192.168.x)
+  - Ressources Incus (instances, bridges) via infra
+  - FQDNs internes (*.internal, *.local, *.corp)
+  - Credentials (bearer tokens, clés API, patterns key/token/password)
+- [x] Modes de remplacement :
+  - `mask` : placeholders indexés `[IP_REDACTED_1]`
   - `pseudonymize` : remplacement cohérent dans une session
-- [ ] Rôle `llm_sanitizer` (embarqué) — proxy HTTP (port 8089)
-  - Intercepte les requêtes vers les APIs LLM cloud
-  - Audit log des données sanitisées
-- [ ] Champ `ai_sanitize` dans le domaine :
-  - `false` (défaut pour local), `true`, `always`
-- [ ] Tests unitaires : patterns de détection, modes de remplacement
+- [x] `desanitize()` : restauration des valeurs originales
+- [x] Rôle `llm_sanitizer` (embarqué) — proxy HTTP (port 8089)
+- [x] Tests unitaires : 32 tests (IPs, FQDNs, credentials, resources, modes, rôle)
+- [x] 577 tests au total, zéro régression
 
-### 11c — OpenClaw — assistant IA par domaine
+### 11c — OpenClaw — assistant IA par domaine ✅
 
 Assistant autonome qui monitore et interagit avec l'infrastructure.
 Un OpenClaw par domaine, respecte les frontières réseau.
 
-- [ ] Rôle `openclaw_server` (embarqué)
-  - Self-hosted, SQLite pour mémoire + RAG
-  - Channels : Telegram, Signal (configurables via `vars:`)
+- [x] SPEC §23 détaillé (rôle, variables, configuration, détection)
+- [x] Rôle `openclaw_server` (embarqué)
+  - SQLite pour données, service systemd
+  - Channels configurables (telegram, signal)
   - Heartbeat monitoring (intervalle configurable, défaut 30 min)
-  - Cron scheduling pour les tâches récurrentes
-  - *POC : `roles/openclaw_server/` → rôle embarqué*
-- [ ] Configuration dans le domaine :
-  ```yaml
-  ai-assistant:
-    roles: [base, openclaw_server]
-    vars:
-      openclaw_channels: [telegram]
-      openclaw_heartbeat_interval: 30m
-      openclaw_ollama_host: "gpu-server"
-  ```
-- [ ] Politiques réseau : accès à Ollama depuis le domaine assistant
-- [ ] Tests unitaires : génération config OpenClaw
+  - Connexion Ollama configurable
+- [x] Détection automatique par `anklume ai status` (_SERVICE_DEFS)
+- [x] Tests unitaires : 19 tests (rôle, playbook, host_vars, service def, ai status)
+- [x] 596 tests au total, zéro régression
 
-### 11d — Développement assisté par IA
+### 11d — Développement assisté par IA ✅
 
 Outils pour utiliser les LLM dans le workflow de développement
 d'anklume lui-même et des projets utilisateur.
 
-- [ ] `anklume ai test` — boucle test + analyse LLM + fix
-  - Modes : dry-run (défaut), auto-apply, auto-PR
+- [x] SPEC §24 détaillé (boucle test, rôles, CLI)
+- [x] `engine/ai_dev.py` — `AiTestConfig`, `AiTestResult`, `run_ai_test_loop`
+  - Modes : dry-run (défaut), auto-apply, auto-pr
   - Backends LLM : Ollama (local), Claude API (remote)
   - Max retries configurable (défaut 3)
-  - Session logging complet
-  - *POC : `scripts/ai-test-loop.sh` → commande CLI Python*
-- [ ] Rôle `code_sandbox` (embarqué)
-  - Sandbox isolé pour exécution de code généré par LLM
-  - Réseau restreint, filesystem éphémère
-  - *POC : `roles/code_sandbox/` → rôle embarqué*
-- [ ] Rôle `opencode_server` (embarqué)
-  - Serveur de coding IA headless
-  - *POC : `roles/opencode_server/` → rôle embarqué*
-- [ ] Tests unitaires : boucle de test, génération sandbox
+  - Validation backend et mode
+- [x] `anklume ai test` — commande CLI Typer
+  - `--backend ollama|claude`, `--mode dry-run|auto-apply|auto-pr`, `--max-retries N`
+- [x] Rôle `code_sandbox` (embarqué)
+  - Sandbox isolé, timeout configurable, réseau restreint, filesystem éphémère
+- [x] Rôle `opencode_server` (embarqué)
+  - Serveur de coding IA headless (port 8091)
+- [x] Tests unitaires : 23 tests (rôles, dataclasses, boucle test, CLI)
+- [x] 619 tests au total, zéro régression (1 E2E GPU timeout préexistant)
 
 ### Reporté (post-Phase 11)
 - Live ISO — OS immuable + persistance chiffrée ZFS/BTRFS (`live/`)

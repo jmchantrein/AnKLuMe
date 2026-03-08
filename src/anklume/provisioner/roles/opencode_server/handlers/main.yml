@@ -1,0 +1,6 @@
+---
+- name: restart opencode
+  ansible.builtin.systemd:
+    name: opencode
+    state: restarted
+    daemon_reload: true

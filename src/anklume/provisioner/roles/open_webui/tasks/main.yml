@@ -1,0 +1,62 @@
+---
+# Installation et configuration d'Open WebUI
+
+- name: Installer les dépendances système pour Open WebUI
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+    update_cache: true
+
+- name: Installer Open WebUI via pip
+  ansible.builtin.pip:
+    name: open-webui
+    state: present
+  changed_when: false
+
+- name: Créer le répertoire de données Open WebUI
+  ansible.builtin.file:
+    path: "{{ open_webui_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Configurer le service systemd Open WebUI
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/open-webui.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Open WebUI
+      After=network.target
+
+      [Service]
+      Type=simple
+      Environment=OLLAMA_BASE_URL={{ open_webui_ollama_url }}
+      Environment=DATA_DIR={{ open_webui_data_dir }}
+      ExecStart=/usr/local/bin/open-webui serve --host 0.0.0.0 --port {{ open_webui_port }}
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart open-webui
+
+- name: Démarrer et activer Open WebUI
+  ansible.builtin.systemd:
+    name: open-webui
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Attendre que Open WebUI soit prêt
+  ansible.builtin.uri:
+    url: "http://localhost:{{ open_webui_port }}"
+    status_code: 200
+  register: webui_health
+  until: webui_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  failed_when: false

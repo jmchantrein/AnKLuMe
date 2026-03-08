@@ -1,0 +1,5 @@
+---
+# OpenCode Server — serveur de coding IA headless
+opencode_port: 8091
+opencode_ollama_host: localhost
+opencode_data_dir: /opt/opencode/data

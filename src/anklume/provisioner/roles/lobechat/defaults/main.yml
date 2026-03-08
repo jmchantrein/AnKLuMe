@@ -1,0 +1,5 @@
+---
+# LobeChat — client de chat multi-providers
+lobechat_port: 3210
+lobechat_ollama_url: "http://localhost:11434"
+lobechat_data_dir: /opt/lobechat/data

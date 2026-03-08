@@ -95,6 +95,20 @@ machines:
     vars:
       ollama_default_model: ""
       stt_language: "en"
+
+  # ai-webui:
+  #   description: "Ollama web interface (Open WebUI)"
+  #   type: lxc
+  #   roles: [base, open_webui]
+  #   vars:
+  #     open_webui_ollama_url: "http://gpu-server:11434"
+
+  # ai-chat:
+  #   description: "Multi-provider chat (LobeChat)"
+  #   type: lxc
+  #   roles: [base, lobechat]
+  #   vars:
+  #     lobechat_ollama_url: "http://gpu-server:11434"
 """,
     "fr": """\
 # Domaine ai-tools — services IA (GPU, LLM, STT)
@@ -112,6 +126,20 @@ machines:
     vars:
       ollama_default_model: ""
       stt_language: "fr"
+
+  # ai-webui:
+  #   description: "Interface web Ollama (Open WebUI)"
+  #   type: lxc
+  #   roles: [base, open_webui]
+  #   vars:
+  #     open_webui_ollama_url: "http://gpu-server:11434"
+
+  # ai-chat:
+  #   description: "Chat multi-providers (LobeChat)"
+  #   type: lxc
+  #   roles: [base, lobechat]
+  #   vars:
+  #     lobechat_ollama_url: "http://gpu-server:11434"
 """,
 }
 
@@ -129,6 +157,14 @@ policies: []
   #   to: ai-tools
   #   ports: [8000]
   #   description: "Work accesses Speaches (STT)"
+  # - from: work
+  #   to: ai-tools
+  #   ports: [3000]
+  #   description: "Work accesses Open WebUI"
+  # - from: work
+  #   to: ai-tools
+  #   ports: [3210]
+  #   description: "Work accesses LobeChat"
 """,
     "fr": """\
 # Politiques réseau — règles d'accès inter-domaines
@@ -143,6 +179,14 @@ policies: []
   #   to: ai-tools
   #   ports: [8000]
   #   description: "Pro accède à Speaches (STT)"
+  # - from: pro
+  #   to: ai-tools
+  #   ports: [3000]
+  #   description: "Pro accède à Open WebUI"
+  # - from: pro
+  #   to: ai-tools
+  #   ports: [3210]
+  #   description: "Pro accède à LobeChat"
 """,
 }
 

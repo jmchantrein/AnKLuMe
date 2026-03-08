@@ -24,11 +24,17 @@ log = logging.getLogger(__name__)
 _DEFAULT_OLLAMA_PORT = 11434
 _DEFAULT_STT_PORT = 8000
 _DEFAULT_LLAMA_SERVER_PORT = 8081
+_DEFAULT_OPEN_WEBUI_PORT = 3000
+_DEFAULT_LOBECHAT_PORT = 3210
+_DEFAULT_OPENCLAW_PORT = 8090
 _SERVICE_TIMEOUT = 3  # secondes
 
 # Rôles IA reconnus
 ROLE_OLLAMA_SERVER = "ollama_server"
 ROLE_STT_SERVER = "stt_server"
+ROLE_OPEN_WEBUI = "open_webui"
+ROLE_LOBECHAT = "lobechat"
+ROLE_OPENCLAW_SERVER = "openclaw_server"
 
 # Descripteurs de services IA (data-driven)
 _SERVICE_DEFS: list[dict[str, str | int]] = [
@@ -45,6 +51,27 @@ _SERVICE_DEFS: list[dict[str, str | int]] = [
         "port_var": "stt_port",
         "default_port": _DEFAULT_STT_PORT,
         "health_path": "/v1/models",
+    },
+    {
+        "role": ROLE_OPEN_WEBUI,
+        "name": "open_webui",
+        "port_var": "open_webui_port",
+        "default_port": _DEFAULT_OPEN_WEBUI_PORT,
+        "health_path": "/",
+    },
+    {
+        "role": ROLE_LOBECHAT,
+        "name": "lobechat",
+        "port_var": "lobechat_port",
+        "default_port": _DEFAULT_LOBECHAT_PORT,
+        "health_path": "/",
+    },
+    {
+        "role": ROLE_OPENCLAW_SERVER,
+        "name": "openclaw",
+        "port_var": "openclaw_port",
+        "default_port": _DEFAULT_OPENCLAW_PORT,
+        "health_path": "/health",
     },
 ]
 
@@ -116,17 +143,20 @@ def compute_ai_status(infra: Infrastructure) -> AiStatus:
                 if str(svc_def["role"]) not in machine.roles:
                     continue
                 port = machine.vars.get(
-                    str(svc_def["port_var"]), svc_def["default_port"],
+                    str(svc_def["port_var"]),
+                    svc_def["default_port"],
                 )
                 health_url = f"http://{machine.ip}:{port}{svc_def['health_path']}"
                 svc_name = str(svc_def["name"])
                 detail, reachable = _check_service(health_url, svc_name)
-                services.append(AiServiceStatus(
-                    name=svc_name,
-                    reachable=reachable,
-                    url=f"http://{machine.ip}:{port}",
-                    detail=detail,
-                ))
+                services.append(
+                    AiServiceStatus(
+                        name=svc_name,
+                        reachable=reachable,
+                        url=f"http://{machine.ip}:{port}",
+                        detail=detail,
+                    )
+                )
 
     return AiStatus(gpu=gpu_info, services=services)
 
@@ -162,7 +192,10 @@ def flush_vram(infra: Infrastructure) -> FlushResult:
     llama_stopped = False
     if ollama_ip and project and instance_name:
         llama_stopped = _stop_llama_server(
-            ollama_ip, _DEFAULT_LLAMA_SERVER_PORT, project, instance_name,
+            ollama_ip,
+            _DEFAULT_LLAMA_SERVER_PORT,
+            project,
+            instance_name,
         )
 
     gpu_after = detect_gpu()
@@ -330,7 +363,10 @@ def _unload_all_models(ip: str, port: int) -> list[str]:
 
 
 def _stop_llama_server(
-    ip: str, port: int, project: str, instance_name: str,
+    ip: str,
+    port: int,
+    project: str,
+    instance_name: str,
 ) -> bool:
     """Arrête llama-server si actif (via health check puis incus exec)."""
     if not check_service_health(f"http://{ip}:{port}/health"):
@@ -344,9 +380,15 @@ def _incus_exec_stop_llama(project: str, instance_name: str) -> bool:
     try:
         subprocess.run(
             [
-                "incus", "exec", instance_name,
-                "--project", project,
-                "--", "systemctl", "stop", "llama-server",
+                "incus",
+                "exec",
+                instance_name,
+                "--project",
+                project,
+                "--",
+                "systemctl",
+                "stop",
+                "llama-server",
             ],
             capture_output=True,
             timeout=10,
