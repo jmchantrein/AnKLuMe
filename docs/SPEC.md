@@ -1128,7 +1128,204 @@ retourne le ruleset nftables complet sous forme de string.
 - Politique `host` : commentaire informatif `[hôte]`
 - Échec `nft -f` : message d'erreur nftables affiché
 
-## 13. Fonctionnalités additionnelles
+## 13. Status et Destroy
+
+Commandes de supervision et de nettoyage de l'infrastructure.
+
+### 13.1 `anklume status`
+
+Compare l'état déclaré (YAML) avec l'état réel (Incus) et affiche
+un tableau par domaine.
+
+#### Logique
+
+Pour chaque domaine activé :
+1. Vérifie si le projet Incus existe
+2. Vérifie si le réseau bridge existe
+3. Pour chaque machine déclarée, vérifie son état dans Incus
+
+#### États d'une instance
+
+| État | Signification |
+|------|---------------|
+| `Running` | Instance active |
+| `Stopped` | Instance existante mais arrêtée |
+| `Absent` | Déclarée dans le YAML, absente dans Incus |
+
+L'état attendu est toujours `Running` (apply démarre toutes les
+instances déclarées).
+
+#### Affichage
+
+```
+pro:
+  Projet : oui    Réseau : oui
+  pro-dev          lxc   Running  [ok]
+  pro-desktop      lxc   Stopped  [arrêtée]
+
+perso:
+  Projet : oui    Réseau : non
+  perso-web        lxc   Absent   [absente]
+
+Résumé : 2/2 projets, 1/2 réseaux, 1/3 instances running
+```
+
+`[ok]` = synchronisé, sinon raison de la désynchronisation.
+
+#### Support nesting
+
+Le préfixe de nesting est appliqué lors de la requête Incus
+(comme dans le réconciliateur). L'affichage montre les noms logiques
+(sans préfixe).
+
+#### Module `engine/status.py`
+
+```python
+@dataclass
+class InstanceStatus:
+    name: str          # nom complet logique (pro-dev)
+    machine_type: str  # lxc/vm
+    state: str         # "Running", "Stopped", "Absent"
+    synced: bool       # True si Running
+
+@dataclass
+class DomainStatus:
+    name: str
+    project_exists: bool
+    network_exists: bool
+    instances: list[InstanceStatus]
+
+@dataclass
+class InfraStatus:
+    domains: list[DomainStatus]
+
+    @property
+    def projects_total(self) -> int: ...
+    @property
+    def projects_found(self) -> int: ...
+    @property
+    def networks_total(self) -> int: ...
+    @property
+    def networks_found(self) -> int: ...
+    @property
+    def instances_total(self) -> int: ...
+    @property
+    def instances_running(self) -> int: ...
+
+def compute_status(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    nesting_context: NestingContext | None = None,
+) -> InfraStatus
+```
+
+Fonction pure (sauf lecture Incus via driver).
+
+### 13.2 `anklume destroy`
+
+Supprime l'infrastructure créée par anklume. Respecte la protection
+`ephemeral` par défaut.
+
+#### Comportement sans `--force`
+
+Pour chaque domaine activé :
+1. Lister les instances dans le projet Incus
+2. Pour chaque machine déclarée :
+   - Si `ephemeral: true` → arrêter et supprimer
+   - Si `ephemeral: false` → ignorer (protégée)
+3. Si toutes les instances du domaine sont supprimées :
+   - Supprimer le réseau
+   - Supprimer le projet
+4. Sinon : réseau et projet conservés (instances protégées restantes)
+
+#### Comportement avec `--force`
+
+1. Pour chaque machine déclarée :
+   - Retirer `security.protection.delete` si présent
+   - Arrêter et supprimer l'instance
+2. Supprimer le réseau
+3. Supprimer le projet
+
+#### Ordre de destruction (inverse de la création)
+
+1. Arrêter les instances running
+2. Retirer la protection delete (si `--force`)
+3. Supprimer les instances
+4. Supprimer le réseau
+5. Supprimer le projet
+
+#### Affichage
+
+```
+pro:
+  Arrêter pro-dev
+  Supprimer pro-dev
+  [protégée] pro-desktop (utiliser --force)
+  Réseau net-pro conservé (instances protégées)
+  Projet pro conservé (instances protégées)
+
+1 instance(s) supprimée(s), 1 protégée(s), 0 erreur(s).
+```
+
+Avec `--force` :
+```
+pro:
+  Arrêter pro-dev
+  Supprimer pro-dev
+  Déprotéger pro-desktop
+  Arrêter pro-desktop
+  Supprimer pro-desktop
+  Supprimer réseau net-pro
+  Supprimer projet pro
+
+2 instance(s) supprimée(s), 0 erreur(s).
+```
+
+#### Support nesting
+
+Comme pour status, le préfixe nesting est appliqué sur les noms
+Incus. L'affichage montre les noms logiques.
+
+#### Driver Incus — méthodes destroy
+
+| Méthode | Commande Incus |
+|---------|---------------|
+| `instance_config_set(inst, project, key, val)` | `incus config set <inst> <key>=<val> --project <p>` |
+| `network_delete(name, project)` | `incus network delete <name> --project <p>` |
+| `project_delete(name)` | `incus project delete <name>` |
+
+#### Module `engine/destroy.py`
+
+```python
+@dataclass
+class DestroyAction:
+    verb: str        # "stop", "unprotect", "delete"
+    resource: str    # "instance", "network", "project"
+    target: str      # nom de la ressource
+    project: str     # projet Incus
+    detail: str      # description lisible
+
+@dataclass
+class DestroyResult:
+    actions: list[DestroyAction]
+    executed: list[DestroyAction]
+    errors: list[tuple[DestroyAction, str]]
+    skipped: list[tuple[str, str]]  # (instance, raison)
+
+    @property
+    def success(self) -> bool: ...
+
+def destroy(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+    nesting_context: NestingContext | None = None,
+) -> DestroyResult
+```
+
+## 14. Fonctionnalités additionnelles
 
 ### Intégration IA
 
@@ -1168,7 +1365,7 @@ Quand anklume détecte une version antérieure :
 - propose la migration automatique (`anklume apply` ou `anklume migrate`)
 - refuse de continuer sur un schéma incompatible sans migration
 
-## 14. Historique
+## 15. Historique
 
 La branche `poc` contient le prototype initial. Décisions retenues :
 

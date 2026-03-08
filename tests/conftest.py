@@ -109,6 +109,11 @@ def mock_driver(
     _snapshots = snapshots or {}
     driver.snapshot_list.side_effect = lambda inst, proj: _snapshots.get(inst, [])
 
+    # Méthodes destroy — noop par défaut
+    driver.instance_config_set.return_value = None
+    driver.network_delete.return_value = None
+    driver.project_delete.return_value = None
+
     return driver
 
 

@@ -96,9 +96,18 @@
 - [x] Tests unitaires : 44 tests resource policy
 - [x] 325 tests unitaires au total, zéro régression
 
-## Phase 9 — Status et destroy
-- [ ] `anklume status` (état réel vs déclaré)
-- [ ] `anklume destroy` (avec protection ephemeral)
+## Phase 9 — Status et destroy ✅
+
+- [x] SPEC §13 détaillé (status : comparaison déclaré/réel, destroy : protection ephemeral, --force, dry-run)
+- [x] `engine/status.py` — compute_status, InfraStatus, DomainStatus, InstanceStatus
+- [x] `engine/destroy.py` — destroy, DestroyAction, DestroyResult, protection ephemeral
+- [x] Driver Incus : `instance_config_set`, `network_delete`, `project_delete`
+- [x] `anklume status` — tableau par domaine (projet, réseau, instances, sync)
+- [x] `anklume destroy` — suppression avec respect ephemeral, `--force` pour tout détruire
+- [x] Support nesting (préfixes) pour status et destroy
+- [x] Dry-run destroy (plan sans exécuter)
+- [x] Tests unitaires : 12 tests status + 18 tests destroy
+- [x] 364 tests au total, zéro régression
 
 ### Reporté (post-MVP, mais design anticipé dès maintenant)
 - Live ISO — OS immuable + persistance chiffrée ZFS/BTRFS (`live/`)

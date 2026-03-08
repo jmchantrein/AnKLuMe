@@ -65,7 +65,9 @@ def init(
 @app.command()
 def status() -> None:
     """Afficher l'état de l'infrastructure."""
-    typer.echo("status : pas encore implémenté")
+    from anklume.cli._status import run_status
+
+    run_status()
 
 
 @app.command()
@@ -76,7 +78,9 @@ def destroy(
     ] = False,
 ) -> None:
     """Détruire l'infrastructure."""
-    typer.echo("destroy : pas encore implémenté")
+    from anklume.cli._destroy import run_destroy
+
+    run_destroy(force=force)
 
 
 # --- anklume apply <all|domaine> ---

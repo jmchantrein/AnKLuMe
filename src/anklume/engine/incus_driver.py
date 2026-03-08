@@ -199,6 +199,15 @@ class IncusDriver:
     def snapshot_delete(self, instance: str, project: str, name: str) -> None:
         self._run(["snapshot", "delete", instance, name, "--project", project])
 
+    def instance_config_set(self, instance: str, project: str, key: str, value: str) -> None:
+        self._run(["config", "set", instance, f"{key}={value}", "--project", project])
+
+    def network_delete(self, name: str, project: str) -> None:
+        self._run(["network", "delete", name, "--project", project])
+
+    def project_delete(self, name: str) -> None:
+        self._run(["project", "delete", name])
+
     # --- Info ---
 
     def host_resources(self) -> dict:
