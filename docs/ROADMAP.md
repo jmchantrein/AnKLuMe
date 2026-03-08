@@ -109,12 +109,220 @@
 - [x] Tests unitaires : 12 tests status + 18 tests destroy
 - [x] 364 tests au total, zéro régression
 
-### Reporté (post-MVP, mais design anticipé dès maintenant)
+## Phase 10 — Infrastructure IA (GPU, LLM, STT)
+
+Fondations IA : GPU passthrough, services de base (Ollama, Speaches),
+gestion VRAM et accès exclusif. Adapté du POC (branche `poc`,
+domaine `ai-tools`) vers l'architecture PSOT `domains/*.yml`.
+
+> **Adaptation POC → main** : les scripts shell (`ai-switch.sh`)
+> deviennent des modules Python dans `engine/` + commandes CLI Typer.
+> Les rôles Ansible passent de `roles/` racine à `provisioner/roles/`
+> embarqués. La config `infra.yml` monolithique est remplacée par
+> `domains/ai-tools.yml` + `anklume.yml`.
+
+### 10a — GPU passthrough et profils
+
+- [ ] SPEC §16 détaillé (GPU : détection, profils, politique, validation)
+- [ ] `engine/gpu.py` — détection GPU hôte via `nvidia-smi`
+  (présence, modèle, VRAM totale/utilisée)
+- [ ] Validation du flag `gpu: true` sur les machines
+  - Erreur si `gpu: true` et aucun GPU détecté sur l'hôte
+- [ ] Profil Incus `nvidia-compute` : création automatique si GPU détecté
+  - Device `gpu` de type `gpu` avec `gid`/`uid` appropriés
+- [ ] Politique GPU (`gpu_policy` dans `anklume.yml`) :
+  - `exclusive` (défaut) : une seule instance GPU à la fois, erreur sinon
+  - `shared` : plusieurs instances partagent le GPU, warning
+- [ ] Intégration au réconciliateur (profil GPU ajouté à l'instance)
+- [ ] Driver Incus : `profile_create`, `profile_exists`, `profile_list`
+- [ ] Tests unitaires : détection, validation, profils, politique
+
+### 10b — Rôles Ansible IA de base
+
+- [ ] Rôle `ollama_server` (embarqué dans `provisioner/roles/`)
+  - Installation via `https://ollama.com/install.sh`
+  - Détection GPU runtime (`nvidia-smi`), fallback CPU
+  - Service systemd, port configurable (défaut 11434)
+  - Pull automatique d'un modèle par défaut au provisioning
+  - *POC : `roles/ollama_server/` → adapté en rôle embarqué*
+- [ ] Rôle `stt_server` — Speaches (embarqué)
+  - Installation via `uv` depuis les sources
+  - API OpenAI-compatible (`/v1/audio/transcriptions`)
+  - GPU float16 si disponible, fallback int8 CPU
+  - Service systemd, port configurable (défaut 8000)
+  - Coexistence avec Ollama sur le même GPU
+  - *POC : `roles/stt_server/` → adapté en rôle embarqué*
+- [ ] Tests unitaires : génération inventaire/playbook avec rôles IA
+
+### 10c — Domaine ai-tools et accès réseau
+
+- [ ] Exemple de domaine `ai-tools` dans `anklume init`
+  - `gpu-server` : `gpu: true`, rôles `[base, ollama_server, stt_server]`
+- [ ] Politiques réseau pour l'accès IA :
+  - Accès depuis d'autres domaines vers Ollama (port 11434)
+  - Accès depuis l'hôte vers les services IA
+- [ ] Sous-commande `anklume ai` (groupe CLI)
+- [ ] `anklume ai status` — état des services IA :
+  - GPU détecté (modèle, VRAM totale/utilisée)
+  - Ollama running, modèles chargés (`/api/ps`)
+  - STT running
+  - Domaine ayant accès actuellement
+
+### 10d — Push-to-talk STT (hôte KDE)
+
+Raccourci clavier sur l'hôte pour dicter du texte via Speaches.
+Le texte transcrit est collé dans la fenêtre active.
+KDE Plasma Wayland uniquement dans un premier temps.
+
+- [ ] Script push-to-talk (`host/stt/push-to-talk.sh`)
+  - Meta+S (Super+S) en mode toggle :
+    1er appui → démarre l'enregistrement (`pw-record`)
+    2e appui → arrête, envoie à Speaches, colle le résultat
+  - Notification desktop (`notify-send`) : début/fin/erreur
+  - Nettoyage des fichiers temporaires (signal handlers)
+  - *POC : `host/stt/stt-push-to-talk.sh` → adapté*
+- [ ] Détection de la fenêtre active via KWin D-Bus
+  - Terminal détecté → Ctrl+Shift+V (paste terminal)
+  - Autre application → Ctrl+V (paste standard)
+  - Liste des classes terminales (Konsole, Alacritty, kitty, etc.)
+- [ ] Support clavier AZERTY (`host/stt/azerty-type.py`)
+  - Frappe via `ydotool key` avec keycodes Linux
+  - Accents (é, è, ê, à, ù), dead keys (^, ¨)
+  - Shift et AltGr pour caractères spéciaux
+  - *POC : `host/stt/stt-azerty-type.py` → adapté*
+- [ ] Mode streaming temps réel (`host/stt/streaming.py`)
+  - Chunks audio ~3s, transcription incrémentale
+  - Diff mot-à-mot pour éviter les doublons
+  - Filtrage des hallucinations Whisper ("sous-titres", "merci")
+  - Détection de silence (RMS), timeouts de sécurité
+  - *POC : `host/stt/stt-streaming.py` → adapté*
+- [ ] `anklume stt setup` — installe les dépendances hôte
+  (`pw-record`, `ydotool`, `wl-copy`, `wl-paste`, `jq`)
+  et configure le raccourci KDE (Meta+S)
+- [ ] `anklume stt status` — état du service STT, santé endpoint
+- [ ] Configuration : `STT_API_URL`, `STT_MODEL`, `STT_LANGUAGE` (défaut `fr`)
+- [ ] Tests unitaires : parsing réponse API, détection terminal, AZERTY
+
+### 10e — Gestion VRAM et accès exclusif
+
+- [ ] `engine/ai.py` — logique métier IA (flush, switch, état)
+- [ ] `anklume ai flush` — décharge tous les modèles Ollama,
+  arrête llama-server si actif (libère la VRAM)
+  - *POC : script bash inline → module Python*
+- [ ] `anklume ai switch <domaine>` — bascule l'accès exclusif GPU :
+  1. Flush VRAM
+  2. Mise à jour nftables (bloquer ancien domaine, autoriser nouveau)
+  3. Redémarrage services GPU
+  4. Log de l'opération
+  - *POC : `scripts/ai-switch.sh` → `engine/ai.py` + CLI*
+- [ ] Fichier d'état `/var/lib/anklume/ai-access-current`
+- [ ] Champ `ai_access_policy` dans `anklume.yml` :
+  - `exclusive` (défaut) : un seul domaine accède à ai-tools
+  - `open` : tous les domaines autorisés peuvent accéder
+- [ ] Tests unitaires : flush, switch, politique d'accès
+
+## Phase 11 — Services IA avancés
+
+Services de haut niveau construits sur la fondation Phase 10 :
+interfaces de chat, sanitisation LLM, assistant autonome,
+développement assisté par IA.
+
+> **Adaptation POC → main** : chaque service POC (Open WebUI,
+> LobeChat, OpenClaw, sanitizer) était un rôle Ansible autonome.
+> Ici ils deviennent des rôles embarqués dans `provisioner/roles/`
+> avec des variables configurables dans `domains/*.yml` via `vars:`.
+> Les scripts de développement IA (`ai-test-loop.sh`) deviennent
+> des commandes CLI Python.
+
+### 11a — Interfaces de chat
+
+- [ ] Rôle `open_webui` (embarqué)
+  - Interface web pour Ollama (port 3000)
+  - Connexion automatique au serveur Ollama du domaine
+  - *POC : `roles/open_webui/` → rôle embarqué*
+- [ ] Rôle `lobechat` (embarqué)
+  - Support multi-providers (Ollama local, OpenRouter cloud)
+  - Port configurable (défaut 3210)
+  - *POC : `roles/lobechat/` → rôle embarqué*
+- [ ] Machines optionnelles dans le domaine `ai-tools` :
+  ```yaml
+  ai-webui:
+    roles: [base, open_webui]
+    vars: { ollama_host: "gpu-server", ollama_port: 11434 }
+  ```
+- [ ] Politiques réseau : accès navigateur depuis les domaines autorisés
+
+### 11b — Proxy de sanitisation LLM
+
+Anonymise les données sensibles avant envoi à un LLM externe.
+Protège contre les fuites d'IPs internes, credentials, noms
+de ressources Incus.
+
+- [ ] `engine/sanitizer.py` — moteur de détection et remplacement
+  - IPs privées (RFC 1918, zones anklume 10.1xx)
+  - Ressources Incus (projets, bridges, instances)
+  - FQDNs internes (*.internal, *.corp, *.local)
+  - Credentials (bearer tokens, clés API, patterns `key=...`)
+  - Identifiants Ansible (group_vars, host_vars)
+  - *POC : `roles/llm_sanitizer/` → module Python + rôle*
+- [ ] Modes de remplacement :
+  - `mask` : `10.120.0.5` → `10.ZONE.SEQ.HOST`
+  - `pseudonymize` : remplacement cohérent dans une session
+- [ ] Rôle `llm_sanitizer` (embarqué) — proxy HTTP (port 8089)
+  - Intercepte les requêtes vers les APIs LLM cloud
+  - Audit log des données sanitisées
+- [ ] Champ `ai_sanitize` dans le domaine :
+  - `false` (défaut pour local), `true`, `always`
+- [ ] Tests unitaires : patterns de détection, modes de remplacement
+
+### 11c — OpenClaw — assistant IA par domaine
+
+Assistant autonome qui monitore et interagit avec l'infrastructure.
+Un OpenClaw par domaine, respecte les frontières réseau.
+
+- [ ] Rôle `openclaw_server` (embarqué)
+  - Self-hosted, SQLite pour mémoire + RAG
+  - Channels : Telegram, Signal (configurables via `vars:`)
+  - Heartbeat monitoring (intervalle configurable, défaut 30 min)
+  - Cron scheduling pour les tâches récurrentes
+  - *POC : `roles/openclaw_server/` → rôle embarqué*
+- [ ] Configuration dans le domaine :
+  ```yaml
+  ai-assistant:
+    roles: [base, openclaw_server]
+    vars:
+      openclaw_channels: [telegram]
+      openclaw_heartbeat_interval: 30m
+      openclaw_ollama_host: "gpu-server"
+  ```
+- [ ] Politiques réseau : accès à Ollama depuis le domaine assistant
+- [ ] Tests unitaires : génération config OpenClaw
+
+### 11d — Développement assisté par IA
+
+Outils pour utiliser les LLM dans le workflow de développement
+d'anklume lui-même et des projets utilisateur.
+
+- [ ] `anklume ai test` — boucle test + analyse LLM + fix
+  - Modes : dry-run (défaut), auto-apply, auto-PR
+  - Backends LLM : Ollama (local), Claude API (remote)
+  - Max retries configurable (défaut 3)
+  - Session logging complet
+  - *POC : `scripts/ai-test-loop.sh` → commande CLI Python*
+- [ ] Rôle `code_sandbox` (embarqué)
+  - Sandbox isolé pour exécution de code généré par LLM
+  - Réseau restreint, filesystem éphémère
+  - *POC : `roles/code_sandbox/` → rôle embarqué*
+- [ ] Rôle `opencode_server` (embarqué)
+  - Serveur de coding IA headless
+  - *POC : `roles/opencode_server/` → rôle embarqué*
+- [ ] Tests unitaires : boucle de test, génération sandbox
+
+### Reporté (post-Phase 11)
 - Live ISO — OS immuable + persistance chiffrée ZFS/BTRFS (`live/`)
 - Plateforme web (`platform/`)
-- Labs (`labs/`)
+- Labs éducatifs (`labs/`)
 - Gestion distante via SSH (optionnel)
-- Intégration IA (LLM, STT)
 - Internationalisation (i18n)
 
 ### Contraintes Live ISO à respecter dès le core
