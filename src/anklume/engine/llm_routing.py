@@ -226,11 +226,7 @@ def enrich_llm_vars(infra: Infrastructure) -> Infrastructure:
     Retourne une copie enrichie de l'infrastructure.
     """
     # Fast path : pas de consommateur LLM → retour direct
-    if not any(
-        _is_llm_consumer(m)
-        for d in infra.enabled_domains
-        for m in d.machines.values()
-    ):
+    if not any(_is_llm_consumer(m) for d in infra.enabled_domains for m in d.machines.values()):
         return infra
 
     enriched = copy.deepcopy(infra)
@@ -255,9 +251,7 @@ def enrich_llm_vars(infra: Infrastructure) -> Infrastructure:
             if ep.sanitized and ep.upstream_url:
                 san = _find_machine_by_role(ROLE_LLM_SANITIZER, domain, enriched)
                 if san is not None:
-                    sanitizer_upstreams.setdefault(
-                        san.full_name, set()
-                    ).add(ep.upstream_url)
+                    sanitizer_upstreams.setdefault(san.full_name, set()).add(ep.upstream_url)
 
     # Appliquer les upstream URLs sur les machines sanitizer
     for domain in enriched.enabled_domains:
@@ -302,13 +296,9 @@ def validate_llm_config(
 
     if backend in _EXTERNAL_BACKENDS:
         if not api_url:
-            errors.append(
-                f"llm_api_url requis pour le backend '{backend}'"
-            )
+            errors.append(f"llm_api_url requis pour le backend '{backend}'")
         if not api_key:
-            errors.append(
-                f"llm_api_key requis pour le backend '{backend}'"
-            )
+            errors.append(f"llm_api_key requis pour le backend '{backend}'")
 
     return errors
 

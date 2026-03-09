@@ -29,9 +29,7 @@ class TestRollbackSnapshot:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ]
             },
             snapshots={
@@ -54,9 +52,7 @@ class TestRollbackSnapshot:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ]
             },
             snapshots={
@@ -74,9 +70,7 @@ class TestRollbackSnapshot:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Stopped", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Stopped", type="container", project="pro")
                 ]
             },
             snapshots={
@@ -97,9 +91,7 @@ class TestRollbackSnapshot:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ]
             },
             snapshots={
@@ -117,9 +109,7 @@ class TestRollbackSnapshot:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ]
             },
             snapshots={
@@ -199,9 +189,7 @@ class TestSnapshotDelete:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ]
             },
         )

@@ -25,14 +25,10 @@ def run_llm_status() -> None:
 
     # Machines LLM
     if status.machines:
-        typer.echo(
-            f"\n{'MACHINE':<25s} {'BACKEND':<12s} {'SANITISÉ':<10s} {'URL'}"
-        )
+        typer.echo(f"\n{'MACHINE':<25s} {'BACKEND':<12s} {'SANITISÉ':<10s} {'URL'}")
         for m in status.machines:
             san = "oui" if m.sanitized else "non"
-            typer.echo(
-                f"{m.name:<25s} {m.backend:<12s} {san:<10s} {m.url}"
-            )
+            typer.echo(f"{m.name:<25s} {m.backend:<12s} {san:<10s} {m.url}")
     else:
         typer.echo("\nAucune machine consommatrice LLM configurée.")
 
@@ -63,7 +59,7 @@ def run_llm_bench(*, model: str = "", prompt: str = "") -> None:
         raise typer.Exit(1) from None
 
     typer.echo(f"Modèle   : {result.model}")
-    typer.echo(f"Prompt   : \"{result.prompt}\"")
+    typer.echo(f'Prompt   : "{result.prompt}"')
     typer.echo(f"Tokens   : {result.tokens}")
     typer.echo(f"Durée    : {result.duration_s}s")
     typer.echo(f"Vitesse  : {result.tokens_per_s} tokens/s")

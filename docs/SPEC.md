@@ -3266,3 +3266,465 @@ Le module `llm_routing.py` continue de traiter `openclaw_server`
 comme un `LLM_CONSUMER_ROLE`. La fonction `enrich_llm_vars()`
 enrichit les variables de la machine, qui sont ensuite mappées
 vers les variables d'environnement OpenClaw dans l'override systemd.
+
+## 29. Portails et transferts
+
+Communication hôte ↔ conteneur sans compromettre l'isolation.
+Quatre fonctionnalités complémentaires : transfert de fichiers,
+partage de presse-papiers, conteneurs jetables, et import d'infra
+existante.
+
+### 29.1 File portals — transfert de fichiers
+
+Transfert de fichiers entre l'hôte et les conteneurs via la
+CLI `incus file push/pull`. Le portail respecte les frontières
+de projet Incus : chaque instance est identifiée par son nom
+complet (`domaine-machine`) et résolue vers son projet.
+
+#### Commandes CLI
+
+```
+anklume portal push <instance> <chemin_local> [chemin_distant]
+anklume portal pull <instance> <chemin_distant> [chemin_local]
+anklume portal list <instance> [chemin_distant]
+```
+
+**`push`** : envoie un fichier local vers l'instance.
+- `chemin_distant` : défaut `/tmp/` (le fichier garde son nom)
+- Vérifie que le fichier local existe
+- Vérifie que l'instance existe dans l'infra
+
+**`pull`** : récupère un fichier depuis l'instance.
+- `chemin_local` : défaut `.` (répertoire courant)
+- Vérifie que l'instance existe dans l'infra
+
+**`list`** : liste les fichiers d'un répertoire distant.
+- `chemin_distant` : défaut `/root/`
+- Affiche : nom, type, taille, permissions
+
+#### Sorties
+
+```
+# push
+Envoyé : rapport.pdf → pro-dev:/tmp/rapport.pdf (42 Ko)
+
+# pull
+Récupéré : pro-dev:/var/log/syslog → ./syslog (128 Ko)
+
+# list
+NOM                TYPE        TAILLE    PERMISSIONS
+rapport.pdf        fichier     42 Ko     -rw-r--r--
+backup/            répertoire  -         drwxr-xr-x
+```
+
+#### Driver Incus — méthodes fichier
+
+```python
+def file_push(
+    self,
+    instance: str,
+    project: str,
+    local_path: str,
+    remote_path: str,
+) -> None:
+    """Push un fichier via incus file push."""
+    self._run([
+        "file", "push", local_path,
+        f"{instance}{remote_path}",
+        "--project", project,
+    ])
+
+def file_pull(
+    self,
+    instance: str,
+    project: str,
+    remote_path: str,
+    local_path: str,
+) -> None:
+    """Pull un fichier via incus file pull."""
+    self._run([
+        "file", "pull",
+        f"{instance}{remote_path}",
+        local_path,
+        "--project", project,
+    ])
+```
+
+#### Module `engine/portal.py`
+
+```python
+@dataclass
+class PortalEntry:
+    """Entrée dans un répertoire distant."""
+    name: str
+    entry_type: str     # "file" | "directory" | "link"
+    size: int           # octets (-1 si inconnu)
+    permissions: str    # ex: "-rw-r--r--"
+
+@dataclass
+class TransferResult:
+    """Résultat d'un transfert fichier."""
+    instance: str
+    local_path: str
+    remote_path: str
+    size: int           # octets transférés
+
+def push_file(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+    local_path: str,
+    remote_path: str = "/tmp/",
+) -> TransferResult:
+    """Envoie un fichier vers une instance."""
+
+def pull_file(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+    remote_path: str,
+    local_path: str = ".",
+) -> TransferResult:
+    """Récupère un fichier depuis une instance."""
+
+def list_remote(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+    remote_path: str = "/root/",
+) -> list[PortalEntry]:
+    """Liste les entrées d'un répertoire distant."""
+```
+
+Chaque fonction résout d'abord l'instance vers son projet via
+`resolve_instance_project()`. Erreur si l'instance est inconnue.
+
+### 29.2 Clipboard sharing — presse-papiers hôte ↔ conteneur
+
+Pipe le contenu du presse-papiers hôte vers/depuis un conteneur.
+Utilise `wl-paste`/`wl-copy` côté hôte (Wayland KDE Plasma) et
+un fichier temporaire dans le conteneur.
+
+#### Commande CLI
+
+```
+anklume instance clipboard <instance> --push    # hôte → conteneur
+anklume instance clipboard <instance> --pull    # conteneur → hôte
+```
+
+**`--push`** (défaut) :
+1. Lit le presse-papiers hôte via `wl-paste`
+2. Écrit le contenu dans `/tmp/.anklume-clipboard` du conteneur
+   via `file_push`
+3. Affiche le nombre de caractères transférés
+
+**`--pull`** :
+1. Lit `/tmp/.anklume-clipboard` du conteneur via `instance_exec`
+2. Écrit sur le presse-papiers hôte via `wl-copy`
+3. Affiche le nombre de caractères transférés
+
+#### Module `engine/clipboard.py`
+
+```python
+CLIPBOARD_PATH = "/tmp/.anklume-clipboard"
+
+@dataclass
+class ClipboardResult:
+    """Résultat d'une opération presse-papiers."""
+    direction: str        # "push" | "pull"
+    instance: str
+    content_length: int   # caractères transférés
+
+def clipboard_push(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+) -> ClipboardResult:
+    """Copie le presse-papiers hôte vers le conteneur."""
+
+def clipboard_pull(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+) -> ClipboardResult:
+    """Copie le contenu du conteneur vers le presse-papiers hôte."""
+
+def read_host_clipboard() -> str:
+    """Lit le presse-papiers hôte via wl-paste."""
+
+def write_host_clipboard(text: str) -> None:
+    """Écrit sur le presse-papiers hôte via wl-copy."""
+```
+
+#### Modification du driver
+
+Ajout du paramètre `input` à `instance_exec` pour supporter
+le pipe de données vers stdin :
+
+```python
+def instance_exec(
+    self,
+    instance: str,
+    project: str,
+    command: list[str],
+    *,
+    input: str | None = None,
+) -> subprocess.CompletedProcess:
+    """Exécute une commande dans une instance.
+
+    Args:
+        input: données à envoyer sur stdin de la commande.
+    """
+```
+
+### 29.3 Disposable containers — conteneurs jetables
+
+Conteneurs éphémères pour des tâches ponctuelles. Lancement rapide,
+shell interactif, destruction automatique à la sortie.
+
+#### Commandes CLI
+
+```
+anklume disp <image>                # shell interactif
+anklume disp <image> -- <cmd>       # exécuter une commande
+anklume disp --list                 # lister les conteneurs jetables actifs
+anklume disp --cleanup              # détruire tous les conteneurs jetables
+```
+
+**Shell interactif** :
+1. Crée un conteneur `disp-XXXX` (suffixe hex aléatoire 4 chars)
+2. Démarre le conteneur
+3. Ouvre un shell via `incus exec` (process remplacé, stdin/stdout
+   directs vers le terminal)
+4. À la sortie du shell, détruit le conteneur
+
+**Exécution unique** :
+1. Crée et démarre le conteneur
+2. Exécute la commande via `instance_exec`
+3. Affiche stdout/stderr
+4. Détruit le conteneur
+
+**Listing** : affiche les conteneurs `disp-*` en cours.
+
+**Cleanup** : détruit tous les conteneurs `disp-*`.
+
+#### Module `engine/disposable.py`
+
+```python
+DISP_PREFIX = "disp-"
+DISP_PROJECT = "default"
+
+@dataclass
+class DispContainer:
+    """Conteneur jetable."""
+    name: str
+    image: str
+    project: str = DISP_PROJECT
+    status: str = "Running"
+
+def generate_disp_name() -> str:
+    """Génère un nom unique disp-XXXX (4 hex)."""
+
+def launch_disposable(
+    driver: IncusDriver,
+    image: str,
+    *,
+    project: str = DISP_PROJECT,
+) -> DispContainer:
+    """Crée et démarre un conteneur jetable."""
+
+def list_disposables(
+    driver: IncusDriver,
+    *,
+    project: str = DISP_PROJECT,
+) -> list[DispContainer]:
+    """Liste les conteneurs jetables actifs."""
+
+def destroy_disposable(
+    driver: IncusDriver,
+    name: str,
+    *,
+    project: str = DISP_PROJECT,
+) -> None:
+    """Arrête et détruit un conteneur jetable."""
+
+def cleanup_disposables(
+    driver: IncusDriver,
+    *,
+    project: str = DISP_PROJECT,
+) -> int:
+    """Détruit tous les conteneurs jetables. Retourne le nombre supprimé."""
+```
+
+#### Shell interactif
+
+Le shell interactif utilise `os.execvp` pour remplacer le processus
+Python par `incus exec`. Cela donne un vrai terminal interactif
+avec support des signaux, redimensionnement, etc.
+
+```python
+import os
+os.execvp("incus", [
+    "incus", "exec", name, "--project", project, "--", "bash",
+])
+```
+
+Le nettoyage du conteneur est assuré par un `atexit` handler
+ou un `try/finally` qui appelle `destroy_disposable` avant
+l'exec. Comme `execvp` remplace le process, le cleanup est
+fait dans un fork préalable.
+
+Alternative : utiliser `subprocess.run` sans `capture_output`
+(stdin/stdout/stderr hérités du terminal parent), puis détruire
+après la fin du process.
+
+### 29.4 Import infrastructure existante
+
+Scanne un Incus déjà configuré et génère les fichiers
+`domains/*.yml` correspondants. Permet d'adopter anklume sur
+une infrastructure existante.
+
+#### Commande CLI
+
+```
+anklume setup import [--dir <répertoire>]
+```
+
+**Flux** :
+1. Scanner les projets Incus (hors `default`)
+2. Pour chaque projet : scanner les réseaux et instances
+3. Mapper vers le format domaine anklume :
+   - Projet → domaine
+   - Réseau `net-*` → subnet (déduit du config CIDR)
+   - Instance → machine (nom déduit en retirant le préfixe projet)
+4. Générer les fichiers `domains/<projet>.yml`
+5. Afficher un récapitulatif
+
+**Limitations** :
+- Les rôles Ansible ne sont pas détectés (config manuelle)
+- Les trust levels ne sont pas déduits (défaut `semi-trusted`)
+- Le `anklume.yml` existant est préservé (créé si absent)
+
+#### Module `engine/import_infra.py`
+
+```python
+@dataclass
+class ScannedInstance:
+    """Instance détectée dans Incus."""
+    name: str
+    status: str
+    instance_type: str    # "container" | "virtual-machine"
+    project: str
+
+@dataclass
+class ScannedDomain:
+    """Domaine reconstitué depuis un projet Incus."""
+    project: str
+    network: str | None
+    subnet: str | None
+    instances: list[ScannedInstance]
+
+@dataclass
+class ImportResult:
+    """Résultat d'un import."""
+    domains: list[ScannedDomain]
+    files_written: list[str]
+
+def scan_incus(driver: IncusDriver) -> list[ScannedDomain]:
+    """Scanne les projets Incus et reconstruit les domaines."""
+
+def generate_domain_files(
+    domains: list[ScannedDomain],
+    output_dir: Path,
+) -> list[str]:
+    """Génère les fichiers domains/*.yml depuis le scan.
+
+    Returns:
+        Liste des chemins de fichiers écrits.
+    """
+
+def import_infrastructure(
+    driver: IncusDriver,
+    output_dir: Path,
+) -> ImportResult:
+    """Scan complet + génération de fichiers."""
+```
+
+### 29.5 Intégration CLI
+
+#### Nouveau groupe `portal`
+
+```python
+# cli/__init__.py
+portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
+app.add_typer(portal_app, name="portal")
+
+@portal_app.command("push")
+def portal_push(instance, local_path, remote_path="/tmp/")
+
+@portal_app.command("pull")
+def portal_pull(instance, remote_path, local_path=".")
+
+@portal_app.command("list")
+def portal_list(instance, path="/root/")
+```
+
+#### Extension `instance clipboard`
+
+```python
+@instance_app.command("clipboard")
+def instance_clipboard(instance, push=True, pull=False)
+```
+
+#### Commande `disp`
+
+```python
+@app.command("disp")
+def disp(image=None, cmd=None, list_all=False, cleanup=False)
+```
+
+#### Nouveau groupe `setup`
+
+```python
+setup_app = typer.Typer(help="Configuration et import.")
+app.add_typer(setup_app, name="setup")
+
+@setup_app.command("import")
+def setup_import(dir=".")
+```
+
+#### Fichiers CLI
+
+| Fichier | Fonctions |
+|---------|-----------|
+| `cli/_portal.py` | `run_portal_push`, `run_portal_pull`, `run_portal_list` |
+| `cli/_instance.py` | `run_instance_clipboard` (ajout) |
+| `cli/_disp.py` | `run_disp` |
+| `cli/_setup.py` | `run_setup_import` |
+
+### 29.6 Tests
+
+| Module | Tests | Couverture |
+|--------|-------|-----------|
+| `test_portal.py` | push, pull, list, instance inconnue, fichier absent | engine/portal.py |
+| `test_clipboard.py` | push, pull, wl-paste/wl-copy mock, erreurs | engine/clipboard.py |
+| `test_disposable.py` | launch, list, destroy, cleanup, nommage | engine/disposable.py |
+| `test_import_infra.py` | scan, generate, projets vides, noms machines | engine/import_infra.py |
+| `test_driver_file.py` | file_push, file_pull, instance_exec input | incus_driver.py |
+| `test_cli_phase17.py` | registration des commandes portal, disp, setup | cli/__init__.py |
+
+### 29.7 Mise à jour des commandes CLI (§6)
+
+```
+### Portails et transferts
+
+| Commande | Description |
+|----------|-------------|
+| `anklume portal push <inst> <local> [remote]` | Envoyer un fichier |
+| `anklume portal pull <inst> <remote> [local]` | Récupérer un fichier |
+| `anklume portal list <inst> [path]` | Lister fichiers distants |
+| `anklume instance clipboard <inst>` | Presse-papiers hôte ↔ conteneur |
+| `anklume disp <image>` | Conteneur jetable (shell interactif) |
+| `anklume disp --list` | Lister les conteneurs jetables |
+| `anklume setup import` | Importer une infra Incus existante |
+```

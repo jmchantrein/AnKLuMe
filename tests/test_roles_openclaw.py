@@ -76,8 +76,7 @@ class TestOpenclawTasks:
     def test_starts_service(self):
         names = role_task_names("openclaw_server")
         assert any(
-            "démarrer" in n.lower() or "activer" in n.lower() or "start" in n.lower()
-            for n in names
+            "démarrer" in n.lower() or "activer" in n.lower() or "start" in n.lower() for n in names
         )
 
     def test_health_check(self):

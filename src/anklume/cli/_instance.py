@@ -1,4 +1,4 @@
-"""Implémentation de `anklume instance list`, `exec`, `info`."""
+"""Implémentation de `anklume instance list`, `exec`, `info`, `clipboard`."""
 
 from __future__ import annotations
 
@@ -23,14 +23,11 @@ def run_instance_list() -> None:
         typer.echo("Aucune instance déclarée.")
         return
 
-    typer.echo(
-        f"{'NOM':<25s} {'DOMAINE':<12s} {'TYPE':<5s} {'ÉTAT':<10s} {'IP'}"
-    )
+    typer.echo(f"{'NOM':<25s} {'DOMAINE':<12s} {'TYPE':<5s} {'ÉTAT':<10s} {'IP'}")
     for inst in instances:
         ip = inst.ip or "-"
         typer.echo(
-            f"{inst.name:<25s} {inst.domain:<12s} {inst.machine_type:<5s} "
-            f"{inst.state:<10s} {ip}"
+            f"{inst.name:<25s} {inst.domain:<12s} {inst.machine_type:<5s} {inst.state:<10s} {ip}"
         )
 
     running = sum(1 for i in instances if i.state == "Running")
@@ -98,3 +95,28 @@ def _print_instance_info(info: InstanceInfo) -> None:
         typer.echo(f"  Snapshots   : {', '.join(info.snapshots)}")
     else:
         typer.echo("  Snapshots   : aucun")
+
+
+def run_instance_clipboard(instance: str, *, pull: bool = False) -> None:
+    """Copie le presse-papiers hôte ↔ conteneur."""
+    from anklume.engine.clipboard import clipboard_pull, clipboard_push
+
+    infra = load_infra()
+    driver = IncusDriver()
+
+    try:
+        if pull:
+            result = clipboard_pull(driver, infra, instance)
+            typer.echo(f"Presse-papiers ← {result.instance} ({result.content_length} caractères)")
+        else:
+            result = clipboard_push(driver, infra, instance)
+            typer.echo(f"Presse-papiers → {result.instance} ({result.content_length} caractères)")
+    except ValueError as e:
+        typer.echo(f"Erreur : {e}", err=True)
+        raise typer.Exit(1) from None
+    except RuntimeError as e:
+        typer.echo(f"Erreur : {e}", err=True)
+        raise typer.Exit(1) from None
+    except IncusError as e:
+        typer.echo(f"Erreur : {e}", err=True)
+        raise typer.Exit(1) from None

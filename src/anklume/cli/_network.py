@@ -67,23 +67,16 @@ def run_network_status() -> None:
         typer.echo("Aucun réseau déclaré.")
         return
 
-    typer.echo(
-        f"{'DOMAINE':<12s} {'BRIDGE':<15s} {'SUBNET':<18s} "
-        f"{'GATEWAY':<15s} {'ÉTAT'}"
-    )
+    typer.echo(f"{'DOMAINE':<12s} {'BRIDGE':<15s} {'SUBNET':<18s} {'GATEWAY':<15s} {'ÉTAT'}")
     for net in status.networks:
         subnet = net.subnet or "-"
         gateway = net.gateway or "-"
         etat = "actif" if net.exists else "absent"
-        typer.echo(
-            f"{net.domain:<12s} {net.bridge:<15s} {subnet:<18s} "
-            f"{gateway:<15s} {etat}"
-        )
+        typer.echo(f"{net.domain:<12s} {net.bridge:<15s} {subnet:<18s} {gateway:<15s} {etat}")
 
     if status.nftables_present:
         typer.echo(
-            f"\nnftables : table inet anklume présente "
-            f"({status.nftables_rule_count} règle(s))"
+            f"\nnftables : table inet anklume présente ({status.nftables_rule_count} règle(s))"
         )
     else:
         typer.echo("\nnftables : table inet anklume absente")

@@ -111,9 +111,7 @@ class TestPlaybookWithAdminBootstrap:
         domain = make_domain(
             "pro",
             machines={
-                "workstation": make_machine(
-                    "workstation", "pro", roles=["admin_bootstrap"]
-                ),
+                "workstation": make_machine("workstation", "pro", roles=["admin_bootstrap"]),
             },
         )
         infra = make_infra(domains={"pro": domain})
@@ -176,9 +174,7 @@ class TestHostVarsWithAdminBootstrapVars:
         domain = make_domain(
             "pro",
             machines={
-                "workstation": make_machine(
-                    "workstation", "pro", roles=["admin_bootstrap"]
-                ),
+                "workstation": make_machine("workstation", "pro", roles=["admin_bootstrap"]),
             },
         )
         infra = make_infra(domains={"pro": domain})

@@ -131,20 +131,14 @@ def stopped_instance(name: str, project: str) -> IncusInstance:
 # ---------------------------------------------------------------------------
 
 
-
-
 def role_tasks(role_name: str) -> list[dict]:
     """Lit et parse tasks/main.yml d'un rôle."""
-    return yaml.safe_load(
-        (BUILTIN_ROLES_DIR / role_name / "tasks" / "main.yml").read_text()
-    )
+    return yaml.safe_load((BUILTIN_ROLES_DIR / role_name / "tasks" / "main.yml").read_text())
 
 
 def role_defaults(role_name: str) -> dict:
     """Lit et parse defaults/main.yml d'un rôle."""
-    return yaml.safe_load(
-        (BUILTIN_ROLES_DIR / role_name / "defaults" / "main.yml").read_text()
-    )
+    return yaml.safe_load((BUILTIN_ROLES_DIR / role_name / "defaults" / "main.yml").read_text())
 
 
 def role_task_names(role_name: str) -> list[str]:

@@ -92,9 +92,7 @@ class TestResolveLocal:
         """Backend local, Ollama dans le meme domaine -> localhost."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         m_claw = make_machine(
             "assistant",
             "ai-tools",
@@ -118,14 +116,10 @@ class TestResolveLocal:
         """Backend local, Ollama dans un autre domaine -> IP de l'autre domaine."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         d_ai = make_domain("ai-tools", machines={"gpu-server": m_ollama})
 
-        m_claw = make_machine(
-            "assistant", "pro", roles=["openclaw_server"], ip="10.100.1.5"
-        )
+        m_claw = make_machine("assistant", "pro", roles=["openclaw_server"], ip="10.100.1.5")
         d_pro = make_domain("pro", machines={"assistant": m_claw})
 
         infra = make_infra(domains={"ai-tools": d_ai, "pro": d_pro})
@@ -138,9 +132,7 @@ class TestResolveLocal:
         """Pas d'Ollama trouve -> fallback localhost."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m_claw = make_machine(
-            "assistant", "pro", roles=["openclaw_server"], ip="10.100.1.5"
-        )
+        m_claw = make_machine("assistant", "pro", roles=["openclaw_server"], ip="10.100.1.5")
         domain = make_domain("pro", machines={"assistant": m_claw})
         infra = make_infra(domains={"pro": domain})
 
@@ -330,9 +322,7 @@ class TestResolveSanitized:
         """Backend local + ai_sanitize: true -> PAS de sanitisation."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m, domain, infra = self._make_infra_with_sanitizer(
-            machine_vars={"ai_sanitize": "true"}
-        )
+        m, domain, infra = self._make_infra_with_sanitizer(machine_vars={"ai_sanitize": "true"})
         ep = resolve_llm_endpoint(m, domain, infra)
         assert ep.sanitized is False
         assert ep.backend == "local"
@@ -341,12 +331,8 @@ class TestResolveSanitized:
         """Backend local + ai_sanitize: always -> sanitisation."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m_ollama = make_machine(
-            "gpu-server", "pro", roles=["ollama_server"], ip="10.100.1.3"
-        )
-        m_sanitizer = make_machine(
-            "sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2"
-        )
+        m_ollama = make_machine("gpu-server", "pro", roles=["ollama_server"], ip="10.100.1.3")
+        m_sanitizer = make_machine("sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2")
         m_claw = make_machine(
             "assistant",
             "pro",
@@ -422,9 +408,7 @@ class TestFindSanitizerUrl:
     def test_finds_in_same_domain(self):
         from anklume.engine.llm_routing import find_sanitizer_url
 
-        m_san = make_machine(
-            "sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2"
-        )
+        m_san = make_machine("sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2")
         domain = make_domain("pro", machines={"sanitizer": m_san})
         infra = make_infra(domains={"pro": domain})
 
@@ -436,9 +420,7 @@ class TestFindSanitizerUrl:
     def test_finds_in_other_domain(self):
         from anklume.engine.llm_routing import find_sanitizer_url
 
-        m_san = make_machine(
-            "sanitizer", "ai-tools", roles=["llm_sanitizer"], ip="10.100.3.2"
-        )
+        m_san = make_machine("sanitizer", "ai-tools", roles=["llm_sanitizer"], ip="10.100.3.2")
         d_ai = make_domain("ai-tools", machines={"sanitizer": m_san})
         d_pro = make_domain("pro", machines={})
         infra = make_infra(domains={"ai-tools": d_ai, "pro": d_pro})
@@ -481,9 +463,7 @@ class TestFindOllamaUrl:
     def test_finds_in_same_domain(self):
         from anklume.engine.llm_routing import find_ollama_url
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         domain = make_domain("ai-tools", machines={"gpu-server": m_ollama})
         infra = make_infra(domains={"ai-tools": domain})
 
@@ -494,9 +474,7 @@ class TestFindOllamaUrl:
     def test_finds_in_other_domain(self):
         from anklume.engine.llm_routing import find_ollama_url
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         d_ai = make_domain("ai-tools", machines={"gpu-server": m_ollama})
         d_pro = make_domain("pro", machines={})
         infra = make_infra(domains={"ai-tools": d_ai, "pro": d_pro})
@@ -540,9 +518,7 @@ class TestEnrichLlmVars:
         """Machine openclaw sans config LLM -> vars enrichies local."""
         from anklume.engine.llm_routing import enrich_llm_vars
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         m_claw = make_machine(
             "assistant",
             "ai-tools",
@@ -593,9 +569,7 @@ class TestEnrichLlmVars:
         """Machine avec sanitisation -> URL du sanitizer."""
         from anklume.engine.llm_routing import enrich_llm_vars
 
-        m_san = make_machine(
-            "sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2"
-        )
+        m_san = make_machine("sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2")
         m_claw = make_machine(
             "assistant",
             "pro",
@@ -657,9 +631,7 @@ class TestEnrichLlmVars:
         """La machine sanitizer recoit sanitizer_upstream_url."""
         from anklume.engine.llm_routing import enrich_llm_vars
 
-        m_san = make_machine(
-            "sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2"
-        )
+        m_san = make_machine("sanitizer", "pro", roles=["llm_sanitizer"], ip="10.100.1.2")
         m_claw = make_machine(
             "assistant",
             "pro",
@@ -721,9 +693,7 @@ class TestOpenclawRoleLlmVars:
         assert "openclaw_llm_model" in defaults
 
     def test_systemd_override_template_has_llm_env_vars(self):
-        tmpl = (
-            BUILTIN_ROLES_DIR / "openclaw_server" / "templates" / "llm.conf.j2"
-        ).read_text()
+        tmpl = (BUILTIN_ROLES_DIR / "openclaw_server" / "templates" / "llm.conf.j2").read_text()
         assert "OPENCLAW_LLM_PROVIDER" in tmpl
         assert "OPENCLAW_LLM_URL" in tmpl
         assert "OPENCLAW_LLM_API_KEY" in tmpl
@@ -825,9 +795,7 @@ class TestPlaybookWithLlmRouting:
         assert "openclaw_server" in plays[0]["roles"]
 
     def test_sanitizer_in_playbook(self):
-        m = make_machine(
-            "sanitizer", "pro", roles=["base", "llm_sanitizer"], ip="10.100.1.2"
-        )
+        m = make_machine("sanitizer", "pro", roles=["base", "llm_sanitizer"], ip="10.100.1.2")
         domain = make_domain("pro", machines={"sanitizer": m})
         infra = make_infra(domains={"pro": domain})
 
@@ -881,9 +849,7 @@ class TestLlmValidation:
     def test_external_with_url_and_key_accepted(self):
         from anklume.engine.llm_routing import validate_llm_config
 
-        errors = validate_llm_config(
-            "openai", "false", "https://api.openai.com/v1", "sk-test"
-        )
+        errors = validate_llm_config("openai", "false", "https://api.openai.com/v1", "sk-test")
         assert len(errors) == 0
 
     def test_local_ignores_url_key(self):
@@ -903,9 +869,7 @@ class TestCrossDomainSanitizer:
         """Sanitizer deploye dans ai-tools, consomme par pro."""
         from anklume.engine.llm_routing import resolve_llm_endpoint
 
-        m_san = make_machine(
-            "sanitizer", "ai-tools", roles=["llm_sanitizer"], ip="10.100.3.2"
-        )
+        m_san = make_machine("sanitizer", "ai-tools", roles=["llm_sanitizer"], ip="10.100.3.2")
         d_ai = make_domain("ai-tools", machines={"sanitizer": m_san})
 
         m_claw = make_machine(
@@ -972,9 +936,7 @@ class TestProvisionPipelineIntegration:
 
         from anklume.provisioner import provision
 
-        m_ollama = make_machine(
-            "gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1"
-        )
+        m_ollama = make_machine("gpu-server", "ai-tools", roles=["ollama_server"], ip="10.100.3.1")
         m_claw = make_machine(
             "assistant",
             "ai-tools",

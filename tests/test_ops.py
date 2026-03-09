@@ -105,9 +105,7 @@ class TestListInstances:
             projects=[IncusProject(name="pro"), IncusProject(name="perso")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Running", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro")
                 ],
                 "perso": [
                     IncusInstance(

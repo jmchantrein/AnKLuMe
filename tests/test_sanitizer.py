@@ -678,7 +678,5 @@ class TestLlmSanitizerRolePhase15:
         tasks = yaml.safe_load(
             (BUILTIN_ROLES_DIR / "llm_sanitizer" / "tasks" / "main.yml").read_text()
         )
-        template_tasks = [
-            t for t in tasks if "ansible.builtin.template" in str(t)
-        ]
+        template_tasks = [t for t in tasks if "ansible.builtin.template" in str(t)]
         assert len(template_tasks) >= 2

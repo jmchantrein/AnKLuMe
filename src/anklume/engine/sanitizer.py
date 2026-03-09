@@ -186,7 +186,12 @@ def sanitize(
     # Construire les remplacements
     for start, end, original, category in matches:
         replaced = _make_replacement(
-            original, category, mode, counters, pseudo_map, pseudo_counters,
+            original,
+            category,
+            mode,
+            counters,
+            pseudo_map,
+            pseudo_counters,
         )
         replacements.append(
             Replacement(

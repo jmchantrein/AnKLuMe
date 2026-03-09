@@ -129,9 +129,7 @@ def get_instance_info(
             snapshots: list[str] = []
 
             if project_name in existing_projects:
-                real_instances = {
-                    i.name: i for i in driver.instance_list(project_name)
-                }
+                real_instances = {i.name: i for i in driver.instance_list(project_name)}
                 real = real_instances.get(incus_name)
                 if real:
                     state = real.status
@@ -226,9 +224,7 @@ def _check_nftables() -> tuple[bool, int]:
 
         lines = result.stdout.strip().splitlines()
         keywords = ("iifname", "oifname", "ip ", "ct ", "accept", "drop")
-        rule_count = sum(
-            1 for line in lines if line.strip().startswith(keywords)
-        )
+        rule_count = sum(1 for line in lines if line.strip().startswith(keywords))
         return True, rule_count
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False, 0

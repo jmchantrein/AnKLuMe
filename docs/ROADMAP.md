@@ -424,18 +424,36 @@ Rôle `openclaw_server` mis à jour pour l'OpenClaw actuel
 - [x] 805 tests unitaires au total, zéro régression
   (7 E2E dnsmasq préexistants)
 
-## Phase 17 — Portails et transferts
+## Phase 17 — Portails et transferts ✅
 
 Communication hôte ↔ conteneur sans compromettre l'isolation.
 
-- [ ] File portals — transfert fichiers hôte ↔ conteneur
-  (`anklume portal push/pull/list`)
-- [ ] Clipboard sharing — copier/coller hôte ↔ conteneur
-  (`anklume instance clipboard <instance>`)
-- [ ] Disposable containers — workflow conteneurs éphémères
-  (`anklume disp <image>` — lance, utilise, détruit)
-- [ ] Import infra existante — importer depuis un Incus déjà configuré
-  (`anklume setup import`)
+- [x] SPEC §29 détaillé (portails fichiers, clipboard, disposable, import)
+- [x] Driver Incus : `file_push`, `file_pull`, `instance_exec` avec `input`
+- [x] `engine/portal.py` — push/pull/list fichiers hôte ↔ conteneur
+  - PortalEntry, TransferResult dataclasses
+  - Résolution instance → projet via `resolve_instance_project()`
+  - Parse `ls -la` pour listing distant
+- [x] `engine/clipboard.py` — presse-papiers hôte ↔ conteneur
+  - `wl-paste`/`wl-copy` côté hôte (Wayland)
+  - Fichier `/tmp/.anklume-clipboard` dans le conteneur
+  - ClipboardResult dataclass
+- [x] `engine/disposable.py` — conteneurs jetables
+  - Nommage `disp-XXXX` (4 hex aléatoires)
+  - launch, list, destroy, cleanup
+  - DispContainer dataclass
+- [x] `engine/import_infra.py` — import infrastructure Incus existante
+  - Scan projets, réseaux, instances
+  - Génération `domains/*.yml`
+  - ScannedDomain, ScannedInstance, ImportResult dataclasses
+- [x] CLI : `anklume portal push/pull/list`
+- [x] CLI : `anklume instance clipboard --push/--pull`
+- [x] CLI : `anklume disp <image> [--list] [--cleanup]`
+- [x] CLI : `anklume setup import [--dir]`
+- [x] Tests unitaires : 72 nouveaux tests (portal, clipboard, disposable,
+  import, driver file, CLI registration)
+- [x] 875 tests unitaires au total, zéro régression
+  (8 E2E/nesting préexistants)
 
 ## Phase 18 — Opérations avancées
 

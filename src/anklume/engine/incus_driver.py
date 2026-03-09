@@ -70,6 +70,7 @@ class IncusDriver:
         args: list[str],
         *,
         check: bool = True,
+        input: str | None = None,
     ) -> subprocess.CompletedProcess:
         """Exécute une commande incus et retourne le résultat."""
         cmd = ["incus", *args]
@@ -77,6 +78,7 @@ class IncusDriver:
             cmd,
             capture_output=True,
             text=True,
+            input=input,
         )
         if check and result.returncode != 0:
             raise IncusError(cmd, result.returncode, result.stderr)
@@ -241,11 +243,60 @@ class IncusDriver:
         """Retourne les ressources hardware de l'hôte via `incus info --resources`."""
         return self._run_json(["info", "--resources"])
 
+    # --- Fichiers ---
+
+    def file_push(
+        self,
+        instance: str,
+        project: str,
+        local_path: str,
+        remote_path: str,
+    ) -> None:
+        """Push un fichier vers une instance via incus file push."""
+        self._run(
+            [
+                "file",
+                "push",
+                local_path,
+                f"{instance}{remote_path}",
+                "--project",
+                project,
+            ]
+        )
+
+    def file_pull(
+        self,
+        instance: str,
+        project: str,
+        remote_path: str,
+        local_path: str,
+    ) -> None:
+        """Pull un fichier depuis une instance via incus file pull."""
+        self._run(
+            [
+                "file",
+                "pull",
+                f"{instance}{remote_path}",
+                local_path,
+                "--project",
+                project,
+            ]
+        )
+
     # --- Exec ---
 
     def instance_exec(
-        self, instance: str, project: str, command: list[str]
+        self,
+        instance: str,
+        project: str,
+        command: list[str],
+        *,
+        input: str | None = None,
     ) -> subprocess.CompletedProcess:
-        """Exécute une commande dans une instance."""
+        """Exécute une commande dans une instance.
+
+        Args:
+            input: données à envoyer sur stdin de la commande.
+        """
         args = ["exec", instance, "--project", project, "--", *command]
-        return self._run(args)
+        return self._run(args, input=input)

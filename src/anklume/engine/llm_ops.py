@@ -122,11 +122,13 @@ def run_llm_bench(
         model = models[0]
 
     gen_url = f"{base_url}/api/generate"
-    payload = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+    ).encode()
 
     req = Request(gen_url, data=payload, method="POST")  # noqa: S310
     req.add_header("Content-Type", "application/json")

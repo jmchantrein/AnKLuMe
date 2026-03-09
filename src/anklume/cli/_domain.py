@@ -24,16 +24,11 @@ def run_domain_list() -> None:
         typer.echo("Aucun domaine défini.")
         return
 
-    typer.echo(
-        f"{'NOM':<15s} {'ÉTAT':<10s} {'TRUST-LEVEL':<15s} {'MACHINES':>8s}  {'ÉPHÉMÈRE'}"
-    )
+    typer.echo(f"{'NOM':<15s} {'ÉTAT':<10s} {'TRUST-LEVEL':<15s} {'MACHINES':>8s}  {'ÉPHÉMÈRE'}")
     for d in domains:
         etat = "activé" if d.enabled else "désactivé"
         eph = "oui" if d.ephemeral else "non"
-        typer.echo(
-            f"{d.name:<15s} {etat:<10s} {d.trust_level:<15s} "
-            f"{d.machine_count:>8d}  {eph}"
-        )
+        typer.echo(f"{d.name:<15s} {etat:<10s} {d.trust_level:<15s} {d.machine_count:>8d}  {eph}")
 
     enabled = sum(1 for d in domains if d.enabled)
     disabled = len(domains) - enabled
@@ -147,8 +142,7 @@ def run_domain_status(name: str) -> None:
         ip_str = ip or "-"
 
         typer.echo(
-            f"  {inst.name:<20s} {inst.machine_type:<5s} {inst.state:<10s} "
-            f"{ip_str:<15s} {tag}"
+            f"  {inst.name:<20s} {inst.machine_type:<5s} {inst.state:<10s} {ip_str:<15s} {tag}"
         )
 
     running = sum(1 for i in ds.instances if i.synced)

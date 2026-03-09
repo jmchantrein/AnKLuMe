@@ -23,6 +23,9 @@ ai_app = typer.Typer(help="Gestion des services IA.")
 stt_app = typer.Typer(help="Push-to-talk STT.")
 llm_app = typer.Typer(help="Supervision LLM.")
 
+portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
+setup_app = typer.Typer(help="Configuration et import.")
+
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
@@ -32,6 +35,8 @@ app.add_typer(network_app, name="network")
 app.add_typer(ai_app, name="ai")
 app.add_typer(stt_app, name="stt")
 app.add_typer(llm_app, name="llm")
+app.add_typer(portal_app, name="portal")
+app.add_typer(setup_app, name="setup")
 
 
 def _version_callback(value: bool) -> None:
@@ -507,3 +512,102 @@ def stt_status() -> None:
     from anklume.cli._stt import run_stt_status
 
     run_stt_status()
+
+
+# --- anklume portal <push|pull|list> ---
+
+
+@portal_app.command("push")
+def portal_push(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    local_path: Annotated[str, typer.Argument(help="Chemin du fichier local")],
+    remote_path: Annotated[str, typer.Argument(help="Chemin distant")] = "/tmp/",  # noqa: S108
+) -> None:
+    """Envoyer un fichier vers une instance."""
+    from anklume.cli._portal import run_portal_push
+
+    run_portal_push(instance, local_path, remote_path)
+
+
+@portal_app.command("pull")
+def portal_pull(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    remote_path: Annotated[str, typer.Argument(help="Chemin du fichier distant")],
+    local_path: Annotated[str, typer.Argument(help="Chemin local de destination")] = ".",
+) -> None:
+    """Récupérer un fichier depuis une instance."""
+    from anklume.cli._portal import run_portal_pull
+
+    run_portal_pull(instance, remote_path, local_path)
+
+
+@portal_app.command("list")
+def portal_list(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    path: Annotated[str, typer.Argument(help="Chemin du répertoire distant")] = "/root/",
+) -> None:
+    """Lister les fichiers d'un répertoire distant."""
+    from anklume.cli._portal import run_portal_list
+
+    run_portal_list(instance, path)
+
+
+# --- anklume instance clipboard ---
+
+
+@instance_app.command("clipboard")
+def instance_clipboard(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    pull: Annotated[
+        bool,
+        typer.Option("--pull", help="Conteneur → hôte (défaut: hôte → conteneur)"),
+    ] = False,
+) -> None:
+    """Partager le presse-papiers avec une instance."""
+    from anklume.cli._instance import run_instance_clipboard
+
+    run_instance_clipboard(instance, pull=pull)
+
+
+# --- anklume disp ---
+
+
+@app.command("disp")
+def disp(
+    image: Annotated[
+        str | None,
+        typer.Argument(help="Image Incus (ex: images:debian/13)"),
+    ] = None,
+    cmd: Annotated[
+        list[str] | None,
+        typer.Argument(help="Commande à exécuter"),
+    ] = None,
+    list_all: Annotated[
+        bool,
+        typer.Option("--list", "-l", help="Lister les conteneurs jetables"),
+    ] = False,
+    cleanup: Annotated[
+        bool,
+        typer.Option("--cleanup", help="Détruire tous les conteneurs jetables"),
+    ] = False,
+) -> None:
+    """Lancer un conteneur jetable."""
+    from anklume.cli._disp import run_disp
+
+    run_disp(image=image, cmd=cmd, list_all=list_all, cleanup=cleanup)
+
+
+# --- anklume setup <import> ---
+
+
+@setup_app.command("import")
+def setup_import(
+    directory: Annotated[
+        str,
+        typer.Option("--dir", "-d", help="Répertoire de sortie"),
+    ] = ".",
+) -> None:
+    """Importer une infrastructure Incus existante."""
+    from anklume.cli._setup import run_setup_import
+
+    run_setup_import(output_dir=directory)

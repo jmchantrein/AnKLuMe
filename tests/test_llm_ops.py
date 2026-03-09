@@ -94,9 +94,7 @@ class TestComputeLlmStatus:
 
     def test_multiple_consumers(self) -> None:
         m1 = make_machine("chat", "pro", ip="10.100.1.3", roles=["base", "lobechat"])
-        m2 = make_machine(
-            "assistant", "pro", ip="10.100.1.5", roles=["base", "openclaw_server"]
-        )
+        m2 = make_machine("assistant", "pro", ip="10.100.1.5", roles=["base", "openclaw_server"])
         domain = make_domain("pro", machines={"chat": m1, "assistant": m2})
         infra = make_infra(domains={"pro": domain})
 
