@@ -1,0 +1,10 @@
+---
+- name: Redémarrer tor
+  ansible.builtin.systemd:
+    name: tor
+    state: restarted
+
+- name: Recharger nftables tor
+  ansible.builtin.command:
+    cmd: nft -f /etc/nftables-tor.conf
+  changed_when: true

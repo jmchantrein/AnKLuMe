@@ -455,12 +455,27 @@ Communication hôte ↔ conteneur sans compromettre l'isolation.
 - [x] 875 tests unitaires au total, zéro régression
   (8 E2E/nesting préexistants)
 
-## Phase 18 — Opérations avancées
+## Phase 18 — Opérations avancées ✅
 
-- [ ] Golden images — `anklume golden create/derive/publish`
-- [ ] Tor gateway — VM routeur transparent Tor
-- [ ] tmux console — console colorée par domaine
-- [ ] Doctor/health check — `anklume doctor` (diagnostic auto + fix)
+- [x] SPEC §30 détaillé (golden images, Tor gateway, tmux console, doctor)
+- [x] Golden images — `anklume golden create/list/delete`
+  - `engine/golden.py` — GoldenImage, create/list/delete, résolution instance
+  - Driver Incus : `IncusImage`, `image_publish`, `image_list`, `image_delete`, `image_alias_exists`
+  - CLI : `_golden.py` — `run_golden_create`, `run_golden_list`, `run_golden_delete`
+- [x] Tor gateway — VM routeur transparent Tor
+  - `engine/tor.py` — TorGateway, `find_tor_gateways`, `validate_tor_config`
+  - Rôle Ansible `tor_gateway` (tasks, defaults, templates torrc.j2 + nftables-tor.conf.j2, handlers)
+  - CLI : `_tor.py` — `run_tor_status`
+- [x] tmux console — console colorée par domaine
+  - `engine/console.py` — ConsolePane, ConsoleConfig, `build_console_config`, `launch_console`
+  - Couleurs par trust level (admin=rouge, trusted=bleu, semi-trusted=jaune, untrusted=orange, disposable=gris)
+  - CLI : `_console.py` — `run_console`, options `--detach` et filtrage par domaine
+- [x] Doctor/health check — `anklume doctor` (diagnostic auto + fix)
+  - `engine/doctor.py` — CheckResult, DoctorReport, checks (incus, nft, ansible, gpu, domains, networks, golden)
+  - CLI : `_doctor.py` — `run_doctor_cmd`, options `--fix` et `--json`
+- [x] Tests unitaires : 74 nouveaux tests (golden, tor, console, doctor, CLI registration)
+- [x] 949 tests unitaires au total, zéro régression
+  (8 E2E/GPU préexistants)
 
 ## Phase 19 — Qualité et distribution
 

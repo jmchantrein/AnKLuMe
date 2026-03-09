@@ -1,0 +1,19 @@
+table ip nat {
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "eth0" udp dport 53 redirect to :{{ tor_dns_port }}
+        iifname "eth0" tcp dport 1:65535 redirect to :{{ tor_trans_port }}
+    }
+    chain output {
+        type nat hook output priority -100; policy accept;
+        meta skuid != "debian-tor" udp dport 53 redirect to :{{ tor_dns_port }}
+        meta skuid != "debian-tor" tcp dport 1:65535 redirect to :{{ tor_trans_port }}
+    }
+}
+table ip filter {
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+        ct state established,related accept
+        iifname "eth0" accept
+    }
+}

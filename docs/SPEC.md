@@ -3728,3 +3728,574 @@ def setup_import(dir=".")
 | `anklume disp --list` | Lister les conteneurs jetables |
 | `anklume setup import` | Importer une infra Incus existante |
 ```
+
+## 30. Opérations avancées
+
+Quatre fonctionnalités opérationnelles : golden images (images
+réutilisables), passerelle Tor transparente, console tmux colorée
+par domaine, et diagnostic automatique (`doctor`).
+
+### 30.1 Golden images — images réutilisables
+
+Créer des images de base à partir d'instances configurées.
+Publier une instance provisionnée en image Incus réutilisable,
+puis dériver de nouvelles instances depuis cette image.
+
+Cas d'usage : provisionner une instance `pro-dev` avec tous les
+outils, la publier comme golden image `golden/pro-dev`, puis
+l'utiliser comme base pour d'autres machines du même domaine.
+
+#### Commandes CLI
+
+```
+anklume golden create <instance> [--alias X]
+anklume golden list
+anklume golden delete <alias>
+```
+
+**`create`** : publie une instance comme image Incus.
+- L'instance est arrêtée avant publication (`incus publish`)
+- Alias par défaut : `golden/<full_name>` (ex: `golden/pro-dev`)
+- `--alias` : alias personnalisé
+- L'instance est redémarrée après publication
+- Erreur si l'instance est inconnue dans l'infra
+
+**`list`** : liste les golden images disponibles.
+- Filtre les images dont l'alias commence par `golden/`
+- Affiche : alias, fingerprint (8 premiers chars), taille, date
+
+**`delete`** : supprime une golden image par alias.
+- Erreur si l'alias est inconnu
+
+#### Sorties
+
+```
+# create
+Image golden/pro-dev créée (fingerprint: a1b2c3d4, 850 Mo)
+
+# list
+ALIAS                  FINGERPRINT  TAILLE    DATE
+golden/pro-dev         a1b2c3d4     850 Mo    2026-03-09
+golden/perso-browser   e5f6g7h8     420 Mo    2026-03-08
+
+# delete
+Image golden/pro-dev supprimée.
+```
+
+#### Driver Incus — méthodes image
+
+```python
+def image_publish(
+    self,
+    instance: str,
+    project: str,
+    *,
+    alias: str,
+) -> dict:
+    """Publie une instance comme image.
+
+    Utilise `incus publish <instance> --project <project> --alias <alias>`.
+    Retourne les métadonnées de l'image (fingerprint, size).
+    """
+
+def image_list(self, project: str = "default") -> list[IncusImage]:
+    """Liste les images Incus du projet."""
+
+def image_delete(self, fingerprint: str, project: str = "default") -> None:
+    """Supprime une image par fingerprint."""
+
+def image_alias_exists(self, alias: str, project: str = "default") -> bool:
+    """Vérifie si un alias d'image existe."""
+```
+
+#### Dataclass driver
+
+```python
+@dataclass
+class IncusImage:
+    """Image Incus."""
+    fingerprint: str
+    aliases: list[str] = field(default_factory=list)
+    size: int = 0          # octets
+    created_at: str = ""
+```
+
+#### Module `engine/golden.py`
+
+```python
+GOLDEN_PREFIX = "golden/"
+
+@dataclass
+class GoldenImage:
+    """Résultat de publication d'une golden image."""
+    alias: str
+    fingerprint: str
+    size: int           # octets
+    instance: str       # instance source
+
+def create_golden(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    instance: str,
+    *,
+    alias: str | None = None,
+) -> GoldenImage:
+    """Publie une instance comme golden image.
+
+    1. Résout instance → projet
+    2. Arrête l'instance si running
+    3. Publie via incus publish
+    4. Redémarre l'instance
+    5. Retourne les métadonnées
+    """
+
+def list_golden(
+    driver: IncusDriver,
+    *,
+    project: str = "default",
+) -> list[GoldenImage]:
+    """Liste les golden images (alias golden/*)."""
+
+def delete_golden(
+    driver: IncusDriver,
+    alias: str,
+    *,
+    project: str = "default",
+) -> None:
+    """Supprime une golden image par alias."""
+```
+
+La résolution instance → projet utilise le même pattern que
+`portal.py` : itération sur les domaines activés de l'infra.
+
+### 30.2 Tor gateway — passerelle Tor transparente
+
+VM dédiée qui route tout le trafic d'un domaine via Tor.
+Le domaine ne voit pas Tor directement : le trafic est
+redirigé de manière transparente par la passerelle.
+
+#### Concept
+
+```
+[instance] → [bridge domaine] → [tor-gateway VM] → Tor → Internet
+```
+
+La passerelle est une VM avec :
+- Tor installé et configuré (TransPort 9040, DNSPort 5353)
+- nftables pour rediriger le trafic (DNAT vers TransPort)
+- Deux interfaces réseau : une vers le domaine, une vers l'hôte
+
+#### Configuration domaine
+
+```yaml
+# domains/anon.yml
+name: anon
+trust_level: untrusted
+
+machines:
+  browser:
+    description: "Navigateur anonyme"
+    type: lxc
+    roles: [base, desktop]
+
+  tor-gw:
+    description: "Passerelle Tor"
+    type: vm
+    roles: [base, tor_gateway]
+    vars:
+      tor_trans_port: 9040
+      tor_dns_port: 5353
+      tor_socks_port: 9050
+```
+
+Le champ `gateway` dans la config domaine est optionnel.
+La simple présence du rôle `tor_gateway` sur une machine
+suffit. Les règles nftables sont générées par le module
+`engine/tor.py`.
+
+#### Rôle Ansible `tor_gateway`
+
+```yaml
+# provisioner/roles/tor_gateway/defaults/main.yml
+tor_trans_port: 9040
+tor_dns_port: 5353
+tor_socks_port: 9050
+tor_exit_policy: "reject *:*"
+tor_country_exclude: ""
+```
+
+Tâches :
+1. Installer `tor` et `nftables`
+2. Déployer `torrc` (template Jinja2)
+3. Déployer les règles nftables de redirection
+4. Activer et démarrer les services `tor` et `nftables`
+5. Vérifier la connectivité Tor (bootstrap 100%)
+
+#### Template `torrc.j2`
+
+```
+VirtualAddrNetworkIPv4 10.192.0.0/10
+AutomapHostsOnResolve 1
+TransPort {{ tor_trans_port }}
+DNSPort {{ tor_dns_port }}
+SocksPort {{ tor_socks_port }}
+{% if tor_exit_policy %}
+ExitPolicy {{ tor_exit_policy }}
+{% endif %}
+{% if tor_country_exclude %}
+ExcludeExitNodes {{ tor_country_exclude }}
+{% endif %}
+```
+
+#### Template `nftables-tor.conf.j2`
+
+```
+table ip nat {
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "eth0" udp dport 53 redirect to :{{ tor_dns_port }}
+        iifname "eth0" tcp dport 1:65535 redirect to :{{ tor_trans_port }}
+    }
+    chain output {
+        type nat hook output priority -100; policy accept;
+        meta skuid != "debian-tor" udp dport 53 redirect to :{{ tor_dns_port }}
+        meta skuid != "debian-tor" tcp dport 1:65535 redirect to :{{ tor_trans_port }}
+    }
+}
+table ip filter {
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+        ct state established,related accept
+        iifname "eth0" accept
+    }
+}
+```
+
+#### Module `engine/tor.py`
+
+```python
+TOR_ROLE = "tor_gateway"
+
+@dataclass
+class TorGateway:
+    """Passerelle Tor détectée dans l'infra."""
+    instance: str
+    domain: str
+    trans_port: int = 9040
+    dns_port: int = 5353
+    socks_port: int = 9050
+
+def find_tor_gateways(infra: Infrastructure) -> list[TorGateway]:
+    """Détecte les machines avec le rôle tor_gateway."""
+
+def validate_tor_config(infra: Infrastructure) -> list[str]:
+    """Valide la cohérence Tor :
+    - Max 1 passerelle par domaine
+    - La passerelle est une VM (recommandé, warning si LXC)
+    - Les ports ne conflictent pas
+    Retourne une liste d'erreurs/warnings.
+    """
+```
+
+#### Commande CLI
+
+```
+anklume tor status
+```
+
+Affiche l'état des passerelles Tor : instance, domaine, circuits
+Tor actifs, bande passante.
+
+### 30.3 tmux console — console colorée par domaine
+
+Console tmux avec une fenêtre par domaine et un panneau par
+instance. Code couleur par trust level.
+
+#### Commandes CLI
+
+```
+anklume console              # tous les domaines
+anklume console <domain>     # un seul domaine
+anklume console --detach     # lancer en arrière-plan
+```
+
+**Tous les domaines** :
+1. Crée une session tmux `anklume`
+2. Pour chaque domaine activé : une fenêtre nommée `domaine`
+3. Dans chaque fenêtre : un panneau par instance (`incus exec ... bash`)
+4. Active la fenêtre du premier domaine
+
+**Un domaine** :
+1. Crée une session tmux `anklume-<domaine>`
+2. Un panneau par instance du domaine
+
+#### Couleurs par trust level
+
+| Trust level | Couleur status bar | Code tmux |
+|-------------|-------------------|-----------|
+| admin       | rouge             | colour196 |
+| trusted     | bleu              | colour33  |
+| semi-trusted| jaune             | colour220 |
+| untrusted   | orange            | colour208 |
+| disposable  | gris              | colour240 |
+
+#### Module `engine/console.py`
+
+```python
+TRUST_COLORS = {
+    "admin": "colour196",
+    "trusted": "colour33",
+    "semi-trusted": "colour220",
+    "untrusted": "colour208",
+    "disposable": "colour240",
+}
+
+SESSION_NAME = "anklume"
+
+@dataclass
+class ConsolePane:
+    """Panneau tmux pour une instance."""
+    instance: str
+    domain: str
+    trust_level: str
+    command: str     # "incus exec <name> --project <proj> -- bash"
+
+@dataclass
+class ConsoleConfig:
+    """Configuration tmux complète."""
+    session_name: str
+    windows: dict[str, list[ConsolePane]]   # domaine → panneaux
+
+def build_console_config(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    *,
+    domain: str | None = None,
+    nesting_context: NestingContext | None = None,
+) -> ConsoleConfig:
+    """Construit la configuration tmux depuis l'infra.
+
+    Filtre les instances existantes (Running) uniquement.
+    """
+
+def launch_console(
+    config: ConsoleConfig,
+    *,
+    detach: bool = False,
+) -> None:
+    """Lance la session tmux.
+
+    Utilise subprocess pour créer la session, fenêtres et panneaux.
+    Attache la session (ou détache avec --detach).
+    """
+```
+
+#### Génération tmux
+
+```python
+# Création session
+subprocess.run(["tmux", "new-session", "-d", "-s", session_name, ...])
+
+# Pour chaque fenêtre (domaine)
+subprocess.run(["tmux", "new-window", "-t", session_name, "-n", domain])
+
+# Pour chaque panneau (instance)
+subprocess.run(["tmux", "send-keys", "-t", ..., command, "Enter"])
+subprocess.run(["tmux", "split-window", "-t", ..., "-v"])
+
+# Couleur de la status bar
+subprocess.run([
+    "tmux", "set-option", "-t", window,
+    "window-status-current-style", f"bg={color}",
+])
+
+# Attache
+subprocess.run(["tmux", "attach-session", "-t", session_name])
+```
+
+### 30.4 Doctor — diagnostic automatique
+
+Vérifie l'état complet du système et suggère des corrections.
+Chaque vérification retourne un statut (ok, warning, erreur)
+avec un message explicatif et une suggestion de correction.
+
+#### Commande CLI
+
+```
+anklume doctor
+anklume doctor --fix          # appliquer les corrections automatiques
+anklume doctor --json         # sortie JSON
+```
+
+#### Sorties
+
+```
+anklume doctor
+
+✓ Incus                   installé (v0.7)
+✓ Incus socket            /var/lib/incus/unix.socket accessible
+✓ nftables                installé
+✓ Ansible                 installé (v2.17.5)
+✓ GPU                     RTX PRO 5000 (24576 Mo VRAM)
+✗ Domaine pro             fichier domains/pro.yml absent
+⚠ Réseau net-perso        bridge absent (lancer anklume apply)
+✓ Snapshots               197 snapshots, 12 Go
+✓ Images golden           2 images, 1.2 Go
+
+Résultat : 7 ok, 1 warning, 1 erreur
+```
+
+#### Module `engine/doctor.py`
+
+```python
+@dataclass
+class CheckResult:
+    """Résultat d'une vérification."""
+    name: str
+    status: str         # "ok" | "warning" | "error"
+    message: str
+    fix_command: str | None = None     # commande de correction
+
+@dataclass
+class DoctorReport:
+    """Rapport complet de diagnostic."""
+    checks: list[CheckResult]
+
+    @property
+    def ok_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "ok")
+
+    @property
+    def warning_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "warning")
+
+    @property
+    def error_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "error")
+
+def run_doctor(
+    driver: IncusDriver | None = None,
+    infra: Infrastructure | None = None,
+    *,
+    fix: bool = False,
+) -> DoctorReport:
+    """Exécute toutes les vérifications.
+
+    Si fix=True, applique les corrections automatiques
+    quand fix_command est disponible.
+    """
+
+def check_incus() -> CheckResult:
+    """Vérifie qu'Incus est installé et accessible."""
+
+def check_nftables() -> CheckResult:
+    """Vérifie que nftables est installé."""
+
+def check_ansible() -> CheckResult:
+    """Vérifie qu'Ansible est installé."""
+
+def check_gpu() -> CheckResult:
+    """Vérifie la présence et l'état du GPU."""
+
+def check_domains(infra: Infrastructure) -> list[CheckResult]:
+    """Vérifie la validité des fichiers domaines."""
+
+def check_networks(
+    infra: Infrastructure,
+    driver: IncusDriver,
+) -> list[CheckResult]:
+    """Vérifie l'état des bridges réseau."""
+
+def check_golden(driver: IncusDriver) -> CheckResult:
+    """Vérifie les golden images."""
+```
+
+#### Vérifications
+
+| Vérification | Type | Condition ok | Fix auto |
+|-------------|------|-------------|----------|
+| Incus installé | binaire | `which incus` retourne 0 | — |
+| Incus socket | fichier | `/var/lib/incus/unix.socket` accessible | — |
+| nftables | binaire | `which nft` retourne 0 | — |
+| Ansible | binaire | `which ansible-playbook` retourne 0 | — |
+| GPU | hardware | `nvidia-smi` retourne 0 | — |
+| Domaines valides | config | parser ne lève pas d'erreur | — |
+| Bridges réseau | infra | bridge existe dans Incus | `anklume apply` |
+| Golden images | infra | images listables | — |
+
+### 30.5 Intégration CLI
+
+#### Nouveau groupe `golden`
+
+```python
+golden_app = typer.Typer(help="Golden images — images réutilisables.")
+app.add_typer(golden_app, name="golden")
+
+@golden_app.command("create")
+def golden_create(instance, alias=None)
+
+@golden_app.command("list")
+def golden_list_cmd()
+
+@golden_app.command("delete")
+def golden_delete(alias)
+```
+
+#### Nouveau groupe `tor`
+
+```python
+tor_app = typer.Typer(help="Passerelle Tor.")
+app.add_typer(tor_app, name="tor")
+
+@tor_app.command("status")
+def tor_status()
+```
+
+#### Commande `console`
+
+```python
+@app.command("console")
+def console(domain=None, detach=False)
+```
+
+#### Commande `doctor`
+
+```python
+@app.command("doctor")
+def doctor(fix=False, json_output=False)
+```
+
+#### Fichiers CLI
+
+| Fichier | Fonctions |
+|---------|-----------|
+| `cli/_golden.py` | `run_golden_create`, `run_golden_list`, `run_golden_delete` |
+| `cli/_tor.py` | `run_tor_status` |
+| `cli/_console.py` | `run_console` |
+| `cli/_doctor.py` | `run_doctor_cmd` |
+
+### 30.6 Tests
+
+| Module | Tests | Couverture |
+|--------|-------|-----------|
+| `test_golden.py` | create, list, delete, alias par défaut, instance inconnue, driver methods | engine/golden.py + driver |
+| `test_tor.py` | find gateways, validate config, rôle, templates, defaults | engine/tor.py + rôle |
+| `test_console.py` | build config, couleurs, filtrage running, session name | engine/console.py |
+| `test_doctor.py` | chaque check (ok, error), report counts, fix flag | engine/doctor.py |
+| `test_cli_phase18.py` | registration des commandes golden, tor, console, doctor | cli/__init__.py |
+
+### 30.7 Mise à jour des commandes CLI (§6)
+
+```
+### Opérations avancées
+
+| Commande | Description |
+|----------|-------------|
+| `anklume golden create <inst> [--alias]` | Publier une instance comme golden image |
+| `anklume golden list` | Lister les golden images |
+| `anklume golden delete <alias>` | Supprimer une golden image |
+| `anklume tor status` | État des passerelles Tor |
+| `anklume console [domain]` | Console tmux colorée |
+| `anklume doctor` | Diagnostic automatique |
+| `anklume doctor --fix` | Diagnostic + corrections auto |
+```

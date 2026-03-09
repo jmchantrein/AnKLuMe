@@ -1,0 +1,36 @@
+---
+- name: Installer tor et nftables
+  ansible.builtin.package:
+    name:
+      - tor
+      - nftables
+    state: present
+
+- name: Déployer la configuration torrc
+  ansible.builtin.template:
+    src: torrc.j2
+    dest: /etc/tor/torrc
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Redémarrer tor
+
+- name: Déployer les règles nftables pour Tor
+  ansible.builtin.template:
+    src: nftables-tor.conf.j2
+    dest: /etc/nftables-tor.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recharger nftables tor
+
+- name: Activer et démarrer tor
+  ansible.builtin.systemd:
+    name: tor
+    enabled: true
+    state: started
+
+- name: Appliquer les règles nftables Tor
+  ansible.builtin.command:
+    cmd: nft -f /etc/nftables-tor.conf
+  changed_when: true

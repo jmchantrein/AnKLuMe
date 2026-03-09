@@ -1,0 +1,234 @@
+"""Doctor — diagnostic automatique de l'infrastructure.
+
+Vérifie l'état du système (binaires, GPU, domaines, réseau)
+et suggère des corrections.
+"""
+
+from __future__ import annotations
+
+import logging
+import shutil
+import subprocess
+from dataclasses import dataclass, field
+from typing import Literal
+
+from anklume.engine.golden import GOLDEN_PREFIX
+from anklume.engine.incus_driver import IncusDriver
+from anklume.engine.models import Infrastructure
+from anklume.engine.ops import compute_network_status
+
+log = logging.getLogger(__name__)
+
+CheckStatus = Literal["ok", "warning", "error"]
+
+
+@dataclass
+class CheckResult:
+    """Résultat d'une vérification."""
+
+    name: str
+    status: CheckStatus
+    message: str
+    fix_command: str | None = None
+
+
+@dataclass
+class DoctorReport:
+    """Rapport complet de diagnostic."""
+
+    checks: list[CheckResult] = field(default_factory=list)
+
+    @property
+    def ok_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "ok")
+
+    @property
+    def warning_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "warning")
+
+    @property
+    def error_count(self) -> int:
+        return sum(1 for c in self.checks if c.status == "error")
+
+
+def _check_binary(
+    display_name: str,
+    binary: str,
+    severity_if_missing: CheckStatus = "error",
+    missing_message: str = "",
+) -> CheckResult:
+    """Vérifie la présence d'un binaire dans le PATH."""
+    path = shutil.which(binary)
+    if path:
+        return CheckResult(
+            name=display_name, status="ok", message=f"installé ({path})"
+        )
+    return CheckResult(
+        name=display_name,
+        status=severity_if_missing,
+        message=missing_message or f"{binary} introuvable dans le PATH",
+    )
+
+
+def check_incus() -> CheckResult:
+    """Vérifie qu'Incus est installé et accessible."""
+    return _check_binary("Incus", "incus")
+
+
+def check_nftables() -> CheckResult:
+    """Vérifie que nftables est installé."""
+    return _check_binary("nftables", "nft")
+
+
+def check_ansible() -> CheckResult:
+    """Vérifie qu'Ansible est installé."""
+    return _check_binary(
+        "Ansible",
+        "ansible-playbook",
+        severity_if_missing="warning",
+        missing_message="ansible-playbook introuvable (provisioning indisponible)",
+    )
+
+
+def check_gpu() -> CheckResult:
+    """Vérifie la présence et l'état du GPU."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            gpu_name = result.stdout.strip().splitlines()[0]
+            return CheckResult(name="GPU", status="ok", message=gpu_name)
+        return CheckResult(
+            name="GPU",
+            status="warning",
+            message="nvidia-smi retourne une erreur",
+        )
+    except FileNotFoundError:
+        return CheckResult(
+            name="GPU",
+            status="warning",
+            message="nvidia-smi introuvable (GPU optionnel)",
+        )
+    except subprocess.TimeoutExpired:
+        return CheckResult(
+            name="GPU", status="warning", message="nvidia-smi timeout"
+        )
+
+
+def check_domains(infra: Infrastructure) -> list[CheckResult]:
+    """Vérifie la validité des domaines."""
+    if not infra.domains:
+        return [
+            CheckResult(
+                name="Domaines",
+                status="warning",
+                message="aucun domaine configuré",
+            )
+        ]
+
+    return [
+        CheckResult(
+            name=f"Domaine {domain.name}",
+            status="ok",
+            message=(
+                f"{len(domain.machines)} machine(s), "
+                f"trust={domain.trust_level}"
+            ),
+        )
+        for domain in infra.enabled_domains
+    ]
+
+
+def check_networks(
+    infra: Infrastructure,
+    driver: IncusDriver,
+) -> list[CheckResult]:
+    """Vérifie l'état des bridges réseau via compute_network_status."""
+    net_status = compute_network_status(infra, driver)
+    results: list[CheckResult] = []
+
+    for net in net_status.networks:
+        if net.exists:
+            results.append(
+                CheckResult(
+                    name=f"Réseau {net.bridge}",
+                    status="ok",
+                    message="bridge actif",
+                )
+            )
+        else:
+            results.append(
+                CheckResult(
+                    name=f"Réseau {net.bridge}",
+                    status="warning",
+                    message="bridge absent",
+                    fix_command="anklume apply all",
+                )
+            )
+
+    return results
+
+
+def check_golden(driver: IncusDriver) -> CheckResult:
+    """Vérifie les golden images."""
+    try:
+        images = driver.image_list("default")
+        golden = [
+            img
+            for img in images
+            if any(a.startswith(GOLDEN_PREFIX) for a in img.aliases)
+        ]
+        count = len(golden)
+        total_size = sum(img.size for img in golden)
+        size_mb = total_size // (1024 * 1024) if total_size else 0
+
+        if count > 0:
+            return CheckResult(
+                name="Images golden",
+                status="ok",
+                message=f"{count} image(s), {size_mb} Mo",
+            )
+        return CheckResult(
+            name="Images golden",
+            status="ok",
+            message="aucune image golden",
+        )
+    except Exception:
+        return CheckResult(
+            name="Images golden",
+            status="warning",
+            message="vérification impossible",
+        )
+
+
+def run_doctor(
+    driver: IncusDriver | None = None,
+    infra: Infrastructure | None = None,
+    *,
+    fix: bool = False,
+) -> DoctorReport:
+    """Exécute toutes les vérifications."""
+    checks: list[CheckResult] = []
+
+    # Checks système
+    checks.append(check_incus())
+    checks.append(check_nftables())
+    checks.append(check_ansible())
+    checks.append(check_gpu())
+
+    # Checks infra (si disponible)
+    if infra is not None:
+        checks.extend(check_domains(infra))
+
+        if driver is not None:
+            checks.extend(check_networks(infra, driver))
+
+    # Checks golden (si driver disponible)
+    if driver is not None:
+        checks.append(check_golden(driver))
+
+    return DoctorReport(checks=checks)

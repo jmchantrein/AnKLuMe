@@ -1,0 +1,16 @@
+---
+# Ports Tor
+tor_trans_port: 9040
+tor_dns_port: 5353
+tor_socks_port: 9050
+
+# Politique de sortie
+tor_exit_policy: "reject *:*"
+
+# Réseau virtuel Tor (automap) — octet 2 = 192 par convention Tor
+tor_virtual_addr_prefix: "10"
+tor_virtual_addr_second_octet: 192
+tor_virtual_addr_cidr: 10
+
+# Pays exclus des nœuds de sortie (vide = tous acceptés)
+tor_country_exclude: ""

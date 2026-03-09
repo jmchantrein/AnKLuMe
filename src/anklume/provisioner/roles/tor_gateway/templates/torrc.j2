@@ -1,0 +1,11 @@
+VirtualAddrNetworkIPv4 {{ tor_virtual_addr_prefix }}.{{ tor_virtual_addr_second_octet }}.0.0/{{ tor_virtual_addr_cidr }}
+AutomapHostsOnResolve 1
+TransPort {{ tor_trans_port }}
+DNSPort {{ tor_dns_port }}
+SocksPort {{ tor_socks_port }}
+{% if tor_exit_policy %}
+ExitPolicy {{ tor_exit_policy }}
+{% endif %}
+{% if tor_country_exclude %}
+ExcludeExitNodes {{ tor_country_exclude }}
+{% endif %}

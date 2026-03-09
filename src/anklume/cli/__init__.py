@@ -25,6 +25,8 @@ llm_app = typer.Typer(help="Supervision LLM.")
 
 portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
 setup_app = typer.Typer(help="Configuration et import.")
+golden_app = typer.Typer(help="Golden images — images réutilisables.")
+tor_app = typer.Typer(help="Passerelle Tor.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
@@ -37,6 +39,8 @@ app.add_typer(stt_app, name="stt")
 app.add_typer(llm_app, name="llm")
 app.add_typer(portal_app, name="portal")
 app.add_typer(setup_app, name="setup")
+app.add_typer(golden_app, name="golden")
+app.add_typer(tor_app, name="tor")
 
 
 def _version_callback(value: bool) -> None:
@@ -611,3 +615,89 @@ def setup_import(
     from anklume.cli._setup import run_setup_import
 
     run_setup_import(output_dir=directory)
+
+
+# --- anklume golden <create|list|delete> ---
+
+
+@golden_app.command("create")
+def golden_create(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance à publier")],
+    alias: Annotated[
+        str | None,
+        typer.Option("--alias", "-a", help="Alias personnalisé (défaut: golden/<instance>)"),
+    ] = None,
+) -> None:
+    """Publier une instance comme golden image."""
+    from anklume.cli._golden import run_golden_create
+
+    run_golden_create(instance, alias=alias)
+
+
+@golden_app.command("list")
+def golden_list_cmd() -> None:
+    """Lister les golden images."""
+    from anklume.cli._golden import run_golden_list
+
+    run_golden_list()
+
+
+@golden_app.command("delete")
+def golden_delete(
+    alias: Annotated[str, typer.Argument(help="Alias de l'image à supprimer")],
+) -> None:
+    """Supprimer une golden image."""
+    from anklume.cli._golden import run_golden_delete
+
+    run_golden_delete(alias)
+
+
+# --- anklume tor <status> ---
+
+
+@tor_app.command("status")
+def tor_status() -> None:
+    """Afficher l'état des passerelles Tor."""
+    from anklume.cli._tor import run_tor_status
+
+    run_tor_status()
+
+
+# --- anklume console ---
+
+
+@app.command("console")
+def console(
+    domain: Annotated[
+        str | None,
+        typer.Argument(help="Domaine (tous si omis)"),
+    ] = None,
+    detach: Annotated[
+        bool,
+        typer.Option("--detach", "-d", help="Lancer en arrière-plan"),
+    ] = False,
+) -> None:
+    """Console tmux colorée par domaine."""
+    from anklume.cli._console import run_console
+
+    run_console(domain=domain, detach=detach)
+
+
+# --- anklume doctor ---
+
+
+@app.command("doctor")
+def doctor(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Appliquer les corrections automatiques"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Sortie JSON"),
+    ] = False,
+) -> None:
+    """Diagnostic automatique de l'infrastructure."""
+    from anklume.cli._doctor import run_doctor_cmd
+
+    run_doctor_cmd(fix=fix, json_output=json_output)

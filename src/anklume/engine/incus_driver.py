@@ -48,6 +48,16 @@ class IncusSnapshot:
 
 
 @dataclass
+class IncusImage:
+    """Image Incus."""
+
+    fingerprint: str
+    aliases: list[str] = field(default_factory=list)
+    size: int = 0  # octets
+    created_at: str = ""
+
+
+@dataclass
 class IncusInstance:
     """État d'une instance Incus."""
 
@@ -282,6 +292,66 @@ class IncusDriver:
                 project,
             ]
         )
+
+    # --- Images ---
+
+    def image_publish(
+        self,
+        instance: str,
+        project: str,
+        *,
+        alias: str,
+    ) -> dict:
+        """Publie une instance comme image.
+
+        Returns:
+            Dict avec fingerprint et size.
+        """
+        result = self._run(
+            [
+                "publish",
+                instance,
+                "--project",
+                project,
+                "--alias",
+                alias,
+            ]
+        )
+        # Parse la sortie pour récupérer le fingerprint
+        # Format typique: "Instance published with fingerprint: <fp>"
+        fingerprint = ""
+        for line in result.stdout.splitlines():
+            if "fingerprint" in line.lower():
+                parts = line.split(":")
+                if len(parts) >= 2:
+                    fingerprint = parts[-1].strip()
+
+        return {"fingerprint": fingerprint, "size": 0}
+
+    def image_list(self, project: str = "default") -> list[IncusImage]:
+        """Liste les images Incus du projet."""
+        data = self._run_json(["image", "list", "--project", project])
+        results: list[IncusImage] = []
+        for img in data:
+            aliases = [a.get("name", "") for a in img.get("aliases", [])]
+            results.append(
+                IncusImage(
+                    fingerprint=img.get("fingerprint", ""),
+                    aliases=aliases,
+                    size=img.get("size", 0),
+                    created_at=img.get("created_at", ""),
+                )
+            )
+        return results
+
+    def image_delete(self, fingerprint: str, project: str = "default") -> None:
+        """Supprime une image par fingerprint."""
+        self._run(["image", "delete", fingerprint, "--project", project])
+
+    def image_alias_exists(self, alias: str, project: str = "default") -> bool:
+        """Vérifie si un alias d'image existe."""
+        images = self.image_list(project)
+        return any(alias in img.aliases for img in images)
 
     # --- Exec ---
 
