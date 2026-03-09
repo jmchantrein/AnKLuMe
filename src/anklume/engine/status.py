@@ -67,8 +67,13 @@ def compute_status(
     infra: Infrastructure,
     driver: IncusDriver,
     nesting_context: NestingContext | None = None,
+    domain_name: str | None = None,
 ) -> InfraStatus:
-    """Compare l'état déclaré avec l'état réel Incus."""
+    """Compare l'état déclaré avec l'état réel Incus.
+
+    Si domain_name est fourni, filtre sur ce seul domaine
+    (évite les requêtes Incus pour les autres domaines).
+    """
     ctx = nesting_context or NestingContext()
     nesting_cfg = infra.config.nesting
     result = InfraStatus()
@@ -76,6 +81,8 @@ def compute_status(
     existing_projects = {p.name for p in driver.project_list()}
 
     for domain in infra.enabled_domains:
+        if domain_name and domain.name != domain_name:
+            continue
         project_name = prefix_name(domain.name, ctx, nesting_cfg)
         network_name = prefix_name(domain.network_name, ctx, nesting_cfg)
 

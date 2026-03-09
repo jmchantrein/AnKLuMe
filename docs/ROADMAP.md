@@ -347,22 +347,29 @@ quand requis.
   cross-domaine, scénario OpenRouter, intégration pipeline)
 - [x] 683 tests unitaires au total, zéro régression
 
-## Phase 14 — CLI opérationnelle
+## Phase 14 — CLI opérationnelle ✅
 
 Commandes essentielles pour l'opérationnel quotidien.
 
-- [ ] `anklume instance list` — tableau Rich (nom, domaine, état, IP, type)
-- [ ] `anklume instance exec <instance> -- <cmd>` — exécuter dans une instance
-- [ ] `anklume instance info <instance>` — détails (config, snapshots, IPs)
-- [ ] `anklume domain list` — tableau des domaines (état, machines, trust-level)
-- [ ] `anklume domain check <nom>` — valider un domaine isolément
-- [ ] `anklume domain exec <nom> -- <cmd>` — exécuter dans toutes les instances
-- [ ] `anklume domain status <nom>` — état détaillé d'un domaine
-- [ ] `anklume snapshot delete <instance> <snapshot>` — supprimer un snapshot
-- [ ] `anklume snapshot rollback <instance> <snapshot>` — rollback destructif
-- [ ] `anklume network status` — état réseau (bridges, IPs, nftables actives)
-- [ ] `anklume llm status` — vue dédiée backend LLM, modèles, VRAM
-- [ ] `anklume llm bench` — benchmark inference (tokens/s, latence)
+- [x] SPEC §26 détaillé (12 commandes, dataclasses, modules engine, exemples)
+- [x] `anklume instance list` — tableau (nom, domaine, état, IP, type)
+- [x] `anklume instance exec <instance> -- <cmd>` — exécuter dans une instance
+- [x] `anklume instance info <instance>` — détails (config, snapshots, IPs)
+- [x] `anklume domain list` — tableau des domaines (état, machines, trust-level)
+- [x] `anklume domain check <nom>` — valider un domaine isolément
+- [x] `anklume domain exec <nom> -- <cmd>` — exécuter dans toutes les instances
+- [x] `anklume domain status <nom>` — état détaillé d'un domaine
+- [x] `anklume snapshot delete <instance> <snapshot>` — supprimer un snapshot
+- [x] `anklume snapshot rollback <instance> <snapshot>` — rollback destructif
+- [x] `anklume network status` — état réseau (bridges, IPs, nftables actives)
+- [x] `anklume llm status` — vue dédiée backend LLM, modèles, VRAM
+- [x] `anklume llm bench` — benchmark inference (tokens/s, latence)
+- [x] `engine/ops.py` — InstanceInfo, DomainInfo, NetworkStatus + fonctions
+- [x] `engine/llm_ops.py` — LlmStatus, BenchResult + compute/bench
+- [x] `engine/snapshot.py` — rollback_snapshot (restaure + cleanup postérieurs)
+- [x] CLI : `_instance.py`, `_domain.py`, `_llm.py` + extensions `_snapshot.py`, `_network.py`
+- [x] Tests unitaires : 49 tests (ops, llm_ops, CLI registration, rollback)
+- [x] 732 tests unitaires au total, zéro régression
 
 ## Phase 15 — Sanitiser avancé
 

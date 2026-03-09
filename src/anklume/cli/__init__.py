@@ -16,18 +16,22 @@ app = typer.Typer(
 apply_app = typer.Typer(help="Déployer l'infrastructure.")
 dev_app = typer.Typer(help="Outils de développement.")
 instance_app = typer.Typer(help="Gestion des instances.")
+domain_app = typer.Typer(help="Gestion des domaines.")
 snapshot_app = typer.Typer(help="Gestion des snapshots.")
 network_app = typer.Typer(help="Réseau et sécurité nftables.")
 ai_app = typer.Typer(help="Gestion des services IA.")
 stt_app = typer.Typer(help="Push-to-talk STT.")
+llm_app = typer.Typer(help="Supervision LLM.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
+app.add_typer(domain_app, name="domain")
 app.add_typer(snapshot_app, name="snapshot")
 app.add_typer(network_app, name="network")
 app.add_typer(ai_app, name="ai")
 app.add_typer(stt_app, name="stt")
+app.add_typer(llm_app, name="llm")
 
 
 def _version_callback(value: bool) -> None:
@@ -183,21 +187,78 @@ def dev_molecule(
     run_molecule(role=role, scenario=scenario, command=command)
 
 
-# --- anklume instance <list|shell> ---
+# --- anklume instance <list|exec|info> ---
 
 
 @instance_app.command("list")
 def instance_list() -> None:
-    """Lister toutes les instances."""
-    typer.echo("instance list : pas encore implémenté")
+    """Lister toutes les instances avec état réel."""
+    from anklume.cli._instance import run_instance_list
+
+    run_instance_list()
 
 
-@instance_app.command("shell")
-def instance_shell(
-    name: Annotated[str, typer.Argument(help="Nom de l'instance")],
+@instance_app.command("exec")
+def instance_exec(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    cmd: Annotated[list[str], typer.Argument(help="Commande à exécuter")],
 ) -> None:
-    """Ouvrir un shell dans une instance."""
-    typer.echo(f"instance shell {name} : pas encore implémenté")
+    """Exécuter une commande dans une instance."""
+    from anklume.cli._instance import run_instance_exec
+
+    run_instance_exec(instance, cmd)
+
+
+@instance_app.command("info")
+def instance_info(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+) -> None:
+    """Détails d'une instance (config, snapshots, IPs)."""
+    from anklume.cli._instance import run_instance_info
+
+    run_instance_info(instance)
+
+
+# --- anklume domain <list|check|exec|status> ---
+
+
+@domain_app.command("list")
+def domain_list() -> None:
+    """Lister tous les domaines."""
+    from anklume.cli._domain import run_domain_list
+
+    run_domain_list()
+
+
+@domain_app.command("check")
+def domain_check(
+    name: Annotated[str, typer.Argument(help="Nom du domaine à valider")],
+) -> None:
+    """Valider un domaine isolément."""
+    from anklume.cli._domain import run_domain_check
+
+    run_domain_check(name)
+
+
+@domain_app.command("exec")
+def domain_exec(
+    name: Annotated[str, typer.Argument(help="Nom du domaine")],
+    cmd: Annotated[list[str], typer.Argument(help="Commande à exécuter")],
+) -> None:
+    """Exécuter une commande dans toutes les instances d'un domaine."""
+    from anklume.cli._domain import run_domain_exec
+
+    run_domain_exec(name, cmd)
+
+
+@domain_app.command("status")
+def domain_status(
+    name: Annotated[str, typer.Argument(help="Nom du domaine")],
+) -> None:
+    """État détaillé d'un domaine."""
+    from anklume.cli._domain import run_domain_status
+
+    run_domain_status(name)
 
 
 # --- anklume snapshot <create|list|restore> ---
@@ -244,7 +305,29 @@ def snapshot_restore(
     run_snapshot_restore(instance=instance, snapshot=snapshot)
 
 
-# --- anklume network <rules|deploy> ---
+@snapshot_app.command("delete")
+def snapshot_delete(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    snapshot: Annotated[str, typer.Argument(help="Nom du snapshot")],
+) -> None:
+    """Supprimer un snapshot."""
+    from anklume.cli._snapshot import run_snapshot_delete
+
+    run_snapshot_delete(instance=instance, snapshot=snapshot)
+
+
+@snapshot_app.command("rollback")
+def snapshot_rollback(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    snapshot: Annotated[str, typer.Argument(help="Nom du snapshot")],
+) -> None:
+    """Rollback destructif (restaure + supprime les snapshots postérieurs)."""
+    from anklume.cli._snapshot import run_snapshot_rollback
+
+    run_snapshot_rollback(instance=instance, snapshot=snapshot)
+
+
+# --- anklume network <rules|deploy|status> ---
 
 
 @network_app.command("rules")
@@ -261,6 +344,42 @@ def network_deploy() -> None:
     from anklume.cli._network import run_network_deploy
 
     run_network_deploy()
+
+
+@network_app.command("status")
+def network_status() -> None:
+    """Afficher l'état réseau (bridges, IPs, nftables)."""
+    from anklume.cli._network import run_network_status
+
+    run_network_status()
+
+
+# --- anklume llm <status|bench> ---
+
+
+@llm_app.command("status")
+def llm_status() -> None:
+    """Vue dédiée backends LLM, modèles, VRAM."""
+    from anklume.cli._llm import run_llm_status
+
+    run_llm_status()
+
+
+@llm_app.command("bench")
+def llm_bench(
+    model: Annotated[
+        str,
+        typer.Option("--model", "-m", help="Modèle à benchmarker"),
+    ] = "",
+    prompt: Annotated[
+        str,
+        typer.Option("--prompt", "-p", help="Prompt personnalisé"),
+    ] = "",
+) -> None:
+    """Benchmark inférence (tokens/s, latence)."""
+    from anklume.cli._llm import run_llm_bench
+
+    run_llm_bench(model=model, prompt=prompt)
 
 
 # --- anklume ai <status|flush|switch> ---

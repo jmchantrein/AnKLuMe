@@ -299,14 +299,44 @@ policies:
 
 | Commande | Description |
 |----------|-------------|
-| `anklume instance list` | Lister les instances |
-| `anklume instance shell <nom>` | Shell dans une instance |
+| `anklume instance list` | Tableau des instances (nom, domaine, état, IP, type) |
+| `anklume instance exec <inst> -- <cmd>` | Exécuter dans une instance |
+| `anklume instance info <inst>` | Détails d'une instance |
+
+### Gestion des domaines
+
+| Commande | Description |
+|----------|-------------|
+| `anklume domain list` | Tableau des domaines |
+| `anklume domain check <nom>` | Valider un domaine isolément |
+| `anklume domain exec <nom> -- <cmd>` | Exécuter dans toutes les instances |
+| `anklume domain status <nom>` | État détaillé d'un domaine |
+
+### Snapshots
+
+| Commande | Description |
+|----------|-------------|
 | `anklume snapshot create [instance]` | Snapshotter toutes les instances ou une seule |
 | `anklume snapshot create --name X` | Snapshot avec nom personnalisé |
 | `anklume snapshot list [instance]` | Lister les snapshots |
 | `anklume snapshot restore <inst> <snap>` | Restaurer un snapshot |
+| `anklume snapshot delete <inst> <snap>` | Supprimer un snapshot |
+| `anklume snapshot rollback <inst> <snap>` | Rollback destructif |
+
+### Réseau
+
+| Commande | Description |
+|----------|-------------|
 | `anklume network rules` | Générer les règles nftables |
 | `anklume network deploy` | Appliquer les règles sur l'hôte |
+| `anklume network status` | État réseau (bridges, IPs, nftables) |
+
+### LLM
+
+| Commande | Description |
+|----------|-------------|
+| `anklume llm status` | Vue dédiée backends LLM |
+| `anklume llm bench` | Benchmark inférence |
 
 ### Développement
 
@@ -2556,3 +2586,371 @@ machines:
 ```
 
 Résultat : même les requêtes vers Ollama passent par le sanitizer.
+
+## 26. CLI opérationnelle
+
+Commandes essentielles pour l'opérationnel quotidien : inspection
+des instances, gestion des domaines, opérations snapshot avancées,
+état réseau et supervision LLM.
+
+### 26.1 Gestion des instances
+
+#### `anklume instance list`
+
+Tableau combinant état déclaré (YAML) et état réel (Incus) pour
+chaque instance de l'infrastructure.
+
+```
+NOM                 DOMAINE   TYPE  ÉTAT       IP
+pro-dev             pro       lxc   Running    10.100.1.2
+pro-desktop         pro       vm    Stopped    10.100.1.3
+perso-web           perso     lxc   Absent     10.100.2.2
+ai-tools-gpu-server ai-tools  lxc   Running    10.100.3.1
+
+4 instance(s) — 2 running, 1 arrêtée, 1 absente
+```
+
+Colonnes : nom complet, domaine, type (lxc/vm), état Incus
+(Running/Stopped/Absent), IP déclarée.
+
+#### `anklume instance exec <instance> -- <cmd>`
+
+Exécute une commande dans une instance via `incus exec`.
+L'instance est résolue par son nom complet (`domaine-machine`).
+
+```bash
+anklume instance exec pro-dev -- apt update
+anklume instance exec pro-dev -- bash
+```
+
+Erreur si l'instance est absente ou le nom inconnu.
+
+#### `anklume instance info <instance>`
+
+Détails d'une instance : configuration déclarée, état réel,
+snapshots existants.
+
+```
+pro-dev
+  Domaine     : pro
+  Type        : lxc
+  État        : Running
+  IP          : 10.100.1.2
+  Trust level : semi-trusted
+  GPU         : non
+  Rôles       : base, openssh_server
+  Profils     : default
+  Éphémère    : non
+  Snapshots   : anklume-pre-20250101-120000, anklume-post-20250101-120001
+```
+
+Erreur si le nom est inconnu dans les domaines déclarés.
+
+### 26.2 Gestion des domaines
+
+#### `anklume domain list`
+
+Tableau récapitulatif de tous les domaines (actifs et désactivés).
+
+```
+NOM       ÉTAT      TRUST-LEVEL    MACHINES  ÉPHÉMÈRE
+pro       activé    semi-trusted   3         non
+perso     activé    trusted        2         non
+ai-tools  désactivé admin          1         non
+
+3 domaine(s) — 2 activé(s), 1 désactivé
+```
+
+#### `anklume domain check <nom>`
+
+Valide un domaine isolément : parsing + validation du fichier
+`domains/<nom>.yml`. Utile pour vérifier un fichier en cours
+d'édition sans déployer.
+
+```bash
+anklume domain check pro
+# → pro : valide (3 machines)
+
+anklume domain check pro
+# → pro : 2 erreur(s)
+#   machines.dev: nom invalide ...
+```
+
+#### `anklume domain exec <nom> -- <cmd>`
+
+Exécute une commande dans toutes les instances running d'un domaine.
+Best-effort : continue si une instance échoue.
+
+```bash
+anklume domain exec pro -- apt update
+# pro-dev : OK
+# pro-desktop : erreur (Stopped)
+```
+
+#### `anklume domain status <nom>`
+
+État détaillé d'un seul domaine : projet, réseau, instances, IPs.
+Équivalent de `anklume status` filtré sur un domaine.
+
+```
+pro:
+  Projet : oui    Réseau : oui
+  pro-dev          lxc   Running    10.100.1.2   [ok]
+  pro-desktop      vm    Stopped    10.100.1.3   [arrêtée]
+
+1/2 instances running
+```
+
+### 26.3 Snapshots avancés
+
+#### `anklume snapshot delete <instance> <snapshot>`
+
+Supprime un snapshot spécifique. Erreur si instance ou snapshot
+inconnu.
+
+```bash
+anklume snapshot delete pro-dev anklume-pre-20250101-120000
+# Snapshot 'anklume-pre-20250101-120000' supprimé de pro-dev.
+```
+
+#### `anklume snapshot rollback <instance> <snapshot>`
+
+Rollback destructif : restaure le snapshot ET supprime tous les
+snapshots créés après celui-ci (cleanup des états intermédiaires).
+
+```bash
+anklume snapshot rollback pro-dev anklume-pre-20250101-120000
+# Restauration de 'anklume-pre-20250101-120000' sur pro-dev.
+# 3 snapshot(s) postérieur(s) supprimé(s).
+```
+
+Séquence :
+1. Arrêter l'instance si running
+2. Restaurer le snapshot
+3. Supprimer les snapshots postérieurs (par date `created_at`)
+4. Redémarrer l'instance si elle était running
+
+### 26.4 État réseau
+
+#### `anklume network status`
+
+Vue réseau combinant l'état déclaré et l'état réel Incus.
+
+```
+DOMAINE   BRIDGE     SUBNET         GATEWAY       ÉTAT
+pro       net-pro    10.100.1.0/24  10.100.1.1    actif
+perso     net-perso  10.100.2.0/24  10.100.2.1    actif
+ai-tools  net-ai     10.100.3.0/24  10.100.3.1    absent
+
+nftables : table inet anklume présente (12 règles)
+```
+
+Affiche aussi l'état de la table nftables anklume si elle existe.
+
+### 26.5 Supervision LLM
+
+#### `anklume llm status`
+
+Vue dédiée backend LLM : configuration par machine, modèles
+chargés, VRAM.
+
+```
+GPU : NVIDIA RTX PRO 5000 — 2048 / 24576 MiB
+
+MACHINE            BACKEND   SANITISÉ  URL
+pro-assistant      openai    oui       http://10.100.1.5:8089
+ai-tools-chat      local     non       http://10.100.3.1:11434
+
+Ollama : actif (llama3.2:3b chargé)
+```
+
+Combine les informations de `compute_ai_status()` (GPU, services)
+avec `resolve_llm_endpoint()` (backends configurés par machine).
+
+#### `anklume llm bench`
+
+Benchmark d'inférence sur le backend Ollama local.
+Envoie un prompt court, mesure tokens/seconde et latence.
+
+```
+Modèle   : llama3.2:3b
+Prompt   : "Bonjour, comment ça va ?"
+Tokens   : 42
+Durée    : 1.23s
+Vitesse  : 34.1 tokens/s
+```
+
+Options :
+- `--model <nom>` — modèle à benchmarker (défaut : premier modèle chargé)
+- `--prompt <texte>` — prompt personnalisé
+
+### 26.6 Mise à jour de la table des commandes CLI (§6)
+
+```
+### Gestion des instances
+
+| Commande | Description |
+|----------|-------------|
+| `anklume instance list` | Tableau des instances (nom, domaine, état, IP, type) |
+| `anklume instance exec <inst> -- <cmd>` | Exécuter dans une instance |
+| `anklume instance info <inst>` | Détails d'une instance |
+
+### Gestion des domaines
+
+| Commande | Description |
+|----------|-------------|
+| `anklume domain list` | Tableau des domaines |
+| `anklume domain check <nom>` | Valider un domaine isolément |
+| `anklume domain exec <nom> -- <cmd>` | Exécuter dans toutes les instances |
+| `anklume domain status <nom>` | État détaillé d'un domaine |
+
+### Snapshots
+
+| Commande | Description |
+|----------|-------------|
+| `anklume snapshot delete <inst> <snap>` | Supprimer un snapshot |
+| `anklume snapshot rollback <inst> <snap>` | Rollback destructif |
+
+### Réseau
+
+| Commande | Description |
+|----------|-------------|
+| `anklume network status` | État réseau (bridges, IPs, nftables) |
+
+### LLM
+
+| Commande | Description |
+|----------|-------------|
+| `anklume llm status` | Vue dédiée backends LLM |
+| `anklume llm bench` | Benchmark inférence |
+```
+
+### 26.7 Modules engine
+
+#### `engine/ops.py` — Opérations d'inspection
+
+Fonctions pures (sauf lecture Incus via driver) pour les requêtes
+d'inspection opérationnelle.
+
+```python
+@dataclass
+class InstanceInfo:
+    """Informations complètes d'une instance."""
+    name: str            # nom complet (pro-dev)
+    domain: str          # nom du domaine
+    machine_type: str    # lxc/vm
+    state: str           # Running/Stopped/Absent
+    ip: str | None       # IP déclarée
+    trust_level: str     # trust level du domaine
+    gpu: bool            # flag GPU
+    ephemeral: bool      # flag éphémère
+    roles: list[str]     # rôles Ansible
+    profiles: list[str]  # profils Incus
+    snapshots: list[str] # noms des snapshots
+
+@dataclass
+class DomainInfo:
+    """Informations récapitulatives d'un domaine."""
+    name: str
+    enabled: bool
+    trust_level: str
+    machine_count: int
+    ephemeral: bool
+
+@dataclass
+class NetworkInfo:
+    """État réseau d'un domaine."""
+    domain: str
+    bridge: str
+    subnet: str | None
+    gateway: str | None
+    exists: bool         # bridge présent dans Incus
+
+@dataclass
+class NetworkStatus:
+    """État réseau complet."""
+    networks: list[NetworkInfo]
+    nftables_present: bool
+    nftables_rule_count: int
+
+def list_instances(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    nesting_context: NestingContext | None = None,
+) -> list[InstanceInfo]:
+    """Liste toutes les instances avec état réel combiné."""
+
+def get_instance_info(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    instance_name: str,
+    nesting_context: NestingContext | None = None,
+) -> InstanceInfo | None:
+    """Détails complets d'une instance."""
+
+def list_domains(infra: Infrastructure) -> list[DomainInfo]:
+    """Liste tous les domaines (actifs et inactifs)."""
+
+def compute_network_status(
+    infra: Infrastructure,
+    driver: IncusDriver,
+    nesting_context: NestingContext | None = None,
+) -> NetworkStatus:
+    """État réseau complet."""
+```
+
+#### `engine/llm_ops.py` — Opérations LLM
+
+```python
+@dataclass
+class LlmMachineStatus:
+    """État LLM d'une machine consommatrice."""
+    name: str          # nom complet
+    backend: str       # local/openai/anthropic
+    sanitized: bool
+    url: str
+
+@dataclass
+class LlmStatus:
+    """État complet LLM."""
+    gpu: GpuInfo
+    machines: list[LlmMachineStatus]
+    ollama_status: str    # actif/injoignable
+    ollama_models: list[str]
+
+@dataclass
+class BenchResult:
+    """Résultat d'un benchmark LLM."""
+    model: str
+    prompt: str
+    tokens: int
+    duration_s: float
+    tokens_per_s: float
+
+def compute_llm_status(infra: Infrastructure) -> LlmStatus:
+    """Vue LLM dédiée."""
+
+def run_llm_bench(
+    infra: Infrastructure,
+    *,
+    model: str = "",
+    prompt: str = "Bonjour, comment ça va ?",
+) -> BenchResult:
+    """Benchmark d'inférence Ollama."""
+```
+
+#### Ajouts à `engine/snapshot.py`
+
+```python
+def rollback_snapshot(
+    driver: IncusDriver,
+    instance: str,
+    project: str,
+    snapshot_name: str,
+) -> int:
+    """Rollback destructif : restaure et supprime les snapshots postérieurs.
+
+    Returns:
+        Nombre de snapshots postérieurs supprimés.
+    """
+```

@@ -123,6 +123,60 @@ def restore_snapshot(
         driver.instance_start(instance, project)
 
 
+def rollback_snapshot(
+    driver: IncusDriver,
+    instance: str,
+    project: str,
+    snapshot_name: str,
+) -> int:
+    """Rollback destructif : restaure et supprime les snapshots postérieurs.
+
+    Séquence :
+    1. Arrêter l'instance si running
+    2. Restaurer le snapshot
+    3. Supprimer les snapshots créés après celui-ci
+    4. Redémarrer si l'instance était running
+
+    Returns:
+        Nombre de snapshots postérieurs supprimés.
+    """
+    instances = driver.instance_list(project)
+    inst = next((i for i in instances if i.name == instance), None)
+    was_running = inst is not None and inst.status == "Running"
+
+    if was_running:
+        driver.instance_stop(instance, project)
+
+    # Trouver le snapshot cible et ses postérieurs
+    all_snaps = driver.snapshot_list(instance, project)
+    target_snap = next((s for s in all_snaps if s.name == snapshot_name), None)
+    if target_snap is None:
+        msg = f"Snapshot '{snapshot_name}' introuvable sur {instance}"
+        raise IncusError(["snapshot", "list"], 1, msg)
+
+    target_date = target_snap.created_at
+
+    # Restaurer
+    driver.snapshot_restore(instance, project, snapshot_name)
+
+    # Supprimer les snapshots postérieurs
+    deleted_count = 0
+    for snap in all_snaps:
+        if snap.name == snapshot_name:
+            continue
+        if snap.created_at and target_date and snap.created_at > target_date:
+            try:
+                driver.snapshot_delete(instance, project, snap.name)
+                deleted_count += 1
+            except IncusError as e:
+                logger.warning("Suppression snapshot %s échouée : %s", snap.name, e)
+
+    if was_running:
+        driver.instance_start(instance, project)
+
+    return deleted_count
+
+
 def resolve_instance_project(
     infra: Infrastructure,
     instance_name: str,

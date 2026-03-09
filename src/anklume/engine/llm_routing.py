@@ -11,7 +11,7 @@ import copy
 from dataclasses import dataclass
 
 from anklume.engine.ai import (
-    _DEFAULT_OLLAMA_PORT,
+    DEFAULT_OLLAMA_PORT,
     ROLE_LOBECHAT,
     ROLE_OLLAMA_SERVER,
     ROLE_OPEN_WEBUI,
@@ -204,8 +204,8 @@ def find_ollama_url(
     """
     machine = _find_machine_by_role(ROLE_OLLAMA_SERVER, domain, infra)
     if machine is None:
-        return f"http://localhost:{_DEFAULT_OLLAMA_PORT}"
-    return _machine_url(machine, "ollama_port", _DEFAULT_OLLAMA_PORT)
+        return f"http://localhost:{DEFAULT_OLLAMA_PORT}"
+    return _machine_url(machine, "ollama_port", DEFAULT_OLLAMA_PORT)
 
 
 # ---------------------------------------------------------------------------

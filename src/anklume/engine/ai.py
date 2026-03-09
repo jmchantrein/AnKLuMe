@@ -21,13 +21,13 @@ from anklume.engine.models import Infrastructure
 log = logging.getLogger(__name__)
 
 # Ports par défaut (canoniques : provisioner/roles/*/defaults/main.yml)
-_DEFAULT_OLLAMA_PORT = 11434
+DEFAULT_OLLAMA_PORT = 11434
 _DEFAULT_STT_PORT = 8000
 _DEFAULT_LLAMA_SERVER_PORT = 8081
 _DEFAULT_OPEN_WEBUI_PORT = 3000
 _DEFAULT_LOBECHAT_PORT = 3210
 _DEFAULT_OPENCLAW_PORT = 8090
-_SERVICE_TIMEOUT = 3  # secondes
+SERVICE_TIMEOUT = 3  # secondes
 
 # Rôles IA reconnus
 ROLE_OLLAMA_SERVER = "ollama_server"
@@ -42,7 +42,7 @@ _SERVICE_DEFS: list[dict[str, str | int]] = [
         "role": ROLE_OLLAMA_SERVER,
         "name": "ollama",
         "port_var": "ollama_port",
-        "default_port": _DEFAULT_OLLAMA_PORT,
+        "default_port": DEFAULT_OLLAMA_PORT,
         "health_path": "/api/ps",
     },
     {
@@ -182,7 +182,7 @@ def flush_vram(infra: Infrastructure) -> FlushResult:
         )
 
     # Trouver la machine Ollama
-    ollama_ip, ollama_port, project, instance_name = _find_ollama_machine(infra)
+    ollama_ip, ollama_port, project, instance_name = find_ollama_machine(infra)
 
     models_unloaded: list[str] = []
     if ollama_ip:
@@ -305,7 +305,7 @@ def check_service_health(url: str) -> bool:
     """Vérifie qu'un endpoint HTTP répond avec status 200."""
     try:
         req = Request(url, method="GET")  # noqa: S310
-        response = urlopen(req, timeout=_SERVICE_TIMEOUT)  # noqa: S310
+        response = urlopen(req, timeout=SERVICE_TIMEOUT)  # noqa: S310
         return response.status == 200
     except (OSError, TimeoutError, ValueError):
         return False
@@ -316,7 +316,7 @@ def check_service_health(url: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _find_ollama_machine(
+def find_ollama_machine(
     infra: Infrastructure,
 ) -> tuple[str | None, int, str | None, str | None]:
     """Trouve l'IP, le port, le projet et le nom de la machine Ollama.
@@ -327,9 +327,9 @@ def _find_ollama_machine(
     for domain in infra.enabled_domains:
         for machine in domain.machines.values():
             if ROLE_OLLAMA_SERVER in machine.roles and machine.ip:
-                port = machine.vars.get("ollama_port", _DEFAULT_OLLAMA_PORT)
+                port = machine.vars.get("ollama_port", DEFAULT_OLLAMA_PORT)
                 return machine.ip, port, domain.name, machine.full_name
-    return None, _DEFAULT_OLLAMA_PORT, None, None
+    return None, DEFAULT_OLLAMA_PORT, None, None
 
 
 def _unload_all_models(ip: str, port: int) -> list[str]:
@@ -338,7 +338,7 @@ def _unload_all_models(ip: str, port: int) -> list[str]:
     try:
         ps_url = f"http://{ip}:{port}/api/ps"
         req = Request(ps_url, method="GET")  # noqa: S310
-        response = urlopen(req, timeout=_SERVICE_TIMEOUT)  # noqa: S310
+        response = urlopen(req, timeout=SERVICE_TIMEOUT)  # noqa: S310
         data = json.loads(response.read().decode())
         models = [m.get("name", "") for m in data.get("models", [])]
     except (OSError, TimeoutError, json.JSONDecodeError):
@@ -354,7 +354,7 @@ def _unload_all_models(ip: str, port: int) -> list[str]:
             gen_url = f"http://{ip}:{port}/api/generate"
             req = Request(gen_url, data=payload, method="POST")  # noqa: S310
             req.add_header("Content-Type", "application/json")
-            urlopen(req, timeout=_SERVICE_TIMEOUT)  # noqa: S310
+            urlopen(req, timeout=SERVICE_TIMEOUT)  # noqa: S310
             unloaded.append(model_name)
         except (OSError, TimeoutError):
             log.warning("Échec déchargement modèle %s", model_name)
@@ -406,7 +406,7 @@ def _check_service(url: str, service_type: str) -> tuple[str, bool]:
     """
     try:
         req = Request(url, method="GET")  # noqa: S310
-        response = urlopen(req, timeout=_SERVICE_TIMEOUT)  # noqa: S310
+        response = urlopen(req, timeout=SERVICE_TIMEOUT)  # noqa: S310
         if response.status == 200:
             body = response.read().decode()
             return _parse_service_response(body, service_type), True

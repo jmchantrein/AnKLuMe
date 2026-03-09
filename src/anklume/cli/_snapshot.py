@@ -10,6 +10,7 @@ from anklume.engine.snapshot import (
     create_auto_snapshots,
     list_all_snapshots,
     resolve_instance_project,
+    rollback_snapshot,
 )
 from anklume.engine.snapshot import (
     create_snapshot as _create_snapshot,
@@ -84,4 +85,42 @@ def run_snapshot_restore(instance: str, snapshot: str) -> None:
         typer.echo(f"Snapshot '{snapshot}' restauré sur {instance}.")
     except IncusError as e:
         typer.echo(f"Erreur de restauration : {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+def run_snapshot_delete(instance: str, snapshot: str) -> None:
+    """Supprime un snapshot."""
+    infra = load_infra()
+    driver = IncusDriver()
+
+    project = resolve_instance_project(infra, instance)
+    if not project:
+        typer.echo(f"Instance inconnue : {instance}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        driver.snapshot_delete(instance, project, snapshot)
+        typer.echo(f"Snapshot '{snapshot}' supprimé de {instance}.")
+    except IncusError as e:
+        typer.echo(f"Erreur de suppression : {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+def run_snapshot_rollback(instance: str, snapshot: str) -> None:
+    """Rollback destructif : restaure + supprime les snapshots postérieurs."""
+
+    infra = load_infra()
+    driver = IncusDriver()
+
+    project = resolve_instance_project(infra, instance)
+    if not project:
+        typer.echo(f"Instance inconnue : {instance}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        deleted_count = rollback_snapshot(driver, instance, project, snapshot)
+        typer.echo(f"Restauration de '{snapshot}' sur {instance}.")
+        typer.echo(f"{deleted_count} snapshot(s) postérieur(s) supprimé(s).")
+    except IncusError as e:
+        typer.echo(f"Erreur de rollback : {e}", err=True)
         raise typer.Exit(1) from None
