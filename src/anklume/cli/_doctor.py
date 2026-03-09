@@ -15,9 +15,9 @@ def run_doctor_cmd(fix: bool = False, json_output: bool = False) -> None:
     # Charger l'infra si possible (optionnel)
     infra = None
     try:
-        from anklume.engine.parser import load_infrastructure
+        from anklume.cli._common import load_infra
 
-        infra = load_infrastructure()
+        infra = load_infra()
     except Exception:  # noqa: S110
         pass  # Infra optionnelle — doctor fonctionne sans
 

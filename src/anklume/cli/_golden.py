@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import typer
 
+from anklume.cli._common import load_infra
 from anklume.engine.golden import create_golden, delete_golden, list_golden
 from anklume.engine.incus_driver import IncusDriver, IncusError
-from anklume.engine.parser import load_infrastructure
 
 
 def run_golden_create(instance: str, alias: str | None = None) -> None:
     """Publie une instance comme golden image."""
     driver = IncusDriver()
-    infra = load_infrastructure()
+    infra = load_infra()
 
     try:
         result = create_golden(driver, infra, instance, alias=alias)

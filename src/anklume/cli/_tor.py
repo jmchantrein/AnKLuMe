@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import typer
 
-from anklume.engine.parser import load_infrastructure
+from anklume.cli._common import load_infra
 from anklume.engine.tor import find_tor_gateways, validate_tor_config
 
 
 def run_tor_status() -> None:
     """Affiche l'état des passerelles Tor."""
-    infra = load_infrastructure()
+    infra = load_infra()
 
     # Validation
     errors = validate_tor_config(infra)

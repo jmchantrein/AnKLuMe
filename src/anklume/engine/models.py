@@ -95,13 +95,18 @@ class AddressingConfig:
     base: str = "10.100"
     zone_step: int = 10
 
+    def __post_init__(self) -> None:
+        parts = self.base.split(".")
+        self._first_octet = int(parts[0])
+        self._base_second_octet = int(parts[1])
+
     @property
     def first_octet(self) -> int:
-        return int(self.base.split(".")[0])
+        return self._first_octet
 
     @property
     def base_second_octet(self) -> int:
-        return int(self.base.split(".")[1])
+        return self._base_second_octet
 
 
 @dataclass

@@ -45,6 +45,9 @@ def generate_ruleset(infra: Infrastructure) -> str:
     lines.append("        # Connexions établies/reliées")
     lines.append("        ct state established,related accept")
 
+    # Index full_name -> resolved target (O(1) au lieu de O(M*K) par policy)
+    machine_index = _build_machine_index(infra)
+
     # Intra-domaine
     enabled = infra.enabled_domains
     if enabled:
@@ -59,7 +62,7 @@ def generate_ruleset(infra: Infrastructure) -> str:
         lines.append("")
         lines.append("        # --- Politiques inter-domaines ---")
         for policy in infra.policies:
-            _append_policy_rules(policy, infra, lines)
+            _append_policy_rules(policy, infra, lines, machine_index)
 
     lines.append("    }")
     lines.append("}")
@@ -68,7 +71,25 @@ def generate_ruleset(infra: Infrastructure) -> str:
     return "\n".join(lines)
 
 
-def _resolve_target(target: str, infra: Infrastructure) -> _ResolvedTarget | None:
+def _build_machine_index(infra: Infrastructure) -> dict[str, _ResolvedTarget]:
+    """Construit un index full_name → ResolvedTarget pour les machines."""
+    index: dict[str, _ResolvedTarget] = {}
+    for domain in infra.domains.values():
+        for machine in domain.machines.values():
+            index[machine.full_name] = _ResolvedTarget(
+                bridge=domain.network_name,
+                ip=machine.ip,
+                is_disabled=not domain.enabled,
+                domain_name=domain.name,
+            )
+    return index
+
+
+def _resolve_target(
+    target: str,
+    infra: Infrastructure,
+    machine_index: dict[str, _ResolvedTarget],
+) -> _ResolvedTarget | None:
     """Résout une cible de politique en identifiants nftables."""
     if target == "host":
         return _ResolvedTarget(is_host=True)
@@ -82,24 +103,19 @@ def _resolve_target(target: str, infra: Infrastructure) -> _ResolvedTarget | Non
             domain_name=target,
         )
 
-    # Machine (full_name) ?
-    for domain in infra.domains.values():
-        for machine in domain.machines.values():
-            if machine.full_name == target:
-                return _ResolvedTarget(
-                    bridge=domain.network_name,
-                    ip=machine.ip,
-                    is_disabled=not domain.enabled,
-                    domain_name=domain.name,
-                )
-
-    return None
+    # Machine (full_name) ? — lookup O(1)
+    return machine_index.get(target)
 
 
-def _append_policy_rules(policy: Policy, infra: Infrastructure, lines: list[str]) -> None:
+def _append_policy_rules(
+    policy: Policy,
+    infra: Infrastructure,
+    lines: list[str],
+    machine_index: dict[str, _ResolvedTarget],
+) -> None:
     """Ajoute les règles nftables d'une politique aux lignes."""
-    src = _resolve_target(policy.from_target, infra)
-    dst = _resolve_target(policy.to_target, infra)
+    src = _resolve_target(policy.from_target, infra, machine_index)
+    dst = _resolve_target(policy.to_target, infra, machine_index)
 
     lines.append(f"        # {policy.description}")
 
