@@ -95,6 +95,7 @@ def write_host_vars(project_dir: Path, infra: Infrastructure) -> list[Path]:
         path = vars_dir / f"{machine_name}.yml"
         content = GENERATED_HEADER + yaml.dump(vars_dict, default_flow_style=False)
         path.write_text(content)
+        path.chmod(0o600)
         paths.append(path)
 
     return paths

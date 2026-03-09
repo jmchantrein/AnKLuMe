@@ -329,9 +329,10 @@ def audit_log(
         total_redactions=len(result.replacements),
     )
 
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with log_path.open("a") as f:
         f.write(json.dumps(asdict(entry)) + "\n")
+    log_path.chmod(0o600)
 
     return entry
 

@@ -11,6 +11,7 @@ from anklume.engine.models import (
     SCHEMA_VERSION,
     TRUST_LEVELS,
     Infrastructure,
+    Policy,
 )
 
 _DNS_SAFE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
@@ -67,6 +68,7 @@ def validate(infra: Infrastructure) -> ValidationResult:
     _check_profile_references(infra, result)
     _check_machine_weights(infra, result)
     _check_policies(infra, result)
+    _check_machine_config_keys(infra, result)
 
     return result
 
@@ -227,3 +229,41 @@ def _check_policies(infra: Infrastructure, result: ValidationResult) -> None:
                 f"protocole '{policy.protocol}' invalide.",
                 "Utiliser 'tcp' ou 'udp'.",
             )
+        _check_policy_ports(policy, loc, result)
+
+
+def _check_policy_ports(
+    policy: Policy, loc: str, result: ValidationResult
+) -> None:
+    """Valide les ports d'une politique (entiers, range 1-65535)."""
+    if not isinstance(policy.ports, list):
+        return
+    for port in policy.ports:
+        if not isinstance(port, int) or port < 1 or port > 65535:
+            result.add(
+                loc,
+                f"port {port!r} invalide.",
+                "Les ports doivent être des entiers entre 1 et 65535.",
+            )
+
+
+# Clés machine.config qui ne devraient pas être écrasées par l'utilisateur
+# sans raison explicite (risque d'escalade de privilèges).
+_SECURITY_ESCALATION_KEYS = {"security.privileged"}
+
+
+def _check_machine_config_keys(
+    infra: Infrastructure, result: ValidationResult
+) -> None:
+    """Alerte si machine.config contient des clés d'escalade de privilèges."""
+    for domain_name, domain in infra.domains.items():
+        for machine_name, machine in domain.machines.items():
+            for key in machine.config:
+                if key in _SECURITY_ESCALATION_KEYS:
+                    result.add(
+                        f"domains/{domain_name}.yml",
+                        f"machine '{machine_name}': clé '{key}' dans config "
+                        f"(escalade de privilèges potentielle).",
+                        "Cette clé est gérée automatiquement par le nesting. "
+                        "Ne la définir que si vous comprenez les implications.",
+                    )

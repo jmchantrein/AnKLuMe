@@ -44,12 +44,27 @@ def run_playbook(
     roles_parts.append(str(builtin_roles_dir))
     roles_path = ":".join(roles_parts)
 
-    env = {
-        **os.environ,
-        "ANSIBLE_ROLES_PATH": roles_path,
-        "ANSIBLE_CONNECTION_PLUGINS": str(plugin_dir),
-        "ANSIBLE_HOST_KEY_CHECKING": "False",
-    }
+    # Whitelist de variables d'environnement — évite de transmettre
+    # des secrets accidentels au subprocess Ansible.
+    _ENV_WHITELIST = (
+        "PATH",
+        "HOME",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TERM",
+        "SSH_AUTH_SOCK",
+        "TMPDIR",
+    )
+    env = {k: v for k, v in os.environ.items() if k in _ENV_WHITELIST}
+    env.update(
+        {
+            "ANSIBLE_ROLES_PATH": roles_path,
+            "ANSIBLE_CONNECTION_PLUGINS": str(plugin_dir),
+            "ANSIBLE_HOST_KEY_CHECKING": "False",
+        }
+    )
 
     cmd = [
         "ansible-playbook",

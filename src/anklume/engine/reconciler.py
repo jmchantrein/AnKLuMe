@@ -281,7 +281,15 @@ def _execute_action(
         config = dict(nesting_security_config(ctx.absolute_level))
         if not machine.ephemeral:
             config["security.protection.delete"] = "true"
-        config.update(machine.config)
+        for k, v in machine.config.items():
+            if k.startswith("security.") and k in config and v != config[k]:
+                log.warning(
+                    "machine.config override nesting : %s=%s (nesting: %s)",
+                    k,
+                    v,
+                    config[k],
+                )
+            config[k] = v
 
         network_name = prefix_name(domain.network_name, ctx, infra.config.nesting)
 
@@ -340,9 +348,14 @@ def _inject_context_files(
     files = context_files_for_instance(ctx, machine.type)
 
     # Batch : mkdir + écriture des 4 fichiers en une seule commande
+    # shlex.quote() empêche l'injection shell via les valeurs
+    import shlex
+
     parts = ["mkdir -p /etc/anklume"]
     for filename, value in files.items():
-        parts.append(f"printf '%s' '{value}' > /etc/anklume/{filename}")
+        safe_value = shlex.quote(value)
+        safe_name = shlex.quote(filename)
+        parts.append(f"printf '%s' {safe_value} > /etc/anklume/{safe_name}")
     script = " && ".join(parts)
 
     try:

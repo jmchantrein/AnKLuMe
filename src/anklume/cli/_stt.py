@@ -411,10 +411,15 @@ def _set_device_on_container(
     compute_type = "float16" if device == "gpu" else "int8"
 
     # Modifier le service systemd via sed
-    for var, value in [
-        ("WHISPER__INFERENCE_DEVICE", inference_device),
-        ("WHISPER__COMPUTE_TYPE", compute_type),
+    # Les valeurs sont restreintes à un set connu (pas d'input utilisateur libre)
+    _ALLOWED_DEVICES = {"cuda", "cpu"}
+    _ALLOWED_COMPUTE = {"float16", "int8"}
+    for var, value, allowed in [
+        ("WHISPER__INFERENCE_DEVICE", inference_device, _ALLOWED_DEVICES),
+        ("WHISPER__COMPUTE_TYPE", compute_type, _ALLOWED_COMPUTE),
     ]:
+        if value not in allowed:
+            continue
         subprocess.run(
             [
                 "incus",

@@ -98,7 +98,12 @@ def _read_int(path: Path, default: int) -> int:
 
 
 def _read_bool(path: Path, default: bool) -> bool:
-    """Lit un booléen depuis un fichier, retourne default en cas d'erreur."""
+    """Lit un booléen depuis un fichier, retourne default en cas d'erreur.
+
+    Seules les valeurs exactes ``true`` et ``false`` sont acceptées —
+    toute autre valeur est traitée comme default (prévient l'injection
+    de valeurs arbitraires via les fichiers de contexte).
+    """
     try:
         text = path.read_text().strip().lower()
         if text == "true":

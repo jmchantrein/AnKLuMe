@@ -14,6 +14,8 @@ from anklume.engine.incus_driver import IncusDriver
 from anklume.engine.models import Infrastructure
 from anklume.engine.snapshot import resolve_instance_project
 
+_PATH_TRAVERSAL_MSG = "Chemin invalide : séquence '..' interdite"
+
 log = logging.getLogger(__name__)
 
 
@@ -60,6 +62,11 @@ def push_file(
         msg = f"Instance inconnue : {instance}"
         raise ValueError(msg)
 
+    if ".." in local_path.split(os.sep):
+        raise ValueError(_PATH_TRAVERSAL_MSG)
+    if ".." in remote_path.split("/"):
+        raise ValueError(_PATH_TRAVERSAL_MSG)
+
     if not os.path.exists(local_path):
         msg = f"Fichier introuvable : {local_path}"
         raise FileNotFoundError(msg)
@@ -101,6 +108,11 @@ def pull_file(
     if project is None:
         msg = f"Instance inconnue : {instance}"
         raise ValueError(msg)
+
+    if ".." in remote_path.split("/"):
+        raise ValueError(_PATH_TRAVERSAL_MSG)
+    if ".." in local_path.split(os.sep):
+        raise ValueError(_PATH_TRAVERSAL_MSG)
 
     # Si local_path est un répertoire, ajouter le nom du fichier distant
     if os.path.isdir(local_path):

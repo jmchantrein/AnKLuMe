@@ -256,6 +256,7 @@ def write_ai_access(
         "previous": state.previous,
     }
     path.write_text(json.dumps(data, indent=2) + "\n")
+    path.chmod(0o600)
 
     return state
 

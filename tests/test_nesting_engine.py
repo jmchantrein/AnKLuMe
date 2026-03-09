@@ -491,10 +491,10 @@ class TestReconcilerContextFiles:
         reconcile(infra, driver, dry_run=False, nesting_context=ctx)
 
         script = self._get_inject_script(driver)
-        assert "printf '%s' '1' > /etc/anklume/absolute_level" in script
-        assert "printf '%s' '1' > /etc/anklume/relative_level" in script
-        assert "printf '%s' 'false' > /etc/anklume/vm_nested" in script
-        assert "printf '%s' 'false' > /etc/anklume/yolo" in script
+        assert "printf '%s' 1 > /etc/anklume/absolute_level" in script
+        assert "printf '%s' 1 > /etc/anklume/relative_level" in script
+        assert "printf '%s' false > /etc/anklume/vm_nested" in script
+        assert "printf '%s' false > /etc/anklume/yolo" in script
 
     def test_dry_run_no_context_injection(self):
         """En dry-run, pas d'injection de fichiers de contexte."""
@@ -521,8 +521,8 @@ class TestReconcilerContextFiles:
         reconcile(infra, driver, dry_run=False, nesting_context=ctx)
 
         script = self._get_inject_script(driver)
-        assert "printf '%s' '0' > /etc/anklume/relative_level" in script
-        assert "printf '%s' 'true' > /etc/anklume/vm_nested" in script
+        assert "printf '%s' 0 > /etc/anklume/relative_level" in script
+        assert "printf '%s' true > /etc/anklume/vm_nested" in script
 
     def test_context_injection_failure_is_warning(self):
         """Si l'injection échoue, le pipeline continue (best-effort)."""

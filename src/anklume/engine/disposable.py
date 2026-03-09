@@ -29,8 +29,8 @@ class DispContainer:
 
 
 def generate_disp_name() -> str:
-    """Génère un nom unique disp-XXXX (4 hex)."""
-    return f"{DISP_PREFIX}{secrets.token_hex(2)}"
+    """Génère un nom unique disp-XXXXXXXX (8 hex)."""
+    return f"{DISP_PREFIX}{secrets.token_hex(4)}"
 
 
 def launch_disposable(

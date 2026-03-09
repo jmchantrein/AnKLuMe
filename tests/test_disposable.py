@@ -30,10 +30,10 @@ class TestGenerateDispName:
     """Tests pour generate_disp_name."""
 
     def test_format(self):
-        """Le nom suit le format disp-XXXX."""
+        """Le nom suit le format disp-XXXXXXXX (8 hex)."""
         name = generate_disp_name()
         assert name.startswith(DISP_PREFIX)
-        assert len(name) == len(DISP_PREFIX) + 4
+        assert len(name) == len(DISP_PREFIX) + 8
 
     def test_unique(self):
         """Deux appels génèrent des noms différents."""

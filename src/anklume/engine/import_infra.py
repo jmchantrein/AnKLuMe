@@ -7,6 +7,7 @@ domaine correspondants pour adoption par anklume.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -14,6 +15,8 @@ from typing import Literal
 import yaml
 
 from anklume.engine.incus_driver import IncusDriver
+
+_DNS_SAFE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 
 log = logging.getLogger(__name__)
 
@@ -145,6 +148,11 @@ def generate_domain_files(
             "enabled": True,
             "machines": machines,
         }
+
+        # Valider le nom de projet contre les injections de chemin
+        if not _DNS_SAFE.match(domain.project):
+            log.warning("Nom de projet invalide ignoré : %s", domain.project)
+            continue
 
         file_path = domains_dir / f"{domain.project}.yml"
         file_path.write_text(

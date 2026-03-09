@@ -8,9 +8,12 @@ Produit un ruleset nftables complet :
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from anklume.engine.models import Infrastructure, Policy
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -119,11 +122,13 @@ def _append_policy_rules(
 
     lines.append(f"        # {policy.description}")
 
-    # Cible non résolue : commentaire d'avertissement, pas de règle
+    # Cible non résolue : commentaire d'avertissement + log warning
     if src is None:
+        log.warning("Politique ignorée : cible '%s' (from) non résolue", policy.from_target)
         lines.append(f"        # [erreur] cible '{policy.from_target}' non résolue")
         return
     if dst is None:
+        log.warning("Politique ignorée : cible '%s' (to) non résolue", policy.to_target)
         lines.append(f"        # [erreur] cible '{policy.to_target}' non résolue")
         return
 
