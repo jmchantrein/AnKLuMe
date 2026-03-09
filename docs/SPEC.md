@@ -2954,3 +2954,193 @@ def rollback_snapshot(
         Nombre de snapshots postérieurs supprimés.
     """
 ```
+
+## 27. Sanitiser avancé
+
+Enrichissement du moteur de sanitisation (§22) avec de nouveaux
+patterns, détection NER optionnelle, templates Jinja2 pour le rôle,
+commande CLI dry-run et audit logging.
+
+### 27.1 Patterns supplémentaires
+
+Nouvelles catégories ajoutées à `engine/sanitizer.py` :
+
+| Catégorie | Pattern | Exemples | Placeholder mask |
+|-----------|---------|----------|-----------------|
+| `mac` | `([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}` | `AA:BB:CC:DD:EE:FF` | `[MAC_REDACTED_N]` |
+| `socket` | Chemins `/run/`, `/var/run/`, `*.sock`, `*.socket` | `/var/run/incus.sock` | `[SOCKET_REDACTED_N]` |
+| `incus_cmd` | `incus (exec\|launch\|start\|stop\|delete\|config) ...` | `incus exec pro-dev -- bash` | `[INCUS_CMD_REDACTED_N]` |
+
+Pseudonymes correspondants :
+- `mac` → `00:00:00:00:00:NN`
+- `socket` → `/run/redacted-N.sock`
+- `incus_cmd` → `incus [COMMAND_N]`
+
+### 27.2 Détection NER optionnelle
+
+Backends NER en complément des regex (détection d'entités nommées) :
+
+1. **GLiNER** (préféré) — modèle léger, labels personnalisés
+2. **spaCy** (fallback) — `fr_core_news_sm` pour entités PER/ORG/LOC
+
+**Fallback gracieux** : si aucun backend NER disponible, regex seul.
+Les entités détectées par NER utilisent la catégorie `"ner"` et le
+placeholder `[NER_REDACTED_N]`.
+
+```python
+NER_BACKENDS = {"gliner", "spacy"}
+
+def detect_ner_backend() -> str | None:
+    """Détecte le backend NER disponible (gliner > spacy > None)."""
+
+def ner_extract(text: str, backend: str) -> list[tuple[int, int, str]]:
+    """Extrait les entités via NER. Retourne [(start, end, entity_text)]."""
+```
+
+La fonction `sanitize()` accepte un nouveau paramètre optionnel
+`ner: bool = False`. Si `True`, les entités NER sont ajoutées aux
+matches regex.
+
+### 27.3 Commande CLI `anklume llm sanitize`
+
+Dry-run de sanitisation depuis le terminal :
+
+```bash
+# Texte en argument
+anklume llm sanitize "Connexion à 10.100.1.1 via pro-dev"
+
+# Pipe stdin
+echo "token=sk-abc123" | anklume llm sanitize -
+
+# Options
+anklume llm sanitize --mode pseudonymize "texte"
+anklume llm sanitize --ner "texte avec Jean Dupont"
+anklume llm sanitize --json "texte"  # sortie JSON
+```
+
+**Sortie par défaut** :
+```
+Texte sanitisé :
+  Connexion à [IP_REDACTED_1] via [RESOURCE_REDACTED_1]
+
+Remplacements (2) :
+  ip         : 10.100.1.1     → [IP_REDACTED_1]
+  resource   : pro-dev        → [RESOURCE_REDACTED_1]
+```
+
+**Sortie JSON** (`--json`) :
+```json
+{
+  "text": "Connexion à [IP_REDACTED_1] via [RESOURCE_REDACTED_1]",
+  "replacements": [
+    {"original": "10.100.1.1", "replaced": "[IP_REDACTED_1]",
+     "category": "ip", "position": [13, 23]},
+    ...
+  ]
+}
+```
+
+### 27.4 Audit logging
+
+Trace des redactions dans un fichier de log (JSON-lines).
+
+```python
+@dataclass
+class AuditEntry:
+    """Une entrée d'audit de sanitisation."""
+    timestamp: str          # ISO 8601
+    mode: str               # mask | pseudonymize
+    categories: dict[str, int]  # {"ip": 2, "credential": 1}
+    total_redactions: int
+
+def audit_log(
+    result: SanitizeResult,
+    *,
+    mode: str,
+    log_path: Path | None = None,
+) -> AuditEntry:
+    """Écrit une entrée d'audit et la retourne.
+
+    log_path: chemin du fichier d'audit (défaut: /var/log/anklume/sanitizer/audit.jsonl).
+    """
+```
+
+Variables du rôle `llm_sanitizer` :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `sanitizer_audit` | `true` | Activer l'audit logging |
+| `sanitizer_audit_log_path` | `/var/log/anklume/sanitizer/audit.jsonl` | Chemin du log |
+| `sanitizer_categories` | `all` | Catégories actives (`all` ou liste) |
+
+### 27.5 Templates Jinja2 du rôle
+
+Le rôle `llm_sanitizer` génère ses fichiers de configuration
+depuis des templates :
+
+- `templates/config.yml.j2` — configuration du proxy
+  (port, mode, upstream, audit, log_path)
+- `templates/patterns.yml.j2` — catégories de patterns activables
+  (ip, mac, fqdn, credential, socket, incus_cmd, resource, ner)
+
+Chaque catégorie est activable/désactivable via
+`sanitizer_categories` (liste ou `"all"`).
+
+```yaml
+# defaults/main.yml
+sanitizer_categories: all  # ou [ip, mac, credential, fqdn]
+sanitizer_audit_log_path: /var/log/anklume/sanitizer/audit.jsonl
+```
+
+### 27.6 Module `engine/sanitizer.py` — ajouts
+
+```python
+# Nouveaux patterns
+_MAC = re.compile(r"\b([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\b")
+_SOCKET = re.compile(r"(/(?:var/)?run/[\w./-]+\.sock(?:et)?|/tmp/[\w./-]+\.sock(?:et)?)")
+_INCUS_CMD = re.compile(
+    r"(incus\s+(?:exec|launch|start|stop|delete|config|copy|move|snapshot)"
+    r"\s+[^\n;|&]+)"
+)
+
+def sanitize(
+    text: str,
+    *,
+    infra: Infrastructure | None = None,
+    mode: str = "mask",
+    ner: bool = False,
+    categories: set[str] | None = None,  # None = toutes
+) -> SanitizeResult:
+    """..."""
+
+def audit_log(
+    result: SanitizeResult,
+    *,
+    mode: str,
+    log_path: Path | None = None,
+) -> AuditEntry:
+    """..."""
+
+def detect_ner_backend() -> str | None:
+    """..."""
+
+def ner_extract(text: str, backend: str) -> list[tuple[int, int, str]]:
+    """..."""
+```
+
+### 27.7 Intégration CLI
+
+Ajout dans `cli/__init__.py` :
+
+```python
+@llm_app.command("sanitize")
+def llm_sanitize(
+    text: str = typer.Argument(None, help="Texte à sanitiser (- pour stdin)"),
+    mode: str = typer.Option("mask", help="Mode : mask, pseudonymize"),
+    ner: bool = typer.Option(False, help="Activer la détection NER"),
+    json_output: bool = typer.Option(False, "--json", help="Sortie JSON"),
+) -> None:
+    """Dry-run de sanitisation."""
+```
+
+Implémentation dans `cli/_llm.py` : `run_llm_sanitize()`.

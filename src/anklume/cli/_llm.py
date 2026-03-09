@@ -1,4 +1,4 @@
-"""Implémentation de `anklume llm status` et `anklume llm bench`."""
+"""Implémentation de `anklume llm status`, `anklume llm bench` et `anklume llm sanitize`."""
 
 from __future__ import annotations
 
@@ -67,3 +67,50 @@ def run_llm_bench(*, model: str = "", prompt: str = "") -> None:
     typer.echo(f"Tokens   : {result.tokens}")
     typer.echo(f"Durée    : {result.duration_s}s")
     typer.echo(f"Vitesse  : {result.tokens_per_s} tokens/s")
+
+
+def run_llm_sanitize(
+    text: str,
+    *,
+    mode: str = "mask",
+    ner: bool = False,
+    json_output: bool = False,
+) -> None:
+    """Dry-run de sanitisation : affiche le texte sanitisé et les remplacements."""
+    import json as json_mod
+    import sys
+
+    from anklume.engine.sanitizer import sanitize
+
+    # Lire stdin si texte est "-"
+    if text == "-":
+        text = sys.stdin.read()
+
+    result = sanitize(text, mode=mode, ner=ner)
+
+    if json_output:
+        data = {
+            "text": result.text,
+            "replacements": [
+                {
+                    "original": r.original,
+                    "replaced": r.replaced,
+                    "category": r.category,
+                    "position": list(r.position),
+                }
+                for r in result.replacements
+            ],
+        }
+        typer.echo(json_mod.dumps(data, ensure_ascii=False, indent=2))
+        return
+
+    typer.echo("Texte sanitisé :")
+    typer.echo(f"  {result.text}")
+    typer.echo("")
+
+    if result.replacements:
+        typer.echo(f"Remplacements ({len(result.replacements)}) :")
+        for r in result.replacements:
+            typer.echo(f"  {r.category:<12s} : {r.original:<25s} → {r.replaced}")
+    else:
+        typer.echo("Aucun remplacement (0 redaction).")

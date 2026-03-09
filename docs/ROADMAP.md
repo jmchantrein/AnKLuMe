@@ -371,19 +371,40 @@ Commandes essentielles pour l'opérationnel quotidien.
 - [x] Tests unitaires : 49 tests (ops, llm_ops, CLI registration, rollback)
 - [x] 732 tests unitaires au total, zéro régression
 
-## Phase 15 — Sanitiser avancé
+## Phase 15 — Sanitiser avancé ✅
 
-Enrichir le proxy de sanitisation : NER, templates, dry-run, audit.
+Enrichissement du moteur de sanitisation : nouveaux patterns,
+NER optionnel, templates Jinja2, CLI dry-run et audit logging.
 
-- [ ] NER sanitizer — backends GLiNER/spaCy en plus du regex
-  - MAC addresses, noms Ansible, sockets, commandes Incus
-  - Fallback gracieux si NLP indisponible
-- [ ] Templates sanitizer — `patterns.yml.j2`, `config.yml.j2`
-  - Catégories activables individuellement
-  - Génération depuis les variables du rôle
-- [ ] `anklume llm sanitize <texte>` — dry-run de sanitisation
-- [ ] Audit logging — trace des redactions dans les logs
+- [x] SPEC §27 détaillé (patterns, NER, CLI, audit, templates, intégration)
+- [x] Patterns supplémentaires dans `engine/sanitizer.py` :
+  - MAC addresses (`AA:BB:CC:DD:EE:FF`) — catégorie `mac`
+  - Sockets Unix (`/var/run/*.sock`, `/run/*_socket`) — catégorie `socket`
+  - Commandes Incus (`incus exec|launch|stop|...`) — catégorie `incus_cmd`
+- [x] Filtrage par catégories (`categories={"ip", "mac"}` ou `None` = toutes)
+- [x] NER optionnel (GLiNER > spaCy > regex seul) :
+  - `detect_ner_backend()` — détection automatique
+  - `ner_extract()` — extraction d'entités nommées
+  - `sanitize(..., ner=True)` — activation
+  - Fallback gracieux si aucun backend disponible
+- [x] `anklume llm sanitize <texte>` — dry-run CLI :
+  - `--mode mask|pseudonymize`
+  - `--ner` (activer NER)
+  - `--json` (sortie JSON structurée)
+  - `-` pour stdin
+- [x] Audit logging (`AuditEntry` dataclass + `audit_log()`) :
+  - JSON-lines, création auto des répertoires parents
+  - Comptage par catégorie, timestamp ISO 8601
   - `sanitizer_audit_log_path` configurable
+- [x] Templates Jinja2 pour le rôle `llm_sanitizer` :
+  - `templates/config.yml.j2` — configuration proxy
+  - `templates/patterns.yml.j2` — catégories activables
+  - Defaults enrichis (`sanitizer_audit_log_path`, `sanitizer_categories`)
+  - Tasks mises à jour (déploiement via `ansible.builtin.template`)
+- [x] Tests unitaires : 42 nouveaux tests (patterns, catégories, NER,
+  audit, CLI, rôle templates)
+- [x] 774 tests unitaires au total, zéro régression
+  (7 E2E dnsmasq préexistants)
 
 ## Phase 16 — Rôle OpenClaw modernisé
 

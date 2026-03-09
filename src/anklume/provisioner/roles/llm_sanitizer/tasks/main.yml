@@ -28,6 +28,26 @@
     state: directory
     mode: "0755"
 
+- name: Créer le répertoire de configuration du sanitizer
+  ansible.builtin.file:
+    path: /etc/anklume/sanitizer
+    state: directory
+    mode: "0755"
+
+- name: Déployer la configuration du sanitizer
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: /etc/anklume/sanitizer/config.yml
+    mode: "0644"
+  notify: restart llm-sanitizer
+
+- name: Déployer les patterns du sanitizer
+  ansible.builtin.template:
+    src: patterns.yml.j2
+    dest: /etc/anklume/sanitizer/patterns.yml
+    mode: "0644"
+  notify: restart llm-sanitizer
+
 - name: Configurer le service systemd du sanitizer
   ansible.builtin.copy:
     dest: /etc/systemd/system/llm-sanitizer.service
@@ -43,6 +63,8 @@
       Environment=SANITIZER_MODE={{ sanitizer_mode }}
       Environment=SANITIZER_UPSTREAM_URL={{ sanitizer_upstream_url }}
       Environment=SANITIZER_LOG_DIR={{ sanitizer_log_dir }}
+      Environment=SANITIZER_AUDIT={{ sanitizer_audit | lower }}
+      Environment=SANITIZER_AUDIT_LOG_PATH={{ sanitizer_audit_log_path }}
       ExecStart=/usr/local/bin/anklume-sanitizer-proxy
       Restart=on-failure
       RestartSec=5

@@ -1,0 +1,9 @@
+# Configuration du proxy de sanitisation LLM
+# Généré par anklume — ne pas modifier manuellement
+
+port: {{ sanitizer_port }}
+mode: {{ sanitizer_mode }}
+upstream_url: "{{ sanitizer_upstream_url }}"
+log_dir: "{{ sanitizer_log_dir }}"
+audit: {{ sanitizer_audit | lower }}
+audit_log_path: "{{ sanitizer_audit_log_path }}"

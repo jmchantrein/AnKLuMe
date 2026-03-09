@@ -313,3 +313,372 @@ class TestLlmSanitizerRoleExists:
             (BUILTIN_ROLES_DIR / "llm_sanitizer" / "defaults" / "main.yml").read_text()
         )
         assert defaults["sanitizer_mode"] == "mask"
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — Patterns supplémentaires (MAC, socket, incus_cmd)
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeMacAddresses:
+    def test_detects_mac_address(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Interface eth0 MAC AA:BB:CC:DD:EE:FF active")
+        assert "AA:BB:CC:DD:EE:FF" not in result.text
+        mac_repls = [r for r in result.replacements if r.category == "mac"]
+        assert len(mac_repls) == 1
+
+    def test_detects_lowercase_mac(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("mac=aa:bb:cc:dd:ee:ff")
+        assert "aa:bb:cc:dd:ee:ff" not in result.text
+
+    def test_mask_mode_mac(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("MAC: AA:BB:CC:DD:EE:FF", mode="mask")
+        assert "[MAC_REDACTED_1]" in result.text
+
+    def test_pseudonymize_mode_mac(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("MAC: AA:BB:CC:DD:EE:FF", mode="pseudonymize")
+        assert "AA:BB:CC:DD:EE:FF" not in result.text
+        assert result.replacements[0].replaced.startswith("00:00:00:00:00:")
+
+    def test_multiple_macs(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("src=AA:BB:CC:DD:EE:01 dst=AA:BB:CC:DD:EE:02")
+        assert len([r for r in result.replacements if r.category == "mac"]) == 2
+
+    def test_preserves_non_mac(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Version 12:34:56")
+        mac_repls = [r for r in result.replacements if r.category == "mac"]
+        assert len(mac_repls) == 0
+
+
+class TestSanitizeSockets:
+    def test_detects_run_socket(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Socket /var/run/incus.sock ouvert")
+        assert "/var/run/incus.sock" not in result.text
+        sock_repls = [r for r in result.replacements if r.category == "socket"]
+        assert len(sock_repls) == 1
+
+    def test_detects_tmp_socket(self):
+        from anklume.engine.sanitizer import sanitize
+
+        tmp_sock = "/tmp/agent.socket"  # noqa: S108
+        result = sanitize(f"Connexion à {tmp_sock}")
+        assert tmp_sock not in result.text
+
+    def test_detects_run_direct_socket(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("fd=/run/dbus/system_bus_socket")
+        assert "/run/dbus/system_bus_socket" not in result.text
+
+    def test_mask_mode_socket(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Socket: /var/run/incus.sock", mode="mask")
+        assert "[SOCKET_REDACTED_1]" in result.text
+
+    def test_pseudonymize_mode_socket(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Socket: /var/run/incus.sock", mode="pseudonymize")
+        assert "/run/redacted-" in result.text
+
+
+class TestSanitizeIncusCommands:
+    def test_detects_incus_exec(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Exécution : incus exec pro-dev -- bash")
+        assert "incus exec pro-dev -- bash" not in result.text
+        cmd_repls = [r for r in result.replacements if r.category == "incus_cmd"]
+        assert len(cmd_repls) == 1
+
+    def test_detects_incus_launch(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("incus launch images:debian/13 test-vm")
+        assert "incus launch images:debian/13 test-vm" not in result.text
+
+    def test_detects_incus_stop(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("incus stop pro-dev")
+        assert "incus stop pro-dev" not in result.text
+
+    def test_detects_incus_config(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("incus config set pro-dev limits.cpu 2")
+        assert "incus config set pro-dev limits.cpu 2" not in result.text
+
+    def test_mask_mode_incus_cmd(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("Run: incus exec pro-dev -- ls", mode="mask")
+        assert "[INCUS_CMD_REDACTED_1]" in result.text
+
+    def test_preserves_incus_non_command(self):
+        from anklume.engine.sanitizer import sanitize
+
+        result = sanitize("incus is a container manager")
+        cmd_repls = [r for r in result.replacements if r.category == "incus_cmd"]
+        assert len(cmd_repls) == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — Filtrage par catégories
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeCategories:
+    def test_filter_ip_only(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "IP 10.100.1.1 MAC AA:BB:CC:DD:EE:FF"
+        result = sanitize(text, categories={"ip"})
+        assert "10.100.1.1" not in result.text
+        assert "AA:BB:CC:DD:EE:FF" in result.text
+
+    def test_filter_mac_only(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "IP 10.100.1.1 MAC AA:BB:CC:DD:EE:FF"
+        result = sanitize(text, categories={"mac"})
+        assert "10.100.1.1" in result.text
+        assert "AA:BB:CC:DD:EE:FF" not in result.text
+
+    def test_filter_multiple_categories(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "10.100.1.1 token=secret server.internal"
+        result = sanitize(text, categories={"ip", "credential"})
+        assert "10.100.1.1" not in result.text
+        assert "secret" not in result.text
+        assert "server.internal" in result.text
+
+    def test_none_means_all(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "10.100.1.1 AA:BB:CC:DD:EE:FF"
+        result = sanitize(text, categories=None)
+        assert "10.100.1.1" not in result.text
+        assert "AA:BB:CC:DD:EE:FF" not in result.text
+
+    def test_empty_set_keeps_all(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "10.100.1.1 AA:BB:CC:DD:EE:FF"
+        result = sanitize(text, categories=set())
+        assert result.text == text
+        assert len(result.replacements) == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — NER optionnel
+# ---------------------------------------------------------------------------
+
+
+class TestNerBackend:
+    def test_detect_ner_backend_returns_string_or_none(self):
+        from anklume.engine.sanitizer import detect_ner_backend
+
+        result = detect_ner_backend()
+        assert result is None or result in {"gliner", "spacy"}
+
+    def test_ner_extract_returns_list(self):
+        from anklume.engine.sanitizer import ner_extract
+
+        # Avec un backend inexistant, retourne liste vide
+        result = ner_extract("Jean Dupont habite à Paris", "nonexistent")
+        assert result == []
+
+    def test_sanitize_ner_flag(self):
+        from anklume.engine.sanitizer import sanitize
+
+        # Avec ner=True et aucun backend, fonctionne comme regex seul
+        result = sanitize("IP 10.100.1.1", ner=True)
+        assert "10.100.1.1" not in result.text
+
+    def test_sanitize_ner_false_default(self):
+        from anklume.engine.sanitizer import sanitize
+
+        # Par défaut ner=False
+        result = sanitize("Texte sans données sensibles")
+        assert result.text == "Texte sans données sensibles"
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — Audit logging
+# ---------------------------------------------------------------------------
+
+
+class TestAuditLog:
+    def test_audit_entry_fields(self):
+        from anklume.engine.sanitizer import AuditEntry
+
+        entry = AuditEntry(
+            timestamp="2026-03-09T10:00:00",
+            mode="mask",
+            categories={"ip": 2, "credential": 1},
+            total_redactions=3,
+        )
+        assert entry.total_redactions == 3
+        assert entry.categories["ip"] == 2
+
+    def test_audit_log_creates_entry(self, tmp_path):
+        from anklume.engine.sanitizer import audit_log, sanitize
+
+        result = sanitize("IP 10.100.1.1 token=secret")
+        log_file = tmp_path / "audit.jsonl"
+        entry = audit_log(result, mode="mask", log_path=log_file)
+        assert entry.total_redactions == 2
+        assert entry.categories["ip"] == 1
+        assert entry.categories["credential"] == 1
+
+    def test_audit_log_writes_file(self, tmp_path):
+        import json
+
+        from anklume.engine.sanitizer import audit_log, sanitize
+
+        result = sanitize("IP 10.100.1.1")
+        log_file = tmp_path / "audit.jsonl"
+        audit_log(result, mode="mask", log_path=log_file)
+        assert log_file.exists()
+        lines = log_file.read_text().strip().split("\n")
+        assert len(lines) == 1
+        data = json.loads(lines[0])
+        assert data["mode"] == "mask"
+        assert data["total_redactions"] == 1
+
+    def test_audit_log_appends(self, tmp_path):
+        from anklume.engine.sanitizer import audit_log, sanitize
+
+        log_file = tmp_path / "audit.jsonl"
+        r1 = sanitize("IP 10.100.1.1")
+        r2 = sanitize("MAC AA:BB:CC:DD:EE:FF")
+        audit_log(r1, mode="mask", log_path=log_file)
+        audit_log(r2, mode="mask", log_path=log_file)
+        lines = log_file.read_text().strip().split("\n")
+        assert len(lines) == 2
+
+    def test_audit_log_no_redactions(self, tmp_path):
+        from anklume.engine.sanitizer import audit_log, sanitize
+
+        result = sanitize("Texte propre")
+        log_file = tmp_path / "audit.jsonl"
+        entry = audit_log(result, mode="mask", log_path=log_file)
+        assert entry.total_redactions == 0
+
+    def test_audit_log_creates_parent_dirs(self, tmp_path):
+        from anklume.engine.sanitizer import audit_log, sanitize
+
+        result = sanitize("IP 10.100.1.1")
+        log_file = tmp_path / "sub" / "dir" / "audit.jsonl"
+        audit_log(result, mode="mask", log_path=log_file)
+        assert log_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — CLI `anklume llm sanitize`
+# ---------------------------------------------------------------------------
+
+
+class TestLlmSanitizeCli:
+    def test_command_registered(self):
+        from anklume.cli import llm_app
+
+        command_names = [cmd.name for cmd in llm_app.registered_commands]
+        assert "sanitize" in command_names
+
+    def test_run_llm_sanitize_basic(self, capsys):
+        from anklume.cli._llm import run_llm_sanitize
+
+        run_llm_sanitize(text="IP 10.100.1.1 détectée", mode="mask")
+        captured = capsys.readouterr()
+        assert "[IP_REDACTED_1]" in captured.out
+        assert "10.100.1.1" in captured.out  # dans le tableau de remplacements
+
+    def test_run_llm_sanitize_json(self, capsys):
+        import json
+
+        from anklume.cli._llm import run_llm_sanitize
+
+        run_llm_sanitize(
+            text="Token: Bearer sk-abc123",
+            mode="mask",
+            json_output=True,
+        )
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert "text" in data
+        assert "replacements" in data
+
+    def test_run_llm_sanitize_no_redactions(self, capsys):
+        from anklume.cli._llm import run_llm_sanitize
+
+        run_llm_sanitize(text="Texte propre", mode="mask")
+        captured = capsys.readouterr()
+        assert "0" in captured.out or "Aucun" in captured.out
+
+    def test_run_llm_sanitize_pseudonymize(self, capsys):
+        from anklume.cli._llm import run_llm_sanitize
+
+        run_llm_sanitize(text="IP 10.100.1.1", mode="pseudonymize")
+        captured = capsys.readouterr()
+        assert "10.100.1.1" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 — Rôle llm_sanitizer enrichi (templates, defaults)
+# ---------------------------------------------------------------------------
+
+
+class TestLlmSanitizerRolePhase15:
+    def test_defaults_has_audit_log_path(self):
+        defaults = yaml.safe_load(
+            (BUILTIN_ROLES_DIR / "llm_sanitizer" / "defaults" / "main.yml").read_text()
+        )
+        assert "sanitizer_audit_log_path" in defaults
+
+    def test_defaults_has_categories(self):
+        defaults = yaml.safe_load(
+            (BUILTIN_ROLES_DIR / "llm_sanitizer" / "defaults" / "main.yml").read_text()
+        )
+        assert "sanitizer_categories" in defaults
+        assert defaults["sanitizer_categories"] == "all"
+
+    def test_has_config_template(self):
+        tpl = BUILTIN_ROLES_DIR / "llm_sanitizer" / "templates" / "config.yml.j2"
+        assert tpl.is_file()
+        content = tpl.read_text()
+        assert "sanitizer_port" in content
+        assert "sanitizer_mode" in content
+
+    def test_has_patterns_template(self):
+        tpl = BUILTIN_ROLES_DIR / "llm_sanitizer" / "templates" / "patterns.yml.j2"
+        assert tpl.is_file()
+        content = tpl.read_text()
+        assert "ip" in content
+        assert "mac" in content
+
+    def test_tasks_use_template(self):
+        tasks = yaml.safe_load(
+            (BUILTIN_ROLES_DIR / "llm_sanitizer" / "tasks" / "main.yml").read_text()
+        )
+        template_tasks = [
+            t for t in tasks if "ansible.builtin.template" in str(t)
+        ]
+        assert len(template_tasks) >= 2

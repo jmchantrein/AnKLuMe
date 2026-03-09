@@ -382,6 +382,35 @@ def llm_bench(
     run_llm_bench(model=model, prompt=prompt)
 
 
+@llm_app.command("sanitize")
+def llm_sanitize(
+    text: Annotated[
+        str | None,
+        typer.Argument(help="Texte à sanitiser (- pour stdin)"),
+    ] = None,
+    mode: Annotated[
+        str,
+        typer.Option("--mode", help="Mode : mask, pseudonymize"),
+    ] = "mask",
+    ner: Annotated[
+        bool,
+        typer.Option("--ner", help="Activer la détection NER"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Sortie JSON"),
+    ] = False,
+) -> None:
+    """Dry-run de sanitisation."""
+    from anklume.cli._llm import run_llm_sanitize
+
+    if text is None:
+        typer.echo("Erreur : texte requis (argument ou - pour stdin)", err=True)
+        raise typer.Exit(1)
+
+    run_llm_sanitize(text=text, mode=mode, ner=ner, json_output=json_output)
+
+
 # --- anklume ai <status|flush|switch> ---
 
 

@@ -5,3 +5,5 @@ sanitizer_mode: mask
 sanitizer_upstream_url: ""
 sanitizer_log_dir: /var/log/anklume/sanitizer
 sanitizer_audit: true
+sanitizer_audit_log_path: /var/log/anklume/sanitizer/audit.jsonl
+sanitizer_categories: all

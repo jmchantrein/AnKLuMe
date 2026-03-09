@@ -1,0 +1,19 @@
+# Catégories de patterns actives pour le sanitizer
+# Généré par anklume — ne pas modifier manuellement
+
+{% if sanitizer_categories == "all" %}
+categories:
+  - ip
+  - mac
+  - fqdn
+  - credential
+  - socket
+  - incus_cmd
+  - resource
+  - ner
+{% else %}
+categories:
+{% for cat in sanitizer_categories %}
+  - {{ cat }}
+{% endfor %}
+{% endif %}
