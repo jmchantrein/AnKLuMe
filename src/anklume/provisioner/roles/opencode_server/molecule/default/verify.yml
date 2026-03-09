@@ -1,0 +1,46 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier le venv OpenCode
+      ansible.builtin.stat:
+        path: /opt/opencode/venv/bin/python
+      register: venv
+
+    - name: Valider le venv
+      ansible.builtin.assert:
+        that:
+          - venv.stat.exists
+
+    - name: Vérifier le répertoire de données
+      ansible.builtin.stat:
+        path: /opt/opencode/data
+      register: data_dir
+
+    - name: Valider le répertoire de données
+      ansible.builtin.assert:
+        that:
+          - data_dir.stat.exists
+          - data_dir.stat.isdir
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/opencode.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/opencode.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'OPENCODE_PORT=8091' in (service_content.content | b64decode)"

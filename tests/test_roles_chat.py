@@ -265,7 +265,7 @@ class TestInventoryWithChatMachines:
         inventories = generate_inventories(infra)
 
         assert "ai-tools" in inventories
-        hosts = inventories["ai-tools"]["all"]["children"]["ai-tools"]["hosts"]
+        hosts = inventories["ai-tools"]["all"]["children"]["ai_tools"]["hosts"]
         assert "ai-tools-webui" in hosts
 
     def test_mixed_gpu_and_chat_machines(self):
@@ -282,7 +282,7 @@ class TestInventoryWithChatMachines:
         infra = make_infra(domains={"ai-tools": domain})
         inventories = generate_inventories(infra)
 
-        hosts = inventories["ai-tools"]["all"]["children"]["ai-tools"]["hosts"]
+        hosts = inventories["ai-tools"]["all"]["children"]["ai_tools"]["hosts"]
         assert "ai-tools-gpu-server" in hosts
         assert "ai-tools-webui" in hosts
         assert "ai-tools-chat" in hosts

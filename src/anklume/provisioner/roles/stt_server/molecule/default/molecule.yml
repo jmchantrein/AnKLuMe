@@ -1,0 +1,15 @@
+---
+driver:
+  name: default
+platforms:
+  - name: molecule-stt-server
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/.."
+  inventory:
+    host_vars:
+      molecule-stt-server:
+        ansible_connection: community.general.incus
+verifier:
+  name: ansible

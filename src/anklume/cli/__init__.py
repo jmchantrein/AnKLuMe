@@ -162,6 +162,27 @@ def dev_test() -> None:
     raise typer.Exit(result.returncode)
 
 
+@dev_app.command("molecule")
+def dev_molecule(
+    role: Annotated[
+        str,
+        typer.Argument(help="Nom du rôle (tous si omis)"),
+    ] = "",
+    scenario: Annotated[
+        str,
+        typer.Option("--scenario", "-s", help="Nom du scénario Molecule"),
+    ] = "default",
+    command: Annotated[
+        str,
+        typer.Option("--command", "-c", help="Commande Molecule (test, converge, verify, destroy)"),
+    ] = "test",
+) -> None:
+    """Lancer les tests Molecule sur les rôles Ansible."""
+    from anklume.cli._molecule import run_molecule
+
+    run_molecule(role=role, scenario=scenario, command=command)
+
+
 # --- anklume instance <list|shell> ---
 
 
@@ -292,15 +313,44 @@ def ai_test(
     run_ai_test(backend=backend, mode=mode, max_retries=max_retries)
 
 
-# --- anklume stt <setup|status> ---
+# --- anklume stt <setup|start|stop|status> ---
 
 
 @stt_app.command("setup")
-def stt_setup() -> None:
-    """Installer les dépendances hôte et configurer le raccourci KDE."""
+def stt_setup(
+    device: Annotated[
+        str,
+        typer.Option("--device", "-d", help="Device serveur (gpu, cpu, auto)"),
+    ] = "auto",
+    hotkey: Annotated[
+        str,
+        typer.Option("--hotkey", "-k", help="Touche push-to-talk (ex: F23, SCROLLLOCK)"),
+    ] = "",
+    model: Annotated[
+        str,
+        typer.Option("--model", "-m", help="Modèle Whisper (ex: Systran/faster-whisper-medium)"),
+    ] = "",
+) -> None:
+    """Configurer le STT (Voxtype + Speaches)."""
     from anklume.cli._stt import run_stt_setup
 
-    run_stt_setup()
+    run_stt_setup(device=device, hotkey=hotkey, model=model)
+
+
+@stt_app.command("start")
+def stt_start() -> None:
+    """Démarrer le push-to-talk STT."""
+    from anklume.cli._stt import run_stt_start
+
+    run_stt_start()
+
+
+@stt_app.command("stop")
+def stt_stop() -> None:
+    """Arrêter le push-to-talk STT."""
+    from anklume.cli._stt import run_stt_stop
+
+    run_stt_stop()
 
 
 @stt_app.command("status")

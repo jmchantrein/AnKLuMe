@@ -11,7 +11,8 @@ Provisioning des instances via Ansible (intégré, optionnel pour l'utilisateur)
 3. **La CLI est la seule interface** — pas de Makefile. Toute opération
    passe par une commande CLI (`anklume <nom> <verbe>`).
 4. **DRY + KISS** — un fichier = une responsabilité.
-5. **Spec-driven, test-driven** — spec d'abord, tests exhaustifs ensuite(unitaires, E2E et Behavior), code après.
+5. **Spec-driven, test-driven** — spec d'abord, tests exhaustifs ensuite
+   (unitaires, Molecule, E2E et Behavior), code après.
 6. **Incus via CLI** — `subprocess` + `incus --format json` +
    idempotence manuelle.
 7. **Français par défaut** — docs, commentaires, UI en français.
@@ -61,8 +62,13 @@ anklume apply all             # Déployer toute l'infrastructure
 anklume apply domain <nom>    # Déployer un seul domaine
 anklume status            # Afficher l'état de l'infrastructure
 anklume destroy           # Détruire (respecte les flags ephemeral)
+anklume stt setup         # Configurer le STT (Voxtype + Speaches)
+anklume stt start         # Démarrer le push-to-talk
+anklume stt stop          # Arrêter le push-to-talk
+anklume stt status        # État du service STT
 anklume dev lint          # Tous les validateurs
 anklume dev test          # pytest + behave
+anklume dev molecule      # Tests Molecule (rôles Ansible)
 ```
 
 ## Conventions de code
@@ -75,6 +81,13 @@ anklume dev test          # pytest + behave
 ### Shell
 - `shellcheck` propre, `set -euo pipefail`
 - Uniquement pour les scripts de boot et l'intégration système
+
+## Pyramide de tests
+
+1. **Unitaires** (`pytest`) — logique Python, engine, CLI
+2. **Molecule** — rôles Ansible isolés dans des conteneurs Incus
+3. **E2E** (`pytest`) — déploiement réel Incus (apply, destroy, idempotence)
+4. **Behavior** (`behave`) — scénarios utilisateur de bout en bout
 
 ## Modèle d'exécution
 

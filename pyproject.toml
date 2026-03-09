@@ -19,6 +19,8 @@ dev = [
     "pytest>=8.0",
     "behave>=1.2",
     "ruff>=0.8",
+    "molecule>=24.0",
+    "ansible-core>=2.16",
 ]
 live = [
     "fastapi>=0.115",

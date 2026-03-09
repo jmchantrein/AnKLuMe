@@ -1,0 +1,15 @@
+---
+driver:
+  name: default
+platforms:
+  - name: molecule-dev-tools
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/.."
+  inventory:
+    host_vars:
+      molecule-dev-tools:
+        ansible_connection: community.general.incus
+verifier:
+  name: ansible

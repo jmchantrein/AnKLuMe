@@ -1,0 +1,12 @@
+---
+- name: Destroy
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Supprimer les instances Incus
+      ansible.builtin.command:
+        cmd: "incus delete --force {{ item.name }}"
+      loop: "{{ molecule_yml.platforms }}"
+      changed_when: true
+      failed_when: false

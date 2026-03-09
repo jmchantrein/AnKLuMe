@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que curl est installé
+      ansible.builtin.command:
+        cmd: which curl
+      changed_when: false
+
+    - name: Vérifier que sudo est installé
+      ansible.builtin.command:
+        cmd: which sudo
+      changed_when: false
+
+    - name: Vérifier que la locale fr_FR.UTF-8 est disponible
+      ansible.builtin.command:
+        cmd: locale -a
+      register: locales
+      changed_when: false
+
+    - name: Valider la locale française
+      ansible.builtin.assert:
+        that:
+          - "'fr_FR.utf8' in locales.stdout"
+        fail_msg: "La locale fr_FR.UTF-8 n'est pas configurée"

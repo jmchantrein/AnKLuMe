@@ -1,0 +1,41 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que l'utilisateur sandbox existe
+      ansible.builtin.command:
+        cmd: id sandbox
+      changed_when: false
+
+    - name: Vérifier les limites de ressources
+      ansible.builtin.stat:
+        path: /etc/security/limits.d/sandbox.conf
+      register: limits_file
+
+    - name: Valider le fichier de limites
+      ansible.builtin.assert:
+        that:
+          - limits_file.stat.exists
+
+    - name: Vérifier la configuration sandbox
+      ansible.builtin.stat:
+        path: /etc/anklume/sandbox.conf
+      register: sandbox_conf
+
+    - name: Valider la configuration
+      ansible.builtin.assert:
+        that:
+          - sandbox_conf.stat.exists
+
+    - name: Lire la configuration sandbox
+      ansible.builtin.slurp:
+        src: /etc/anklume/sandbox.conf
+      register: sandbox_content
+
+    - name: Valider le contenu de la configuration
+      ansible.builtin.assert:
+        that:
+          - "'SANDBOX_TIMEOUT=60' in (sandbox_content.content | b64decode)"
+          - "'SANDBOX_NETWORK=False' in (sandbox_content.content | b64decode)"

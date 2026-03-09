@@ -1,0 +1,58 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que ffmpeg est installé
+      ansible.builtin.command:
+        cmd: which ffmpeg
+      changed_when: false
+
+    - name: Vérifier que git est installé
+      ansible.builtin.command:
+        cmd: git --version
+      changed_when: false
+
+    - name: Vérifier le répertoire Speaches
+      ansible.builtin.stat:
+        path: /opt/speaches
+      register: speaches_dir
+
+    - name: Valider le répertoire Speaches
+      ansible.builtin.assert:
+        that:
+          - speaches_dir.stat.exists
+          - speaches_dir.stat.isdir
+
+    - name: Vérifier le cache HuggingFace
+      ansible.builtin.stat:
+        path: /root/.cache/huggingface/hub
+      register: hf_cache
+
+    - name: Valider le cache HuggingFace
+      ansible.builtin.assert:
+        that:
+          - hf_cache.stat.exists
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/speaches.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/speaches.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'speaches.main' in (service_content.content | b64decode)"
+          - "'WHISPER__MODEL' in (service_content.content | b64decode)"
+          - "'WHISPER__INFERENCE_DEVICE' in (service_content.content | b64decode)"

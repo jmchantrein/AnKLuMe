@@ -1,0 +1,37 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que Ollama est installé
+      ansible.builtin.stat:
+        path: /usr/local/bin/ollama
+      register: ollama_bin
+
+    - name: Valider l'installation Ollama
+      ansible.builtin.assert:
+        that:
+          - ollama_bin.stat.exists
+          - ollama_bin.stat.executable
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/ollama.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/ollama.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'OLLAMA_HOST=0.0.0.0:11434' in (service_content.content | b64decode)"
+          - "'ollama serve' in (service_content.content | b64decode)"

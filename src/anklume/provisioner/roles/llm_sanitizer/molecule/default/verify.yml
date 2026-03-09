@@ -1,0 +1,47 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier le venv sanitizer
+      ansible.builtin.stat:
+        path: /opt/sanitizer/venv/bin/python
+      register: venv
+
+    - name: Valider le venv
+      ansible.builtin.assert:
+        that:
+          - venv.stat.exists
+
+    - name: Vérifier le répertoire de logs
+      ansible.builtin.stat:
+        path: /var/log/anklume/sanitizer
+      register: log_dir
+
+    - name: Valider le répertoire de logs
+      ansible.builtin.assert:
+        that:
+          - log_dir.stat.exists
+          - log_dir.stat.isdir
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/llm-sanitizer.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/llm-sanitizer.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'SANITIZER_PORT=8089' in (service_content.content | b64decode)"
+          - "'SANITIZER_MODE=mask' in (service_content.content | b64decode)"

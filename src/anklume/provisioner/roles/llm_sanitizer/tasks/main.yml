@@ -10,11 +10,17 @@
     state: present
     update_cache: true
 
-- name: Installer anklume (module sanitizer)
+- name: Créer le venv sanitizer
+  ansible.builtin.command:
+    cmd: python3 -m venv /opt/sanitizer/venv
+    creates: /opt/sanitizer/venv/bin/python
+
+- name: Installer anklume (module sanitizer) via pip (venv)
   ansible.builtin.pip:
     name: anklume
+    virtualenv: /opt/sanitizer/venv
     state: present
-  changed_when: false
+  failed_when: false
 
 - name: Créer le répertoire de logs du sanitizer
   ansible.builtin.file:

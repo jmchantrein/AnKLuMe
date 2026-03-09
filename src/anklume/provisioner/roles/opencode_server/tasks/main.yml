@@ -11,11 +11,17 @@
     state: present
     update_cache: true
 
-- name: Installer OpenCode via pip
+- name: Créer le venv OpenCode
+  ansible.builtin.command:
+    cmd: python3 -m venv /opt/opencode/venv
+    creates: /opt/opencode/venv/bin/python
+
+- name: Installer OpenCode via pip (venv)
   ansible.builtin.pip:
     name: opencode-server
+    virtualenv: /opt/opencode/venv
     state: present
-  changed_when: false
+  failed_when: false
 
 - name: Créer le répertoire de données OpenCode
   ansible.builtin.file:

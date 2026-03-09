@@ -1,0 +1,31 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que git est installé
+      ansible.builtin.command:
+        cmd: git --version
+      changed_when: false
+
+    - name: Vérifier que python3 est installé
+      ansible.builtin.command:
+        cmd: python3 --version
+      changed_when: false
+
+    - name: Vérifier que vim est installé
+      ansible.builtin.command:
+        cmd: vim --version
+      changed_when: false
+      failed_when: false
+
+    - name: Vérifier que tmux est installé
+      ansible.builtin.command:
+        cmd: which tmux
+      changed_when: false
+
+    - name: Vérifier que jq est installé
+      ansible.builtin.command:
+        cmd: which jq
+      changed_when: false

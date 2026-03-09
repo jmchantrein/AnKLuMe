@@ -1,0 +1,41 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que Node.js est installé
+      ansible.builtin.command:
+        cmd: node --version
+      changed_when: false
+
+    - name: Vérifier le répertoire de données
+      ansible.builtin.stat:
+        path: /opt/lobechat/data
+      register: data_dir
+
+    - name: Valider le répertoire de données
+      ansible.builtin.assert:
+        that:
+          - data_dir.stat.exists
+          - data_dir.stat.isdir
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/lobechat.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/lobechat.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'PORT=3210' in (service_content.content | b64decode)"

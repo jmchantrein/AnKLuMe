@@ -24,13 +24,17 @@ def generate_inventories(infra: Infrastructure) -> dict[str, dict]:
         for machine in domain.sorted_machines:
             hosts[machine.full_name] = {
                 "ansible_connection": "anklume_incus",
+                "ansible_host": machine.full_name,
                 "anklume_incus_project": domain.name,
             }
+
+        # Ansible interdit les tirets dans les noms de groupes
+        group_name = domain.name.replace("-", "_")
 
         inventories[domain.name] = {
             "all": {
                 "children": {
-                    domain.name: {
+                    group_name: {
                         "hosts": hosts,
                     },
                 },

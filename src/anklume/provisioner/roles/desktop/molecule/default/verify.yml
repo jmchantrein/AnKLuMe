@@ -1,0 +1,20 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier que konsole est installé
+      ansible.builtin.command:
+        cmd: dpkg -l konsole
+      changed_when: false
+
+    - name: Vérifier que dolphin est installé
+      ansible.builtin.command:
+        cmd: dpkg -l dolphin
+      changed_when: false
+
+    - name: Vérifier que les polices Noto sont installées
+      ansible.builtin.command:
+        cmd: dpkg -l fonts-noto
+      changed_when: false

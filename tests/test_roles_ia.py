@@ -317,7 +317,8 @@ class TestInventoryWithIaDomain:
         inventories = generate_inventories(infra)
 
         assert "ai-tools" in inventories
-        hosts = inventories["ai-tools"]["all"]["children"]["ai-tools"]["hosts"]
+        # Le nom de groupe Ansible remplace les tirets par des underscores
+        hosts = inventories["ai-tools"]["all"]["children"]["ai_tools"]["hosts"]
         assert "ai-tools-gpu-server" in hosts
         assert hosts["ai-tools-gpu-server"]["anklume_incus_project"] == "ai-tools"
 
@@ -334,7 +335,8 @@ class TestInventoryWithIaDomain:
         infra = make_infra(domains={"ai-tools": domain})
         inventories = generate_inventories(infra)
 
-        hosts = inventories["ai-tools"]["all"]["children"]["ai-tools"]["hosts"]
+        # Le nom de groupe Ansible remplace les tirets par des underscores
+        hosts = inventories["ai-tools"]["all"]["children"]["ai_tools"]["hosts"]
         assert "ai-tools-gpu-server" in hosts
         assert "ai-tools-webui" in hosts
 

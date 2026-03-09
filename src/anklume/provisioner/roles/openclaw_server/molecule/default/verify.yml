@@ -1,0 +1,52 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier le venv OpenClaw
+      ansible.builtin.stat:
+        path: /opt/openclaw/venv/bin/python
+      register: venv
+
+    - name: Valider le venv
+      ansible.builtin.assert:
+        that:
+          - venv.stat.exists
+
+    - name: Vérifier le répertoire de données
+      ansible.builtin.stat:
+        path: /opt/openclaw/data
+      register: data_dir
+
+    - name: Valider le répertoire de données
+      ansible.builtin.assert:
+        that:
+          - data_dir.stat.exists
+          - data_dir.stat.isdir
+
+    - name: Vérifier sqlite3 installé
+      ansible.builtin.command:
+        cmd: which sqlite3
+      changed_when: false
+
+    - name: Vérifier le service systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/system/openclaw.service
+      register: service_file
+
+    - name: Valider le service systemd
+      ansible.builtin.assert:
+        that:
+          - service_file.stat.exists
+
+    - name: Lire le service systemd
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/openclaw.service
+      register: service_content
+
+    - name: Valider le contenu du service
+      ansible.builtin.assert:
+        that:
+          - "'OPENCLAW_PORT=8090' in (service_content.content | b64decode)"
+          - "'OPENCLAW_HEARTBEAT_INTERVAL=30m' in (service_content.content | b64decode)"

@@ -12,16 +12,16 @@
     state: present
     update_cache: true
 
-- name: Installer uv (gestionnaire de paquets Python)
+- name: Installer uv (version compatible Speaches)
   ansible.builtin.shell:
-    cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
-    creates: /root/.local/bin/uv
+    cmd: curl -LsSf https://astral.sh/uv/0.8.14/install.sh | sh
+  changed_when: true
 
 - name: Cloner Speaches
   ansible.builtin.git:
     repo: https://github.com/speaches-ai/speaches.git
     dest: /opt/speaches
-    version: main
+    version: master
     update: true
 
 - name: Installer Speaches via uv
@@ -29,6 +29,28 @@
     cmd: /root/.local/bin/uv sync
     chdir: /opt/speaches
   changed_when: true
+
+- name: Créer le cache HuggingFace
+  ansible.builtin.file:
+    path: /root/.cache/huggingface/hub
+    state: directory
+    mode: "0755"
+
+- name: Détecter la présence de devices GPU
+  ansible.builtin.stat:
+    path: /dev/nvidia0
+  register: gpu_device
+
+- name: Installer nvidia-smi si GPU détecté
+  ansible.builtin.shell:
+    cmd: |
+      apt-get update -qq
+      apt-get install -y -qq nvidia-cuda-toolkit 2>/dev/null \
+        || apt-get install -y -qq nvidia-utils 2>/dev/null \
+        || true
+  when: gpu_device.stat.exists
+  changed_when: true
+  failed_when: false
 
 - name: Détecter la présence GPU (nvidia-smi)
   ansible.builtin.command:
@@ -50,6 +72,14 @@
         stt_compute_type
       ) }}
 
+- name: Installer les dépendances CUDA Python si GPU
+  ansible.builtin.shell:
+    cmd: /root/.local/bin/uv pip install --python /opt/speaches/.venv/bin/python nvidia-cublas-cu12 nvidia-cudnn-cu12
+    chdir: /opt/speaches
+  when: stt_actual_device == 'cuda'
+  changed_when: true
+  failed_when: false
+
 - name: Créer la configuration systemd Speaches
   ansible.builtin.copy:
     dest: /etc/systemd/system/speaches.service
@@ -63,7 +93,8 @@
       [Service]
       Type=simple
       WorkingDirectory=/opt/speaches
-      ExecStart=/root/.local/bin/uv run speaches \
+      ExecStart=/opt/speaches/.venv/bin/uvicorn speaches.main:create_app \
+        --factory \
         --host {{ stt_host }} \
         --port {{ stt_port }}
       Restart=always
@@ -84,10 +115,7 @@
     daemon_reload: true
 
 - name: Attendre que Speaches soit prêt
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ stt_port }}/v1/models"
-    method: GET
-  register: stt_health
-  retries: 60
-  delay: 3
-  until: stt_health.status == 200
+  ansible.builtin.wait_for:
+    port: "{{ stt_port }}"
+    host: 127.0.0.1
+    timeout: 120

@@ -27,6 +27,22 @@ def generate_playbook(infra: Infrastructure) -> list[dict]:
                 {
                     "hosts": machine.full_name,
                     "become": True,
+                    "gather_facts": False,
+                    "pre_tasks": [
+                        {
+                            "name": "Installer Python3 (bootstrap)",
+                            "raw": (
+                                "test -x /usr/bin/python3"
+                                " || (apt-get update -qq"
+                                " && apt-get install -y -qq python3-minimal)"
+                            ),
+                            "changed_when": False,
+                        },
+                        {
+                            "name": "Collecter les facts",
+                            "setup": None,
+                        },
+                    ],
                     "roles": list(machine.roles),
                 }
             )
