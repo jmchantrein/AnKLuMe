@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import yaml
+
 from anklume.engine.incus_driver import (
     IncusDriver,
     IncusInstance,
@@ -19,6 +21,7 @@ from anklume.engine.models import (
     Infrastructure,
     Machine,
 )
+from anklume.provisioner import BUILTIN_ROLES_DIR
 
 
 def make_infra(
@@ -121,3 +124,29 @@ def running_instance(name: str, project: str) -> IncusInstance:
 
 def stopped_instance(name: str, project: str) -> IncusInstance:
     return IncusInstance(name=name, status="Stopped", type="container", project=project)
+
+
+# ---------------------------------------------------------------------------
+# Helpers pour lire les fichiers YAML des rôles Ansible
+# ---------------------------------------------------------------------------
+
+
+
+
+def role_tasks(role_name: str) -> list[dict]:
+    """Lit et parse tasks/main.yml d'un rôle."""
+    return yaml.safe_load(
+        (BUILTIN_ROLES_DIR / role_name / "tasks" / "main.yml").read_text()
+    )
+
+
+def role_defaults(role_name: str) -> dict:
+    """Lit et parse defaults/main.yml d'un rôle."""
+    return yaml.safe_load(
+        (BUILTIN_ROLES_DIR / role_name / "defaults" / "main.yml").read_text()
+    )
+
+
+def role_task_names(role_name: str) -> list[str]:
+    """Retourne les noms des tâches d'un rôle."""
+    return [t.get("name", "") for t in role_tasks(role_name)]

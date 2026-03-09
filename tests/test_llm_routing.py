@@ -690,19 +690,17 @@ class TestEnrichLlmVars:
 
 
 class TestOpenclawRoleLlmVars:
-    def test_defaults_has_llm_backend(self):
+    def test_defaults_has_llm_provider(self):
         defaults = yaml.safe_load(
             (BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml").read_text()
         )
-        assert "openclaw_llm_backend" in defaults
+        assert "openclaw_llm_provider" in defaults
 
-    def test_defaults_llm_backend_local(self):
+    def test_defaults_llm_provider_ollama(self):
         defaults = yaml.safe_load(
             (BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml").read_text()
         )
-        # Le default doit etre une expression Jinja ou "local"
-        val = defaults["openclaw_llm_backend"]
-        assert "local" in str(val)
+        assert defaults["openclaw_llm_provider"] == "ollama"
 
     def test_defaults_has_llm_url(self):
         defaults = yaml.safe_load(
@@ -722,14 +720,14 @@ class TestOpenclawRoleLlmVars:
         )
         assert "openclaw_llm_model" in defaults
 
-    def test_systemd_service_has_llm_env_vars(self):
-        tasks = (
-            BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml"
+    def test_systemd_override_template_has_llm_env_vars(self):
+        tmpl = (
+            BUILTIN_ROLES_DIR / "openclaw_server" / "templates" / "llm.conf.j2"
         ).read_text()
-        assert "OPENCLAW_LLM_BACKEND" in tasks
-        assert "OPENCLAW_LLM_URL" in tasks
-        assert "OPENCLAW_LLM_API_KEY" in tasks
-        assert "OPENCLAW_LLM_MODEL" in tasks
+        assert "OPENCLAW_LLM_PROVIDER" in tmpl
+        assert "OPENCLAW_LLM_URL" in tmpl
+        assert "OPENCLAW_LLM_API_KEY" in tmpl
+        assert "OPENCLAW_LLM_MODEL" in tmpl
 
 
 # ===========================================================================

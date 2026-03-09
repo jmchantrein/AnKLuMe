@@ -406,18 +406,23 @@ NER optionnel, templates Jinja2, CLI dry-run et audit logging.
 - [x] 774 tests unitaires au total, zéro régression
   (7 E2E dnsmasq préexistants)
 
-## Phase 16 — Rôle OpenClaw modernisé
+## Phase 16 — Rôle OpenClaw modernisé ✅
 
-Mettre à jour le rôle pour l'OpenClaw actuel (TypeScript, npm,
-daemon systemd). Ne pas réinventer la configuration — OpenClaw
-gère nativement ses channels, skills et providers.
+Rôle `openclaw_server` mis à jour pour l'OpenClaw actuel
+(TypeScript, npm, daemon natif). Nouveau rôle `admin_bootstrap`.
 
-- [ ] Installation via `npm install -g openclaw@latest`
-- [ ] Daemon systemd via `openclaw onboard --install-daemon`
-- [ ] Configuration workspace `~/.openclaw/workspace`
-- [ ] Variables : `openclaw_version`, `openclaw_channels`, `openclaw_llm_provider`
-- [ ] Rôle `admin_bootstrap` — première configuration machine
+- [x] Installation via `npm install -g openclaw@latest`
+- [x] Daemon systemd via `openclaw onboard --install-daemon`
+- [x] Configuration workspace `~/.openclaw/workspace`
+- [x] Variables : `openclaw_version`, `openclaw_channels`, `openclaw_llm_provider`
+- [x] Template systemd override `llm.conf.j2` (variables LLM)
+- [x] Rôle `admin_bootstrap` — première configuration machine
   (locale, timezone, packages de base, mise à jour)
+- [x] Template `anklume init` mis à jour (ai-assistant commenté)
+- [x] SPEC §28 rédigée, §23 mise à jour
+- [x] Tests unitaires : 31 nouveaux tests (openclaw + admin_bootstrap)
+- [x] 805 tests unitaires au total, zéro régression
+  (7 E2E dnsmasq préexistants)
 
 ## Phase 17 — Portails et transferts
 

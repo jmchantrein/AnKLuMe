@@ -109,6 +109,14 @@ machines:
   #   roles: [base, lobechat]
   #   vars:
   #     lobechat_ollama_url: "http://gpu-server:11434"
+
+  # ai-assistant:
+  #   description: "OpenClaw AI assistant"
+  #   type: lxc
+  #   roles: [base, admin_bootstrap, openclaw_server]
+  #   vars:
+  #     openclaw_channels: [telegram]
+  #     openclaw_llm_provider: ollama
 """,
     "fr": """\
 # Domaine ai-tools — services IA (GPU, LLM, STT)
@@ -140,6 +148,14 @@ machines:
   #   roles: [base, lobechat]
   #   vars:
   #     lobechat_ollama_url: "http://gpu-server:11434"
+
+  # ai-assistant:
+  #   description: "Assistant IA OpenClaw"
+  #   type: lxc
+  #   roles: [base, admin_bootstrap, openclaw_server]
+  #   vars:
+  #     openclaw_channels: [telegram]
+  #     openclaw_llm_provider: ollama
 """,
 }
 

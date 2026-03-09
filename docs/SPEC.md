@@ -2147,39 +2147,23 @@ Assistant autonome qui monitore l'infrastructure et interagit
 via des canaux de communication. Un OpenClaw par domaine,
 respecte les frontières réseau.
 
+> **Modernisé en §28** — le rôle `openclaw_server` utilise désormais
+> npm + daemon natif au lieu de pip/venv. Voir §28 pour les détails.
+
 ### 23.1 Rôle `openclaw_server`
 
-**Variables** (`defaults/main.yml`) :
-
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `openclaw_port` | `8090` | Port HTTP API |
-| `openclaw_ollama_host` | `localhost` | Hôte Ollama |
-| `openclaw_ollama_port` | `11434` | Port Ollama |
-| `openclaw_channels` | `[]` | Canaux : `telegram`, `signal` |
-| `openclaw_heartbeat_interval` | `30m` | Intervalle heartbeat |
-| `openclaw_data_dir` | `/opt/openclaw/data` | Données (SQLite + RAG) |
-
-**Tâches** :
-1. Installer les dépendances (Python 3, pip, SQLite)
-2. Installer OpenClaw
-3. Créer les répertoires de données
-4. Configurer le service systemd (variables d'environnement)
-5. Démarrer et activer le service
-
-**Handler** : `restart openclaw`.
+Voir §28.1 pour la version actuelle (TypeScript, npm, daemon natif).
 
 ### 23.2 Configuration dans le domaine
 
 ```yaml
 ai-assistant:
-  description: "Assistant IA"
+  description: "Assistant IA OpenClaw"
   type: lxc
-  roles: [base, openclaw_server]
+  roles: [base, admin_bootstrap, openclaw_server]
   vars:
     openclaw_channels: [telegram]
-    openclaw_heartbeat_interval: 30m
-    openclaw_ollama_host: "gpu-server"
+    openclaw_llm_provider: ollama
 ```
 
 ### 23.3 Détection du service
@@ -3144,3 +3128,141 @@ def llm_sanitize(
 ```
 
 Implémentation dans `cli/_llm.py` : `run_llm_sanitize()`.
+
+## 28. Rôle OpenClaw modernisé et admin_bootstrap
+
+Phase 16 — mise à jour du rôle `openclaw_server` pour l'OpenClaw
+actuel (TypeScript, npm, daemon natif) et ajout du rôle
+`admin_bootstrap` pour la première configuration machine.
+
+### 28.1 Rôle `openclaw_server` modernisé
+
+OpenClaw est désormais une application TypeScript installée via npm.
+Le daemon systemd est créé par OpenClaw lui-même via `openclaw onboard`.
+Le rôle Ansible ne réinvente pas la configuration — il délègue à
+la CLI native d'OpenClaw.
+
+**Installation** :
+
+```
+npm install -g openclaw@<version>
+```
+
+**Daemon** :
+
+```
+openclaw onboard --install-daemon
+```
+
+Cette commande crée le workspace (`~/.openclaw/workspace`), installe
+le service systemd, et configure les défauts.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `openclaw_version` | `latest` | Version npm à installer |
+| `openclaw_user` | `openclaw` | Utilisateur système dédié |
+| `openclaw_channels` | `[]` | Canaux : `telegram`, `signal`, `matrix` |
+| `openclaw_llm_provider` | `ollama` | Provider LLM natif OpenClaw |
+| `openclaw_llm_model` | `""` | Modèle LLM (vide = défaut provider) |
+| `openclaw_port` | `8090` | Port HTTP API (inchangé) |
+
+Les variables `llm_effective_*` issues du routage §25 sont mappées
+vers les variables OpenClaw natives :
+
+| Variable routage | Variable OpenClaw |
+|------------------|-------------------|
+| `llm_effective_backend` | `openclaw_llm_provider` |
+| `llm_effective_url` | `OPENCLAW_LLM_URL` (env) |
+| `llm_effective_key` | `OPENCLAW_LLM_API_KEY` (env) |
+| `llm_effective_model` | `openclaw_llm_model` |
+
+**Tâches** :
+
+1. Créer l'utilisateur système `openclaw` (avec home dir)
+2. Installer Node.js 20.x (si absent)
+3. Installer OpenClaw via npm global (`openclaw@{{ openclaw_version }}`)
+4. Exécuter `openclaw onboard --install-daemon` (en tant que
+   `openclaw_user`, crée workspace + service systemd)
+5. Déployer l'override systemd pour les variables d'environnement
+   LLM (`/etc/systemd/system/openclaw.service.d/llm.conf`)
+6. Démarrer et activer le service
+7. Health check `/health` (port `openclaw_port`)
+
+**Override systemd** (template `llm.conf.j2`) :
+
+```ini
+[Service]
+Environment=OPENCLAW_LLM_URL={{ openclaw_llm_url }}
+Environment=OPENCLAW_LLM_API_KEY={{ openclaw_llm_api_key }}
+Environment=OPENCLAW_LLM_PROVIDER={{ openclaw_llm_provider }}
+Environment=OPENCLAW_LLM_MODEL={{ openclaw_llm_model }}
+Environment=OPENCLAW_PORT={{ openclaw_port }}
+```
+
+L'override ne remplace pas l'unit file créée par `onboard` —
+il ajoute les variables d'environnement spécifiques à l'infra.
+
+**Handler** : `restart openclaw` (inchangé).
+
+### 28.2 Rôle `admin_bootstrap`
+
+Première configuration d'une machine fraîche : locale, timezone,
+paquets de base, mise à jour système. Rôle généraliste applicable
+à toute instance, pas spécifique IA.
+
+**Variables** (`defaults/main.yml`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `bootstrap_locale` | `fr_FR.UTF-8` | Locale système |
+| `bootstrap_timezone` | `Europe/Paris` | Timezone |
+| `bootstrap_packages` | `[vim, htop, tree, jq, unzip]` | Paquets utilitaires |
+| `bootstrap_upgrade` | `true` | Lancer `apt upgrade` |
+
+**Tâches** :
+
+1. Mettre à jour le cache APT
+2. Mettre à jour les paquets (`apt upgrade`, si `bootstrap_upgrade`)
+3. Configurer la locale (`locale-gen`)
+4. Configurer la timezone (`timedatectl`)
+5. Installer les paquets utilitaires
+
+**Différence avec le rôle `base`** : le rôle `base` installe les
+prérequis pour qu'Ansible fonctionne (curl, ca-certificates, sudo,
+locales). Le rôle `admin_bootstrap` configure la machine pour un
+usage confortable (timezone, vim, htop, upgrade). Ils sont
+complémentaires : `roles: [base, admin_bootstrap, ...]`.
+
+### 28.3 Configuration dans le domaine
+
+```yaml
+machines:
+  ai-assistant:
+    description: "Assistant IA OpenClaw"
+    type: lxc
+    roles: [base, admin_bootstrap, openclaw_server]
+    vars:
+      openclaw_channels: [telegram]
+      openclaw_llm_provider: ollama
+      bootstrap_timezone: "Europe/Paris"
+```
+
+### 28.4 Détection du service
+
+Le `_SERVICE_DEFS` dans `engine/ai.py` reste inchangé :
+port 8090, health path `/health`, rôle `openclaw_server`.
+
+### 28.5 Mise à jour du template init
+
+Le template `anklume init` inclut `ai-assistant` (commenté)
+dans le domaine `ai-tools` avec les rôles
+`[base, admin_bootstrap, openclaw_server]`.
+
+### 28.6 Intégration routage LLM
+
+Le module `llm_routing.py` continue de traiter `openclaw_server`
+comme un `LLM_CONSUMER_ROLE`. La fonction `enrich_llm_vars()`
+enrichit les variables de la machine, qui sont ensuite mappées
+vers les variables d'environnement OpenClaw dans l'override systemd.

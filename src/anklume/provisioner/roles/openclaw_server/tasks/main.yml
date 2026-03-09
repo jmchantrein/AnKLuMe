@@ -1,60 +1,46 @@
 ---
-# Installation et configuration d'OpenClaw
+# Rôle openclaw_server — OpenClaw modernisé (TypeScript, npm, daemon natif)
 
-- name: Installer les dépendances système pour OpenClaw
-  ansible.builtin.apt:
-    name:
-      - python3
-      - python3-pip
-      - python3-venv
-      - sqlite3
-    state: present
-    update_cache: true
+- name: Créer l'utilisateur système OpenClaw
+  ansible.builtin.user:
+    name: "{{ openclaw_user }}"
+    system: true
+    create_home: true
+    shell: /bin/bash
 
-- name: Créer le venv OpenClaw
+- name: Installer Node.js 20.x
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+
+- name: Installer OpenClaw via npm global
+  ansible.builtin.shell: |
+    npm install -g openclaw@{{ openclaw_version }}
+  args:
+    creates: /usr/lib/node_modules/openclaw
+
+- name: Exécuter openclaw onboard --install-daemon
   ansible.builtin.command:
-    cmd: python3 -m venv /opt/openclaw/venv
-    creates: /opt/openclaw/venv/bin/python
+    cmd: openclaw onboard --install-daemon
+  become: true
+  become_user: "{{ openclaw_user }}"
+  args:
+    creates: "/home/{{ openclaw_user }}/.openclaw/workspace"
+  changed_when: false
 
-- name: Installer OpenClaw via pip (venv)
-  ansible.builtin.pip:
-    name: openclaw
-    virtualenv: /opt/openclaw/venv
-    state: present
-  failed_when: false
-
-- name: Créer le répertoire de données OpenClaw
+- name: Créer le répertoire d'override systemd
   ansible.builtin.file:
-    path: "{{ openclaw_data_dir }}"
+    path: /etc/systemd/system/openclaw.service.d
     state: directory
     mode: "0755"
 
-- name: Configurer le service systemd OpenClaw
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/openclaw.service
+- name: Déployer l'override systemd llm.conf
+  ansible.builtin.template:
+    src: llm.conf.j2
+    dest: /etc/systemd/system/openclaw.service.d/llm.conf
     mode: "0644"
-    content: |
-      [Unit]
-      Description=OpenClaw Assistant IA
-      After=network.target
-
-      [Service]
-      Type=simple
-      Environment=OPENCLAW_PORT={{ openclaw_port }}
-      Environment=OPENCLAW_OLLAMA_HOST={{ openclaw_ollama_host }}
-      Environment=OPENCLAW_OLLAMA_PORT={{ openclaw_ollama_port }}
-      Environment=OPENCLAW_DATA_DIR={{ openclaw_data_dir }}
-      Environment=OPENCLAW_HEARTBEAT_INTERVAL={{ openclaw_heartbeat_interval }}
-      Environment=OPENCLAW_LLM_BACKEND={{ openclaw_llm_backend }}
-      Environment=OPENCLAW_LLM_URL={{ openclaw_llm_url }}
-      Environment=OPENCLAW_LLM_API_KEY={{ openclaw_llm_api_key }}
-      Environment=OPENCLAW_LLM_MODEL={{ openclaw_llm_model }}
-      ExecStart=/usr/local/bin/openclaw serve --port {{ openclaw_port }}
-      Restart=on-failure
-      RestartSec=5
-
-      [Install]
-      WantedBy=multi-user.target
   notify: restart openclaw
 
 - name: Démarrer et activer OpenClaw

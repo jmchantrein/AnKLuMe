@@ -14,14 +14,7 @@
         cmd: which sudo
       changed_when: false
 
-    - name: Vérifier que la locale fr_FR.UTF-8 est disponible
+    - name: Vérifier que le paquet locales est installé
       ansible.builtin.command:
-        cmd: locale -a
-      register: locales
+        cmd: dpkg -s locales
       changed_when: false
-
-    - name: Valider la locale française
-      ansible.builtin.assert:
-        that:
-          - "'fr_FR.utf8' in locales.stdout"
-        fail_msg: "La locale fr_FR.UTF-8 n'est pas configurée"

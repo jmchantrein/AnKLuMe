@@ -1,0 +1,11 @@
+---
+# admin_bootstrap — première configuration machine
+bootstrap_locale: "fr_FR.UTF-8"
+bootstrap_timezone: "Europe/Paris"
+bootstrap_packages:
+  - vim
+  - htop
+  - tree
+  - jq
+  - unzip
+bootstrap_upgrade: true

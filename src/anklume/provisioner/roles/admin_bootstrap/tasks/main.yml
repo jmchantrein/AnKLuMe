@@ -1,0 +1,26 @@
+---
+# Rôle admin_bootstrap — première configuration machine
+
+- name: Mettre à jour le cache APT
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Mise à jour des paquets (apt upgrade)
+  ansible.builtin.apt:
+    upgrade: safe
+  when: bootstrap_upgrade | default(true) | bool
+
+- name: Configurer la locale
+  ansible.builtin.locale_gen:
+    name: "{{ bootstrap_locale }}"
+    state: present
+
+- name: Configurer le fuseau horaire (timezone)
+  ansible.builtin.timezone:
+    name: "{{ bootstrap_timezone }}"
+
+- name: Installer les paquets utilitaires
+  ansible.builtin.apt:
+    name: "{{ bootstrap_packages }}"
+    state: present

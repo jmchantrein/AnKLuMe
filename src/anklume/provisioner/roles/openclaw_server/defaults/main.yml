@@ -1,13 +1,11 @@
 ---
-# OpenClaw — assistant IA par domaine
+# OpenClaw — assistant IA par domaine (modernisé TypeScript/npm)
+openclaw_version: "latest"
+openclaw_user: "openclaw"
 openclaw_port: 8090
-openclaw_ollama_host: localhost
-openclaw_ollama_port: 11434
 openclaw_channels: []
-openclaw_heartbeat_interval: "30m"
-openclaw_data_dir: /opt/openclaw/data
+openclaw_llm_provider: "ollama"
+openclaw_llm_model: ""
 # Routage LLM (§25) — enrichies par enrich_llm_vars()
-openclaw_llm_backend: "{{ llm_effective_backend | default('local') }}"
 openclaw_llm_url: "{{ llm_effective_url | default('') }}"
 openclaw_llm_api_key: "{{ llm_effective_key | default('') }}"
-openclaw_llm_model: "{{ llm_effective_model | default('') }}"

@@ -1,15 +1,20 @@
-"""Tests unitaires — rôle Ansible OpenClaw (Phase 11c)."""
+"""Tests unitaires — rôle Ansible OpenClaw modernisé (Phase 16)."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
-import yaml
-
 from anklume.provisioner import BUILTIN_ROLES_DIR, has_provisionable_machines
 from anklume.provisioner.playbook import generate_host_vars, generate_playbook
 
-from .conftest import make_domain, make_infra, make_machine
+from .conftest import (
+    make_domain,
+    make_infra,
+    make_machine,
+    role_defaults,
+    role_task_names,
+    role_tasks,
+)
 
 # ---------------------------------------------------------------------------
 # Vérification existence physique du rôle
@@ -18,79 +23,123 @@ from .conftest import make_domain, make_infra, make_machine
 
 class TestOpenclawRoleExists:
     def test_role_directory_exists(self):
-        role_dir = BUILTIN_ROLES_DIR / "openclaw_server"
-        assert role_dir.is_dir()
+        assert (BUILTIN_ROLES_DIR / "openclaw_server").is_dir()
 
     def test_has_tasks(self):
-        tasks = BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml"
-        assert tasks.is_file()
-        content = yaml.safe_load(tasks.read_text())
-        assert isinstance(content, list)
-        assert len(content) > 0
+        tasks = role_tasks("openclaw_server")
+        assert isinstance(tasks, list)
+        assert len(tasks) > 0
 
     def test_has_defaults(self):
-        defaults = BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml"
-        assert defaults.is_file()
-        content = yaml.safe_load(defaults.read_text())
-        assert "openclaw_port" in content
-        assert content["openclaw_port"] == 8090
+        defaults = role_defaults("openclaw_server")
+        assert "openclaw_port" in defaults
+        assert defaults["openclaw_port"] == 8090
 
     def test_has_handlers(self):
-        handlers = BUILTIN_ROLES_DIR / "openclaw_server" / "handlers" / "main.yml"
-        assert handlers.is_file()
+        assert (BUILTIN_ROLES_DIR / "openclaw_server" / "handlers" / "main.yml").is_file()
+
+    def test_has_templates_dir(self):
+        assert (BUILTIN_ROLES_DIR / "openclaw_server" / "templates").is_dir()
+
+    def test_has_llm_conf_template(self):
+        assert (BUILTIN_ROLES_DIR / "openclaw_server" / "templates" / "llm.conf.j2").is_file()
 
 
 # ---------------------------------------------------------------------------
-# Contenu du rôle
+# Contenu des tâches — installation npm + daemon natif
 # ---------------------------------------------------------------------------
 
 
-class TestOpenclawContent:
-    def test_installs_dependencies(self):
-        tasks = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml").read_text()
-        )
-        task_names = [t.get("name", "") for t in tasks]
-        assert any("dépendances" in n.lower() or "depend" in n.lower() for n in task_names)
+class TestOpenclawTasks:
+    def test_creates_user(self):
+        names = role_task_names("openclaw_server")
+        assert any("utilisateur" in n.lower() or "user" in n.lower() for n in names)
 
-    def test_installs_openclaw(self):
-        tasks = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml").read_text()
-        )
-        task_names = [t.get("name", "") for t in tasks]
-        assert any("openclaw" in n.lower() and "install" in n.lower() for n in task_names)
+    def test_installs_nodejs(self):
+        names = role_task_names("openclaw_server")
+        assert any("node" in n.lower() for n in names)
 
-    def test_creates_systemd_service(self):
-        tasks = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml").read_text()
-        )
-        task_names = [t.get("name", "") for t in tasks]
-        assert any("systemd" in n.lower() for n in task_names)
+    def test_installs_openclaw_npm(self):
+        tasks = role_tasks("openclaw_server")
+        found = any("openclaw" in str(t).lower() and "npm" in str(t).lower() for t in tasks)
+        assert found, "Tâche d'installation npm OpenClaw introuvable"
 
-    def test_creates_data_directory(self):
-        tasks = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "tasks" / "main.yml").read_text()
-        )
-        task_names = [t.get("name", "") for t in tasks]
-        assert any("répertoire" in n.lower() or "données" in n.lower() for n in task_names)
+    def test_runs_onboard(self):
+        tasks = role_tasks("openclaw_server")
+        found = any("onboard" in str(t).lower() for t in tasks)
+        assert found, "Tâche openclaw onboard introuvable"
 
-    def test_defaults_ollama_host(self):
-        defaults = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml").read_text()
-        )
-        assert defaults["openclaw_ollama_host"] == "localhost"
+    def test_deploys_systemd_override(self):
+        names = role_task_names("openclaw_server")
+        assert any("override" in n.lower() or "llm.conf" in n.lower() for n in names)
 
-    def test_defaults_heartbeat_interval(self):
-        defaults = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml").read_text()
+    def test_starts_service(self):
+        names = role_task_names("openclaw_server")
+        assert any(
+            "démarrer" in n.lower() or "activer" in n.lower() or "start" in n.lower()
+            for n in names
         )
-        assert defaults["openclaw_heartbeat_interval"] == "30m"
 
-    def test_defaults_channels_empty(self):
-        defaults = yaml.safe_load(
-            (BUILTIN_ROLES_DIR / "openclaw_server" / "defaults" / "main.yml").read_text()
-        )
-        assert defaults["openclaw_channels"] == []
+    def test_health_check(self):
+        names = role_task_names("openclaw_server")
+        assert any("prêt" in n.lower() or "health" in n.lower() for n in names)
+
+
+# ---------------------------------------------------------------------------
+# Defaults — variables modernisées
+# ---------------------------------------------------------------------------
+
+
+class TestOpenclawDefaults:
+    def test_version_default(self):
+        assert role_defaults("openclaw_server")["openclaw_version"] == "latest"
+
+    def test_user_default(self):
+        assert role_defaults("openclaw_server")["openclaw_user"] == "openclaw"
+
+    def test_channels_default(self):
+        assert role_defaults("openclaw_server")["openclaw_channels"] == []
+
+    def test_llm_provider_default(self):
+        assert role_defaults("openclaw_server")["openclaw_llm_provider"] == "ollama"
+
+    def test_port_default(self):
+        assert role_defaults("openclaw_server")["openclaw_port"] == 8090
+
+    def test_llm_model_default(self):
+        assert role_defaults("openclaw_server")["openclaw_llm_model"] == ""
+
+
+# ---------------------------------------------------------------------------
+# Template llm.conf.j2
+# ---------------------------------------------------------------------------
+
+
+class TestOpenclawTemplate:
+    _tmpl: str | None = None
+
+    @classmethod
+    def _read_template(cls) -> str:
+        if cls._tmpl is None:
+            cls._tmpl = (
+                BUILTIN_ROLES_DIR / "openclaw_server" / "templates" / "llm.conf.j2"
+            ).read_text()
+        return cls._tmpl
+
+    def test_llm_conf_contains_provider(self):
+        assert "OPENCLAW_LLM_PROVIDER" in self._read_template()
+
+    def test_llm_conf_contains_url(self):
+        assert "OPENCLAW_LLM_URL" in self._read_template()
+
+    def test_llm_conf_contains_api_key(self):
+        assert "OPENCLAW_LLM_API_KEY" in self._read_template()
+
+    def test_llm_conf_contains_port(self):
+        assert "OPENCLAW_PORT" in self._read_template()
+
+    def test_llm_conf_is_systemd_override(self):
+        assert "[Service]" in self._read_template()
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +176,7 @@ class TestPlaybookWithOpenclaw:
 
 
 # ---------------------------------------------------------------------------
-# Host vars avec variables OpenClaw
+# Host vars avec variables OpenClaw modernisées
 # ---------------------------------------------------------------------------
 
 
@@ -142,8 +191,8 @@ class TestHostVarsWithOpenclawVars:
                     roles=["openclaw_server"],
                     vars={
                         "openclaw_channels": ["telegram"],
-                        "openclaw_ollama_host": "gpu-server",
-                        "openclaw_heartbeat_interval": "15m",
+                        "openclaw_llm_provider": "anthropic",
+                        "openclaw_version": "1.2.0",
                     },
                 ),
             },
@@ -154,7 +203,8 @@ class TestHostVarsWithOpenclawVars:
         assert "ai-tools-assistant" in host_vars
         hv = host_vars["ai-tools-assistant"]
         assert hv["openclaw_channels"] == ["telegram"]
-        assert hv["openclaw_ollama_host"] == "gpu-server"
+        assert hv["openclaw_llm_provider"] == "anthropic"
+        assert hv["openclaw_version"] == "1.2.0"
 
     def test_no_vars_no_host_vars(self):
         domain = make_domain(

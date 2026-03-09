@@ -14,8 +14,3 @@
       - locales
       - apt-transport-https
     state: present
-
-- name: Configurer la locale fr_FR.UTF-8
-  ansible.builtin.locale_gen:
-    name: fr_FR.UTF-8
-    state: present
