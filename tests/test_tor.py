@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import yaml
+
 from anklume.engine.tor import (
     TOR_ROLE,
     TorGateway,
     find_tor_gateways,
     validate_tor_config,
 )
-
 from anklume.provisioner import BUILTIN_ROLES_DIR
 from tests.conftest import make_domain, make_infra, make_machine
 
@@ -215,9 +215,7 @@ class TestTorRole:
 
     def test_nftables_template_exists(self):
         """Le template nftables-tor.conf.j2 existe."""
-        assert (
-            BUILTIN_ROLES_DIR / "tor_gateway" / "templates" / "nftables-tor.conf.j2"
-        ).is_file()
+        assert (BUILTIN_ROLES_DIR / "tor_gateway" / "templates" / "nftables-tor.conf.j2").is_file()
 
     def test_tasks_content(self):
         """Les tâches principales sont présentes."""

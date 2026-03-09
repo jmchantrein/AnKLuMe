@@ -23,8 +23,7 @@ def run_console(domain: str | None = None, detach: bool = False) -> None:
     window_count = len(config.windows)
     pane_count = sum(len(panes) for panes in config.windows.values())
     typer.echo(
-        f"Console {config.session_name} : "
-        f"{window_count} fenêtre(s), {pane_count} panneau(x)"
+        f"Console {config.session_name} : {window_count} fenêtre(s), {pane_count} panneau(x)"
     )
 
     launch_console(config, detach=detach)

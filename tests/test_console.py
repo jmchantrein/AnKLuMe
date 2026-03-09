@@ -57,7 +57,9 @@ class TestBuildConsoleConfig:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro"),
+                    IncusInstance(
+                        name="pro-dev", status="Running", type="container", project="pro"
+                    ),
                     IncusInstance(
                         name="pro-mail", status="Running", type="container", project="pro"
                     ),
@@ -86,7 +88,9 @@ class TestBuildConsoleConfig:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(name="pro-dev", status="Running", type="container", project="pro"),
+                    IncusInstance(
+                        name="pro-dev", status="Running", type="container", project="pro"
+                    ),
                     IncusInstance(
                         name="pro-mail", status="Stopped", type="container", project="pro"
                     ),
@@ -171,9 +175,7 @@ class TestBuildConsoleConfig:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev", status="Stopped", type="container", project="pro"
-                    )
+                    IncusInstance(name="pro-dev", status="Stopped", type="container", project="pro")
                 ],
             },
         )

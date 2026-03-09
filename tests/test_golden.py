@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from anklume.engine.golden import (
     GOLDEN_PREFIX,
     GoldenImage,
@@ -124,11 +126,8 @@ class TestCreateGolden:
         infra = make_infra(domains={})
         driver = _golden_driver()
 
-        try:
+        with pytest.raises(ValueError, match="unknown-inst"):
             create_golden(driver, infra, "unknown-inst")
-            assert False, "Devrait lever ValueError"
-        except ValueError as e:
-            assert "unknown-inst" in str(e)
 
     def test_create_default_alias(self):
         """L'alias par défaut est golden/<full_name>."""
@@ -238,11 +237,8 @@ class TestDeleteGolden:
         """Erreur si l'alias est inconnu."""
         driver = _golden_driver(images=[])
 
-        try:
+        with pytest.raises(ValueError, match="golden/unknown"):
             delete_golden(driver, "golden/unknown")
-            assert False, "Devrait lever ValueError"
-        except ValueError as e:
-            assert "golden/unknown" in str(e)
 
 
 class TestDriverImageMethods:

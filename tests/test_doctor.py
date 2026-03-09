@@ -103,9 +103,7 @@ class TestCheckAnsible:
 
     def test_ansible_present(self):
         """Ansible installé → ok."""
-        with patch(
-            "anklume.engine.doctor.shutil.which", return_value="/usr/bin/ansible-playbook"
-        ):
+        with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/ansible-playbook"):
             result = check_ansible()
         assert result.status == "ok"
 
@@ -130,9 +128,7 @@ class TestCheckGpu:
 
     def test_gpu_missing(self):
         """GPU absent → warning (pas une erreur, optionnel)."""
-        with patch(
-            "anklume.engine.doctor.subprocess.run", side_effect=FileNotFoundError
-        ):
+        with patch("anklume.engine.doctor.subprocess.run", side_effect=FileNotFoundError):
             result = check_gpu()
         assert result.status == "warning"
 

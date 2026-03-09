@@ -107,7 +107,9 @@ class TestEnableDisable:
         assert is_enabled() is False
 
     def test_enable_creates_parent_dirs(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         import anklume.engine.telemetry as mod
 
@@ -159,7 +161,9 @@ class TestRecordEvent:
         assert not events_file.exists()
 
     def test_record_silent_on_io_error(
-        self, telemetry_dir: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        telemetry_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         import anklume.engine.telemetry as mod
 

@@ -60,9 +60,7 @@ def _check_binary(
     """Vérifie la présence d'un binaire dans le PATH."""
     path = shutil.which(binary)
     if path:
-        return CheckResult(
-            name=display_name, status="ok", message=f"installé ({path})"
-        )
+        return CheckResult(name=display_name, status="ok", message=f"installé ({path})")
     return CheckResult(
         name=display_name,
         status=severity_if_missing,
@@ -114,9 +112,7 @@ def check_gpu() -> CheckResult:
             message="nvidia-smi introuvable (GPU optionnel)",
         )
     except subprocess.TimeoutExpired:
-        return CheckResult(
-            name="GPU", status="warning", message="nvidia-smi timeout"
-        )
+        return CheckResult(name="GPU", status="warning", message="nvidia-smi timeout")
 
 
 def check_domains(infra: Infrastructure) -> list[CheckResult]:
@@ -134,10 +130,7 @@ def check_domains(infra: Infrastructure) -> list[CheckResult]:
         CheckResult(
             name=f"Domaine {domain.name}",
             status="ok",
-            message=(
-                f"{len(domain.machines)} machine(s), "
-                f"trust={domain.trust_level}"
-            ),
+            message=(f"{len(domain.machines)} machine(s), trust={domain.trust_level}"),
         )
         for domain in infra.enabled_domains
     ]
@@ -177,11 +170,7 @@ def check_golden(driver: IncusDriver) -> CheckResult:
     """Vérifie les golden images."""
     try:
         images = driver.image_list("default")
-        golden = [
-            img
-            for img in images
-            if any(a.startswith(GOLDEN_PREFIX) for a in img.aliases)
-        ]
+        golden = [img for img in images if any(a.startswith(GOLDEN_PREFIX) for a in img.aliases)]
         count = len(golden)
         total_size = sum(img.size for img in golden)
         size_mb = total_size // (1024 * 1024) if total_size else 0

@@ -85,9 +85,7 @@ def build_console_config(
         if project_name not in existing_projects:
             continue
 
-        real_instances = {
-            i.name: i for i in driver.instance_list(project_name)
-        }
+        real_instances = {i.name: i for i in driver.instance_list(project_name)}
         panes: list[ConsolePane] = []
 
         for machine in dom.sorted_machines:
@@ -97,10 +95,7 @@ def build_console_config(
             if real is None or real.status != "Running":
                 continue
 
-            cmd = (
-                f"incus exec {incus_name} "
-                f"--project {project_name} -- bash"
-            )
+            cmd = f"incus exec {incus_name} --project {project_name} -- bash"
             panes.append(
                 ConsolePane(
                     instance=incus_name,
@@ -134,14 +129,21 @@ def launch_console(
     for domain_name, panes in config.windows.items():
         if first_window:
             _tmux_run(
-                "new-session", "-d", "-s", config.session_name,
-                "-n", domain_name,
+                "new-session",
+                "-d",
+                "-s",
+                config.session_name,
+                "-n",
+                domain_name,
             )
             first_window = False
         else:
             _tmux_run(
-                "new-window", "-t", config.session_name,
-                "-n", domain_name,
+                "new-window",
+                "-t",
+                config.session_name,
+                "-n",
+                domain_name,
             )
 
         window_target = f"{config.session_name}:{domain_name}"
@@ -151,15 +153,21 @@ def launch_console(
                 _tmux_run("split-window", "-t", window_target, "-v")
 
             _tmux_run(
-                "send-keys", "-t", f"{window_target}.{i}",
-                pane.command, "Enter",
+                "send-keys",
+                "-t",
+                f"{window_target}.{i}",
+                pane.command,
+                "Enter",
             )
 
         # Couleur de la status bar selon trust level
         color = TRUST_COLORS.get(panes[0].trust_level, "colour220")
         _tmux_run(
-            "set-option", "-t", window_target,
-            "window-status-current-style", f"bg={color}",
+            "set-option",
+            "-t",
+            window_target,
+            "window-status-current-style",
+            f"bg={color}",
         )
 
         # Répartir les panneaux uniformément

@@ -65,7 +65,7 @@ def _write_project(path, domains: dict):
             {
                 "schema_version": 1,
                 "defaults": {"os_image": "images:debian/13", "trust_level": "semi-trusted"},
-                "addressing": {"base": "10.100", "zone_step": 10},
+                "addressing": {"base": "10.200", "zone_step": 10},
                 "nesting": {"prefix": True},
             }
         )
@@ -291,7 +291,12 @@ class TestE2EDevWorkflow:
         # 1. anklume init
         run_init(str(project_dir))
 
-        # 2. Remplacer le domaine par défaut par un nom E2E-safe
+        # 2. Changer le base d'adressage pour éviter conflit avec l'infra réelle
+        anklume_yml = yaml.safe_load((project_dir / "anklume.yml").read_text())
+        anklume_yml["addressing"]["base"] = "10.200"
+        (project_dir / "anklume.yml").write_text(yaml.dump(anklume_yml))
+
+        # 3. Remplacer le domaine par défaut par un nom E2E-safe
         (project_dir / "domains" / "pro.yml").unlink()
         (project_dir / "domains" / f"{project_name}.yml").write_text(
             yaml.dump(
@@ -305,18 +310,18 @@ class TestE2EDevWorkflow:
             )
         )
 
-        # 3. Apply depuis le répertoire projet
+        # 4. Apply depuis le répertoire projet
         os.chdir(project_dir)
         run_apply(dry_run=False)
 
-        # 4. Vérifier les ressources Incus
+        # 5. Vérifier les ressources Incus
         full_name = f"{project_name}-dev"
         assert project_exists(project_name)
         assert network_exists(f"net-{project_name}", project_name)
         assert instance_exists(full_name, project_name)
         assert instance_status(full_name, project_name) == "Running"
 
-        # 5. Idempotence — second apply ne change rien
+        # 6. Idempotence — second apply ne change rien
         driver = IncusDriver()
         infra = parse_project(project_dir)
         assign_addresses(infra)
