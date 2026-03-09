@@ -1,0 +1,12 @@
+site_name: anklume
+site_description: Framework déclaratif de compartimentalisation d'infrastructure
+theme:
+  name: material
+  language: fr
+  palette:
+    primary: indigo
+nav:
+  - Accueil: index.md
+  - Spécification: SPEC.md
+  - Architecture: ARCHITECTURE.md
+  - Roadmap: ROADMAP.md

@@ -27,6 +27,7 @@ portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
 setup_app = typer.Typer(help="Configuration et import.")
 golden_app = typer.Typer(help="Golden images — images réutilisables.")
 tor_app = typer.Typer(help="Passerelle Tor.")
+telemetry_app = typer.Typer(help="Métriques d'usage.")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
@@ -41,6 +42,7 @@ app.add_typer(portal_app, name="portal")
 app.add_typer(setup_app, name="setup")
 app.add_typer(golden_app, name="golden")
 app.add_typer(tor_app, name="tor")
+app.add_typer(telemetry_app, name="telemetry")
 
 
 def _version_callback(value: bool) -> None:
@@ -701,3 +703,30 @@ def doctor(
     from anklume.cli._doctor import run_doctor_cmd
 
     run_doctor_cmd(fix=fix, json_output=json_output)
+
+
+# --- anklume telemetry <on|off|status> ---
+
+
+@telemetry_app.command("on")
+def telemetry_on() -> None:
+    """Activer la collecte de métriques."""
+    from anklume.cli._telemetry import run_telemetry_on
+
+    run_telemetry_on()
+
+
+@telemetry_app.command("off")
+def telemetry_off() -> None:
+    """Désactiver la collecte de métriques."""
+    from anklume.cli._telemetry import run_telemetry_off
+
+    run_telemetry_off()
+
+
+@telemetry_app.command("status")
+def telemetry_status() -> None:
+    """Afficher l'état et le résumé des métriques."""
+    from anklume.cli._telemetry import run_telemetry_status
+
+    run_telemetry_status()

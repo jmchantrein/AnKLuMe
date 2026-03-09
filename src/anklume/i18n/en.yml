@@ -1,0 +1,24 @@
+cli:
+  version: "anklume {version}"
+  init:
+    created: "Project created in {directory}"
+    exists: "Directory {directory} already exists"
+  apply:
+    deploying: "Deploying {domain}..."
+    done: "Deployment complete ({count} domains)"
+  status:
+    ok: "Infrastructure synchronized"
+  destroy:
+    done: "Infrastructure destroyed"
+  telemetry:
+    enabled: "Telemetry enabled"
+    disabled: "Telemetry disabled"
+    status_on: "Telemetry: enabled ({count} events)"
+    status_off: "Telemetry: disabled"
+    top_commands: "Most used commands:"
+    success_rate: "Success rate: {rate}"
+    last_event: "Last event: {timestamp}"
+errors:
+  file_not_found: "File not found: {path}"
+  domain_not_found: "Unknown domain: {name}"
+  parse_error: "Parse error: {detail}"

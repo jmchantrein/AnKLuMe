@@ -4299,3 +4299,398 @@ def doctor(fix=False, json_output=False)
 | `anklume doctor` | Diagnostic automatique |
 | `anklume doctor --fix` | Diagnostic + corrections auto |
 ```
+
+## 31. CI/CD — GitHub Actions
+
+Pipeline d'intégration continue. Chaque push et pull request
+déclenche la validation complète : lint, tests, build.
+
+### 31.1 Philosophie
+
+Un seul workflow minimaliste. Python 3.11 (version cible).
+Cache `uv` pour la rapidité. Pas de matrice complexe.
+Shellcheck sur les scripts shell (`host/stt/*.sh`).
+
+### 31.2 Workflow `ci.yml`
+
+Fichier : `.github/workflows/ci.yml`
+
+```yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group dev
+      - run: uv run ruff check src/ tests/
+      - run: uv run ruff format --check src/ tests/
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck host/stt/*.sh
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --group dev
+      - run: uv run pytest tests/ -v --ignore=tests/e2e
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv build
+```
+
+#### Jobs
+
+| Job | Dépend de | Rôle |
+|-----|-----------|------|
+| `lint` | — | Ruff check + format |
+| `shellcheck` | — | Validation scripts shell |
+| `test` | `lint` | pytest (hors E2E) |
+| `build` | `test` | Construction du wheel |
+
+### 31.3 Tests
+
+| Test | Vérification |
+|------|-------------|
+| Fichier `.github/workflows/ci.yml` existe | Glob |
+| YAML valide | `yaml.safe_load()` |
+| Contient les jobs `lint`, `test`, `build`, `shellcheck` | Clés |
+
+## 32. i18n — Internationalisation
+
+Messages CLI en français par défaut, anglais en option.
+Fichiers YAML simples (léger, lisible, éditable).
+
+### 32.1 Philosophie
+
+Traduire les messages utilisateur (sorties CLI, erreurs).
+Les textes `help=` de Typer et les noms de commandes restent
+en anglais (convention universelle). Le code reste en anglais.
+
+Auto-détection de la locale via l'environnement, configurable
+via `anklume.yml` ou variable `ANKLUME_LANG`.
+
+### 32.2 Structure
+
+```
+src/anklume/i18n/
+  __init__.py     # t(), set_locale(), get_locale()
+  fr.yml          # Français (source de vérité)
+  en.yml          # Anglais
+```
+
+### 32.3 Module `i18n/__init__.py`
+
+```python
+_current_locale: str = ""
+_catalogs: dict[str, dict] = {}
+
+SUPPORTED_LOCALES = ("fr", "en")
+DEFAULT_LOCALE = "fr"
+
+def get_locale() -> str:
+    """Détecte la locale courante.
+
+    Priorité : set_locale() > ANKLUME_LANG > LANG > fr.
+    """
+
+def set_locale(locale: str) -> None:
+    """Force la locale pour la session."""
+
+def _load_catalog(locale: str) -> dict:
+    """Charge le YAML de traduction."""
+
+def _resolve(catalog: dict, key: str) -> str | None:
+    """Résout une clé pointée (ex: 'cli.init.created')."""
+
+def t(key: str, **kwargs) -> str:
+    """Traduit une clé avec interpolation.
+
+    >>> t("cli.init.created", directory="/tmp")
+    "Projet créé dans /tmp"
+
+    Clé absente → retourne la clé brute.
+    Interpolation via str.format(**kwargs).
+    """
+```
+
+### 32.4 Catalogues
+
+```yaml
+# fr.yml
+cli:
+  version: "anklume {version}"
+  init:
+    created: "Projet créé dans {directory}"
+    exists: "Le répertoire {directory} existe déjà"
+  apply:
+    deploying: "Déploiement de {domain}..."
+    done: "Déploiement terminé ({count} domaines)"
+  status:
+    ok: "Infrastructure synchronisée"
+  destroy:
+    done: "Infrastructure détruite"
+  telemetry:
+    enabled: "Télémétrie activée"
+    disabled: "Télémétrie désactivée"
+    status_on: "Télémétrie : activée ({count} événements)"
+    status_off: "Télémétrie : désactivée"
+errors:
+  file_not_found: "Fichier introuvable : {path}"
+  domain_not_found: "Domaine inconnu : {name}"
+  parse_error: "Erreur de parsing : {detail}"
+```
+
+```yaml
+# en.yml
+cli:
+  version: "anklume {version}"
+  init:
+    created: "Project created in {directory}"
+    exists: "Directory {directory} already exists"
+  apply:
+    deploying: "Deploying {domain}..."
+    done: "Deployment complete ({count} domains)"
+  status:
+    ok: "Infrastructure synchronized"
+  destroy:
+    done: "Infrastructure destroyed"
+  telemetry:
+    enabled: "Telemetry enabled"
+    disabled: "Telemetry disabled"
+    status_on: "Telemetry: enabled ({count} events)"
+    status_off: "Telemetry: disabled"
+errors:
+  file_not_found: "File not found: {path}"
+  domain_not_found: "Unknown domain: {name}"
+  parse_error: "Parse error: {detail}"
+```
+
+### 32.5 Détection de locale
+
+```
+Priorité :
+1. set_locale() (appel explicite)
+2. ANKLUME_LANG (variable d'environnement)
+3. LANG (locale système, extrait avant le '.')
+4. "fr" (défaut)
+```
+
+Locale inconnue → fallback `fr` avec warning stderr.
+
+### 32.6 Tests
+
+| Test | Vérification |
+|------|-------------|
+| `fr.yml` et `en.yml` existent | Glob |
+| YAML valides | `yaml.safe_load()` |
+| `t("cli.init.created", directory="/tmp")` | Résolution + interpolation |
+| `t("cle.inexistante")` → retourne la clé | Fallback |
+| `set_locale("en")` change la langue | Bascule |
+| `get_locale()` détecte `ANKLUME_LANG` | Env |
+| `get_locale()` détecte `LANG=fr_FR.UTF-8` | Extraction |
+| Catalogues fr et en ont les mêmes clés | Cohérence |
+| Locale inconnue → fallback fr | Robustesse |
+
+## 33. Telemetry — Métriques d'usage opt-in
+
+Métriques locales uniquement. Opt-in explicite. Échec silencieux.
+
+### 33.1 Philosophie
+
+Collecter des métriques d'usage pour comprendre quelles commandes
+sont utilisées. Stockage local uniquement : aucune donnée envoyée
+nulle part. L'utilisateur active avec `anklume telemetry on` et
+peut consulter/effacer à tout moment.
+
+### 33.2 Module `engine/telemetry.py`
+
+```python
+from dataclasses import dataclass, field
+from pathlib import Path
+
+CONFIG_DIR = Path.home() / ".config" / "anklume"
+CONFIG_PATH = CONFIG_DIR / "telemetry.json"
+EVENTS_PATH = CONFIG_DIR / "telemetry-events.jsonl"
+
+@dataclass
+class TelemetryEvent:
+    command: str
+    timestamp: str      # ISO 8601
+    duration_ms: int
+    success: bool
+    error: str | None = None
+
+@dataclass
+class TelemetryStats:
+    total_events: int
+    commands: dict[str, int]     # commande → nombre d'appels
+    success_rate: float          # 0.0 - 1.0
+    last_event: str | None       # timestamp du dernier événement
+
+def is_enabled() -> bool:
+    """Lit CONFIG_PATH → {"enabled": true/false}."""
+
+def enable() -> None:
+    """Écrit {"enabled": true} dans CONFIG_PATH."""
+
+def disable() -> None:
+    """Écrit {"enabled": false} dans CONFIG_PATH."""
+
+def record_event(event: TelemetryEvent) -> None:
+    """Ajoute l'événement en JSON-line dans EVENTS_PATH.
+
+    Silencieux si désactivé ou en cas d'erreur I/O.
+    """
+
+def get_stats() -> TelemetryStats:
+    """Agrège les événements : total, commandes, taux de succès."""
+
+def clear_events() -> None:
+    """Supprime EVENTS_PATH."""
+```
+
+### 33.3 Stockage
+
+| Fichier | Format | Contenu |
+|---------|--------|---------|
+| `~/.config/anklume/telemetry.json` | JSON | `{"enabled": true}` |
+| `~/.config/anklume/telemetry-events.jsonl` | JSON-lines | Un TelemetryEvent par ligne |
+
+Création automatique des répertoires parents.
+Toutes les erreurs I/O sont silencieuses (catch + ignore).
+
+### 33.4 CLI
+
+```python
+telemetry_app = typer.Typer(help="Métriques d'usage.")
+app.add_typer(telemetry_app, name="telemetry")
+
+@telemetry_app.command("on")
+def telemetry_on() -> None:
+    """Activer la collecte de métriques."""
+
+@telemetry_app.command("off")
+def telemetry_off() -> None:
+    """Désactiver la collecte de métriques."""
+
+@telemetry_app.command("status")
+def telemetry_status() -> None:
+    """Afficher l'état et le résumé des métriques."""
+```
+
+#### Sorties
+
+```
+# anklume telemetry on
+Télémétrie activée.
+
+# anklume telemetry off
+Télémétrie désactivée.
+
+# anklume telemetry status (activée)
+Télémétrie : activée (42 événements)
+Commandes les plus utilisées :
+  apply all        15
+  status            8
+  instance list     7
+Taux de succès : 95.2%
+Dernier événement : 2026-03-09T14:32:00
+
+# anklume telemetry status (désactivée)
+Télémétrie : désactivée.
+```
+
+### 33.5 Fichiers CLI
+
+| Fichier | Fonctions |
+|---------|-----------|
+| `cli/_telemetry.py` | `run_telemetry_on`, `run_telemetry_off`, `run_telemetry_status` |
+
+### 33.6 Tests
+
+| Test | Vérification |
+|------|-------------|
+| `enable()` crée le fichier config | Écriture |
+| `disable()` met `enabled: false` | Écriture |
+| `is_enabled()` lit correctement | Lecture |
+| `is_enabled()` → `False` si fichier absent | Défaut |
+| `record_event()` écrit une ligne JSON | Append |
+| `record_event()` silencieux si désactivé | Garde |
+| `record_event()` silencieux si erreur I/O | Robustesse |
+| `get_stats()` agrège correctement | Calcul |
+| `get_stats()` → zéros si fichier vide | Défaut |
+| `clear_events()` supprime le fichier | Nettoyage |
+| `TelemetryEvent` sérialisation JSON | Dataclass |
+
+## 34. Documentation — MkDocs
+
+Documentation HTML générée depuis les Markdown existants.
+
+### 34.1 Philosophie
+
+Les fichiers `docs/` sont la source de vérité. MkDocs avec
+Material theme génère le site statique. Pas de duplication.
+
+### 34.2 Configuration `mkdocs.yml`
+
+```yaml
+site_name: anklume
+site_description: Framework déclaratif de compartimentalisation
+theme:
+  name: material
+  language: fr
+  palette:
+    primary: indigo
+nav:
+  - Accueil: index.md
+  - Spécification: SPEC.md
+  - Architecture: ARCHITECTURE.md
+  - Roadmap: ROADMAP.md
+```
+
+### 34.3 Page d'accueil `docs/index.md`
+
+Résumé du projet avec liens vers SPEC, ARCHITECTURE, ROADMAP.
+Exemples de commandes de base.
+
+### 34.4 Build
+
+```bash
+# Local
+uv run mkdocs serve
+
+# CI
+uv run mkdocs build --strict
+```
+
+### 34.5 Tests
+
+| Test | Vérification |
+|------|-------------|
+| `mkdocs.yml` existe | Glob |
+| YAML valide | `yaml.safe_load()` |
+| `docs/index.md` existe | Glob |
+| Navigation référence les fichiers existants | Cohérence |
+
+### 34.6 Mise à jour des commandes CLI (§6)
+
+```
+### Qualité et distribution
+
+| Commande | Description |
+|----------|-------------|
+| `anklume telemetry on` | Activer les métriques d'usage |
+| `anklume telemetry off` | Désactiver les métriques |
+| `anklume telemetry status` | État et résumé des métriques |
+```

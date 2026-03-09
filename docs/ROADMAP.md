@@ -477,12 +477,30 @@ Communication hôte ↔ conteneur sans compromettre l'isolation.
 - [x] 949 tests unitaires au total, zéro régression
   (8 E2E/GPU préexistants)
 
-## Phase 19 — Qualité et distribution
+## Phase 19 — Qualité et distribution ✅
 
-- [ ] CI/CD — GitHub Actions (lint, ruff, pytest, shellcheck)
-- [ ] Documentation — MkDocs, docs fr/en par fonctionnalité
-- [ ] i18n — traductions fr.yml, mécanisme gettext
-- [ ] Telemetry — métriques d'usage opt-in (`anklume telemetry on/off`)
+- [x] SPEC §31-34 détaillé (CI/CD, i18n, telemetry, documentation)
+- [x] CI/CD — GitHub Actions (`.github/workflows/ci.yml`)
+  - Jobs : `lint` (ruff check + format), `shellcheck`, `test` (pytest), `build` (uv build)
+  - Triggers : push, pull_request
+- [x] i18n — internationalisation (§32)
+  - `i18n/__init__.py` — `t()`, `set_locale()`, `get_locale()`
+  - Catalogues YAML : `fr.yml`, `en.yml` (mêmes clés)
+  - Détection locale : `ANKLUME_LANG` > `LANG` > `fr`
+  - Interpolation `{variable}`, fallback clé brute
+- [x] Telemetry — métriques d'usage opt-in (§33)
+  - `engine/telemetry.py` — `TelemetryEvent`, `TelemetryStats`
+  - `enable()`, `disable()`, `is_enabled()`, `record_event()`, `get_stats()`, `clear_events()`
+  - Stockage local `~/.config/anklume/` (JSON + JSON-lines)
+  - Échec silencieux, garde si désactivé
+  - `cli/_telemetry.py` — `run_telemetry_on/off/status`
+  - CLI : `anklume telemetry on/off/status`
+- [x] Documentation — MkDocs (§34)
+  - `mkdocs.yml` — Material theme, navigation manuelle
+  - `docs/index.md` — page d'accueil avec démarrage rapide
+- [x] Tests unitaires : 67 nouveaux tests (i18n, telemetry, CI/CD, MkDocs, CLI)
+- [x] 1016 tests unitaires au total, zéro régression
+  (7 E2E dnsmasq préexistants)
 
 ### En réflexion
 
