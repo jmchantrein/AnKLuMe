@@ -2237,3 +2237,322 @@ Serveur de coding IA headless.
 ```
 anklume ai test [--backend ollama|claude] [--mode dry-run|auto-apply] [--max-retries N]
 ```
+
+## 25. Routage LLM — choix local/externe + sanitisation
+
+Mécanisme de sélection du backend LLM (local Ollama, API cloud,
+abonnement) avec routage conditionnel via le proxy de sanitisation.
+Chaque machine choisit son backend, le sanitizer s'interpose
+automatiquement quand requis.
+
+### 25.1 Philosophie
+
+Le POC avait trois modes d'accès aux LLM :
+1. **Local** — Ollama sur le réseau interne (gratuit, privé)
+2. **API cloud** — OpenAI, Anthropic, etc. (payant à l'usage)
+3. **Abonnement** — OpenRouter, Together, etc. (payant mensuel)
+
+Les modes 2 et 3 utilisent tous le format OpenAI-compatible.
+Le routage se résume donc à deux familles de backends :
+- `local` → Ollama (protocole Ollama natif)
+- `openai` → toute API OpenAI-compatible (OpenAI, OpenRouter,
+  Groq, Together, Mistral, vLLM distant, etc.)
+- `anthropic` → API Claude (format Messages distinct)
+
+Quand les données sortent du réseau local (backends `openai`
+et `anthropic`), le proxy de sanitisation s'interpose pour
+protéger les données sensibles.
+
+### 25.2 Configuration machine
+
+Les variables LLM se déclarent dans `vars:` de chaque machine.
+Les rôles consommateurs (OpenClaw, LobeChat, Open WebUI)
+lisent ces variables résolues.
+
+```yaml
+# domains/pro.yml
+machines:
+  assistant:
+    description: "Assistant IA pro"
+    type: lxc
+    roles: [base, openclaw_server]
+    vars:
+      llm_backend: openai
+      llm_api_url: "https://openrouter.ai/api/v1"
+      llm_api_key: "sk-or-..."
+      llm_model: "anthropic/claude-sonnet-4-20250514"
+      ai_sanitize: true
+```
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `llm_backend` | `local` | Backend LLM : `local`, `openai`, `anthropic` |
+| `llm_api_url` | `""` | URL de l'API (requis si backend externe) |
+| `llm_api_key` | `""` | Clé API (requis si backend externe) |
+| `llm_model` | `""` | Modèle à utiliser (optionnel, défaut du provider) |
+| `ai_sanitize` | `false` | `false`, `true` (externe only), `always` |
+
+### 25.3 Backends supportés
+
+| Backend | `llm_api_url` | Format API | Exemples |
+|---------|---------------|------------|----------|
+| `local` | ignoré | Ollama natif | Ollama local |
+| `openai` | requis | OpenAI-compatible | OpenAI, OpenRouter, Groq, Together, Mistral, vLLM |
+| `anthropic` | requis | Messages API | Claude API |
+
+Pour `local`, l'URL Ollama est résolue automatiquement depuis
+l'infrastructure (même domaine : `localhost`, cross-domaine :
+IP de la machine `ollama_server`).
+
+### 25.4 Routage et sanitisation
+
+Le module `engine/llm_routing.py` résout l'endpoint effectif
+pour chaque machine au moment du provisioning.
+
+```
+                                        ┌─────────────┐
+llm_backend: local ──────────────────── │   Ollama     │
+                                        └─────────────┘
+
+                        ai_sanitize:    ┌─────────────┐    ┌─────────────┐
+llm_backend: openai ──── true ────────► │  Sanitizer   │───►│  Cloud API   │
+                    │                   └─────────────┘    └─────────────┘
+                    │   ai_sanitize:    ┌─────────────┐
+                    └─── false ────────►│  Cloud API   │
+                                        └─────────────┘
+
+                        ai_sanitize:    ┌─────────────┐    ┌─────────────┐
+llm_backend: local ──── always ────────►│  Sanitizer   │───►│   Ollama     │
+                                        └─────────────┘    └─────────────┘
+```
+
+Règles de routage :
+1. `llm_backend: local` + `ai_sanitize: false` → Ollama direct
+2. `llm_backend: local` + `ai_sanitize: true` → Ollama direct
+   (true = externe seulement, local exempt)
+3. `llm_backend: local` + `ai_sanitize: always` → Sanitizer → Ollama
+4. `llm_backend: openai|anthropic` + `ai_sanitize: false` → Cloud direct
+5. `llm_backend: openai|anthropic` + `ai_sanitize: true` → Sanitizer → Cloud
+6. `llm_backend: openai|anthropic` + `ai_sanitize: always` → Sanitizer → Cloud
+
+### 25.5 Module `engine/llm_routing.py`
+
+```python
+LLM_BACKENDS = {"local", "openai", "anthropic"}
+AI_SANITIZE_VALUES = {"false", "true", "always"}
+
+@dataclass
+class LlmEndpoint:
+    """Endpoint LLM résolu pour une machine."""
+    backend: str       # "local", "openai", "anthropic"
+    url: str           # URL effective (Ollama, cloud, ou sanitizer)
+    api_key: str       # Clé API (vide pour local)
+    model: str         # Modèle sélectionné
+    sanitized: bool    # Passe par le proxy sanitizer
+    upstream_url: str  # URL réelle derrière le sanitizer (vide si pas sanitisé)
+
+def resolve_llm_endpoint(
+    machine: Machine,
+    domain: Domain,
+    infra: Infrastructure,
+) -> LlmEndpoint:
+    """Résout l'endpoint LLM effectif pour une machine.
+
+    Raises:
+        ValueError: configuration invalide (backend inconnu,
+                    URL manquante, sanitizer introuvable).
+    """
+
+def find_sanitizer_url(
+    domain: Domain,
+    infra: Infrastructure,
+) -> str | None:
+    """Trouve l'URL du proxy sanitizer dans le domaine ou l'infra.
+
+    Cherche d'abord dans le même domaine, puis dans tous les
+    domaines activés.
+    """
+
+def find_ollama_url(
+    domain: Domain,
+    infra: Infrastructure,
+) -> str:
+    """Trouve l'URL Ollama accessible depuis le domaine.
+
+    Cherche d'abord dans le même domaine (localhost),
+    puis dans l'infra.
+    """
+
+def enrich_llm_vars(infra: Infrastructure) -> Infrastructure:
+    """Enrichit les vars des machines avec les endpoints résolus.
+
+    Ajoute `llm_effective_url`, `llm_effective_key`,
+    `llm_effective_model`, `llm_effective_backend` aux machines
+    qui ont un rôle consommateur LLM.
+
+    Appelé dans le pipeline apply, avant la génération host_vars.
+    """
+```
+
+Les rôles consommateurs LLM sont identifiés par une constante :
+```python
+LLM_CONSUMER_ROLES = {
+    "openclaw_server",
+    "lobechat",
+    "open_webui",
+    "opencode_server",
+}
+```
+
+### 25.6 Enrichissement dans le pipeline apply
+
+```
+domains/*.yml
+    │
+    ▼
+parse_project()
+    │
+    ▼
+enrich_llm_vars()    ◄── NOUVEAU : résout les endpoints
+    │
+    ▼
+generate_host_vars()  ── les vars enrichies sont transmises
+    │
+    ▼
+ansible-playbook
+```
+
+`enrich_llm_vars()` ajoute à chaque machine consommatrice :
+
+| Variable injectée | Description |
+|---|---|
+| `llm_effective_url` | URL à contacter (sanitizer ou direct) |
+| `llm_effective_key` | Clé API à utiliser (vide si local) |
+| `llm_effective_model` | Modèle résolu |
+| `llm_effective_backend` | Backend résolu (`local`, `openai`, `anthropic`) |
+
+### 25.7 Mise à jour du rôle `llm_sanitizer`
+
+Le rôle existant reçoit une variable supplémentaire auto-remplie :
+
+```yaml
+# defaults/main.yml
+sanitizer_port: 8089
+sanitizer_mode: mask
+sanitizer_upstream_url: ""      # auto-rempli par enrich_llm_vars
+sanitizer_log_dir: /var/log/anklume/sanitizer
+sanitizer_audit: true           # NOUVEAU : log d'audit des sanitisations
+```
+
+Le service systemd du sanitizer transmet `SANITIZER_UPSTREAM_URL`
+qui pointe vers le vrai backend LLM (Ollama ou cloud).
+
+### 25.8 Mise à jour des rôles consommateurs
+
+Chaque rôle consommateur lit `llm_effective_url` en priorité,
+avec fallback sur sa variable spécifique existante.
+
+**OpenClaw** (`openclaw_server/defaults/main.yml`) :
+```yaml
+openclaw_port: 8090
+openclaw_ollama_host: localhost        # fallback si llm_effective_url absent
+openclaw_ollama_port: 11434
+openclaw_llm_backend: "{{ llm_effective_backend | default('local') }}"
+openclaw_llm_url: "{{ llm_effective_url | default('') }}"
+openclaw_llm_api_key: "{{ llm_effective_key | default('') }}"
+openclaw_llm_model: "{{ llm_effective_model | default('') }}"
+```
+
+Le service systemd passe les variables d'environnement :
+```ini
+Environment=OPENCLAW_LLM_BACKEND={{ openclaw_llm_backend }}
+Environment=OPENCLAW_LLM_URL={{ openclaw_llm_url }}
+Environment=OPENCLAW_LLM_API_KEY={{ openclaw_llm_api_key }}
+Environment=OPENCLAW_LLM_MODEL={{ openclaw_llm_model }}
+```
+
+**LobeChat** (`lobechat/defaults/main.yml`) :
+```yaml
+lobechat_ollama_url: "http://localhost:11434"  # fallback
+lobechat_llm_backend: "{{ llm_effective_backend | default('local') }}"
+lobechat_llm_url: "{{ llm_effective_url | default('') }}"
+lobechat_llm_api_key: "{{ llm_effective_key | default('') }}"
+```
+
+### 25.9 Validation
+
+Le validateur vérifie :
+1. `llm_backend` ∈ `{"local", "openai", "anthropic"}` (sinon erreur)
+2. `ai_sanitize` ∈ `{"false", "true", "always"}` (sinon erreur)
+3. Si `llm_backend` externe → `llm_api_url` requis (sinon erreur)
+4. Si `ai_sanitize: true|always` → au moins une machine avec rôle
+   `llm_sanitizer` dans l'infra (sinon warning)
+5. Si `llm_api_key` présent → ne pas logger/afficher la valeur
+
+### 25.10 Exemples de configuration
+
+**Scénario 1 : tout local (défaut)**
+```yaml
+# domains/ai-tools.yml
+machines:
+  gpu-server:
+    roles: [base, ollama_server, stt_server]
+    gpu: true
+
+# domains/pro.yml
+machines:
+  assistant:
+    roles: [base, openclaw_server]
+    vars:
+      openclaw_ollama_host: "10.100.3.1"
+```
+
+Résultat : OpenClaw contacte Ollama directement. Pas de sanitisation.
+
+**Scénario 2 : LLM cloud + sanitisation**
+```yaml
+# domains/pro.yml
+machines:
+  sanitizer:
+    description: "Proxy de sanitisation LLM"
+    type: lxc
+    roles: [base, llm_sanitizer]
+
+  assistant:
+    description: "Assistant IA pro"
+    type: lxc
+    roles: [base, openclaw_server]
+    vars:
+      llm_backend: openai
+      llm_api_url: "https://api.openai.com/v1"
+      llm_api_key: "sk-..."
+      llm_model: "gpt-4o"
+      ai_sanitize: true
+```
+
+Résultat : OpenClaw → sanitizer (port 8089) → OpenAI.
+Le sanitizer redacte IPs, FQDNs, credentials, noms Incus.
+
+**Scénario 3 : OpenRouter (abonnement) + sanitisation**
+```yaml
+machines:
+  assistant:
+    roles: [base, openclaw_server]
+    vars:
+      llm_backend: openai
+      llm_api_url: "https://openrouter.ai/api/v1"
+      llm_api_key: "sk-or-..."
+      llm_model: "anthropic/claude-sonnet-4-20250514"
+      ai_sanitize: true
+```
+
+**Scénario 4 : sanitisation même en local**
+```yaml
+machines:
+  assistant:
+    roles: [base, openclaw_server]
+    vars:
+      ai_sanitize: always
+```
+
+Résultat : même les requêtes vers Ollama passent par le sanitizer.

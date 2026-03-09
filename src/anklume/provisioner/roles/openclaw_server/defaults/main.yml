@@ -6,3 +6,8 @@ openclaw_ollama_port: 11434
 openclaw_channels: []
 openclaw_heartbeat_interval: "30m"
 openclaw_data_dir: /opt/openclaw/data
+# Routage LLM (§25) — enrichies par enrich_llm_vars()
+openclaw_llm_backend: "{{ llm_effective_backend | default('local') }}"
+openclaw_llm_url: "{{ llm_effective_url | default('') }}"
+openclaw_llm_api_key: "{{ llm_effective_key | default('') }}"
+openclaw_llm_model: "{{ llm_effective_model | default('') }}"

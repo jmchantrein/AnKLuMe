@@ -312,7 +312,42 @@ d'anklume lui-même et des projets utilisateur.
 - [x] Tests unitaires : 23 tests (rôles, dataclasses, boucle test, CLI)
 - [x] 619 tests au total, zéro régression (1 E2E GPU timeout préexistant)
 
-### Reporté (post-Phase 11)
+## Phase 12 — STT Voxtype + tests Molecule ✅
+
+(commit 7bbe3db)
+
+## Phase 13 — Routage LLM et intégration sanitiser ✅
+
+Choix du backend LLM (local Ollama, API cloud, abonnement) avec
+routage conditionnel via le proxy de sanitisation. Chaque machine
+choisit son backend, le sanitizer s'interpose automatiquement
+quand requis.
+
+- [x] SPEC §25 détaillé (10 sous-sections : philosophie, config, backends,
+  routage, module, enrichissement, rôles, validation, exemples)
+- [x] `engine/llm_routing.py` — module de routage LLM
+  - `resolve_llm_endpoint()` : résout backend + sanitisation
+  - `find_sanitizer_url()` : cherche le proxy (même domaine, cross-domaine)
+  - `find_ollama_url()` : cherche Ollama dans l'infra
+  - `enrich_llm_vars()` : enrichit les vars machines avant provisioning
+  - `validate_llm_config()` : valide backend, ai_sanitize, URL, clé
+- [x] Backends supportés : `local` (Ollama), `openai` (OpenAI-compatible
+  incluant OpenRouter, Groq, Together, etc.), `anthropic` (Claude API)
+- [x] Sanitisation conditionnelle :
+  - `ai_sanitize: false` → direct
+  - `ai_sanitize: true` → sanitise les requêtes externes uniquement
+  - `ai_sanitize: always` → sanitise même le local
+- [x] Rôle `openclaw_server` mis à jour (LLM_BACKEND, LLM_URL, LLM_API_KEY, LLM_MODEL)
+- [x] Rôle `lobechat` mis à jour (llm_backend, llm_url, llm_api_key)
+- [x] Rôle `llm_sanitizer` mis à jour (sanitizer_audit, upstream auto-rempli)
+- [x] Pipeline apply : `enrich_llm_vars()` câblé dans `provision()`
+  avant `write_host_vars()` — les vars enrichies sont transmises à Ansible
+- [x] Tests unitaires : 60 tests (constantes, resolve local/externe/sanitisé,
+  find sanitizer/ollama, enrich_llm_vars, rôles, host_vars, validation,
+  cross-domaine, scénario OpenRouter, intégration pipeline)
+- [x] 683 tests unitaires au total, zéro régression
+
+### Reporté (post-Phase 13)
 - Live ISO — OS immuable + persistance chiffrée ZFS/BTRFS (`live/`)
 - Plateforme web (`platform/`)
 - Labs éducatifs (`labs/`)

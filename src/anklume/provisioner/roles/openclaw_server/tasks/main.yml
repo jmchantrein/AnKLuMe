@@ -45,6 +45,10 @@
       Environment=OPENCLAW_OLLAMA_PORT={{ openclaw_ollama_port }}
       Environment=OPENCLAW_DATA_DIR={{ openclaw_data_dir }}
       Environment=OPENCLAW_HEARTBEAT_INTERVAL={{ openclaw_heartbeat_interval }}
+      Environment=OPENCLAW_LLM_BACKEND={{ openclaw_llm_backend }}
+      Environment=OPENCLAW_LLM_URL={{ openclaw_llm_url }}
+      Environment=OPENCLAW_LLM_API_KEY={{ openclaw_llm_api_key }}
+      Environment=OPENCLAW_LLM_MODEL={{ openclaw_llm_model }}
       ExecStart=/usr/local/bin/openclaw serve --port {{ openclaw_port }}
       Restart=on-failure
       RestartSec=5

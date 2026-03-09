@@ -3,3 +3,7 @@
 lobechat_port: 3210
 lobechat_ollama_url: "http://localhost:11434"
 lobechat_data_dir: /opt/lobechat/data
+# Routage LLM (§25) — enrichies par enrich_llm_vars()
+lobechat_llm_backend: "{{ llm_effective_backend | default('local') }}"
+lobechat_llm_url: "{{ llm_effective_url | default('') }}"
+lobechat_llm_api_key: "{{ llm_effective_key | default('') }}"

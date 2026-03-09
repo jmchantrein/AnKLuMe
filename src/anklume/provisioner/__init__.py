@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from anklume.engine.llm_routing import enrich_llm_vars
 from anklume.engine.models import Infrastructure
 from anklume.provisioner.inventory import write_inventories
 from anklume.provisioner.playbook import write_host_vars, write_playbook
@@ -42,10 +43,13 @@ def provision(
             skip_reason="Ansible absent du PATH — provisioning ignoré",
         )
 
+    # Enrichir les vars LLM (résout les endpoints avant génération)
+    enriched = enrich_llm_vars(infra)
+
     # Générer les fichiers
-    write_inventories(project_dir, infra)
-    write_playbook(project_dir, infra)
-    write_host_vars(project_dir, infra)
+    write_inventories(project_dir, enriched)
+    write_playbook(project_dir, enriched)
+    write_host_vars(project_dir, enriched)
 
     # Résoudre le répertoire des rôles custom
     custom_roles_dir = project_dir / "ansible_roles_custom"
