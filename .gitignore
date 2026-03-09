@@ -6,6 +6,7 @@ build/
 .venv/
 .ruff_cache/
 .pytest_cache/
+src/anklume/_version.py
 *.iso
 *.sha256
 .env

@@ -1,3 +1,8 @@
 """anklume — framework déclaratif de compartimentalisation d'infrastructure."""
 
-__version__ = "0.1.0-dev"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("anklume")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"

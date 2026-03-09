@@ -1,6 +1,6 @@
 [project]
 name = "anklume"
-version = "0.1.0-dev"
+dynamic = ["version"]
 description = "Framework déclaratif de compartimentalisation d'infrastructure"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -37,6 +37,7 @@ package = true
 target-version = "py311"
 line-length = 100
 src = ["src", "tests", "live/platform"]
+exclude = ["src/anklume/_version.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "RUF"]
@@ -54,8 +55,18 @@ markers = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/anklume/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/anklume"]
