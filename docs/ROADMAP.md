@@ -347,15 +347,96 @@ quand requis.
   cross-domaine, scénario OpenRouter, intégration pipeline)
 - [x] 683 tests unitaires au total, zéro régression
 
-### Reporté (post-Phase 13)
-- Live ISO — OS immuable + persistance chiffrée ZFS/BTRFS (`live/`)
-- Plateforme web (`platform/`)
-- Labs éducatifs (`labs/`)
-- Gestion distante via SSH (optionnel)
-- Internationalisation (i18n)
+## Phase 14 — CLI opérationnelle
 
-### Contraintes Live ISO à respecter dès le core
-- Chemins de données configurables
-- Storage Incus sur volume chiffré (ZFS pool / BTRFS subvolume)
-- `anklume apply all` idempotent (survit aux redémarrages)
-- Compatible avec tout mode de boot (installé ou live)
+Commandes essentielles pour l'opérationnel quotidien.
+
+- [ ] `anklume instance list` — tableau Rich (nom, domaine, état, IP, type)
+- [ ] `anklume instance exec <instance> -- <cmd>` — exécuter dans une instance
+- [ ] `anklume instance info <instance>` — détails (config, snapshots, IPs)
+- [ ] `anklume domain list` — tableau des domaines (état, machines, trust-level)
+- [ ] `anklume domain check <nom>` — valider un domaine isolément
+- [ ] `anklume domain exec <nom> -- <cmd>` — exécuter dans toutes les instances
+- [ ] `anklume domain status <nom>` — état détaillé d'un domaine
+- [ ] `anklume snapshot delete <instance> <snapshot>` — supprimer un snapshot
+- [ ] `anklume snapshot rollback <instance> <snapshot>` — rollback destructif
+- [ ] `anklume network status` — état réseau (bridges, IPs, nftables actives)
+- [ ] `anklume llm status` — vue dédiée backend LLM, modèles, VRAM
+- [ ] `anklume llm bench` — benchmark inference (tokens/s, latence)
+
+## Phase 15 — Sanitiser avancé
+
+Enrichir le proxy de sanitisation : NER, templates, dry-run, audit.
+
+- [ ] NER sanitizer — backends GLiNER/spaCy en plus du regex
+  - MAC addresses, noms Ansible, sockets, commandes Incus
+  - Fallback gracieux si NLP indisponible
+- [ ] Templates sanitizer — `patterns.yml.j2`, `config.yml.j2`
+  - Catégories activables individuellement
+  - Génération depuis les variables du rôle
+- [ ] `anklume llm sanitize <texte>` — dry-run de sanitisation
+- [ ] Audit logging — trace des redactions dans les logs
+  - `sanitizer_audit_log_path` configurable
+
+## Phase 16 — Rôle OpenClaw modernisé
+
+Mettre à jour le rôle pour l'OpenClaw actuel (TypeScript, npm,
+daemon systemd). Ne pas réinventer la configuration — OpenClaw
+gère nativement ses channels, skills et providers.
+
+- [ ] Installation via `npm install -g openclaw@latest`
+- [ ] Daemon systemd via `openclaw onboard --install-daemon`
+- [ ] Configuration workspace `~/.openclaw/workspace`
+- [ ] Variables : `openclaw_version`, `openclaw_channels`, `openclaw_llm_provider`
+- [ ] Rôle `admin_bootstrap` — première configuration machine
+  (locale, timezone, packages de base, mise à jour)
+
+## Phase 17 — Portails et transferts
+
+Communication hôte ↔ conteneur sans compromettre l'isolation.
+
+- [ ] File portals — transfert fichiers hôte ↔ conteneur
+  (`anklume portal push/pull/list`)
+- [ ] Clipboard sharing — copier/coller hôte ↔ conteneur
+  (`anklume instance clipboard <instance>`)
+- [ ] Disposable containers — workflow conteneurs éphémères
+  (`anklume disp <image>` — lance, utilise, détruit)
+- [ ] Import infra existante — importer depuis un Incus déjà configuré
+  (`anklume setup import`)
+
+## Phase 18 — Opérations avancées
+
+- [ ] Golden images — `anklume golden create/derive/publish`
+- [ ] Tor gateway — VM routeur transparent Tor
+- [ ] tmux console — console colorée par domaine
+- [ ] Doctor/health check — `anklume doctor` (diagnostic auto + fix)
+
+## Phase 19 — Qualité et distribution
+
+- [ ] CI/CD — GitHub Actions (lint, ruff, pytest, shellcheck)
+- [ ] Documentation — MkDocs, docs fr/en par fonctionnalité
+- [ ] i18n — traductions fr.yml, mécanisme gettext
+- [ ] Telemetry — métriques d'usage opt-in (`anklume telemetry on/off`)
+
+### En réflexion
+
+- **MCP services** — canal de communication contrôlé pour les instances
+  isolées (trust-level `untrusted`). Socket local côté hôte, le
+  serveur MCP filtre les requêtes selon la politique. Permet de lire
+  des métadonnées (statut, services, snapshots) sans ouvrir de port
+  réseau. Valeur de sécurité réelle, mérite spécification dédiée.
+- **Desktop integration** — fichiers `.desktop` par instance avec
+  couleur trust-level, générés par `anklume apply`. Minimaliste
+  ou rien — pas d'usine à gaz.
+
+### Écarté
+
+- ~~Live ISO~~ — hors scope (OS immuable séparé)
+- ~~`anklume llm switch`~~ — le routage §25 suffit, pas de bascule runtime
+- ~~Rôle `firewall_router`~~ — remplacé par nftables natif
+- ~~Rôles Ansible infra (`incus_*`)~~ — géré par le réconciliateur Python
+- ~~Labs éducatifs~~ — hors scope
+- ~~Plateforme web / dashboard~~ — hors scope
+- ~~Modes (user/student/dev)~~ — complexité inutile
+- ~~Accessibility~~ — hors scope
+- ~~Examples~~ — les docs suffisent
