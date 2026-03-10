@@ -4694,3 +4694,149 @@ uv run mkdocs build --strict
 | `anklume telemetry off` | Désactiver les métriques |
 | `anklume telemetry status` | État et résumé des métriques |
 ```
+
+## 35. Environnement de développement — `anklume dev env`
+
+Génération automatique de domaines d'environnement de développement.
+Un domaine complet (machine, rôles, montages, politiques réseau) est
+produit en une commande, prêt à `anklume apply`.
+
+### 35.1 Philosophie
+
+Le développeur décrit ses besoins via des flags, anklume génère le
+domaine YAML correspondant. Choix LXC (léger, rapide) ou VM (isolé,
+Docker-in-Docker possible). GPU et LLM optionnels. Montages persistants
+pour le code source hôte.
+
+### 35.2 CLI
+
+```bash
+# Minimal : environnement LXC de base
+anklume dev env myproject
+
+# Complet : VM avec GPU, Claude Code, montage projet
+anklume dev env myproject \
+  --type vm \
+  --gpu \
+  --llm \
+  --claude-code \
+  --mount src=/home/user/myproject \
+  --memory 8GiB \
+  --cpu 4
+
+# Preset anklume : self-dev avec toute la chaîne
+anklume dev env --preset anklume
+```
+
+| Flag | Défaut | Description |
+|------|--------|-------------|
+| `--type` | `lxc` | `lxc` (conteneur) ou `vm` (machine virtuelle) |
+| `--gpu` | `false` | GPU passthrough + rôle `ollama_server` |
+| `--llm` | `false` | Accès aux services LLM (politiques réseau) |
+| `--claude-code` | `false` | Installer Claude Code CLI |
+| `--mount` | — | Montage persistant `nom=/chemin` (répétable) |
+| `--memory` | — | Limite mémoire (`4GiB`, `8GiB`, etc.) |
+| `--cpu` | — | Limite CPU (nombre de vCPUs) |
+| `--preset` | — | Configuration prédéfinie (`anklume`) |
+| `--output` | `.` | Répertoire du projet anklume |
+
+### 35.3 Rôle Ansible `dev_env`
+
+Complète `dev-tools` (build-essential, git, python3, vim, tmux, jq)
+avec un outillage moderne :
+
+| Outil | Variable | Défaut | Description |
+|-------|----------|--------|-------------|
+| uv | `dev_env_install_uv` | `true` | Gestionnaire Python rapide |
+| Node.js | `dev_env_install_node` | `true` | Runtime JS (pour Claude Code) |
+| ripgrep | `dev_env_install_ripgrep` | `true` | Recherche rapide dans le code |
+| fd | `dev_env_install_fd` | `true` | Find alternatif moderne |
+| fzf | `dev_env_install_fzf` | `true` | Fuzzy finder interactif |
+| lazygit | `dev_env_install_lazygit` | `true` | Interface git TUI |
+| direnv | `dev_env_install_direnv` | `true` | Variables d'env par projet |
+| Claude Code | `dev_env_install_claude_code` | `false` | CLI agent IA |
+| aider | `dev_env_install_aider` | `false` | Assistant coding AI |
+
+Variables supplémentaires :
+
+| Variable | Description |
+|----------|-------------|
+| `dev_env_user` | Utilisateur non-root (vide = root) |
+| `dev_env_shell` | Shell par défaut (`/bin/bash`) |
+| `dev_env_node_version` | Version Node.js (`22`) |
+| `dev_env_git_name` | `git config user.name` |
+| `dev_env_git_email` | `git config user.email` |
+| `dev_env_extra_packages` | Paquets APT additionnels |
+
+### 35.4 Module `engine/dev_env.py`
+
+```python
+@dataclass
+class DevEnvConfig:
+    name: str          # Nom du domaine
+    machine_type: str  # "lxc" ou "vm"
+    gpu: bool          # GPU passthrough
+    llm: bool          # Accès LLM
+    claude_code: bool  # Installer Claude Code CLI
+    mount_paths: dict  # Montages {nom: chemin}
+    memory: str        # Limite mémoire
+    cpu: str           # Limite CPU
+    ...
+
+def generate_dev_domain(config: DevEnvConfig) -> str:
+    """Génère le YAML du domaine."""
+
+def generate_dev_policies(domain_name: str, *, llm: bool) -> str:
+    """Génère les politiques réseau pour l'accès LLM."""
+
+def anklume_self_dev_config() -> DevEnvConfig:
+    """Preset pour le développement d'anklume lui-même."""
+```
+
+### 35.5 LXC vs VM — guide de choix
+
+| Critère | LXC | VM |
+|---------|-----|----|
+| Démarrage | ~1s | ~10s |
+| RAM overhead | ~20 MB | ~256 MB+ |
+| Isolation kernel | Partagé | Séparé |
+| Docker-in-Docker | Limité | Natif |
+| GPU passthrough | Oui | Oui |
+| Développement général | Recommandé | — |
+| Tests d'intégration OS | — | Recommandé |
+
+**Défaut : LXC.** Choisir VM uniquement si Docker-in-Docker ou isolation
+kernel sont requis.
+
+### 35.6 Preset anklume (self-dev)
+
+Le preset `--preset anklume` génère un environnement dédié au
+développement d'anklume :
+
+- **Type** : LXC (léger, itérations rapides)
+- **Trust level** : `trusted`
+- **Rôles** : `base`, `dev-tools`, `dev_env`
+- **Outils** : uv, ruff, pytest, Claude Code, shellcheck, ansible
+- **Montage** : repo anklume → `/home/dev/AnKLuMe`
+- **Ressources** : 4 GiB RAM, 4 vCPUs
+- **LLM** : accès Ollama activé (politiques réseau)
+
+### 35.7 Tests
+
+| Test | Vérification |
+|------|-------------|
+| `DevEnvConfig` defaults | Valeurs par défaut correctes |
+| `generate_dev_domain` minimal | YAML valide, rôles base+dev-tools+dev_env |
+| GPU ajoute `ollama_server` | Rôle ajouté si `gpu=True` |
+| Claude Code vars injectées | `dev_env_install_claude_code: true` |
+| LLM active aider | `dev_env_install_aider: true` |
+| Montages persistants | `persistent` dans le YAML |
+| Limites ressources | `config.limits.memory/cpu` |
+| Git config | Vars `dev_env_git_name/email` |
+| Politiques LLM | Ports 11434, 8000 vers ai-tools |
+| Preset anklume | Config correcte, YAML valide |
+| Rôle `dev_env` structure | tasks/main.yml, defaults/main.yml |
+| CLI enregistrée | Commande `env` dans `dev_app` |
+| CLI crée le fichier | Fichier domaine écrit dans domains/ |
+| CLI refuse doublon | Erreur si domaine existe |
+| CLI refuse sans domains/ | Erreur si init pas fait |

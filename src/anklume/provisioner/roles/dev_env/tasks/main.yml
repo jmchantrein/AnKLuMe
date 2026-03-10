@@ -1,0 +1,99 @@
+# Rôle dev_env — environnement de développement moderne
+# Complète le rôle dev-tools avec des outils avancés et AI coding.
+---
+
+# --- Utilisateur de développement ---
+- name: Créer l'utilisateur de développement
+  ansible.builtin.user:
+    name: "{{ dev_env_user }}"
+    shell: "{{ dev_env_shell }}"
+    create_home: true
+    groups: sudo
+    append: true
+  when: dev_env_user | length > 0
+
+# --- uv (gestionnaire Python moderne) ---
+- name: Installer uv
+  ansible.builtin.shell:
+    cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
+    creates: /root/.local/bin/uv
+  when: dev_env_install_uv
+
+# --- Node.js via NodeSource ---
+- name: Installer Node.js {{ dev_env_node_version }}
+  ansible.builtin.shell:
+    cmd: >
+      curl -fsSL https://deb.nodesource.com/setup_{{ dev_env_node_version }}.x
+      | bash - && apt-get install -y nodejs
+    creates: /usr/bin/node
+  when: dev_env_install_node
+
+# --- Outils CLI modernes ---
+- name: Installer ripgrep
+  ansible.builtin.apt:
+    name: ripgrep
+    state: present
+  when: dev_env_install_ripgrep
+
+- name: Installer fd-find
+  ansible.builtin.apt:
+    name: fd-find
+    state: present
+  when: dev_env_install_fd
+
+- name: Installer fzf
+  ansible.builtin.apt:
+    name: fzf
+    state: present
+  when: dev_env_install_fzf
+
+- name: Installer direnv
+  ansible.builtin.apt:
+    name: direnv
+    state: present
+  when: dev_env_install_direnv
+
+- name: Installer lazygit
+  ansible.builtin.shell:
+    cmd: >
+      LAZYGIT_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+      | grep -Po '"tag_name": "v\K[^"]*') &&
+      curl -Lo /tmp/lazygit.tar.gz
+      "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" &&
+      tar xf /tmp/lazygit.tar.gz -C /usr/local/bin lazygit &&
+      rm /tmp/lazygit.tar.gz
+    creates: /usr/local/bin/lazygit
+  when: dev_env_install_lazygit
+
+# --- AI coding assistants ---
+- name: Installer Claude Code CLI
+  ansible.builtin.shell:
+    cmd: npm install -g @anthropic-ai/claude-code
+    creates: /usr/lib/node_modules/@anthropic-ai/claude-code
+  when: dev_env_install_claude_code and dev_env_install_node
+
+- name: Installer aider
+  ansible.builtin.shell:
+    cmd: /root/.local/bin/uv tool install aider-chat
+    creates: /root/.local/bin/aider
+  when: dev_env_install_aider and dev_env_install_uv
+
+# --- Git configuration ---
+- name: Configurer git user.name
+  ansible.builtin.command:
+    cmd: git config --global user.name "{{ dev_env_git_name }}"
+  when: dev_env_git_name | length > 0
+  changed_when: true
+
+- name: Configurer git user.email
+  ansible.builtin.command:
+    cmd: git config --global user.email "{{ dev_env_git_email }}"
+  when: dev_env_git_email | length > 0
+  changed_when: true
+
+# --- Paquets supplémentaires ---
+- name: Installer les paquets supplémentaires
+  ansible.builtin.apt:
+    name: "{{ dev_env_extra_packages }}"
+    state: present
+  when: dev_env_extra_packages | length > 0

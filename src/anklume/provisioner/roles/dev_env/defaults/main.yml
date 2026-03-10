@@ -1,0 +1,28 @@
+---
+# Dev Environment — environnement de développement complet
+# Rôle complémentaire à dev-tools (build-essential, git, python3, vim, tmux, jq)
+
+# Utilisateur de développement (vide = utiliser root)
+dev_env_user: ""
+dev_env_shell: /bin/bash
+
+# Outillage moderne
+dev_env_install_uv: true
+dev_env_install_node: true
+dev_env_node_version: "22"
+dev_env_install_ripgrep: true
+dev_env_install_fd: true
+dev_env_install_fzf: true
+dev_env_install_lazygit: true
+dev_env_install_direnv: true
+
+# AI coding assistants
+dev_env_install_claude_code: false
+dev_env_install_aider: false
+
+# Git (vide = hériter de l'hôte)
+dev_env_git_name: ""
+dev_env_git_email: ""
+
+# Paquets supplémentaires (liste libre)
+dev_env_extra_packages: []

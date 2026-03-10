@@ -179,6 +179,115 @@ def dev_test() -> None:
     raise typer.Exit(result.returncode)
 
 
+@dev_app.command("env")
+def dev_env(
+    name: Annotated[
+        str,
+        typer.Argument(help="Nom de l'environnement (ex: myproject)"),
+    ] = "dev",
+    machine_type: Annotated[
+        str,
+        typer.Option("--type", "-t", help="Type d'instance : lxc (léger) ou vm (isolé)"),
+    ] = "lxc",
+    gpu: Annotated[
+        bool,
+        typer.Option("--gpu", help="Activer le GPU passthrough"),
+    ] = False,
+    llm: Annotated[
+        bool,
+        typer.Option("--llm", help="Accès aux services LLM (Ollama, STT)"),
+    ] = False,
+    claude_code: Annotated[
+        bool,
+        typer.Option("--claude-code", help="Installer Claude Code CLI"),
+    ] = False,
+    mount: Annotated[
+        list[str] | None,
+        typer.Option("--mount", "-m", help="Montage persistant (nom=/chemin). Répétable."),
+    ] = None,
+    memory: Annotated[
+        str,
+        typer.Option("--memory", help="Limite mémoire (ex: 4GiB, 8GiB)"),
+    ] = "",
+    cpu: Annotated[
+        str,
+        typer.Option("--cpu", help="Limite CPU (ex: 4, 8)"),
+    ] = "",
+    output: Annotated[
+        str,
+        typer.Option("--output", "-o", help="Répertoire projet anklume"),
+    ] = ".",
+    preset: Annotated[
+        str,
+        typer.Option("--preset", "-p", help="Preset prédéfini (anklume)"),
+    ] = "",
+    llm_backend: Annotated[
+        str,
+        typer.Option(
+            "--llm-backend",
+            help="Backend LLM : local (Ollama), openai, anthropic",
+        ),
+    ] = "local",
+    llm_model: Annotated[
+        str,
+        typer.Option("--llm-model", help="Modèle LLM (ex: qwen2:7b, gpt-4o)"),
+    ] = "",
+    llm_api_url: Annotated[
+        str,
+        typer.Option("--llm-api-url", help="URL API LLM (pour openai/anthropic)"),
+    ] = "",
+    llm_api_key: Annotated[
+        str,
+        typer.Option("--llm-api-key", help="Clé API LLM (pour openai/anthropic)"),
+    ] = "",
+    sanitize: Annotated[
+        str,
+        typer.Option(
+            "--sanitize",
+            help="Sanitisation LLM : false, true (cloud), always (tout)",
+        ),
+    ] = "false",
+) -> None:
+    """Générer un environnement de développement (domaine + rôle dev_env)."""
+    from anklume.cli._dev_env import run_dev_env
+    from anklume.engine.dev_env import DevEnvConfig
+
+    if preset == "anklume":
+        from anklume.engine.dev_env import anklume_self_dev_config
+
+        config = anklume_self_dev_config()
+    else:
+        # Construire les montages depuis --mount key=path
+        mount_paths: dict[str, str] = {}
+        for m in mount or []:
+            if "=" not in m:
+                typer.echo(
+                    f"Format invalide pour --mount : {m} (attendu: nom=/chemin)",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            k, v = m.split("=", 1)
+            mount_paths[k] = v
+
+        config = DevEnvConfig(
+            name=name,
+            machine_type=machine_type,
+            gpu=gpu,
+            llm=llm,
+            claude_code=claude_code,
+            mount_paths=mount_paths,
+            memory=memory,
+            cpu=cpu,
+            llm_backend=llm_backend,
+            llm_model=llm_model,
+            llm_api_url=llm_api_url,
+            llm_api_key=llm_api_key,
+            sanitize=sanitize,
+        )
+
+    run_dev_env(config, output=output)
+
+
 @dev_app.command("molecule")
 def dev_molecule(
     role: Annotated[
@@ -757,8 +866,11 @@ def console(
     from anklume.cli._console import run_console
 
     run_console(
-        domain=domain, detach=detach,
-        kill=kill, dedicated=dedicated, status_color=status_color,
+        domain=domain,
+        detach=detach,
+        kill=kill,
+        dedicated=dedicated,
+        status_color=status_color,
     )
 
 

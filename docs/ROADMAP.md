@@ -502,6 +502,38 @@ Communication hôte ↔ conteneur sans compromettre l'isolation.
 - [x] 1016 tests unitaires au total, zéro régression
   (7 E2E dnsmasq préexistants)
 
+## Phase 20 — Environnement de développement ✅
+
+Génération automatique de domaines de dev via `anklume dev env`.
+
+- [x] SPEC §35 détaillé (CLI, rôle, module, LXC vs VM, preset, tests)
+- [x] `engine/dev_env.py` — DevEnvConfig, generate_dev_domain, generate_dev_policies
+  - Génération YAML domaine complet depuis config
+  - Politiques réseau pour accès LLM (Ollama, STT)
+  - Preset `anklume_self_dev_config()` pour auto-développement
+- [x] Rôle Ansible `dev_env` (embarqué) — outillage moderne
+  - uv, Node.js, ripgrep, fd, fzf, lazygit, direnv
+  - Claude Code CLI, aider (optionnels)
+  - Configuration git, utilisateur non-root, paquets extras
+- [x] `anklume dev env <name>` — commande CLI Typer
+  - `--type lxc|vm`, `--gpu`, `--llm`, `--claude-code`
+  - `--mount nom=/chemin` (répétable), `--memory`, `--cpu`
+  - `--preset anklume` — self-dev avec toute la chaîne
+  - `--llm-backend local|openai|anthropic` — choix du backend LLM
+  - `--llm-model <model>` — modèle par défaut
+  - `--sanitize false|true|always` — proxy de sanitisation LLM
+- [x] Routage LLM intégré (cohérent avec §25 llm_routing.py)
+  - Backend local → `ollama_default_model` dans les vars
+  - Backend cloud → `llm_backend`, `llm_api_url`, `llm_api_key`, `llm_model`
+  - Politiques réseau intelligentes (Ollama distant seulement si pas de GPU local)
+- [x] Sanitisation intégrée (cohérent avec §22/27 sanitizer)
+  - `--sanitize true|always` → machine `sanitizer` dédiée dans le domaine
+  - Rôle `llm_sanitizer` avec mode mask + audit activé
+  - Var `ai_sanitize` injectée dans la machine dev
+- [x] Tests unitaires : 65 tests (config, domaines, LLM backends,
+  sanitisation, politiques, preset, rôle, CLI, validations)
+- [x] 1172 tests au total, zéro régression
+
 ### En réflexion
 
 - **MCP services** — canal de communication contrôlé pour les instances
