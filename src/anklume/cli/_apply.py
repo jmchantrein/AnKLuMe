@@ -40,6 +40,11 @@ def run_apply(
             typer.echo(f"GPU : {err}", err=True)
         raise typer.Exit(1)
 
+    # GUI : détection Wayland/PipeWire/iGPU et enrichissement des profils
+    from anklume.engine.gui import apply_gui_profiles
+
+    gui_info = apply_gui_profiles(infra)
+
     driver = IncusDriver()
     nesting_ctx = detect_nesting_context()
 
@@ -57,7 +62,9 @@ def run_apply(
         if pre:
             typer.echo(f"Snapshots pré-apply : {len(pre)} créé(s)")
 
-    reconcile_result = reconcile(infra, driver, dry_run=dry_run, nesting_context=nesting_ctx)
+    reconcile_result = reconcile(
+        infra, driver, dry_run=dry_run, nesting_context=nesting_ctx, gui_info=gui_info,
+    )
 
     # Snapshots post-apply — refetch des projets (reconcile a pu en créer)
     if not dry_run and reconcile_result.executed:

@@ -146,7 +146,9 @@ def apply_domain(
 @dev_app.command("setup")
 def dev_setup() -> None:
     """Préparer l'environnement de développement anklume."""
-    typer.echo("dev setup : pas encore implémenté")
+    from anklume.cli._dev_setup import run_dev_setup_cmd
+
+    run_dev_setup_cmd()
 
 
 @dev_app.command("lint")
@@ -228,6 +230,20 @@ def instance_info(
     from anklume.cli._instance import run_instance_info
 
     run_instance_info(instance)
+
+
+@instance_app.command("gui")
+def instance_gui(
+    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
+    app: Annotated[
+        str,
+        typer.Argument(help="Application à lancer (ex: firefox, code)"),
+    ] = "bash",
+) -> None:
+    """Lancer une application graphique dans une instance."""
+    from anklume.cli._gui import run_instance_gui
+
+    run_instance_gui(instance, app)
 
 
 # --- anklume domain <list|check|exec|status> ---
@@ -619,6 +635,45 @@ def setup_import(
     run_setup_import(output_dir=directory)
 
 
+@setup_app.command("aliases")
+def setup_aliases(
+    remove: Annotated[
+        bool,
+        typer.Option("--remove", "-r", help="Supprimer les aliases"),
+    ] = False,
+    shell: Annotated[
+        str | None,
+        typer.Option("--shell", "-s", help="Shell cible (bash/zsh/fish). Auto-détecté."),
+    ] = None,
+) -> None:
+    """Installer les aliases shell (anklume, ank)."""
+    from anklume.cli._setup import run_setup_aliases
+
+    run_setup_aliases(remove=remove, shell=shell)
+
+
+@setup_app.command("gui")
+def setup_gui(
+    fix: Annotated[
+        bool,
+        typer.Option("--fix", help="Réparer les profils GUI et conteneurs."),
+    ] = False,
+    recover: Annotated[
+        bool,
+        typer.Option("--recover", help="Récupération d'urgence (stop, retrait profil, restart)."),
+    ] = False,
+) -> None:
+    """Diagnostic (et réparation) de l'environnement GUI."""
+    from anklume.cli._gui import run_setup_gui, run_setup_gui_fix, run_setup_gui_recover
+
+    if recover:
+        run_setup_gui_recover()
+    elif fix:
+        run_setup_gui_fix()
+    else:
+        run_setup_gui()
+
+
 # --- anklume golden <create|list|delete> ---
 
 
@@ -668,21 +723,56 @@ def tor_status() -> None:
 # --- anklume console ---
 
 
-@app.command("console")
+console_app = typer.Typer(help="Console tmux colorée par domaine.")
+app.add_typer(console_app, name="console")
+
+
+@console_app.callback(invoke_without_command=True)
 def console(
+    ctx: typer.Context,
     domain: Annotated[
         str | None,
-        typer.Argument(help="Domaine (tous si omis)"),
+        typer.Option("--domain", help="Domaine (tous si omis)"),
     ] = None,
     detach: Annotated[
         bool,
         typer.Option("--detach", "-d", help="Lancer en arrière-plan"),
     ] = False,
+    kill: Annotated[
+        bool,
+        typer.Option("--kill", help="Tuer et recréer la session"),
+    ] = False,
+    dedicated: Annotated[
+        bool,
+        typer.Option("--dedicated", help="1 fenêtre par instance (2 panes)"),
+    ] = False,
+    status_color: Annotated[
+        str,
+        typer.Option("--status-color", help="Couleur barre statut"),
+    ] = "terminal",
 ) -> None:
-    """Console tmux colorée par domaine."""
+    """Ouvrir la console tmux."""
+    if ctx.invoked_subcommand is not None:
+        return
     from anklume.cli._console import run_console
 
-    run_console(domain=domain, detach=detach)
+    run_console(
+        domain=domain, detach=detach,
+        kill=kill, dedicated=dedicated, status_color=status_color,
+    )
+
+
+@console_app.command("kill")
+def console_kill(
+    domain: Annotated[
+        str | None,
+        typer.Option("--domain", help="Domaine (tous si omis)"),
+    ] = None,
+) -> None:
+    """Tuer la session tmux anklume."""
+    from anklume.cli._console import run_console_kill
+
+    run_console_kill(domain=domain)
 
 
 # --- anklume doctor ---

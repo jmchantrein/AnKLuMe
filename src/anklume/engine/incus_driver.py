@@ -247,6 +247,38 @@ class IncusDriver:
             args.append(f"{key}={value}")
         self._run(args)
 
+    def profile_config_set(
+        self,
+        profile: str,
+        project: str,
+        config: dict[str, str],
+    ) -> None:
+        """Positionne des clés de config sur un profil."""
+        for key, value in config.items():
+            self._run(["profile", "set", profile, key, value, "--project", project])
+
+    def instance_profile_add(
+        self,
+        instance: str,
+        profile: str,
+        project: str,
+    ) -> None:
+        """Ajoute un profil à une instance existante."""
+        self._run(["profile", "add", instance, profile, "--project", project])
+
+    def instance_profile_remove(
+        self,
+        instance: str,
+        profile: str,
+        project: str,
+    ) -> None:
+        """Retire un profil d'une instance existante."""
+        self._run(["profile", "remove", instance, profile, "--project", project])
+
+    def profile_delete(self, name: str, project: str) -> None:
+        """Supprime un profil d'un projet."""
+        self._run(["profile", "delete", name, "--project", project])
+
     # --- Info ---
 
     def host_resources(self) -> dict:

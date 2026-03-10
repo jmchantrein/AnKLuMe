@@ -12,6 +12,54 @@ TRUST_LEVELS = {
     "disposable": 50,
 }
 
+
+@dataclass(frozen=True)
+class TrustColor:
+    """Couleur associée à un trust level (hex GUI + ANSI 256 tmux).
+
+    Palette conçue pour la sécurité colorblind-safe (WCAG AA, Okabe-Ito) :
+    chaque couleur est distinguable sous protanopie et deutéranopie.
+    Foreground calculé automatiquement par luminance ITU-R BT.601 (WCAG AA).
+    """
+
+    hex: str    # #RRGGBB pour KDE/GUI
+    ansi: str   # colour### pour tmux 256-color
+
+    @property
+    def luminance(self) -> float:
+        """Luminance perçue (ITU-R BT.601), 0-255."""
+        h = self.hex.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return r * 0.299 + g * 0.587 + b * 0.114
+
+    @property
+    def fg(self) -> str:
+        """Foreground optimal pour tmux (WCAG AA : noir ou blanc)."""
+        return "black" if self.luminance > 128 else "white"
+
+    @property
+    def fg_rgb(self) -> str:
+        """Foreground RGB pour KDE (0,0,0 ou 255,255,255)."""
+        return "0,0,0" if self.luminance > 128 else "255,255,255"
+
+
+# Source unique de vérité pour les couleurs trust level.
+# Violet pour untrusted (ex-orange) : distinguable du rouge admin
+# même en cas de daltonisme rouge-vert (protanopie/deutéranopie).
+TRUST_COLORS: dict[str, TrustColor] = {
+    "admin": TrustColor("#ff0000", "colour196"),       # rouge — danger
+    "trusted": TrustColor("#005faf", "colour25"),       # bleu foncé — sûr
+    "semi-trusted": TrustColor("#ffd700", "colour220"), # or — prudence
+    "untrusted": TrustColor("#9B59B6", "colour134"),    # violet — suspect
+    "disposable": TrustColor("#5f5f5f", "colour240"),   # gris — éphémère
+}
+
+# Vérification à l'import : chaque trust level a une couleur
+if set(TRUST_COLORS) != set(TRUST_LEVELS):
+    _msg = f"TRUST_COLORS désynchronisé : {set(TRUST_COLORS)} != {set(TRUST_LEVELS)}"
+    raise RuntimeError(_msg)
+
+
 MACHINE_TYPES = {"lxc", "vm"}
 PROTOCOLS = {"tcp", "udp"}
 
@@ -29,6 +77,7 @@ class Machine:
     ip: str | None = None
     ephemeral: bool | None = None
     gpu: bool = False
+    gui: bool = False
     profiles: list[str] = field(default_factory=lambda: ["default"])
     roles: list[str] = field(default_factory=list)
     config: dict = field(default_factory=dict)

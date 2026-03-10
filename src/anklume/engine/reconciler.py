@@ -11,6 +11,11 @@ import logging
 from dataclasses import dataclass, field
 
 from anklume.engine.gpu import GPU_PROFILE_NAME
+from anklume.engine.gui import (
+    GUI_PROFILE_NAME,
+    GuiInfo,
+    create_gui_profile,
+)
 from anklume.engine.incus_driver import IncusDriver, IncusError
 from anklume.engine.models import Domain, Infrastructure, Machine, NestingConfig
 from anklume.engine.nesting import (
@@ -54,6 +59,7 @@ def reconcile(
     *,
     dry_run: bool = False,
     nesting_context: NestingContext | None = None,
+    gui_info: GuiInfo | None = None,
 ) -> ReconcileResult:
     """Réconcilie l'infrastructure désirée avec l'état réel Incus.
 
@@ -75,7 +81,9 @@ def reconcile(
         result.actions.extend(domain_actions)
 
         if not dry_run:
-            _execute_domain_actions(domain_actions, domain, infra, driver, result, ctx)
+            _execute_domain_actions(
+                domain_actions, domain, infra, driver, result, ctx, gui_info,
+            )
 
     return result
 
@@ -126,6 +134,30 @@ def _plan_domain(
                 )
             )
 
+    # 1c. Profil GUI (si des machines GUI dans ce domaine)
+    has_gui_machines = any(
+        GUI_PROFILE_NAME in m.profiles for m in domain.machines.values()
+    )
+    if has_gui_machines:
+        if project_is_new:
+            gui_profile_exists = False
+        else:
+            gui_profile_exists = driver.profile_exists(
+                GUI_PROFILE_NAME, project_name,
+            )
+
+        if not gui_profile_exists:
+            actions.append(
+                Action(
+                    verb="create",
+                    resource="profile",
+                    target=GUI_PROFILE_NAME,
+                    project=project_name,
+                    detail=f"Créer profil {GUI_PROFILE_NAME} "
+                    "(Wayland + PipeWire + iGPU)",
+                )
+            )
+
     # 2. Réseau
     if project_is_new:
         net_exists = False
@@ -166,6 +198,20 @@ def _plan_domain(
                         detail=f"Démarrer instance {incus_name}",
                     )
                 )
+            # Profil GUI manquant sur instance existante
+            if GUI_PROFILE_NAME in machine.profiles:
+                real_profiles = getattr(instance, "profiles", [])
+                if GUI_PROFILE_NAME not in real_profiles:
+                    actions.append(
+                        Action(
+                            verb="update",
+                            resource="profile",
+                            target=incus_name,
+                            project=project_name,
+                            detail=f"Appliquer profil {GUI_PROFILE_NAME} "
+                            f"à {incus_name}",
+                        )
+                    )
         else:
             detail = _instance_create_detail(machine, infra, incus_name)
             actions.append(
@@ -218,6 +264,7 @@ def _execute_domain_actions(
     driver: IncusDriver,
     result: ReconcileResult,
     ctx: NestingContext,
+    gui_info: GuiInfo | None = None,
 ) -> None:
     """Exécute les actions d'un domaine. Best-effort."""
     domain_failed = False
@@ -229,7 +276,7 @@ def _execute_domain_actions(
             continue
 
         try:
-            _execute_action(action, domain, infra, driver, ctx)
+            _execute_action(action, domain, infra, driver, ctx, gui_info)
             result.executed.append(action)
 
             if action.verb == "create" and action.resource == "instance":
@@ -252,20 +299,25 @@ def _execute_action(
     infra: Infrastructure,
     driver: IncusDriver,
     ctx: NestingContext,
+    gui_info: GuiInfo | None = None,
 ) -> None:
     """Exécute une action unique."""
     if action.verb == "create" and action.resource == "project":
         driver.project_create(action.target, description=domain.description)
 
     elif action.verb == "create" and action.resource == "profile":
-        driver.profile_create(action.target, action.project)
-        driver.profile_device_add(
-            action.target,
-            "gpu",
-            "gpu",
-            {"gid": "44", "uid": "0"},
-            project=action.project,
-        )
+        if action.target == GUI_PROFILE_NAME and gui_info and gui_info.detected:
+            create_gui_profile(driver, action.project, gui_info)
+        else:
+            # Profil GPU (comportement existant)
+            driver.profile_create(action.target, action.project)
+            driver.profile_device_add(
+                action.target,
+                "gpu",
+                "gpu",
+                {"gid": "44", "uid": "0"},
+                project=action.project,
+            )
 
     elif action.verb == "create" and action.resource == "network":
         config = {}
@@ -311,6 +363,14 @@ def _execute_action(
 
     elif action.verb == "delete" and action.resource == "instance":
         driver.instance_delete(action.target, action.project)
+
+    elif action.verb == "update" and action.resource == "profile":
+        # Appliquer un profil GUI à une instance existante
+        from anklume.engine.gui import prepare_gui_dirs
+
+        if gui_info and gui_info.detected:
+            prepare_gui_dirs(driver, action.target, action.project, gui_info)
+        driver.instance_profile_add(action.target, GUI_PROFILE_NAME, action.project)
 
     else:
         msg = f"Action inconnue : {action.verb}/{action.resource}"

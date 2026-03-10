@@ -156,6 +156,7 @@ def _parse_domain(path: Path, defaults: Defaults) -> Domain:
             ip=machine_data.get("ip"),
             ephemeral=ephemeral,
             gpu=machine_data.get("gpu", False),
+            gui=machine_data.get("gui", False),
             profiles=machine_data.get("profiles", ["default"]),
             roles=machine_data.get("roles", []),
             config=machine_data.get("config", {}),

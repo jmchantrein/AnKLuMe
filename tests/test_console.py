@@ -35,9 +35,15 @@ class TestTrustColors:
 
     def test_colors_are_tmux_format(self):
         """Les couleurs sont au format tmux (colour + nombre)."""
-        for color in TRUST_COLORS.values():
-            assert color.startswith("colour")
-            int(color.replace("colour", ""))  # ValueError si pas un nombre
+        for tc in TRUST_COLORS.values():
+            assert tc.ansi.startswith("colour")
+            int(tc.ansi.replace("colour", ""))  # ValueError si pas un nombre
+
+    def test_colors_have_hex(self):
+        """Chaque couleur a un hex valide."""
+        for tc in TRUST_COLORS.values():
+            assert tc.hex.startswith("#")
+            assert len(tc.hex) == 7
 
 
 class TestBuildConsoleConfig:
