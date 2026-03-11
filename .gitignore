@@ -16,3 +16,6 @@ src/anklume/_version.py
 ansible_roles_custom/
 roles_custom/
 roles_vendor/
+
+# MkDocs
+site/

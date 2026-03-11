@@ -1,12 +1,106 @@
 site_name: anklume
 site_description: Framework déclaratif de compartimentalisation d'infrastructure
+site_url: https://jmchantrein.github.io/AnKLuMe/
+repo_url: https://github.com/jmchantrein/AnKLuMe
+repo_name: jmchantrein/AnKLuMe
+
 theme:
   name: material
   language: fr
   palette:
-    primary: indigo
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Mode sombre
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Mode clair
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.prune
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.mark
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search:
+      lang: fr
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jmchantrein/AnKLuMe
+
 nav:
   - Accueil: index.md
-  - Spécification: SPEC.md
-  - Architecture: ARCHITECTURE.md
-  - Roadmap: ROADMAP.md
+  - Guide:
+    - guide/index.md
+    - Installation: guide/installation.md
+    - Démarrage rapide: guide/quickstart.md
+    - Structure projet: guide/project-structure.md
+  - Concepts:
+    - concepts/index.md
+    - Domaines et machines: concepts/domaines.md
+    - Niveaux de confiance: concepts/trust-levels.md
+    - Modèle PSOT: concepts/psot.md
+    - Réseau et isolation: concepts/reseau.md
+    - Nesting Incus: concepts/nesting.md
+    - Resource policy: concepts/resources.md
+  - CLI:
+    - cli/index.md
+  - IA:
+    - ia/index.md
+    - GPU passthrough: ia/gpu.md
+    - Routage LLM: ia/routage-llm.md
+    - Push-to-talk STT: ia/stt.md
+  - Opérations:
+    - operations/index.md
+    - Snapshots: operations/snapshots.md
+    - Portails et transferts: operations/portails.md
+    - Golden images: operations/golden-images.md
+    - Passerelle Tor: operations/tor.md
+    - Diagnostic: operations/doctor.md
+  - Développement:
+    - developpement/index.md
+    - Environnement de dev: developpement/dev-env.md
+    - Tests: developpement/tests.md
+    - Contribuer: developpement/contribuer.md
+  - Référence:
+    - Spécification: SPEC.md
+    - Architecture (ADRs): ARCHITECTURE.md
+    - Roadmap: ROADMAP.md
