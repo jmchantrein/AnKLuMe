@@ -105,9 +105,15 @@ class TestCheckDevDependencies:
     def test_all_present(self):
         """Toutes les dépendances dev installées → ok."""
         with patch("anklume.engine.dev_setup.shutil.which") as mock_which:
-            mock_which.side_effect = lambda b: f"/usr/bin/{b}" if b in {
-                "ruff", "ansible-playbook",
-            } else None
+            mock_which.side_effect = lambda b: (
+                f"/usr/bin/{b}"
+                if b
+                in {
+                    "ruff",
+                    "ansible-playbook",
+                }
+                else None
+            )
             results = check_dev_dependencies()
 
         # Au moins ruff doit être vérifié

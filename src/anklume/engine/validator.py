@@ -233,9 +233,7 @@ def _check_policies(infra: Infrastructure, result: ValidationResult) -> None:
         _check_policy_ports(policy, loc, result)
 
 
-def _check_policy_ports(
-    policy: Policy, loc: str, result: ValidationResult
-) -> None:
+def _check_policy_ports(policy: Policy, loc: str, result: ValidationResult) -> None:
     """Valide les ports d'une politique (entiers, range 1-65535)."""
     if not isinstance(policy.ports, list):
         return
@@ -253,9 +251,7 @@ def _check_policy_ports(
 _SECURITY_ESCALATION_KEYS = {"security.privileged"}
 
 
-def _check_machine_config_keys(
-    infra: Infrastructure, result: ValidationResult
-) -> None:
+def _check_machine_config_keys(infra: Infrastructure, result: ValidationResult) -> None:
     """Alerte si machine.config contient des clés d'escalade de privilèges."""
     for domain_name, domain in infra.domains.items():
         for machine_name, machine in domain.machines.items():
@@ -308,8 +304,7 @@ def _check_workspace(infra: Infrastructure, result: ValidationResult) -> None:
                 if not isinstance(col, int) or not isinstance(row, int):
                     result.add(
                         loc,
-                        f"machine '{machine_name}': workspace.desktop doit contenir "
-                        f"des entiers.",
+                        f"machine '{machine_name}': workspace.desktop doit contenir des entiers.",
                         "Exemple : desktop: [1, 2]",
                     )
                 elif col < 1 or row < 1:

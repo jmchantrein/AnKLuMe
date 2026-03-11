@@ -80,29 +80,19 @@ def validate_workspace_entries(entries: list[WorkspaceEntry]) -> list[str]:
     for entry in entries:
         col, row = entry.desktop
         if col < 1:
-            errors.append(
-                f"{entry.machine_name}: desktop colonne {col} invalide (min 1)."
-            )
+            errors.append(f"{entry.machine_name}: desktop colonne {col} invalide (min 1).")
         if row < 1:
-            errors.append(
-                f"{entry.machine_name}: desktop ligne {row} invalide (min 1)."
-            )
+            errors.append(f"{entry.machine_name}: desktop ligne {row} invalide (min 1).")
         if entry.position is not None:
             x, y = entry.position
             if x < 0 or y < 0:
-                errors.append(
-                    f"{entry.machine_name}: position ({x}, {y}) invalide (min 0, 0)."
-                )
+                errors.append(f"{entry.machine_name}: position ({x}, {y}) invalide (min 0, 0).")
         if entry.size is not None:
             w, h = entry.size
             if w < 1 or h < 1:
-                errors.append(
-                    f"{entry.machine_name}: size ({w}, {h}) invalide (min 1, 1)."
-                )
+                errors.append(f"{entry.machine_name}: size ({w}, {h}) invalide (min 1, 1).")
         if entry.screen < 0:
-            errors.append(
-                f"{entry.machine_name}: screen {entry.screen} invalide (min 0)."
-            )
+            errors.append(f"{entry.machine_name}: screen {entry.screen} invalide (min 0).")
     return errors
 
 

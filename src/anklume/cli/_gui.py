@@ -32,6 +32,7 @@ _LUMA_THRESHOLD = 128
 # Atténuation pour les couleurs inactives
 _INACTIVE_ATTENUATION = 0.78
 
+
 def _title_prefix(text: str) -> str:
     """Préfixe titre : majuscules simples (lisible, cohérent toutes polices)."""
     return text.upper()
@@ -111,7 +112,9 @@ def run_setup_gui_fix() -> None:
             if GUI_PROFILE_NAME in inst.profiles:
                 try:
                     driver.instance_profile_remove(
-                        inst.name, GUI_PROFILE_NAME, project_name,
+                        inst.name,
+                        GUI_PROFILE_NAME,
+                        project_name,
                     )
                     typer.echo(f"  Profil retiré de {inst.name}")
                 except IncusError:
@@ -127,7 +130,9 @@ def run_setup_gui_fix() -> None:
 
         for machine in gui_machines:
             incus_name = prefix_name(
-                machine.full_name, ctx, infra.config.nesting,
+                machine.full_name,
+                ctx,
+                infra.config.nesting,
             )
             if incus_name not in instances:
                 continue
@@ -139,7 +144,9 @@ def run_setup_gui_fix() -> None:
             prepare_gui_dirs(driver, incus_name, project_name, gui)
             try:
                 driver.instance_profile_add(
-                    incus_name, GUI_PROFILE_NAME, project_name,
+                    incus_name,
+                    GUI_PROFILE_NAME,
+                    project_name,
                 )
                 typer.echo(f"  {incus_name} : profil réappliqué.")
                 fixed += 1
@@ -163,7 +170,9 @@ def run_setup_gui_recover() -> None:
     # Lister tous les projets
     result = subprocess.run(
         ["incus", "project", "list", "--format", "csv"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         typer.echo("Incus inaccessible.", err=True)
@@ -176,7 +185,9 @@ def run_setup_gui_recover() -> None:
         # Lister les instances avec leurs profils (JSON pour éviter N+1)
         inst_result = subprocess.run(
             ["incus", "list", "--project", project, "--format", "json"],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if inst_result.returncode != 0:
             continue
@@ -201,22 +212,26 @@ def run_setup_gui_recover() -> None:
                 typer.echo("  Force stop...")
                 subprocess.run(
                     ["incus", "stop", name, "--project", project, "--force"],
-                    capture_output=True, check=False, timeout=30,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
                 )
 
             # 2. Retirer le profil gui
             typer.echo(f"  Retrait profil {GUI_PROFILE_NAME}...")
             subprocess.run(
-                ["incus", "profile", "remove", name, GUI_PROFILE_NAME,
-                 "--project", project],
-                capture_output=True, check=False,
+                ["incus", "profile", "remove", name, GUI_PROFILE_NAME, "--project", project],
+                capture_output=True,
+                check=False,
             )
 
             # 3. Redémarrer
             typer.echo("  Redémarrage...")
             start_result = subprocess.run(
                 ["incus", "start", name, "--project", project],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
             if start_result.returncode == 0:
                 typer.echo(f"  {name} démarré.")
@@ -230,15 +245,13 @@ def run_setup_gui_recover() -> None:
     # Supprimer les profils gui orphelins
     for project in projects:
         subprocess.run(
-            ["incus", "profile", "delete", GUI_PROFILE_NAME,
-             "--project", project],
-            capture_output=True, check=False,
+            ["incus", "profile", "delete", GUI_PROFILE_NAME, "--project", project],
+            capture_output=True,
+            check=False,
         )
 
     typer.echo(f"\nRécupération terminée : {recovered} instance(s) redémarrée(s).")
-    typer.echo(
-        "Pour réappliquer le GUI : anklume setup gui --fix"
-    )
+    typer.echo("Pour réappliquer le GUI : anklume setup gui --fix")
 
 
 def _gui_user_home(gui_uid: int) -> Path:
@@ -246,7 +259,11 @@ def _gui_user_home(gui_uid: int) -> Path:
     try:
         return Path(pwd.getpwuid(gui_uid).pw_dir)
     except KeyError:
-        return Path(f"/home/{gui_uid}")
+        # Fallback standard : /home/<username> via uid
+        # On refuse les UIDs système (< 1000) sans entrée passwd
+        if gui_uid < 1000:
+            return Path("/root") if gui_uid == 0 else Path("/var/empty")
+        return Path(f"/home/user{gui_uid}")
 
 
 def _chown_for_user(path: Path, uid: int) -> None:
@@ -346,13 +363,13 @@ def _ensure_title_lib() -> Path | None:
     try:
         c_file.write_text(_TITLE_PREFIX_C)
         result = subprocess.run(
-            ["gcc", "-shared", "-fPIC", "-O2", "-o", str(lib_path),
-             str(c_file), "-ldl"],
-            capture_output=True, text=True, check=False,
+            ["gcc", "-shared", "-fPIC", "-O2", "-o", str(lib_path), str(c_file), "-ldl"],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode != 0:
-            log.warning("Compilation libtitle-prefix échouée : %s",
-                        result.stderr[:200])
+            log.warning("Compilation libtitle-prefix échouée : %s", result.stderr[:200])
             lib_path.unlink(missing_ok=True)
             return None
         log.info("libtitle-prefix.so compilée : %s", lib_path)
@@ -367,17 +384,18 @@ def _push_title_lib(
     project: str,
     lib_path: Path,
 ) -> bool:
-    """Pousse la lib LD_PRELOAD dans le conteneur via base64."""
-    import base64
-
-    b64 = base64.b64encode(lib_path.read_bytes()).decode()
-    script = (
-        f"mkdir -p /usr/local/lib && "
-        f"echo {b64} | base64 -d > {_TITLE_LIB_CONTAINER}"
-    )
+    """Pousse la lib LD_PRELOAD dans le conteneur via file_push."""
     try:
         driver.instance_exec(  # type: ignore[attr-defined]
-            incus_name, project, ["sh", "-c", script],
+            incus_name,
+            project,
+            ["mkdir", "-p", "/usr/local/lib"],
+        )
+        driver.file_push(  # type: ignore[attr-defined]
+            incus_name,
+            project,
+            str(lib_path),
+            _TITLE_LIB_CONTAINER,
         )
         return True
     except Exception:
@@ -399,9 +417,7 @@ def _ensure_color_scheme(trust_level: str, user_home: Path, gui_uid: int = 0) ->
 
     # Couleur inactive = même teinte atténuée
     parts = [int(x) for x in rgb.split(",")]
-    inactive_rgb = ",".join(
-        str(max(0, int(v * _INACTIVE_ATTENUATION))) for v in parts
-    )
+    inactive_rgb = ",".join(str(max(0, int(v * _INACTIVE_ATTENUATION))) for v in parts)
     # Foreground adapté à la luminosité (WCAG AA via TrustColor)
     tc = TRUST_COLORS.get(trust_level)
     fg = tc.fg_rgb if tc else "0,0,0"
@@ -578,7 +594,9 @@ def run_instance_gui(instance: str, app: str) -> None:
                 machine = m
                 trust_level = domain.trust_level
                 project_name = prefix_name(
-                    domain.name, ctx, infra.config.nesting,
+                    domain.name,
+                    ctx,
+                    infra.config.nesting,
                 )
                 break
         if machine:
@@ -594,8 +612,7 @@ def run_instance_gui(instance: str, app: str) -> None:
     if machine.type == "vm":
         typer.echo(f"VM détectée — ouverture console SPICE pour {instance}...")
         subprocess.Popen(
-            ["incus", "console", incus_name, "--type=vga",
-             "--project", project_name],
+            ["incus", "console", incus_name, "--type=vga", "--project", project_name],
             start_new_session=True,
         )
         typer.echo(f"Console SPICE ouverte pour {instance}.")
@@ -610,18 +627,23 @@ def run_instance_gui(instance: str, app: str) -> None:
         )
         raise typer.Exit(1)
 
+    import shlex
+
     driver = IncusDriver()
-    uid_str = str(gui.uid)
+    uid_str = str(int(gui.uid))  # force int → str, refuse non-numériques
+    gid_str = str(int(gui.gid))
+    rd = shlex.quote(gui.runtime_dir)
 
     # Résoudre utilisateur et home en une seule commande
     try:
         result = driver.instance_exec(
-            incus_name, project_name,
-            ["sh", "-c", f"getent passwd {uid_str} | cut -d: -f1,6"],
+            incus_name,
+            project_name,
+            ["getent", "passwd", uid_str],
         )
         passwd_parts = (result.stdout.strip() if result.stdout else "").split(":")
         container_user = passwd_parts[0] if passwd_parts[0] else ""
-        container_home = passwd_parts[1] if len(passwd_parts) > 1 else ""
+        container_home = passwd_parts[5] if len(passwd_parts) > 5 else ""
     except (IncusError, AttributeError):
         container_user = ""
         container_home = ""
@@ -630,13 +652,19 @@ def run_instance_gui(instance: str, app: str) -> None:
         typer.echo(f"Aucun utilisateur UID {uid_str}, création...")
         try:
             driver.instance_exec(
-                incus_name, project_name,
+                incus_name,
+                project_name,
+                ["useradd", "-m", "-u", uid_str, "-s", "/bin/bash", "user"],
+            )
+            # Groupes vidéo + runtime dir séparément
+            driver.instance_exec(
+                incus_name,
+                project_name,
                 [
-                    "sh", "-c",
-                    f"useradd -m -u {uid_str} -s /bin/bash user "
-                    f"&& usermod -aG video,render user 2>/dev/null; "
-                    f"mkdir -p {gui.runtime_dir} "
-                    f"&& chown {uid_str}:{gui.gid} {gui.runtime_dir}",
+                    "sh",
+                    "-c",
+                    f"usermod -aG video,render user 2>/dev/null; "
+                    f"mkdir -p {rd} && chown {uid_str}:{gid_str} {rd}",
                 ],
             )
             container_user = "user"
@@ -688,7 +716,10 @@ def run_instance_gui(instance: str, app: str) -> None:
     bold_prefix: str | None = None
     title_lib = _ensure_title_lib()
     if title_lib and _push_title_lib(
-        driver, incus_name, project_name, title_lib,
+        driver,
+        incus_name,
+        project_name,
+        title_lib,
     ):
         bold_prefix = _title_prefix(instance)
         env_vars["LD_PRELOAD"] = _TITLE_LIB_CONTAINER
@@ -698,7 +729,10 @@ def run_instance_gui(instance: str, app: str) -> None:
     # title_prefix permet de ne cibler que les fenêtres du conteneur
     app_wmclass = app.split()[0].split("/")[-1]
     _install_kwin_rule(
-        instance, trust_level, app_wmclass, gui.uid,
+        instance,
+        trust_level,
+        app_wmclass,
+        gui.uid,
         title_prefix=bold_prefix,
     )
 
@@ -709,10 +743,7 @@ def run_instance_gui(instance: str, app: str) -> None:
 
     # Si pas d'app et rôle desktop → lancer le bureau complet
     if app == "bash" and "desktop" in machine.roles:
-        app = (
-            "dbus-run-session kwin_wayland --xwayland"
-            " plasmashell konsole dolphin"
-        )
+        app = "dbus-run-session kwin_wayland --xwayland plasmashell konsole dolphin"
 
     # Commandes composées (avec espaces) → passer via sh -c
     if " " in app:
@@ -721,12 +752,18 @@ def run_instance_gui(instance: str, app: str) -> None:
         app_args = [app]
 
     cmd = [
-        "incus", "exec", incus_name,
-        "--project", project_name,
-        "--user", uid_str,
-        "--group", str(gui.gid),
+        "incus",
+        "exec",
+        incus_name,
+        "--project",
+        project_name,
+        "--user",
+        uid_str,
+        "--group",
+        str(gui.gid),
         *env_args,
-        "--", *app_args,
+        "--",
+        *app_args,
     ]
 
     subprocess.Popen(

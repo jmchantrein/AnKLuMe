@@ -63,7 +63,11 @@ def run_apply(
             typer.echo(f"Snapshots pré-apply : {len(pre)} créé(s)")
 
     reconcile_result = reconcile(
-        infra, driver, dry_run=dry_run, nesting_context=nesting_ctx, gui_info=gui_info,
+        infra,
+        driver,
+        dry_run=dry_run,
+        nesting_context=nesting_ctx,
+        gui_info=gui_info,
     )
 
     # Snapshots post-apply — refetch des projets (reconcile a pu en créer)

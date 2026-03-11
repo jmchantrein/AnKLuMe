@@ -12,6 +12,7 @@ Orchestre le cycle de vie d'une VM sandbox isolée :
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import tempfile
 import time
@@ -145,6 +146,7 @@ def push_source_to_vm(
     log.info("Packing source depuis %s", source_dir)
 
     with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+        Path(tmp.name).chmod(0o600)
         tar_path = tmp.name
 
     try:
@@ -314,7 +316,6 @@ def _find_anklume_root() -> Path:
 
 def _parse_pytest_summary(stdout: str) -> tuple[int, int, int]:
     """Extrait passed/failed/errors depuis la sortie pytest."""
-    import re
 
     passed = failed = errors = 0
     for line in stdout.splitlines():

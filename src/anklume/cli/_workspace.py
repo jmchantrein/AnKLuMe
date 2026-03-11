@@ -48,7 +48,9 @@ def _gui_uid() -> int:
     # Chercher le propriétaire du processus kwin
     result = subprocess.run(
         ["pgrep", "-n", "-U", "1000:", "kwin"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout.strip():
         pid = result.stdout.strip()
@@ -97,13 +99,24 @@ def _qdbus6(args: list[str], env: dict[str, str] | None = None) -> str:
         import pwd
 
         username = pwd.getpwuid(uid).pw_name
-        dbus_var = f"DBUS_SESSION_BUS_ADDRESS={dbus_env['DBUS_SESSION_BUS_ADDRESS']}"
-        cmd = ["sudo", "-u", username, dbus_var, "qdbus6", *args]
+        # Passer l'env DBus via env(1) pour éviter l'injection via sudo
+        cmd = [
+            "sudo",
+            "-u",
+            username,
+            "env",
+            f"DBUS_SESSION_BUS_ADDRESS={dbus_env['DBUS_SESSION_BUS_ADDRESS']}",
+            "qdbus6",
+            *args,
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     else:
         result = subprocess.run(
             ["qdbus6", *args],
-            capture_output=True, text=True, env=dbus_env, check=False,
+            capture_output=True,
+            text=True,
+            env=dbus_env,
+            check=False,
         )
     return result.stdout.strip()
 
@@ -162,15 +175,15 @@ def ensure_virtual_desktops(needed_count: int, needed_rows: int) -> None:
     # Ajuster rows via DBus (synchrone) + persister dans kwinrc
     if needed_rows != grid.rows:
         _qdbus6(
-            [vdm, path, "org.freedesktop.DBus.Properties.Set",
-             iface, "rows", str(needed_rows)],
+            [vdm, path, "org.freedesktop.DBus.Properties.Set", iface, "rows", str(needed_rows)],
             env,
         )
         _kwriteconfig6("kwinrc", "Desktops", "Rows", str(needed_rows))
 
 
 def resolve_desktop_uuids(
-    layout: WorkspaceLayout, grid: GridInfo,
+    layout: WorkspaceLayout,
+    grid: GridInfo,
 ) -> dict[tuple[int, int], str]:
     """Mapper (col, row) → UUID depuis la grille."""
     uuid_map: dict[tuple[int, int], str] = {}
@@ -418,8 +431,7 @@ def run_workspace_grid(
                 )
             # Ajuster rows via DBus + persister
             _qdbus6(
-                [vdm, path, "org.freedesktop.DBus.Properties.Set",
-                 iface, "rows", str(new_rows)],
+                [vdm, path, "org.freedesktop.DBus.Properties.Set", iface, "rows", str(new_rows)],
                 env,
             )
             _kwriteconfig6("kwinrc", "Desktops", "Rows", str(new_rows))
@@ -430,8 +442,11 @@ def run_workspace_grid(
 
     if add_cols > 0 or add_rows > 0:
         new_count, new_rows = compute_grid_change(
-            grid.cols, grid.rows, grid.count,
-            add_cols=add_cols, add_rows=add_rows,
+            grid.cols,
+            grid.rows,
+            grid.count,
+            add_cols=add_cols,
+            add_rows=add_rows,
         )
         ensure_virtual_desktops(new_count, new_rows)
         grid = get_grid_info()

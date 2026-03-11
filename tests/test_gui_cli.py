@@ -362,7 +362,8 @@ class TestTitlePrefixLib:
     def test_ensure_title_lib_compiles(self, tmp_path: Path):
         """Compile la lib .so si gcc est disponible."""
         with patch(
-            "anklume.cli._gui.Path.home", return_value=tmp_path,
+            "anklume.cli._gui.Path.home",
+            return_value=tmp_path,
         ):
             result = _ensure_title_lib()
 
@@ -379,15 +380,16 @@ class TestTitlePrefixLib:
         lib_file.write_bytes(b"fake-elf")
 
         with patch(
-            "anklume.cli._gui.Path.home", return_value=tmp_path,
+            "anklume.cli._gui.Path.home",
+            return_value=tmp_path,
         ):
             result = _ensure_title_lib()
 
         assert result == lib_file
         assert result.read_bytes() == b"fake-elf"  # pas recompilé
 
-    def test_push_sends_base64_to_container(self):
-        """Pousse le .so dans le conteneur via base64."""
+    def test_push_sends_file_to_container(self):
+        """Pousse le .so dans le conteneur via file_push."""
         import tempfile
 
         driver = MagicMock()
@@ -400,19 +402,20 @@ class TestTitlePrefixLib:
             lib_path.unlink()
 
         assert result is True
+        # mkdir -p via instance_exec + file_push
         driver.instance_exec.assert_called_once()
         cmd = driver.instance_exec.call_args[0][2]
-        assert cmd[0] == "sh"
-        script = cmd[2]
-        assert "base64 -d" in script
-        assert "/usr/local/lib/libanklume-title.so" in script
+        assert cmd == ["mkdir", "-p", "/usr/local/lib"]
+        driver.file_push.assert_called_once_with(
+            "inst", "proj", str(lib_path), "/usr/local/lib/libanklume-title.so"
+        )
 
     def test_push_failure_returns_false(self):
         """Erreur push retourne False (non-fatal)."""
         import tempfile
 
         driver = MagicMock()
-        driver.instance_exec.side_effect = RuntimeError("push failed")
+        driver.file_push.side_effect = RuntimeError("push failed")
         with tempfile.NamedTemporaryFile(suffix=".so", delete=False) as f:
             f.write(b"content")
             lib_path = Path(f.name)

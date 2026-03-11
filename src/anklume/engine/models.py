@@ -22,8 +22,8 @@ class TrustColor:
     Foreground calculé automatiquement par luminance ITU-R BT.601 (WCAG AA).
     """
 
-    hex: str    # #RRGGBB pour KDE/GUI
-    ansi: str   # colour### pour tmux 256-color
+    hex: str  # #RRGGBB pour KDE/GUI
+    ansi: str  # colour### pour tmux 256-color
 
     @property
     def luminance(self) -> float:
@@ -47,11 +47,11 @@ class TrustColor:
 # Violet pour untrusted (ex-orange) : distinguable du rouge admin
 # même en cas de daltonisme rouge-vert (protanopie/deutéranopie).
 TRUST_COLORS: dict[str, TrustColor] = {
-    "admin": TrustColor("#ff0000", "colour196"),       # rouge — danger
-    "trusted": TrustColor("#005faf", "colour25"),       # bleu foncé — sûr
-    "semi-trusted": TrustColor("#ffd700", "colour220"), # or — prudence
-    "untrusted": TrustColor("#9B59B6", "colour134"),    # violet — suspect
-    "disposable": TrustColor("#5f5f5f", "colour240"),   # gris — éphémère
+    "admin": TrustColor("#ff0000", "colour196"),  # rouge — danger
+    "trusted": TrustColor("#005faf", "colour25"),  # bleu foncé — sûr
+    "semi-trusted": TrustColor("#ffd700", "colour220"),  # or — prudence
+    "untrusted": TrustColor("#9B59B6", "colour134"),  # violet — suspect
+    "disposable": TrustColor("#5f5f5f", "colour240"),  # gris — éphémère
 }
 
 # Vérification à l'import : chaque trust level a une couleur

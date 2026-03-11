@@ -82,7 +82,13 @@ def reconcile(
 
         if not dry_run:
             _execute_domain_actions(
-                domain_actions, domain, infra, driver, result, ctx, gui_info,
+                domain_actions,
+                domain,
+                infra,
+                driver,
+                result,
+                ctx,
+                gui_info,
             )
 
     return result
@@ -135,15 +141,14 @@ def _plan_domain(
             )
 
     # 1c. Profil GUI (si des machines GUI dans ce domaine)
-    has_gui_machines = any(
-        GUI_PROFILE_NAME in m.profiles for m in domain.machines.values()
-    )
+    has_gui_machines = any(GUI_PROFILE_NAME in m.profiles for m in domain.machines.values())
     if has_gui_machines:
         if project_is_new:
             gui_profile_exists = False
         else:
             gui_profile_exists = driver.profile_exists(
-                GUI_PROFILE_NAME, project_name,
+                GUI_PROFILE_NAME,
+                project_name,
             )
 
         if not gui_profile_exists:
@@ -153,8 +158,7 @@ def _plan_domain(
                     resource="profile",
                     target=GUI_PROFILE_NAME,
                     project=project_name,
-                    detail=f"Créer profil {GUI_PROFILE_NAME} "
-                    "(Wayland + PipeWire + iGPU)",
+                    detail=f"Créer profil {GUI_PROFILE_NAME} (Wayland + PipeWire + iGPU)",
                 )
             )
 
@@ -208,8 +212,7 @@ def _plan_domain(
                             resource="profile",
                             target=incus_name,
                             project=project_name,
-                            detail=f"Appliquer profil {GUI_PROFILE_NAME} "
-                            f"à {incus_name}",
+                            detail=f"Appliquer profil {GUI_PROFILE_NAME} à {incus_name}",
                         )
                     )
         else:

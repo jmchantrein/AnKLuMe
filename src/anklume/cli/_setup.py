@@ -113,7 +113,10 @@ def run_setup_aliases(remove: bool = False, shell: str | None = None) -> None:
 
     # Vérifier si uv tool a déjà installé anklume globalement
     result = subprocess.run(
-        ["uv", "tool", "list"], capture_output=True, text=True, check=False,
+        ["uv", "tool", "list"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if "anklume" in result.stdout:
         typer.echo("anklume est déjà installé globalement via `uv tool install`.")

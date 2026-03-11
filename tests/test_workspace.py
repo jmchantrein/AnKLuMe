@@ -251,16 +251,18 @@ class TestParseWorkspace:
         return Infrastructure(config=config, domains={"test": domain}, policies=[])
 
     def test_single_machine_with_workspace(self):
-        infra = self._make_infra({
-            "firefox": {
-                "gui": True,
-                "workspace": {
-                    "desktop": [1, 2],
-                    "autostart": True,
-                    "app": "firefox",
+        infra = self._make_infra(
+            {
+                "firefox": {
+                    "gui": True,
+                    "workspace": {
+                        "desktop": [1, 2],
+                        "autostart": True,
+                        "app": "firefox",
+                    },
                 },
-            },
-        })
+            }
+        )
         layout = parse_workspace(infra)
         assert len(layout.entries) == 1
         assert layout.entries[0].desktop == (1, 2)
@@ -270,18 +272,22 @@ class TestParseWorkspace:
         assert layout.grid_rows == 2
 
     def test_machine_without_workspace(self):
-        infra = self._make_infra({
-            "server": {"gui": False},
-        })
+        infra = self._make_infra(
+            {
+                "server": {"gui": False},
+            }
+        )
         layout = parse_workspace(infra)
         assert len(layout.entries) == 0
         assert layout.grid_cols == 0
         assert layout.grid_rows == 0
 
     def test_workspace_none(self):
-        infra = self._make_infra({
-            "browser": {"gui": True, "workspace": None},
-        })
+        infra = self._make_infra(
+            {
+                "browser": {"gui": True, "workspace": None},
+            }
+        )
         layout = parse_workspace(infra)
         assert len(layout.entries) == 0
 
@@ -311,8 +317,10 @@ class TestParseWorkspace:
             workspace={"desktop": [2, 1], "app": "code"},
         )
         d1 = Domain(
-            name="perso", description="Perso",
-            trust_level="semi-trusted", machines={"firefox": m1},
+            name="perso",
+            description="Perso",
+            trust_level="semi-trusted",
+            machines={"firefox": m1},
         )
         d2 = Domain(name="pro", description="Pro", trust_level="trusted", machines={"ide": m2})
 
@@ -351,18 +359,20 @@ class TestParseWorkspace:
 
     def test_optional_fields(self):
         """Champs optionnels (position, size, fullscreen, screen)."""
-        infra = self._make_infra({
-            "app": {
-                "gui": True,
-                "workspace": {
-                    "desktop": [3, 2],
-                    "position": [100, 200],
-                    "size": [1920, 1080],
-                    "fullscreen": True,
-                    "screen": 1,
+        infra = self._make_infra(
+            {
+                "app": {
+                    "gui": True,
+                    "workspace": {
+                        "desktop": [3, 2],
+                        "position": [100, 200],
+                        "size": [1920, 1080],
+                        "fullscreen": True,
+                        "screen": 1,
+                    },
                 },
-            },
-        })
+            }
+        )
         layout = parse_workspace(infra)
         entry = layout.entries[0]
         assert entry.position == (100, 200)
@@ -578,7 +588,9 @@ class TestWorkspaceKwinRules:
         kwin_path = tmp_path / ".config" / "kwinrulesrc"
 
         install_workspace_rules(
-            [entry], uuid_map, kwin_path=kwin_path,
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
         )
 
         config = configparser.ConfigParser()
@@ -607,7 +619,9 @@ class TestWorkspaceKwinRules:
         kwin_path = tmp_path / ".config" / "kwinrulesrc"
 
         install_workspace_rules(
-            [entry], uuid_map, kwin_path=kwin_path,
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
         )
 
         config = configparser.ConfigParser()
@@ -636,7 +650,9 @@ class TestWorkspaceKwinRules:
         kwin_path = tmp_path / ".config" / "kwinrulesrc"
 
         install_workspace_rules(
-            [entry], uuid_map, kwin_path=kwin_path,
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
         )
 
         config = configparser.ConfigParser()
@@ -661,7 +677,9 @@ class TestWorkspaceKwinRules:
         kwin_path = tmp_path / ".config" / "kwinrulesrc"
 
         install_workspace_rules(
-            [entry], uuid_map, kwin_path=kwin_path,
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
         )
 
         config = configparser.ConfigParser()
@@ -695,7 +713,9 @@ class TestWorkspaceKwinRules:
         uuid_map = {(1, 1): "uuid-1"}
 
         install_workspace_rules(
-            [entry], uuid_map, kwin_path=kwin_path,
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
         )
 
         config = configparser.ConfigParser()
@@ -719,10 +739,13 @@ class TestGridOperations:
         from anklume.engine.workspace import compute_grid_change
 
         new_count, new_rows = compute_grid_change(
-            current_cols=3, current_rows=2, current_count=6,
-            add_cols=1, add_rows=0,
+            current_cols=3,
+            current_rows=2,
+            current_count=6,
+            add_cols=1,
+            add_rows=0,
         )
-        assert new_count == 8   # 4 x 2
+        assert new_count == 8  # 4 x 2
         assert new_rows == 2
 
     def test_compute_add_rows(self):
@@ -730,10 +753,13 @@ class TestGridOperations:
         from anklume.engine.workspace import compute_grid_change
 
         new_count, new_rows = compute_grid_change(
-            current_cols=3, current_rows=2, current_count=6,
-            add_cols=0, add_rows=1,
+            current_cols=3,
+            current_rows=2,
+            current_count=6,
+            add_cols=0,
+            add_rows=1,
         )
-        assert new_count == 9   # 3 x 3
+        assert new_count == 9  # 3 x 3
         assert new_rows == 3
 
     def test_compute_add_both(self):
@@ -741,10 +767,13 @@ class TestGridOperations:
         from anklume.engine.workspace import compute_grid_change
 
         new_count, new_rows = compute_grid_change(
-            current_cols=2, current_rows=2, current_count=4,
-            add_cols=1, add_rows=1,
+            current_cols=2,
+            current_rows=2,
+            current_count=4,
+            add_cols=1,
+            add_rows=1,
         )
-        assert new_count == 9   # 3 x 3
+        assert new_count == 9  # 3 x 3
         assert new_rows == 3
 
     def test_compute_set_grid(self):

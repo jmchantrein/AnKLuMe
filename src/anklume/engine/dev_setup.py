@@ -100,17 +100,21 @@ def check_dev_dependencies() -> list[SetupStep]:
     for binary, display, severity in _DEV_BINARIES:
         path = shutil.which(binary)
         if path:
-            steps.append(SetupStep(
-                name=binary,
-                status="ok",
-                message=f"installé ({path})",
-            ))
+            steps.append(
+                SetupStep(
+                    name=binary,
+                    status="ok",
+                    message=f"installé ({path})",
+                )
+            )
         else:
-            steps.append(SetupStep(
-                name=binary,
-                status=severity,
-                message=f"{display} introuvable",
-            ))
+            steps.append(
+                SetupStep(
+                    name=binary,
+                    status=severity,
+                    message=f"{display} introuvable",
+                )
+            )
     return steps
 
 
@@ -172,7 +176,7 @@ def install_git_hooks(
 
     hooks_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_hook, target)
-    target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    target.chmod(target.stat().st_mode | stat.S_IXUSR)
 
     return SetupStep(
         name="Hooks git",

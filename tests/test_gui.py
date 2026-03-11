@@ -220,7 +220,10 @@ class TestDetectGui:
     def test_no_sockets(self):
         """Runtime dir sans sockets → GuiInfo.none()."""
         with (
-            patch("anklume.engine.gui._detect_runtime_uid", return_value=(1000, 1000, "/run/user/1000")),
+            patch(
+                "anklume.engine.gui._detect_runtime_uid",
+                return_value=(1000, 1000, "/run/user/1000"),
+            ),
             patch("anklume.engine.gui._find_igpu_pci", return_value=""),
             patch("anklume.engine.gui._detect_sockets", return_value=[]),
         ):
@@ -233,7 +236,10 @@ class TestDetectGui:
             GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
         ]
         with (
-            patch("anklume.engine.gui._detect_runtime_uid", return_value=(1000, 1000, "/run/user/1000")),
+            patch(
+                "anklume.engine.gui._detect_runtime_uid",
+                return_value=(1000, 1000, "/run/user/1000"),
+            ),
             patch("anklume.engine.gui._find_igpu_pci", return_value="0000:00:02.0"),
             patch("anklume.engine.gui._detect_sockets", return_value=sockets),
             patch("anklume.engine.gui._get_group_gid", side_effect=[44, 109]),
@@ -315,10 +321,12 @@ class TestCreateGuiProfile:
     def test_creates_profile_and_devices(self):
         """Crée le profil avec proxy devices pour chaque socket."""
         driver = mock_driver()
-        gui_info = _make_gui_info(sockets=[
-            GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
-            GuiSocket("pipewire-0", "/run/user/1000/pipewire-0", "/run/user/1000/pipewire-0"),
-        ])
+        gui_info = _make_gui_info(
+            sockets=[
+                GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
+                GuiSocket("pipewire-0", "/run/user/1000/pipewire-0", "/run/user/1000/pipewire-0"),
+            ]
+        )
 
         create_gui_profile(driver, "perso", gui_info)
 
@@ -329,9 +337,11 @@ class TestCreateGuiProfile:
     def test_igpu_device_config(self):
         """Le device iGPU contient le PCI address et le GID vidéo."""
         driver = mock_driver()
-        gui_info = _make_gui_info(sockets=[
-            GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
-        ])
+        gui_info = _make_gui_info(
+            sockets=[
+                GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
+            ]
+        )
 
         create_gui_profile(driver, "perso", gui_info)
 
@@ -347,9 +357,11 @@ class TestCreateGuiProfile:
     def test_proxy_device_config(self):
         """Les proxy devices contiennent connect/listen/uid/gid."""
         driver = mock_driver()
-        gui_info = _make_gui_info(sockets=[
-            GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
-        ])
+        gui_info = _make_gui_info(
+            sockets=[
+                GuiSocket("wayland-0", "/run/user/1000/wayland-0", "/run/user/1000/wayland-0"),
+            ]
+        )
 
         create_gui_profile(driver, "perso", gui_info)
 

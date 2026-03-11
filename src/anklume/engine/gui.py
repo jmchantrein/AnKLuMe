@@ -135,41 +135,49 @@ def _detect_sockets(runtime_dir: str) -> list[GuiSocket]:
         if sock.name.endswith(".lock"):
             continue
         if _is_socket(sock):
-            sockets.append(GuiSocket(
-                name=sock.name,
-                host_path=str(sock),
-                container_path=f"{runtime_dir}/{sock.name}",
-            ))
+            sockets.append(
+                GuiSocket(
+                    name=sock.name,
+                    host_path=str(sock),
+                    container_path=f"{runtime_dir}/{sock.name}",
+                )
+            )
 
     # PipeWire
     for name in ("pipewire-0", "pipewire-0-manager"):
         sock = rd / name
         if _is_socket(sock):
-            sockets.append(GuiSocket(
-                name=name,
-                host_path=str(sock),
-                container_path=f"{runtime_dir}/{name}",
-            ))
+            sockets.append(
+                GuiSocket(
+                    name=name,
+                    host_path=str(sock),
+                    container_path=f"{runtime_dir}/{name}",
+                )
+            )
 
     # PulseAudio
     pulse_sock = rd / "pulse" / "native"
     if _is_socket(pulse_sock):
-        sockets.append(GuiSocket(
-            name="pulse-native",
-            host_path=str(pulse_sock),
-            container_path=f"{runtime_dir}/pulse/native",
-        ))
+        sockets.append(
+            GuiSocket(
+                name="pulse-native",
+                host_path=str(pulse_sock),
+                container_path=f"{runtime_dir}/pulse/native",
+            )
+        )
 
     # X11 (fallback pour apps non-Wayland)
     x11_dir = Path("/tmp/.X11-unix")  # noqa: S108
     if x11_dir.exists():
         for sock in sorted(x11_dir.glob("X*")):
             if _is_socket(sock):
-                sockets.append(GuiSocket(
-                    name=f"x11-{sock.name}",
-                    host_path=str(sock),
-                    container_path=f"/tmp/.X11-unix/{sock.name}",  # noqa: S108
-                ))
+                sockets.append(
+                    GuiSocket(
+                        name=f"x11-{sock.name}",
+                        host_path=str(sock),
+                        container_path=f"/tmp/.X11-unix/{sock.name}",  # noqa: S108
+                    )
+                )
                 break  # Premier display uniquement
 
     return sockets
@@ -226,9 +234,7 @@ def apply_gui_profiles(infra: Infrastructure) -> GuiInfo:
     domaines activés, si un environnement graphique est détecté.
     """
     # Court-circuit : éviter la détection système si aucune machine GUI
-    has_gui = any(
-        m.gui for d in infra.enabled_domains for m in d.machines.values()
-    )
+    has_gui = any(m.gui for d in infra.enabled_domains for m in d.machines.values())
     if not has_gui:
         return GuiInfo.none()
 
@@ -304,9 +310,11 @@ def prepare_gui_dirs(
     Doit être appelé avant d'appliquer le profil GUI à une instance,
     sinon les proxy devices échouent au bind.
     """
-    uid_str = str(gui_info.uid)
-    gid_str = str(gui_info.gid)
-    runtime_dir = gui_info.runtime_dir
+    import shlex
+
+    uid_str = str(int(gui_info.uid))  # force int → str, refuse non-numériques
+    gid_str = str(int(gui_info.gid))
+    runtime_dir = shlex.quote(gui_info.runtime_dir)
 
     # Créer les répertoires + installer un tmpfiles.d pour le boot
     script = (

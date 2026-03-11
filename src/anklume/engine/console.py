@@ -101,8 +101,10 @@ def _build_window_plans(config: ConsoleConfig) -> list[_WindowPlan]:
     """Construit le plan des fenêtres : fenêtre 0 hôte, puis par zone VLAN."""
     # Fenêtre 0 : hôte
     host_pane = ConsolePane(
-        instance="host", domain="host",
-        trust_level="admin", command="bash",
+        instance="host",
+        domain="host",
+        trust_level="admin",
+        command="bash",
     )
 
     if config.dedicated:
@@ -118,11 +120,13 @@ def _build_window_plans(config: ConsoleConfig) -> list[_WindowPlan]:
         zone_seq: dict[int, int] = {}
         for pane in all_panes:
             seq = zone_seq.get(pane.zone_id, 0)
-            plans.append(_WindowPlan(
-                name=f"{pane.zone_id}:{seq}",
-                panes=[pane, pane],
-                trust_level=pane.trust_level,
-            ))
+            plans.append(
+                _WindowPlan(
+                    name=f"{pane.zone_id}:{seq}",
+                    panes=[pane, pane],
+                    trust_level=pane.trust_level,
+                )
+            )
             zone_seq[pane.zone_id] = seq + 1
         return plans
 
@@ -143,12 +147,15 @@ def _build_window_plans(config: ConsoleConfig) -> list[_WindowPlan]:
         )
 
         for i in range(0, len(panes), _MAX_PANES_PER_WINDOW):
-            chunk = panes[i:i + _MAX_PANES_PER_WINDOW]
+            chunk = panes[i : i + _MAX_PANES_PER_WINDOW]
             seq = i // _MAX_PANES_PER_WINDOW
-            plans.append(_WindowPlan(
-                name=f"{zone_id}:{seq}",
-                panes=chunk, trust_level=trust,
-            ))
+            plans.append(
+                _WindowPlan(
+                    name=f"{zone_id}:{seq}",
+                    panes=chunk,
+                    trust_level=trust,
+                )
+            )
 
     return plans
 
@@ -156,36 +163,50 @@ def _build_window_plans(config: ConsoleConfig) -> list[_WindowPlan]:
 def _setup_session(session_name: str, status_bg: str) -> None:
     """Configure les options au niveau de la session."""
     _tmux_run(
-        "set-option", "-t", session_name,
-        "status-style", f"bg={status_bg},fg=white",
+        "set-option",
+        "-t",
+        session_name,
+        "status-style",
+        f"bg={status_bg},fg=white",
     )
     _tmux_run(
-        "set-option", "-t", session_name,
-        "pane-border-status", "top",
+        "set-option",
+        "-t",
+        session_name,
+        "pane-border-status",
+        "top",
     )
     _tmux_run(
-        "set-option", "-t", session_name,
+        "set-option",
+        "-t",
+        session_name,
         "pane-border-format",
-        "#{?pane_active,"
-        "#[reverse#,bold] #{pane_title} #[default],"
-        " #{pane_title} }",
+        "#{?pane_active,#[reverse#,bold] #{pane_title} #[default], #{pane_title} }",
     )
     _tmux_run(
-        "set-option", "-t", session_name,
-        "pane-border-lines", "heavy",
+        "set-option",
+        "-t",
+        session_name,
+        "pane-border-lines",
+        "heavy",
     )
     _tmux_run(
-        "set-option", "-t", session_name,
-        "pane-border-indicators", "colour",
+        "set-option",
+        "-t",
+        session_name,
+        "pane-border-indicators",
+        "colour",
     )
     # Rebind split : nouveau panneau → même machine
     _tmux_run(
-        "bind-key", '"',
+        "bind-key",
+        '"',
         "run-shell",
         "tmux split-window -v #{pane_start_command}",
     )
     _tmux_run(
-        "bind-key", "%",
+        "bind-key",
+        "%",
         "run-shell",
         "tmux split-window -h #{pane_start_command}",
     )
@@ -195,38 +216,70 @@ def _apply_window_colors(window_target: str, color: str, fg: str) -> None:
     """Applique les couleurs trust sur une fenêtre."""
     # Onglets : nom seul (sans index tmux), actif coloré, inactif dimmed
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-status-format", " #{window_name} ",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-status-format",
+        " #{window_name} ",
     )
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-status-current-format", " #{window_name} ",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-status-current-format",
+        " #{window_name} ",
     )
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-status-current-style", f"bg={color},fg={fg},bold",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-status-current-style",
+        f"bg={color},fg={fg},bold",
     )
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-status-style", f"fg={color},dim",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-status-style",
+        f"fg={color},dim",
     )
     # Bordures : inactif dimmed, actif trust color vive
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "pane-border-style", "fg=colour238",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "pane-border-style",
+        "fg=colour238",
     )
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "pane-active-border-style", f"fg={color},bold",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "pane-active-border-style",
+        f"fg={color},bold",
     )
     # Contenu : inactif fortement dimmed, actif = terminal normal
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-style", "fg=colour240,bg=colour232",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-style",
+        "fg=colour240,bg=colour232",
     )
     _tmux_run(
-        "set-option", "-w", "-t", window_target,
-        "window-active-style", "fg=default,bg=default",
+        "set-option",
+        "-w",
+        "-t",
+        window_target,
+        "window-active-style",
+        "fg=default,bg=default",
     )
 
 
@@ -283,10 +336,7 @@ def build_console_config(
             if real is None or real.status != "Running":
                 continue
 
-            cmd = (
-                f"incus exec {incus_name} --project {project_name}"
-                " -- bash"
-            )
+            cmd = f"incus exec {incus_name} --project {project_name} -- bash"
             panes.append(
                 ConsolePane(
                     instance=incus_name,
@@ -335,14 +385,23 @@ def launch_console(
     for idx, plan in enumerate(plans):
         if idx == 0:
             _tmux_run(
-                "new-session", "-d", "-s", config.session_name,
-                "-n", plan.name, plan.panes[0].command,
+                "new-session",
+                "-d",
+                "-s",
+                config.session_name,
+                "-n",
+                plan.name,
+                plan.panes[0].command,
             )
             _setup_session(config.session_name, status_bg)
         else:
             _tmux_run(
-                "new-window", "-t", config.session_name,
-                "-n", plan.name, plan.panes[0].command,
+                "new-window",
+                "-t",
+                config.session_name,
+                "-n",
+                plan.name,
+                plan.panes[0].command,
             )
 
         window_target = f"{config.session_name}:{plan.name}"
@@ -350,12 +409,18 @@ def launch_console(
         for i, pane in enumerate(plan.panes):
             if i > 0:
                 _tmux_run(
-                    "split-window", "-t", window_target, "-v",
+                    "split-window",
+                    "-t",
+                    window_target,
+                    "-v",
                     pane.command,
                 )
             _tmux_run(
-                "select-pane", "-t", f"{window_target}.{i}",
-                "-T", f"[{pane.domain}] {pane.instance}",
+                "select-pane",
+                "-t",
+                f"{window_target}.{i}",
+                "-T",
+                f"[{pane.domain}] {pane.instance}",
             )
 
         _apply_layout(window_target, len(plan.panes))
@@ -366,7 +431,9 @@ def launch_console(
         _apply_window_colors(window_target, color, fg)
 
     _tmux_run(
-        "select-window", "-t", f"{config.session_name}:{plans[0].name}",
+        "select-window",
+        "-t",
+        f"{config.session_name}:{plans[0].name}",
     )
 
     if not detach:
