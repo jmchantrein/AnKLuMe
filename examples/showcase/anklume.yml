@@ -1,0 +1,46 @@
+# anklume.yml — Configuration showcase sysadmin solo
+#
+# Démontre TOUTES les options de configuration anklume.
+# Adapté pour un sysadmin travaillant sur une seule machine
+# avec séparation vie pro / perso / IA / navigation à risque.
+#
+# Domaines :
+#   vault     (admin)        — secrets, backup chiffré, KeePassXC + Syncthing
+#   pro       (trusted)      — travail quotidien, dev, communication
+#   perso     (semi-trusted) — vie personnelle, médias, cloud perso
+#   ai-tools  (trusted)      — GPU, LLM, STT, interfaces chat, sanitisation
+#   sandbox   (disposable)   — navigation à risque, Tor, éphémère
+#   gaming    (untrusted)    — exemple désactivé (enabled: false)
+
+schema_version: 1
+
+defaults:
+  os_image: images:debian/13
+  trust_level: semi-trusted
+
+# Adressage réseau — chaque domaine reçoit un /24 automatique
+# (10.100.x.0/24, 10.110.x.0/24, etc.)
+addressing:
+  base: "10.100"
+  zone_step: 10
+
+# Nesting — préfixe les noms d'instances par le niveau de nesting
+# (utile si anklume tourne dans un conteneur Incus lui-même)
+nesting:
+  prefix: true
+
+# Politique de ressources — répartition CPU/RAM entre domaines
+resource_policy:
+  host_reserve:
+    cpu: "15%"      # 15% CPU réservé à l'hôte
+    memory: "4GB"   # 4 GB RAM minimum pour l'hôte
+  mode: proportional  # répartition selon le poids (weight) des machines
+  cpu_mode: allowance # pourcentage CPU (vs count: vCPUs fixes)
+  memory_enforce: soft  # ballooning (vs hard: limite stricte)
+  overcommit: false     # pas de surallocation
+
+# Politique GPU — partagé entre ai-tools et pro (desktop)
+gpu_policy: shared
+
+# Accès GPU IA — switch explicite requis entre domaines
+ai_access_policy: exclusive

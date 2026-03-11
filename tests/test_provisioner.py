@@ -24,7 +24,11 @@ from anklume.provisioner.playbook import (
     write_host_vars,
     write_playbook,
 )
-from anklume.provisioner.runner import ansible_available, run_playbook
+from anklume.provisioner.runner import (
+    ansible_available,
+    install_galaxy_requirements,
+    run_playbook,
+)
 
 from .conftest import make_domain, make_infra, make_machine
 
@@ -380,6 +384,135 @@ class TestAnsibleAvailable:
     def test_not_available(self) -> None:
         with patch("shutil.which", return_value=None):
             assert ansible_available() is False
+
+
+# ============================================================
+# install_galaxy_requirements
+# ============================================================
+
+
+class TestInstallGalaxyRequirements:
+    def test_no_requirements_file(self, tmp_path: Path) -> None:
+        """Sans requirements.yml → True (skip silencieux)."""
+        result = install_galaxy_requirements(tmp_path, tmp_path / "galaxy_roles")
+        assert result is True
+        assert not (tmp_path / "galaxy_roles").exists()
+
+    def test_success(self, tmp_path: Path) -> None:
+        """requirements.yml présent, ansible-galaxy réussit."""
+        (tmp_path / "requirements.yml").write_text("---\nroles:\n  - name: geerlingguy.docker\n")
+        galaxy_dir = tmp_path / "galaxy_roles"
+
+        result_mock = MagicMock()
+        result_mock.returncode = 0
+        result_mock.stdout = "ok"
+        result_mock.stderr = ""
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/ansible-galaxy"),
+            patch("subprocess.run", return_value=result_mock) as mock_run,
+        ):
+            result = install_galaxy_requirements(tmp_path, galaxy_dir)
+
+        assert result is True
+        assert galaxy_dir.is_dir()
+        cmd = mock_run.call_args[0][0]
+        assert "ansible-galaxy" in cmd[0]
+        assert "-r" in cmd
+        assert str(tmp_path / "requirements.yml") in cmd
+
+    def test_failure(self, tmp_path: Path) -> None:
+        """ansible-galaxy échoue → False."""
+        (tmp_path / "requirements.yml").write_text("---\nroles:\n  - name: bad.role\n")
+        galaxy_dir = tmp_path / "galaxy_roles"
+
+        result_mock = MagicMock()
+        result_mock.returncode = 1
+        result_mock.stdout = ""
+        result_mock.stderr = "ERROR! role not found"
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/ansible-galaxy"),
+            patch("subprocess.run", return_value=result_mock),
+        ):
+            result = install_galaxy_requirements(tmp_path, galaxy_dir)
+
+        assert result is False
+
+    def test_ansible_galaxy_absent(self, tmp_path: Path) -> None:
+        """ansible-galaxy absent → True (skip avec warning)."""
+        (tmp_path / "requirements.yml").write_text("---\nroles:\n  - name: geerlingguy.docker\n")
+
+        with patch("shutil.which", return_value=None):
+            result = install_galaxy_requirements(tmp_path, tmp_path / "galaxy_roles")
+
+        assert result is True
+
+
+# ============================================================
+# run_playbook (galaxy_roles_dir)
+# ============================================================
+
+
+class TestRunPlaybookGalaxyPath:
+    def test_galaxy_roles_in_path(self, tmp_path: Path) -> None:
+        """galaxy_roles_dir apparaît dans ANSIBLE_ROLES_PATH."""
+        ansible_dir = tmp_path / "ansible"
+        ansible_dir.mkdir()
+        (ansible_dir / "site.yml").write_text("---\n")
+        (ansible_dir / "inventory").mkdir()
+        galaxy = tmp_path / "ansible_roles_galaxy"
+        galaxy.mkdir()
+
+        result_mock = MagicMock()
+        result_mock.returncode = 0
+        result_mock.stdout = ""
+        result_mock.stderr = ""
+
+        with patch("subprocess.run", return_value=result_mock) as mock:
+            run_playbook(
+                project_dir=tmp_path,
+                builtin_roles_dir=Path("/builtin"),
+                custom_roles_dir=None,
+                galaxy_roles_dir=galaxy,
+                plugin_dir=Path("/plugins"),
+            )
+
+        env = mock.call_args[1].get("env", {})
+        roles_path = env.get("ANSIBLE_ROLES_PATH", "")
+        assert str(galaxy) in roles_path
+
+    def test_galaxy_between_custom_and_builtin(self, tmp_path: Path) -> None:
+        """Ordre : custom > galaxy > builtin."""
+        ansible_dir = tmp_path / "ansible"
+        ansible_dir.mkdir()
+        (ansible_dir / "site.yml").write_text("---\n")
+        (ansible_dir / "inventory").mkdir()
+        custom = tmp_path / "ansible_roles_custom"
+        custom.mkdir()
+        galaxy = tmp_path / "ansible_roles_galaxy"
+        galaxy.mkdir()
+
+        result_mock = MagicMock()
+        result_mock.returncode = 0
+        result_mock.stdout = ""
+        result_mock.stderr = ""
+
+        with patch("subprocess.run", return_value=result_mock) as mock:
+            run_playbook(
+                project_dir=tmp_path,
+                builtin_roles_dir=Path("/builtin"),
+                custom_roles_dir=custom,
+                galaxy_roles_dir=galaxy,
+                plugin_dir=Path("/plugins"),
+            )
+
+        env = mock.call_args[1].get("env", {})
+        roles_path = env.get("ANSIBLE_ROLES_PATH", "")
+        custom_idx = roles_path.index(str(custom))
+        galaxy_idx = roles_path.index(str(galaxy))
+        builtin_idx = roles_path.index("/builtin")
+        assert custom_idx < galaxy_idx < builtin_idx
 
 
 # ============================================================

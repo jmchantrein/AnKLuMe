@@ -1,0 +1,65 @@
+# Politiques réseau — règles d'accès inter-domaines
+#
+# Par défaut, TOUT le trafic inter-domaines est bloqué (nftables drop).
+# Chaque règle ci-dessous ouvre un accès spécifique.
+#
+# Cibles possibles :
+#   - Nom de domaine (ex: "pro") → tout le sous-réseau du domaine
+#   - Nom complet de machine (ex: "sandbox-tor-gateway") → IP unique
+#   - "host" → la machine hôte
+#
+# Démontre : TCP, UDP, bidirectionnel, ports "all", cible machine.
+
+policies:
+  # --- Pro → Services IA ---
+  - from: pro
+    to: ai-tools
+    ports: [11434, 8000]
+    description: "Pro accède à Ollama (LLM) et Speaches (STT)"
+
+  - from: pro
+    to: ai-tools
+    ports: [3000, 3210, 8089]
+    description: "Pro accède aux interfaces chat et au sanitizer OpenRouter"
+
+  # --- Perso → Services IA ---
+  - from: perso
+    to: ai-tools
+    ports: [11434, 8000]
+    description: "Perso accède à Ollama (LLM) et Speaches (STT)"
+
+  - from: perso
+    to: ai-tools
+    ports: [3000]
+    description: "Perso accède à Open WebUI"
+
+  # --- Vault → Pro (administration complète) ---
+  - from: vault
+    to: pro
+    ports: "all"
+    description: "Vault (admin) a un accès complet vers pro"
+
+  # --- Pro ↔ Perso (SSH bidirectionnel) ---
+  - from: pro
+    to: perso
+    ports: [22]
+    bidirectional: true
+    description: "SSH bidirectionnel entre pro et perso"
+
+  # --- Sandbox → Tor (SOCKS + DNS) ---
+  - from: sandbox-risky-browse
+    to: sandbox-tor-gateway
+    ports: [9050]
+    description: "Navigateur jetable → Tor SOCKS proxy"
+
+  - from: sandbox-risky-browse
+    to: sandbox-tor-gateway
+    ports: [5353]
+    protocol: udp
+    description: "Navigateur jetable → Tor DNS (UDP)"
+
+  # --- Monitoring : hôte → services IA ---
+  - from: host
+    to: ai-tools
+    ports: [11434, 8000]
+    description: "Hôte vérifie la santé des services IA"

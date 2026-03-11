@@ -1,0 +1,39 @@
+# Domaine sandbox — navigation à risque, éphémère
+#
+# Trust level disposable : le domaine entier est éphémère.
+# Toutes les machines sont détruites à l'arrêt (sauf override explicite).
+# Idéal pour ouvrir des liens suspects, tester des logiciels douteux,
+# ou naviguer anonymement via Tor.
+#
+# Machines :
+#   risky-browse — navigateur jetable, détruit à chaque session
+#   tor-gateway  — VM routeur Tor transparent (persistent)
+
+description: "Navigation à risque — jetable"
+trust_level: disposable
+ephemeral: true               # domaine éphémère — toutes les machines par défaut
+
+machines:
+  risky-browse:
+    description: "Navigateur jetable (détruit à l'arrêt)"
+    type: lxc
+    gui: true
+    roles: [base]
+    workspace:
+      desktop: [3, 1]        # bureau virtuel colonne 3, ligne 1
+      app: "firefox"
+      autostart: false        # lancement manuel uniquement
+      tile: maximize          # maximisé (garde la barre de titre + panneau KDE)
+    vars:
+      admin_packages:
+        - firefox-esr
+
+  tor-gateway:
+    description: "Routeur Tor transparent (VM persistante)"
+    type: vm                  # VM pour isolation réseau renforcée
+    ephemeral: false          # override — la gateway Tor persiste (config Tor, clés)
+    roles: [base, tor_gateway]
+    vars:
+      tor_socks_port: 9050
+      tor_dns_port: 5353
+      tor_transparent_port: 9040

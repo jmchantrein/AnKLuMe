@@ -5,12 +5,14 @@ from __future__ import annotations
 import configparser
 
 from anklume.engine.workspace import (
+    VALID_TILES,
     DesktopInfo,
     GridInfo,
     WorkspaceEntry,
     compute_grid_needs,
     parse_workspace,
     resolve_desktop_index,
+    resolve_tile,
     validate_workspace_entries,
 )
 
@@ -206,6 +208,159 @@ class TestValidateWorkspaceEntries:
         errors = validate_workspace_entries(entries)
         assert len(errors) >= 2
 
+    def test_fullscreen_collision_same_desktop(self):
+        """Deux machines fullscreen sur le même desktop+screen = erreur."""
+        entries = [
+            WorkspaceEntry("m1", "d", "t", desktop=(1, 1), fullscreen=True, screen=0),
+            WorkspaceEntry("m2", "d", "t", desktop=(1, 1), fullscreen=True, screen=0),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 1
+        assert "collision" in errors[0]
+        assert "m1" in errors[0]
+        assert "m2" in errors[0]
+
+    def test_fullscreen_no_collision_different_desktop(self):
+        """Deux machines fullscreen sur des desktops différents = OK."""
+        entries = [
+            WorkspaceEntry("m1", "d", "t", desktop=(1, 1), fullscreen=True),
+            WorkspaceEntry("m2", "d", "t", desktop=(2, 1), fullscreen=True),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 0
+
+    def test_fullscreen_no_collision_different_screen(self):
+        """Deux machines fullscreen sur le même desktop mais écrans différents = OK."""
+        entries = [
+            WorkspaceEntry("m1", "d", "t", desktop=(1, 1), fullscreen=True, screen=0),
+            WorkspaceEntry("m2", "d", "t", desktop=(1, 1), fullscreen=True, screen=1),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 0
+
+    def test_no_collision_non_fullscreen(self):
+        """Deux machines non-fullscreen sur le même desktop = OK (fenêtres côte à côte)."""
+        entries = [
+            WorkspaceEntry("m1", "d", "t", desktop=(1, 1), fullscreen=False),
+            WorkspaceEntry("m2", "d", "t", desktop=(1, 1), fullscreen=False),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 0
+
+    def test_fullscreen_and_windowed_same_desktop(self):
+        """Une fullscreen + une fenêtrée sur le même desktop = pas de collision."""
+        entries = [
+            WorkspaceEntry("m1", "d", "t", desktop=(1, 1), fullscreen=True),
+            WorkspaceEntry("m2", "d", "t", desktop=(1, 1), fullscreen=False),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 0
+
+    def test_tile_valid(self):
+        """Valeurs tile valides = OK."""
+
+        for tile in VALID_TILES:
+            entries = [WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile=tile)]
+            errors = validate_workspace_entries(entries)
+            assert errors == [], f"tile={tile} devrait être valide"
+
+    def test_tile_invalid(self):
+        """Valeur tile inconnue = erreur."""
+        entries = [WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile="center")]
+        errors = validate_workspace_entries(entries)
+        assert len(errors) == 1
+        assert "invalide" in errors[0]
+
+    def test_tile_conflicts_with_fullscreen(self):
+        """tile + fullscreen = erreur."""
+        entries = [
+            WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile="left", fullscreen=True),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert any("mutuellement exclusifs" in e for e in errors)
+
+    def test_tile_conflicts_with_position(self):
+        """tile + position = erreur."""
+        entries = [
+            WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile="right", position=(0, 0)),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert any("mutuellement exclusifs" in e for e in errors)
+
+    def test_tile_conflicts_with_size(self):
+        """tile + size = erreur."""
+        entries = [
+            WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile="left", size=(960, 1080)),
+        ]
+        errors = validate_workspace_entries(entries)
+        assert any("mutuellement exclusifs" in e for e in errors)
+
+    def test_tile_empty_no_error(self):
+        """tile vide = pas d'erreur."""
+        entries = [WorkspaceEntry("m", "d", "t", desktop=(1, 1), tile="")]
+        errors = validate_workspace_entries(entries)
+        assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# resolve_tile
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTile:
+    """Tests pour resolve_tile."""
+
+    def test_maximize_returns_none(self):
+        """maximize → None (géré séparément)."""
+
+        assert resolve_tile("maximize", 1920, 1080) is None
+
+    def test_left_half(self):
+
+        pos, size = resolve_tile("left", 1920, 1080)
+        assert pos == (0, 0)
+        assert size == (960, 1080)
+
+    def test_right_half(self):
+
+        pos, size = resolve_tile("right", 1920, 1080)
+        assert pos == (960, 0)
+        assert size == (960, 1080)
+
+    def test_top_left_quarter(self):
+
+        pos, size = resolve_tile("top-left", 1920, 1080)
+        assert pos == (0, 0)
+        assert size == (960, 540)
+
+    def test_top_right_quarter(self):
+
+        pos, size = resolve_tile("top-right", 1920, 1080)
+        assert pos == (960, 0)
+        assert size == (960, 540)
+
+    def test_bottom_left_quarter(self):
+
+        pos, size = resolve_tile("bottom-left", 1920, 1080)
+        assert pos == (0, 540)
+        assert size == (960, 540)
+
+    def test_bottom_right_quarter(self):
+
+        pos, size = resolve_tile("bottom-right", 1920, 1080)
+        assert pos == (960, 540)
+        assert size == (960, 540)
+
+    def test_unknown_tile_returns_none(self):
+
+        assert resolve_tile("center", 1920, 1080) is None
+
+    def test_different_screen_size(self):
+
+        pos, size = resolve_tile("left", 2560, 1440)
+        assert pos == (0, 0)
+        assert size == (1280, 1440)
+
 
 # ---------------------------------------------------------------------------
 # parse_workspace (intégration avec Infrastructure)
@@ -379,6 +534,36 @@ class TestParseWorkspace:
         assert entry.size == (1920, 1080)
         assert entry.fullscreen is True
         assert entry.screen == 1
+
+    def test_tile_field(self):
+        """Champ tile: lu depuis le workspace."""
+        infra = self._make_infra(
+            {
+                "comms": {
+                    "gui": True,
+                    "workspace": {
+                        "desktop": [2, 1],
+                        "app": "thunderbird",
+                        "tile": "left",
+                    },
+                },
+            }
+        )
+        layout = parse_workspace(infra)
+        assert layout.entries[0].tile == "left"
+
+    def test_tile_default_empty(self):
+        """Sans tile: → chaîne vide."""
+        infra = self._make_infra(
+            {
+                "app": {
+                    "gui": True,
+                    "workspace": {"desktop": [1, 1]},
+                },
+            }
+        )
+        layout = parse_workspace(infra)
+        assert layout.entries[0].tile == ""
 
 
 # ---------------------------------------------------------------------------
@@ -691,6 +876,97 @@ class TestWorkspaceKwinRules:
         assert "decocolor" in config[section]
         assert "desktops" in config[section]
         assert config[section]["decocolor"] == "anklume-semi-trusted"
+
+    def test_install_workspace_rule_tile_maximize(self, tmp_path):
+        """tile: maximize → maximizehoriz + maximizevert."""
+        from anklume.cli._workspace import install_workspace_rules
+
+        entry = WorkspaceEntry(
+            machine_name="sandbox-browse",
+            domain_name="sandbox",
+            trust_level="disposable",
+            desktop=(1, 1),
+            app="firefox",
+            tile="maximize",
+        )
+        uuid_map = {(1, 1): "uuid-1"}
+        kwin_path = tmp_path / ".config" / "kwinrulesrc"
+
+        install_workspace_rules(
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
+        )
+
+        config = configparser.ConfigParser()
+        config.optionxform = str
+        config.read(str(kwin_path))
+
+        section = "anklume-sandbox-browse"
+        assert config[section]["maximizehoriz"] == "true"
+        assert config[section]["maximizehorizrule"] == "2"
+        assert config[section]["maximizevert"] == "true"
+        assert config[section]["maximizevertrule"] == "2"
+
+    def test_install_workspace_rule_tile_left(self, tmp_path):
+        """tile: left → position moitié gauche, taille moitié écran."""
+        from anklume.cli._workspace import install_workspace_rules
+
+        entry = WorkspaceEntry(
+            machine_name="pro-comms",
+            domain_name="pro",
+            trust_level="trusted",
+            desktop=(2, 1),
+            app="thunderbird",
+            tile="left",
+        )
+        uuid_map = {(2, 1): "uuid-2"}
+        kwin_path = tmp_path / ".config" / "kwinrulesrc"
+
+        install_workspace_rules(
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
+            screen_size=(1920, 1080),
+        )
+
+        config = configparser.ConfigParser()
+        config.optionxform = str
+        config.read(str(kwin_path))
+
+        section = "anklume-pro-comms"
+        assert config[section]["position"] == "0,0"
+        assert config[section]["size"] == "960,1080"
+
+    def test_install_workspace_rule_tile_bottom_right(self, tmp_path):
+        """tile: bottom-right → position et taille quart inférieur droit."""
+        from anklume.cli._workspace import install_workspace_rules
+
+        entry = WorkspaceEntry(
+            machine_name="pro-terminal",
+            domain_name="pro",
+            trust_level="trusted",
+            desktop=(1, 1),
+            app="konsole",
+            tile="bottom-right",
+        )
+        uuid_map = {(1, 1): "uuid-1"}
+        kwin_path = tmp_path / ".config" / "kwinrulesrc"
+
+        install_workspace_rules(
+            [entry],
+            uuid_map,
+            kwin_path=kwin_path,
+            screen_size=(2560, 1440),
+        )
+
+        config = configparser.ConfigParser()
+        config.optionxform = str
+        config.read(str(kwin_path))
+
+        section = "anklume-pro-terminal"
+        assert config[section]["position"] == "1280,720"
+        assert config[section]["size"] == "1280,720"
 
     def test_install_preserves_existing_rules(self, tmp_path):
         """Les règles existantes (non-anklume) sont préservées."""

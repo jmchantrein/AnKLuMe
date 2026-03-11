@@ -1,0 +1,111 @@
+# Domaine ai-tools — services d'intelligence artificielle
+#
+# Trust level trusted : fournit LLM, STT, interfaces chat et sanitisation
+# aux autres domaines via les politiques réseau.
+#
+# Le GPU est partagé (gpu_policy: shared dans anklume.yml) entre
+# gpu-server (inférence) et pro-desktop (rendu graphique).
+#
+# Les assistants OpenClaw sont dans pro et perso (un par domaine).
+# Ici ne restent que les services partagés.
+#
+# Machines :
+#   gpu-server  — Ollama + Speaches (STT), GPU passthrough
+#   webui       — Open WebUI (interface Ollama)
+#   chat        — LobeChat (multi-providers, exemple config OpenRouter)
+#   sanitizer   — Proxy de sanitisation LLM (mode pseudonymize, audit)
+#   code-runner — Serveur de coding IA headless (OpenCode)
+#   sandbox     — Exécution isolée de code généré par LLM
+
+description: "Services IA"
+trust_level: trusted
+
+machines:
+  gpu-server:
+    description: "Serveur LLM et STT avec GPU"
+    type: lxc
+    gpu: true
+    roles: [base, ollama_server, stt_server]
+    weight: 4                 # poids fort — priorité ressources maximale
+    vars:
+      ollama_default_model: "qwen2.5-coder:14b"
+      ollama_port: 11434
+      stt_language: "fr"
+      stt_port: 8000
+
+  webui:
+    description: "Interface web Ollama (Open WebUI)"
+    type: lxc
+    roles: [base, open_webui]
+    vars:
+      open_webui_ollama_url: "http://gpu-server:11434"
+
+  chat:
+    description: "Chat multi-providers (LobeChat)"
+    type: lxc
+    roles: [base, lobechat]
+    vars:
+      lobechat_ollama_url: "http://gpu-server:11434"
+      llm_backend: openai
+      llm_url: "https://openrouter.ai/api/v1"
+      # llm_api_key: "sk-or-..."          # à remplir avec votre clé
+      llm_model: "anthropic/claude-sonnet-4"
+      ai_sanitize: true                   # passe par le proxy sanitizer
+
+  sanitizer:
+    description: "Proxy de sanitisation LLM (OpenRouter)"
+    type: lxc
+    roles: [base, llm_sanitizer]
+    vars:
+      sanitizer_mode: pseudonymize        # remplacement cohérent (vs mask)
+      sanitizer_upstream_url: "https://openrouter.ai/api/v1"
+      sanitizer_audit: true
+      sanitizer_audit_log_path: "/var/log/anklume/sanitizer-audit.jsonl"
+      sanitizer_categories:
+        - ip
+        - fqdn
+        - credential
+        - mac
+        - incus_cmd
+
+  code-runner:
+    description: "Serveur de coding IA headless (OpenCode)"
+    type: lxc
+    roles: [base, dev_env, opencode_server]
+    vars:
+      opencode_port: 8091
+      opencode_ollama_host: "gpu-server"
+      dev_env_uv: true
+      dev_env_nodejs: true
+
+  claude-agent:
+    description: "Claude Code CLI via sanitizer/OpenRouter (headless)"
+    type: lxc
+    roles: [base, dev_env]
+    vars:
+      dev_env_uv: true
+      dev_env_claude_code: true
+      dev_env_extra_packages:
+        - tmux
+        - git
+      # Claude Code CLI configuré pour passer par le proxy sanitizer
+      # qui anonymise les données avant envoi vers OpenRouter.
+      # Usage :
+      #   ANTHROPIC_BASE_URL=http://sanitizer:8080/v1 \
+      #   ANTHROPIC_API_KEY=sk-or-... \
+      #   claude --model anthropic/claude-sonnet-4 \
+      #          --dangerously-skip-permissions
+      # Le sanitizer intercepte et pseudonymise les IPs, FQDNs,
+      # credentials, MACs et commandes Incus avant envoi à OpenRouter.
+      claude_code_base_url: "http://sanitizer:8080/v1"
+      claude_code_model: "anthropic/claude-sonnet-4"
+
+  sandbox:
+    description: "Exécution isolée de code généré par LLM"
+    type: lxc
+    ephemeral: true           # jetable — détruit après chaque session
+    roles: [base, code_sandbox]
+    vars:
+      sandbox_timeout: 60     # timeout exécution (secondes)
+      sandbox_network: false  # réseau désactivé — isolation totale
+      sandbox_ephemeral: true

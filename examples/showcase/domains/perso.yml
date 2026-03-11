@@ -1,0 +1,78 @@
+# Domaine perso — vie personnelle
+#
+# Trust level semi-trusted : accès aux services IA (Ollama, STT, WebUI).
+# Bureau complet sur la ligne 2 des bureaux virtuels.
+#
+# Machines :
+#   desktop   — bureau KDE complet, navigation perso, plein écran
+#   firefox   — navigateur web isolé (séparé du desktop pour la sécurité)
+#   media     — consommation multimédia (VLC, streaming)
+#   cloud     — stockage perso (Syncthing, fichiers)
+#   assistant — OpenClaw (assistant IA dédié au domaine perso)
+
+description: "Vie personnelle"
+trust_level: semi-trusted
+
+machines:
+  desktop:
+    description: "Bureau KDE perso"
+    type: lxc
+    gui: true
+    roles: [base, desktop]
+    weight: 2
+    workspace:
+      desktop: [1, 2]        # bureau virtuel colonne 1, ligne 2
+      app: "startplasma-wayland"
+      autostart: true
+      fullscreen: true
+
+  firefox:
+    description: "Navigateur web isolé"
+    type: lxc
+    gui: true
+    roles: [base]
+    workspace:
+      desktop: [2, 2]        # bureau virtuel colonne 2, ligne 2
+      app: "firefox"
+      autostart: true
+      tile: left              # navigateur en moitié gauche (tiling KWin natif)
+    vars:
+      # Approche simple : apt install (préféré quand le paquet existe)
+      admin_packages:
+        - firefox-esr
+      # Alternative flatpak (décommenter si préféré) :
+      # admin_flatpaks:
+      #   - org.mozilla.firefox
+
+  media:
+    description: "Multimédia (VLC, streaming)"
+    type: lxc
+    gui: true
+    roles: [base]
+    workspace:
+      desktop: [2, 2]        # même bureau que firefox — tiling côte à côte
+      app: "vlc"
+      tile: right             # VLC en moitié droite (complète le split avec firefox)
+    vars:
+      admin_packages:
+        - vlc
+        - mpv
+
+  cloud:
+    description: "Cloud perso (Syncthing)"
+    type: lxc
+    roles: [base]
+    ephemeral: false          # override — persistant même si le domaine était éphémère
+    vars:
+      admin_packages:
+        - syncthing
+
+  assistant:
+    description: "Assistant IA dédié au domaine perso"
+    type: lxc
+    roles: [base, openclaw_server]
+    vars:
+      openclaw_channels: [signal]
+      openclaw_llm_provider: ollama
+      openclaw_ollama_host: "ai-tools-gpu-server"
+      openclaw_heartbeat_interval: 60

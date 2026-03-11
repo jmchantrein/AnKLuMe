@@ -13,6 +13,7 @@ from anklume.engine.models import (
     Infrastructure,
     Policy,
 )
+from anklume.engine.workspace import VALID_TILES
 
 _DNS_SAFE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 _IP_V4 = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$")
@@ -313,4 +314,32 @@ def _check_workspace(infra: Infrastructure, result: ValidationResult) -> None:
                         f"machine '{machine_name}': workspace.desktop [{col}, {row}] "
                         f"invalide (valeurs 1-indexed, min [1, 1]).",
                         "Les coordonnées commencent à 1.",
+                    )
+
+            # tile: valider la valeur et les conflits
+            tile = ws.get("tile", "")
+            if tile:
+                if tile not in VALID_TILES:
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': workspace.tile '{tile}' invalide.",
+                        f"Valeurs acceptées : {', '.join(sorted(VALID_TILES))}.",
+                    )
+                if ws.get("fullscreen"):
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': tile et fullscreen mutuellement exclusifs.",
+                        "Utiliser tile: maximize pour maximiser sans plein écran.",
+                    )
+                if ws.get("position"):
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': tile et position mutuellement exclusifs.",
+                        "Le tile calcule automatiquement la position.",
+                    )
+                if ws.get("size"):
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': tile et size mutuellement exclusifs.",
+                        "Le tile calcule automatiquement la taille.",
                     )

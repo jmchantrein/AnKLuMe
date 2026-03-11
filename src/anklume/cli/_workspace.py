@@ -21,6 +21,7 @@ from anklume.engine.workspace import (
     compute_grid_set,
     parse_workspace,
     resolve_desktop_index,
+    resolve_tile,
     validate_workspace_entries,
 )
 
@@ -205,13 +206,15 @@ def install_workspace_rules(
     uuid_map: dict[tuple[int, int], str],
     *,
     kwin_path: Path | None = None,
+    screen_size: tuple[int, int] = (1920, 1080),
 ) -> None:
-    """Écrit les règles kwinrulesrc (desktop + position + couleur trust).
+    """Écrit les règles kwinrulesrc (desktop + position + tiling + couleur trust).
 
     Args:
         entries: Entrées workspace à écrire.
         uuid_map: Mapping (col, row) → UUID desktop.
         kwin_path: Chemin vers kwinrulesrc (défaut: ~/.config/kwinrulesrc).
+        screen_size: Taille de l'écran (w, h) pour le calcul du tiling.
     """
     if kwin_path is None:
         kwin_path = Path.home() / ".config" / "kwinrulesrc"
@@ -271,6 +274,22 @@ def install_workspace_rules(
             rule["fullscreen"] = "true"
             rule["fullscreenrule"] = _KWIN_RULE_FORCE
 
+        # Tiling (KWin quick-tile)
+        if entry.tile:
+            if entry.tile == "maximize":
+                rule["maximizehoriz"] = "true"
+                rule["maximizehorizrule"] = _KWIN_RULE_FORCE
+                rule["maximizevert"] = "true"
+                rule["maximizevertrule"] = _KWIN_RULE_FORCE
+            else:
+                tile_result = resolve_tile(entry.tile, screen_size[0], screen_size[1])
+                if tile_result:
+                    pos, sz = tile_result
+                    rule["position"] = f"{pos[0]},{pos[1]}"
+                    rule["positionrule"] = _KWIN_RULE_APPLY
+                    rule["size"] = f"{sz[0]},{sz[1]}"
+                    rule["sizerule"] = _KWIN_RULE_APPLY
+
         # Écran
         if entry.screen != 0:
             rule["screen"] = str(entry.screen)
@@ -293,6 +312,29 @@ def install_workspace_rules(
             lines.append(f"{key}={val}")
         lines.append("")
     kwin_path.write_text("\n".join(lines))
+
+
+def _get_screen_size() -> tuple[int, int]:
+    """Récupère la taille de l'écran via kscreen-doctor.
+
+    Retourne (1920, 1080) en fallback si l'outil est absent ou échoue.
+    """
+    try:
+        result = subprocess.run(
+            ["kscreen-doctor", "-o"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if "Geometry:" in line:
+                    match = re.search(r"(\d+)x(\d+)", line.split("Geometry:")[1])
+                    if match:
+                        return int(match.group(1)), int(match.group(2))
+    except FileNotFoundError:
+        pass
+    return 1920, 1080
 
 
 def _reconfigure_kwin() -> None:
@@ -351,8 +393,9 @@ def run_workspace_load(domain: str | None = None) -> None:
     # Résoudre les UUIDs
     uuid_map = resolve_desktop_uuids(layout, grid)
 
-    # Écrire kwinrulesrc
-    install_workspace_rules(layout.entries, uuid_map)
+    # Écrire kwinrulesrc (avec résolution écran pour le tiling)
+    screen_size = _get_screen_size()
+    install_workspace_rules(layout.entries, uuid_map, screen_size=screen_size)
     _reconfigure_kwin()
 
     typer.echo(f"Workspace configuré ({len(layout.entries)} règle(s) KWin).")
@@ -392,9 +435,10 @@ def run_workspace_status() -> None:
         app = f" → {entry.app}" if entry.app else ""
         pos = f" pos={entry.position}" if entry.position else ""
         fs = " [fullscreen]" if entry.fullscreen else ""
+        tile = f" [tile:{entry.tile}]" if entry.tile else ""
         typer.echo(
             f"  {entry.machine_name} ({entry.trust_level}): "
-            f"desktop [{col},{row}]{app}{auto}{pos}{fs}"
+            f"desktop [{col},{row}]{app}{auto}{pos}{fs}{tile}"
         )
 
 

@@ -1,0 +1,19 @@
+# requirements.yml — Rôles Ansible Galaxy
+#
+# Installés automatiquement par `anklume apply` dans ansible_roles_galaxy/.
+# Référencés par leur nom Galaxy dans les `roles:` des machines.
+#
+# Philosophie :
+#   - Utiliser Galaxy quand un rôle officiel/réputé existe
+#   - Préférer apt/flatpak pour les installs simples
+#   - Les rôles embarqués anklume restent disponibles en complément
+
+---
+roles:
+  # Docker — le standard de conteneurisation dev
+  # https://galaxy.ansible.com/geerlingguy/docker
+  - name: geerlingguy.docker
+
+  # Node.js — plus fiable que curl | bash (NodeSource)
+  # https://galaxy.ansible.com/geerlingguy/nodejs
+  - name: geerlingguy.nodejs

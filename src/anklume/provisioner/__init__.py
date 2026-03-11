@@ -8,7 +8,12 @@ from anklume.engine.llm_routing import enrich_llm_vars
 from anklume.engine.models import Infrastructure
 from anklume.provisioner.inventory import write_inventories
 from anklume.provisioner.playbook import write_host_vars, write_playbook
-from anklume.provisioner.runner import ProvisionResult, ansible_available, run_playbook
+from anklume.provisioner.runner import (
+    ProvisionResult,
+    ansible_available,
+    install_galaxy_requirements,
+    run_playbook,
+)
 
 PROVISIONER_DIR = Path(__file__).parent
 BUILTIN_ROLES_DIR = PROVISIONER_DIR / "roles"
@@ -56,9 +61,16 @@ def provision(
     if not custom_roles_dir.is_dir():
         custom_roles_dir = None
 
+    # Installer les rôles Galaxy si requirements.yml existe
+    galaxy_roles_dir = project_dir / "ansible_roles_galaxy"
+    install_galaxy_requirements(project_dir, galaxy_roles_dir)
+    if not galaxy_roles_dir.is_dir():
+        galaxy_roles_dir = None
+
     return run_playbook(
         project_dir=project_dir,
         builtin_roles_dir=BUILTIN_ROLES_DIR,
         custom_roles_dir=custom_roles_dir,
+        galaxy_roles_dir=galaxy_roles_dir,
         plugin_dir=PLUGIN_DIR,
     )

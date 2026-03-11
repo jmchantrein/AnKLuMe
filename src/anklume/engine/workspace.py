@@ -32,6 +32,17 @@ class GridInfo:
     desktops: list[DesktopInfo] = field(default_factory=list)
 
 
+VALID_TILES = frozenset({
+    "left",
+    "right",
+    "top-left",
+    "top-right",
+    "bottom-left",
+    "bottom-right",
+    "maximize",
+})
+
+
 @dataclass
 class WorkspaceEntry:
     """Placement d'une machine GUI sur le bureau."""
@@ -46,6 +57,7 @@ class WorkspaceEntry:
     size: tuple[int, int] | None = None  # (w, h) pixels
     fullscreen: bool = False
     screen: int = 0
+    tile: str = ""  # KWin quick-tile: left, right, top-left, ..., maximize
 
 
 @dataclass
@@ -77,6 +89,9 @@ def resolve_desktop_index(col: int, row: int, grid_cols: int) -> int:
 def validate_workspace_entries(entries: list[WorkspaceEntry]) -> list[str]:
     """Valide les entrées workspace. Retourne les messages d'erreur."""
     errors: list[str] = []
+
+    # Détection de collisions : deux machines fullscreen sur le même bureau
+    seen_fullscreen: dict[tuple[int, int, int], str] = {}
     for entry in entries:
         col, row = entry.desktop
         if col < 1:
@@ -93,6 +108,39 @@ def validate_workspace_entries(entries: list[WorkspaceEntry]) -> list[str]:
                 errors.append(f"{entry.machine_name}: size ({w}, {h}) invalide (min 1, 1).")
         if entry.screen < 0:
             errors.append(f"{entry.machine_name}: screen {entry.screen} invalide (min 0).")
+
+        # Collision : deux apps fullscreen sur le même desktop+screen
+        if entry.fullscreen:
+            key = (col, row, entry.screen)
+            if key in seen_fullscreen:
+                other = seen_fullscreen[key]
+                errors.append(
+                    f"{entry.machine_name}: collision fullscreen avec {other} "
+                    f"sur desktop [{col},{row}] screen {entry.screen}."
+                )
+            else:
+                seen_fullscreen[key] = entry.machine_name
+
+        # Validation tile
+        if entry.tile:
+            if entry.tile not in VALID_TILES:
+                errors.append(
+                    f"{entry.machine_name}: tile '{entry.tile}' invalide "
+                    f"(valeurs: {', '.join(sorted(VALID_TILES))})."
+                )
+            if entry.fullscreen:
+                errors.append(
+                    f"{entry.machine_name}: tile et fullscreen sont mutuellement exclusifs."
+                )
+            if entry.position is not None:
+                errors.append(
+                    f"{entry.machine_name}: tile et position sont mutuellement exclusifs."
+                )
+            if entry.size is not None:
+                errors.append(
+                    f"{entry.machine_name}: tile et size sont mutuellement exclusifs."
+                )
+
     return errors
 
 
@@ -127,11 +175,42 @@ def parse_workspace(infra: Infrastructure) -> WorkspaceLayout:
                 size=tuple(ws["size"]) if ws.get("size") else None,
                 fullscreen=ws.get("fullscreen", False),
                 screen=ws.get("screen", 0),
+                tile=ws.get("tile", ""),
             )
             entries.append(entry)
 
     cols, rows = compute_grid_needs(entries)
     return WorkspaceLayout(entries=entries, grid_cols=cols, grid_rows=rows)
+
+
+def resolve_tile(
+    tile: str,
+    screen_w: int,
+    screen_h: int,
+) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """Résout un tile en (position, size). None pour maximize.
+
+    Args:
+        tile: Mode de tiling (left, right, top-left, ..., maximize).
+        screen_w: Largeur de l'écran en pixels.
+        screen_h: Hauteur de l'écran en pixels.
+
+    Returns:
+        Tuple ((x, y), (w, h)) ou None pour maximize.
+    """
+    if tile == "maximize":
+        return None  # géré séparément via maximizehoriz/maximizevert
+    half_w = screen_w // 2
+    half_h = screen_h // 2
+    mapping: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
+        "left": ((0, 0), (half_w, screen_h)),
+        "right": ((half_w, 0), (half_w, screen_h)),
+        "top-left": ((0, 0), (half_w, half_h)),
+        "top-right": ((half_w, 0), (half_w, half_h)),
+        "bottom-left": ((0, half_h), (half_w, half_h)),
+        "bottom-right": ((half_w, half_h), (half_w, half_h)),
+    }
+    return mapping.get(tile)
 
 
 def compute_grid_change(

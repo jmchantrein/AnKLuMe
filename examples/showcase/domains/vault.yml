@@ -1,0 +1,29 @@
+# Domaine vault — secrets et backup chiffré
+#
+# Trust level admin : accès réseau complet vers les autres domaines.
+# VM KVM (pas LXC) pour une isolation renforcée du stockage de secrets.
+# Non-éphémère : les données persistent entre les redémarrages.
+#
+# Usage type : KeePassXC pour les mots de passe, Syncthing pour
+# synchroniser la base chiffrée avec un NAS ou un téléphone.
+
+description: "Coffre-fort numérique — secrets et backup"
+trust_level: admin
+ephemeral: false  # JAMAIS détruire automatiquement ce domaine
+
+machines:
+  secrets:
+    description: "KeePassXC + Syncthing (VM isolée)"
+    type: vm              # VM KVM, pas LXC — meilleure isolation
+    roles: [base, admin_bootstrap]
+    ip: "10.100.1.100"    # IP manuelle — toujours la même adresse
+    weight: 1             # faible poids — peu de ressources nécessaires
+    config:
+      limits.memory: "1GB"   # config machine explicite (exclue de l'allocation auto)
+      limits.cpu: "2"
+    vars:
+      admin_locale: "fr_FR.UTF-8"
+      admin_timezone: "Europe/Paris"
+      admin_packages:
+        - keepassxc
+        - syncthing

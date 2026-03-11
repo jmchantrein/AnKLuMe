@@ -1,0 +1,109 @@
+# Domaine pro — espace professionnel
+#
+# Trust level trusted : accès aux services IA et au vault.
+# Bureau complet KDE sur un bureau virtuel dédié + outils de dev.
+#
+# Machines :
+#   desktop   — bureau KDE complet, GPU, plein écran sur bureau virtuel 1
+#   dev       — développement (uv, Node, Claude Code), montage source hôte
+#   comms     — communication (email, chat), app isolée sur bureau virtuel 2
+#   assistant — OpenClaw (assistant IA dédié au domaine pro)
+#   e2e-lab   — VM KVM pour tests E2E (anklume teste anklume)
+
+description: "Espace professionnel"
+trust_level: trusted
+
+# Profil custom — partage audio PipeWire entre machines du domaine
+profiles:
+  audio-share:
+    devices:
+      pipewire:
+        type: proxy
+        connect: unix:/run/user/1000/pipewire-0
+        listen: unix:/run/user/1000/pipewire-0
+
+machines:
+  desktop:
+    description: "Bureau KDE complet (GPU)"
+    type: lxc
+    gpu: true
+    gui: true
+    roles: [base, desktop]
+    profiles: [default, audio-share]   # profil custom appliqué
+    weight: 3                          # priorité haute en ressources
+    workspace:
+      desktop: [1, 1]        # bureau virtuel colonne 1, ligne 1
+      app: "startplasma-wayland"  # DE complet (pas juste une app)
+      autostart: true         # lancer au boot
+      fullscreen: true        # plein écran sur ce bureau virtuel
+      screen: 0               # écran principal
+
+  dev:
+    description: "Développement (uv, Node, Claude Code CLI, Docker)"
+    type: lxc
+    # Mélange rôles embarqués + Galaxy (geerlingguy.docker, geerlingguy.nodejs)
+    # Les rôles Galaxy sont installés depuis requirements.yml
+    roles: [base, dev-tools, dev_env, geerlingguy.docker, geerlingguy.nodejs]
+    weight: 2
+    config:
+      limits.cpu: "8"         # 8 vCPUs fixes (exclut de l'allocation auto CPU)
+    persistent:
+      projets: "/home/jmc/Projets"   # montage hôte → conteneur (bind-mount)
+    vars:
+      dev_env_uv: true
+      dev_env_claude_code: true
+      dev_env_git_user: "Jean-Marc"
+      dev_env_git_email: "jm@example.com"
+      dev_env_extra_packages:
+        - ripgrep
+        - fd-find
+        - lazygit
+        - tmux                # pour les sessions Claude Code en tmux sandbox
+      # Variables du rôle geerlingguy.docker
+      docker_users: ["user"]
+      # Variables du rôle geerlingguy.nodejs
+      nodejs_version: "22.x"
+      # Claude Code CLI — agent root avec 1M tokens beta
+      # Usage typique en tmux sandbox pour le développement d'anklume :
+      #   tmux new-session -s anklume
+      #   claude --dangerously-skip-permissions \
+      #          --model opus --max-tokens 1000000 \
+      #          --project /home/user/Projets/anklume
+      # L'agent tourne isolé dans le conteneur LXC (sandbox naturelle)
+      # avec accès uniquement au montage persistant projets/.
+      claude_code_anthropic_api_key_env: "ANTHROPIC_API_KEY"
+
+  comms:
+    description: "Communication (email, messagerie)"
+    type: lxc
+    gui: true
+    roles: [base]
+    workspace:
+      desktop: [2, 1]        # bureau virtuel colonne 2, ligne 1
+      app: "thunderbird"      # app unique (pas un DE complet)
+      autostart: true
+      tile: left              # KWin quick-tile moitié gauche (auto position+taille)
+
+  assistant:
+    description: "Assistant IA dédié au domaine pro"
+    type: lxc
+    roles: [base, admin_bootstrap, openclaw_server]
+    vars:
+      openclaw_channels: [telegram]
+      openclaw_llm_provider: ollama
+      openclaw_ollama_host: "ai-tools-gpu-server"
+      openclaw_heartbeat_interval: 30
+      admin_locale: "fr_FR.UTF-8"
+
+  e2e-lab:
+    description: "VM de test E2E — anklume teste anklume"
+    type: vm                  # VM KVM obligatoire (Incus dans Incus = nesting)
+    roles: [base, dev_env, e2e_runner]
+    ephemeral: true           # jetable — recréée à chaque campagne de tests
+    config:
+      limits.memory: "4GB"
+      limits.cpu: "4"
+    vars:
+      e2e_runner_incus_init: true       # initialise Incus dans la VM
+      e2e_runner_anklume_path: "/opt/anklume"
+      dev_env_uv: true

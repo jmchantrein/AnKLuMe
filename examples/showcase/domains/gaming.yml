@@ -1,0 +1,25 @@
+# Domaine gaming — jeux et divertissement (DÉSACTIVÉ)
+#
+# Exemple de domaine désactivé (enabled: false).
+# Présent dans la configuration mais ignoré par `anklume apply`.
+# Activer en passant enabled: true quand souhaité.
+#
+# Trust level untrusted : pas d'accès aux autres domaines,
+# sauf éventuellement au GPU pour le rendu 3D.
+
+description: "Jeux et divertissement"
+trust_level: untrusted
+enabled: false                # désactivé — ignoré par apply/status/destroy
+
+machines:
+  station:
+    description: "Station de jeu (GPU, bureau complet)"
+    type: lxc
+    gpu: true
+    gui: true
+    roles: [base, desktop]
+    weight: 3
+    workspace:
+      desktop: [3, 2]
+      app: "startplasma-wayland"
+      fullscreen: true

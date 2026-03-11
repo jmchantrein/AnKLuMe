@@ -162,6 +162,26 @@ def _plan_domain(
                 )
             )
 
+    # 1d. Profils custom du domaine
+    for profile_name, _profile in domain.profiles.items():
+        if profile_name in (GPU_PROFILE_NAME, GUI_PROFILE_NAME):
+            continue  # déjà gérés ci-dessus
+        if project_is_new:
+            custom_exists = False
+        else:
+            custom_exists = driver.profile_exists(profile_name, project_name)
+
+        if not custom_exists:
+            actions.append(
+                Action(
+                    verb="create",
+                    resource="profile",
+                    target=profile_name,
+                    project=project_name,
+                    detail=f"Créer profil custom {profile_name}",
+                )
+            )
+
     # 2. Réseau
     if project_is_new:
         net_exists = False
@@ -309,10 +329,12 @@ def _execute_action(
         driver.project_create(action.target, description=domain.description)
 
     elif action.verb == "create" and action.resource == "profile":
-        if action.target == GUI_PROFILE_NAME and gui_info and gui_info.detected:
+        # Idempotent : Incus copie les profils de default dans les nouveaux projets
+        if driver.profile_exists(action.target, action.project):
+            log.info("Profil %s déjà présent dans %s — skip", action.target, action.project)
+        elif action.target == GUI_PROFILE_NAME and gui_info and gui_info.detected:
             create_gui_profile(driver, action.project, gui_info)
-        else:
-            # Profil GPU (comportement existant)
+        elif action.target == GPU_PROFILE_NAME:
             driver.profile_create(action.target, action.project)
             driver.profile_device_add(
                 action.target,
@@ -321,6 +343,24 @@ def _execute_action(
                 {"gid": "44", "uid": "0"},
                 project=action.project,
             )
+        elif action.target in domain.profiles:
+            # Profil custom défini dans le domaine
+            profile = domain.profiles[action.target]
+            driver.profile_create(action.target, action.project)
+            for dev_name, dev_cfg in profile.devices.items():
+                cfg = dict(dev_cfg)  # copie pour ne pas modifier l'original
+                dtype = cfg.pop("type", "none")
+                driver.profile_device_add(
+                    action.target,
+                    dev_name,
+                    dtype,
+                    cfg,
+                    project=action.project,
+                )
+            if profile.config:
+                driver.profile_config_set(action.target, action.project, profile.config)
+        else:
+            driver.profile_create(action.target, action.project)
 
     elif action.verb == "create" and action.resource == "network":
         config = {}
