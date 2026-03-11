@@ -144,3 +144,27 @@ def role_defaults(role_name: str) -> dict:
 def role_task_names(role_name: str) -> list[str]:
     """Retourne les noms des tâches d'un rôle."""
     return [t.get("name", "") for t in role_tasks(role_name)]
+
+
+def write_test_project(path, domains: dict, *, policies: list | None = None):
+    """Écrit un projet anklume complet dans path (helper de test partagé)."""
+    from pathlib import Path
+
+    path = Path(path)
+    (path / "anklume.yml").write_text(
+        yaml.dump(
+            {
+                "schema_version": 1,
+                "defaults": {"os_image": "images:debian/13", "trust_level": "semi-trusted"},
+                "addressing": {"base": "10.200", "zone_step": 10},
+                "nesting": {"prefix": True},
+            }
+        )
+    )
+    domains_dir = path / "domains"
+    domains_dir.mkdir(exist_ok=True)
+    for name, data in domains.items():
+        (domains_dir / f"{name}.yml").write_text(yaml.dump(data))
+    (path / "policies.yml").write_text(
+        yaml.dump({"policies": policies or []}, default_flow_style=False)
+    )

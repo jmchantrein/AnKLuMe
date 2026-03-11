@@ -153,7 +153,7 @@ class TestNesting:
                 "--",
                 "chmod",
                 "+x",
-                "/tmp/nest-setup.sh",  # noqa: S108
+                "/tmp/nest-setup.sh",
             ]
         )
 
@@ -166,7 +166,7 @@ class TestNesting:
                 "--project",
                 NEST_PROJECT,
                 "--",
-                "/tmp/nest-setup.sh",  # noqa: S108
+                "/tmp/nest-setup.sh",
                 "1",
                 str(MAX_DEPTH),
             ],

@@ -81,6 +81,7 @@ class IncusDriver:
         *,
         check: bool = True,
         input: str | None = None,
+        timeout: float | None = None,
     ) -> subprocess.CompletedProcess:
         """Exécute une commande incus et retourne le résultat."""
         cmd = ["incus", *args]
@@ -89,6 +90,7 @@ class IncusDriver:
             capture_output=True,
             text=True,
             input=input,
+            timeout=timeout,
         )
         if check and result.returncode != 0:
             raise IncusError(cmd, result.returncode, result.stderr)
@@ -394,11 +396,15 @@ class IncusDriver:
         command: list[str],
         *,
         input: str | None = None,
+        check: bool = True,
+        timeout: float | None = None,
     ) -> subprocess.CompletedProcess:
         """Exécute une commande dans une instance.
 
         Args:
             input: données à envoyer sur stdin de la commande.
+            check: lever IncusError si le code retour est non-nul.
+            timeout: timeout en secondes (None = pas de timeout).
         """
         args = ["exec", instance, "--project", project, "--", *command]
-        return self._run(args, input=input)
+        return self._run(args, input=input, check=check, timeout=timeout)

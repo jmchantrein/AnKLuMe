@@ -1,0 +1,58 @@
+# Rôle e2e_runner — provisionne une VM KVM pour tests réels E2E
+#
+# Installe Incus, uv, Python, nftables et tmux dans la VM.
+# Le source anklume est poussé séparément par l'orchestrateur.
+---
+- name: Mettre à jour le cache APT
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Installer Incus
+  ansible.builtin.apt:
+    name:
+      - incus
+      - incus-client
+    state: present
+
+- name: Initialiser Incus (minimal)
+  ansible.builtin.command:
+    cmd: incus admin init --minimal
+  changed_when: true
+  when: e2e_runner_incus_init
+
+- name: Installer les paquets système
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+      - python3-dev
+      - git
+      - nftables
+      - ansible
+      - tmux
+      - build-essential
+    state: present
+
+- name: Installer uv
+  ansible.builtin.shell:
+    cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
+    creates: /root/.local/bin/uv
+
+- name: Ajouter uv au PATH
+  ansible.builtin.copy:
+    content: 'export PATH="/root/.local/bin:$PATH"'
+    dest: /etc/profile.d/uv.sh
+    mode: "0644"
+
+- name: Créer le répertoire anklume
+  ansible.builtin.file:
+    path: "{{ e2e_runner_anklume_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Activer nftables
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: started

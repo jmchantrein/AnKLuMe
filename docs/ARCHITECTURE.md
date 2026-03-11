@@ -167,3 +167,27 @@ modifications, suppressions) sans appliquer.
 des fichiers. Chaque version a une fonction de migration.
 `anklume apply` vérifie et propose la migration automatique.
 Approche minimaliste : un entier incrémental, pas de semver.
+
+## ADR-024 : Tests réels dans VM KVM — anklume teste anklume
+
+Les tests unitaires (81% du code) utilisent des mocks. Les interactions
+réelles avec Incus, nftables, Ansible et le nesting sont validées
+dans une VM KVM isolée, créée par anklume lui-même (dogfooding).
+
+`anklume dev test-real` orchestre le cycle :
+1. Génère un domaine VM sandbox (`e2e-sandbox`)
+2. Applique via le pipeline standard (reconcile + Ansible)
+3. Pousse le source anklume dans la VM (tar + file_push)
+4. Exécute `pytest -m real` dans la VM via `incus exec`
+5. Collecte les résultats et détruit la VM (sauf `--keep`)
+
+**Pourquoi une VM et pas un conteneur LXC** : le kernel est séparé,
+ce qui permet de tester nftables et le nesting sans corrompre l'hôte.
+
+**Composants** :
+- `engine/e2e_real.py` — orchestrateur (génération, push, exec, résultats)
+- `provisioner/roles/e2e_runner/` — rôle Ansible (Incus, uv, nftables)
+- `tests/test_e2e_real.py` — tests marqués `@pytest.mark.real`
+
+**Hors VM** (restent sur l'hôte) : GPU passthrough, GUI Wayland,
+clipboard, STT push-to-talk.

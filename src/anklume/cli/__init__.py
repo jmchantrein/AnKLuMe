@@ -288,6 +288,48 @@ def dev_env(
     run_dev_env(config, output=output)
 
 
+@dev_app.command("test-real")
+def dev_test_real(
+    keep: Annotated[
+        bool,
+        typer.Option("--keep", help="Conserver la VM après les tests"),
+    ] = False,
+    filter_expr: Annotated[
+        str,
+        typer.Option("--filter", "-k", help="Filtre pytest (-k expression)"),
+    ] = "",
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Afficher la sortie complète"),
+    ] = False,
+    memory: Annotated[
+        str,
+        typer.Option("--memory", help="Mémoire de la VM (ex: 8GiB)"),
+    ] = "8GiB",
+    cpu: Annotated[
+        str,
+        typer.Option("--cpu", help="CPU de la VM (ex: 8)"),
+    ] = "8",
+    timeout: Annotated[
+        int,
+        typer.Option("--timeout", help="Timeout des tests en secondes"),
+    ] = 600,
+) -> None:
+    """Lancer les tests réels E2E dans une VM KVM isolée."""
+    from anklume.cli._dev_test_real import run_dev_test_real
+    from anklume.engine.e2e_real import E2eRealConfig
+
+    config = E2eRealConfig(
+        memory=memory,
+        cpu=cpu,
+        keep_vm=keep,
+        test_filter=filter_expr,
+        verbose=verbose,
+        timeout=timeout,
+    )
+    run_dev_test_real(config)
+
+
 @dev_app.command("molecule")
 def dev_molecule(
     role: Annotated[

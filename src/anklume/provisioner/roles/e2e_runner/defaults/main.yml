@@ -1,0 +1,4 @@
+# Rôle e2e_runner — valeurs par défaut
+---
+e2e_runner_incus_init: true
+e2e_runner_anklume_path: /opt/anklume

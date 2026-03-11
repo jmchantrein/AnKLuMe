@@ -31,7 +31,7 @@ class TestPushFile:
 
         assert isinstance(result, TransferResult)
         assert result.instance == "pro-dev"
-        expected = "/tmp/test.txt"  # noqa: S108
+        expected = "/tmp/test.txt"
         assert result.remote_path == expected
         assert result.size == 7
         driver.file_push.assert_called_once_with(
@@ -70,7 +70,7 @@ class TestPushFile:
         infra = make_infra(domains={"pro": make_domain("pro", {"dev": make_machine("dev", "pro")})})
         driver = mock_driver()
 
-        bad_path = "/tmp/inexistant_xyz.txt"  # noqa: S108
+        bad_path = "/tmp/inexistant_xyz.txt"
         with pytest.raises(FileNotFoundError, match="introuvable"):
             push_file(driver, infra, "pro-dev", bad_path)
 
@@ -111,7 +111,7 @@ class TestPullFile:
         infra = make_infra()
         driver = mock_driver()
 
-        remote = "/tmp/file.txt"  # noqa: S108
+        remote = "/tmp/file.txt"
         with pytest.raises(ValueError, match="Instance inconnue"):
             pull_file(driver, infra, "inexistant", remote)
 

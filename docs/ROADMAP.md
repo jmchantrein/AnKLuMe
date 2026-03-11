@@ -534,6 +534,47 @@ Génération automatique de domaines de dev via `anklume dev env`.
   sanitisation, politiques, preset, rôle, CLI, validations)
 - [x] 1172 tests au total, zéro régression
 
+## Phase 21 — Tests réels en VM KVM ✅
+
+Mécanisme de tests réels dans une VM KVM isolée — anklume teste anklume.
+ADR-024.
+
+- [x] `engine/e2e_real.py` — orchestrateur (génération domaine, push source,
+  exec pytest, collecte résultats)
+  - E2eRealConfig, E2eRealResult dataclasses
+  - `generate_e2e_project()` — projet anklume temporaire avec VM sandbox
+  - `wait_for_vm_ready()` — attente boot cloud-init
+  - `push_source_to_vm()` — tar + file_push + extraction
+  - `install_deps_in_vm()` — uv sync dans la VM
+  - `run_tests_in_vm()` — pytest via incus exec
+- [x] Rôle Ansible `e2e_runner` (embarqué) — provisionne la VM
+  - Incus + init minimal, uv, Python, nftables, Ansible, tmux
+- [x] `anklume dev test-real` — commande CLI Typer
+  - `--keep` conserver la VM après les tests
+  - `--filter/-k` filtre pytest
+  - `--verbose/-v` sortie complète
+  - `--memory`, `--cpu`, `--timeout` configuration VM
+- [x] `tests/test_e2e_real.py` — 15 classes de tests marqués `@pytest.mark.real`
+  - Driver CRUD réel (projet, réseau, instance, exec)
+  - Snapshots (create, list, restore, rollback)
+  - Réconciliateur (apply, idempotence, restart)
+  - Destroy (protection ephemeral, --force)
+  - Status (déclaré vs réel)
+  - Nftables (déploiement, vérification nft list)
+  - Nesting (injection fichiers de contexte /etc/anklume/)
+  - Portal (push/pull fichier)
+  - Disposable (lancement, cleanup)
+  - Golden images (publish, list, delete)
+  - Import infrastructure (scan projets existants)
+  - Doctor (diagnostic Incus)
+  - Network status (bridges réels)
+  - Provisioner Ansible (rôle base réel)
+  - Console tmux (build config)
+- [x] Tests unitaires : 21 tests (config, génération, parsing, rôle, CLI)
+- [x] 22 tests réels E2E marqués `@real` (exécutés dans la VM)
+- [x] 1204 tests unitaires au total, zéro régression
+  (2 E501 pré-existants dans test_gui.py)
+
 ### En réflexion
 
 - **MCP services** — canal de communication contrôlé pour les instances

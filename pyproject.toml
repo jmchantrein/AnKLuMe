@@ -44,7 +44,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "RUF"]
 ignore = ["S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]
+"tests/*" = ["S101", "S108"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -52,6 +52,7 @@ pythonpath = ["src"]
 markers = [
     "slow: tests lents (nesting, GPU)",
     "gpu: tests nécessitant un GPU NVIDIA",
+    "real: tests réels E2E dans VM KVM (anklume dev test-real)",
 ]
 
 [build-system]

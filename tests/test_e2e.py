@@ -18,6 +18,7 @@ from anklume.engine.incus_driver import IncusDriver
 from anklume.engine.parser import parse_project
 from anklume.engine.reconciler import reconcile
 
+from .conftest import write_test_project
 from .incus_helpers import (
     cleanup_project,
     instance_config_get,
@@ -58,33 +59,12 @@ def e2e_multi_project(tmp_path, monkeypatch):
         cleanup_project(p)
 
 
-def _write_project(path, domains: dict):
-    """Écrire un projet anklume complet."""
-    (path / "anklume.yml").write_text(
-        yaml.dump(
-            {
-                "schema_version": 1,
-                "defaults": {"os_image": "images:debian/13", "trust_level": "semi-trusted"},
-                "addressing": {"base": "10.200", "zone_step": 10},
-                "nesting": {"prefix": True},
-            }
-        )
-    )
-
-    domains_dir = path / "domains"
-    domains_dir.mkdir(exist_ok=True)
-    for name, data in domains.items():
-        (domains_dir / f"{name}.yml").write_text(yaml.dump(data))
-
-    (path / "policies.yml").write_text(yaml.dump({"policies": []}))
-
-
 class TestE2EApplyAll:
     """Pipeline complet : apply all crée les ressources dans Incus."""
 
     def test_creates_project_network_instance(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {
@@ -107,7 +87,7 @@ class TestE2EApplyAll:
 
     def test_protection_delete_set(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {
@@ -128,7 +108,7 @@ class TestE2EApplyAll:
 
     def test_ephemeral_no_protection(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {
@@ -154,7 +134,7 @@ class TestE2EIdempotence:
 
     def test_second_apply_no_changes(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {
@@ -189,7 +169,7 @@ class TestE2EDryRun:
 
     def test_dry_run_creates_nothing(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {
@@ -212,7 +192,7 @@ class TestE2EApplyDomain:
 
     def test_only_specified_domain(self, e2e_multi_project):
         path, projects = e2e_multi_project
-        _write_project(
+        write_test_project(
             path,
             {
                 projects[0]: {
@@ -239,7 +219,7 @@ class TestE2EStoppedInstance:
 
     def test_restarts_stopped_instance(self, e2e_project):
         path, project_name = e2e_project
-        _write_project(
+        write_test_project(
             path,
             {
                 project_name: {

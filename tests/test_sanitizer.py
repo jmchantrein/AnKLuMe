@@ -374,7 +374,7 @@ class TestSanitizeSockets:
     def test_detects_tmp_socket(self):
         from anklume.engine.sanitizer import sanitize
 
-        tmp_sock = "/tmp/agent.socket"  # noqa: S108
+        tmp_sock = "/tmp/agent.socket"
         result = sanitize(f"Connexion à {tmp_sock}")
         assert tmp_sock not in result.text
 

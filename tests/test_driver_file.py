@@ -18,7 +18,7 @@ class TestFilePush:
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
         driver = IncusDriver()
 
-        remote = "/tmp/file.txt"  # noqa: S108
+        remote = "/tmp/file.txt"
         driver.file_push("pro-dev", "pro", "/local/file.txt", remote)
 
         cmd = mock_run.call_args[0][0]
@@ -39,7 +39,7 @@ class TestFilePush:
         driver = IncusDriver()
 
         with pytest.raises(IncusError):
-            driver.file_push("pro-dev", "pro", "/bad", "/tmp/x")  # noqa: S108
+            driver.file_push("pro-dev", "pro", "/bad", "/tmp/x")
 
 
 class TestFilePull:
@@ -74,7 +74,7 @@ class TestInstanceExecInput:
         mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
         driver = IncusDriver()
 
-        remote = "/tmp/file"  # noqa: S108
+        remote = "/tmp/file"
         result = driver.instance_exec(
             "pro-dev",
             "pro",
