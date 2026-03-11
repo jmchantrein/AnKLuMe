@@ -102,6 +102,13 @@ Makefile, pas d'API web.
 | `anklume stt stop` | Arrêter le push-to-talk |
 | `anklume stt status` | État du service STT |
 
+## Éditeur TUI
+
+| Commande | Description |
+|---|---|
+| `anklume tui` | Éditeur interactif de domaines et politiques |
+| `anklume tui --project <dir>` | Éditeur sur un projet spécifique |
+
 ## Développement
 
 | Commande | Description |
@@ -144,6 +151,7 @@ graph TD
     CLI --> stt
     CLI --> dev
     CLI --> setup
+    CLI --> tui
     CLI --> telemetry
 
     apply --> apply_all[all]

@@ -5106,3 +5106,111 @@ anklume workspace grid --set 2x3
 | Grid add-cols | count augmente de cols × rows_ajoutés |
 | Grid add-rows | count augmente et rows augmente |
 | Grid set | count et rows forcés |
+
+## 37. TUI interactif — éditeur de domaines et politiques
+
+Interface terminal (TUI) basée sur Textual pour éditer visuellement
+les fichiers de domaines et politiques réseau d'un projet anklume.
+
+### 37.1 Philosophie
+
+Le TUI complète la CLI sans la remplacer. Il offre une vue d'ensemble
+interactive lors de la conception initiale de l'infrastructure ou pour
+des modifications ponctuelles. Les fichiers YAML restent la source de
+vérité (PSOT).
+
+### 37.2 Architecture
+
+```
+anklume tui [--project <dir>]
+  └─ AnklumeTUI (Textual App)
+       ├─ Onglet Domaines
+       │    ├─ DomainTree — arbre de navigation coloré par trust-level
+       │    ├─ DomainForm / MachineForm — formulaires contextuels
+       │    └─ YamlPreview — preview YAML temps réel (read-only)
+       └─ Onglet Politiques
+            └─ PolicyTable — table + formulaire d'édition inline
+```
+
+**Modules :**
+
+| Module | Responsabilité |
+|---|---|
+| `cli/_tui.py` | Point d'entrée CLI, gestion dépendance optionnelle |
+| `tui/app.py` | Application Textual (composition, bindings, sauvegarde) |
+| `tui/widgets/domain_tree.py` | Arbre Tree[NodeData], couleurs trust |
+| `tui/widgets/domain_form.py` | Formulaire domaine (description, trust, enabled, ephemeral) |
+| `tui/widgets/machine_form.py` | Formulaire machine (type, IP, GPU, GUI, rôles, weight) |
+| `tui/widgets/yaml_preview.py` | Preview YAML, sérialisation `domain_to_dict`/`machine_to_dict` |
+| `tui/widgets/policy_table.py` | Table DataTable + formulaire (from, to, ports, protocol, bidi) |
+| `tui/styles/app.tcss` | Thème CSS Textual |
+
+### 37.3 Dépendance optionnelle
+
+Textual est déclaré dans `pyproject.toml` sous `[project.optional-dependencies.tui]`.
+L'import est protégé par un try/except dans `cli/_tui.py` — si Textual
+est absent, un message guide l'installation.
+
+### 37.4 Sérialisation YAML
+
+Les fonctions `domain_to_dict()` et `machine_to_dict()` convertissent
+les modèles en dictionnaires YAML-ready en omettant les valeurs par
+défaut (type=lxc, weight=1, profiles=[default], etc.). Cette sérialisation
+est utilisée à la fois pour le preview temps réel et pour la sauvegarde.
+
+### 37.5 Détection des rôles
+
+Les rôles Ansible embarqués sont détectés au chargement du module
+depuis `provisioner/roles/` via `BUILTIN_ROLES_DIR` (importé de
+`anklume.provisioner`). Le même répertoire est utilisé par la CLI
+Molecule et le provisioner.
+
+### 37.6 CLI
+
+```
+anklume tui [--project/-p <dir>]
+```
+
+| Option | Défaut | Description |
+|---|---|---|
+| `--project`, `-p` | `.` | Répertoire du projet anklume |
+
+### 37.7 Raccourcis clavier
+
+| Raccourci | Action |
+|---|---|
+| `Ctrl+S` | Sauvegarder (domaines + politiques) |
+| `Ctrl+Q` | Quitter |
+| `a` | Ajouter domaine (racine) ou machine (domaine sélectionné) |
+| `d` | Supprimer l'élément sélectionné |
+
+### 37.8 Sauvegarde
+
+`Ctrl+S` écrit :
+- `domains/<nom>.yml` pour chaque domaine (via `domain_to_dict`)
+- `policies.yml` pour les politiques réseau
+
+Les fichiers de domaines supprimés dans le TUI sont effacés du disque.
+
+### 37.9 Tests
+
+| Scénario | Vérifié |
+|---|---|
+| NodeData root/domain/machine | Création et attributs |
+| machine_to_dict minimal | Seule description présente |
+| machine_to_dict type VM | Champ type inclus |
+| machine_to_dict gpu/gui | Flags booléens |
+| machine_to_dict rôles | Liste préservée |
+| machine_to_dict weight défaut omis | Pas de champ weight |
+| machine_to_dict IP explicite/auto | Présence conditionnelle |
+| machine_to_dict persistent/vars/workspace/config | Dicts préservés |
+| machine_to_dict profiles/ephemeral | Valeurs non-défaut |
+| domain_to_dict minimal | trust_level défaut omis |
+| domain_to_dict trust non-défaut | Champ inclus |
+| domain_to_dict disabled/ephemeral | Flags booléens |
+| domain_to_dict machines/profiles | Sous-dicts inclus |
+| domain_to_dict vide | Pas de clés machines/profiles |
+| BUILTIN_ROLES découverts | Liste non-vide, contient base/desktop/ollama_server |
+| BUILTIN_ROLES triés | Ordre alphabétique |
+| CLI tui enregistrée | Commande et --project |
+| PolicyTable parse_ports | Numérique, "all", vide |

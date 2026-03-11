@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
@@ -11,23 +9,13 @@ from textual.validation import Length
 from textual.widgets import Input, Label, Select, SelectionList, Static, Switch
 
 from anklume.engine.models import Machine
+from anklume.provisioner import BUILTIN_ROLES_DIR
 
-# Rôles embarqués (détectés au runtime)
-_BUILTIN_ROLES_DIR = Path(__file__).parent.parent.parent / "provisioner" / "roles"
-
-
-def _discover_roles() -> list[str]:
-    """Découvre les rôles Ansible embarqués."""
-    if _BUILTIN_ROLES_DIR.is_dir():
-        return sorted(
-            d.name
-            for d in _BUILTIN_ROLES_DIR.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
-        )
-    return []
-
-
-BUILTIN_ROLES = _discover_roles()
+BUILTIN_ROLES = sorted(
+    d.name
+    for d in BUILTIN_ROLES_DIR.iterdir()
+    if d.is_dir() and not d.name.startswith(".")
+) if BUILTIN_ROLES_DIR.is_dir() else []
 
 
 class MachineForm(Vertical):
@@ -104,9 +92,9 @@ class MachineForm(Vertical):
         # Cocher les rôles actifs
         roles_list = self.query_one("#roles-list", SelectionList)
         roles_list.deselect_all()
-        for _i, (_, role_value) in enumerate(roles_list._options):
-            if role_value in machine.roles:
-                roles_list.select(role_value)
+        for role in BUILTIN_ROLES:
+            if role in machine.roles:
+                roles_list.select(role)
 
     def apply_to_machine(self, machine: Machine) -> None:
         """Applique les valeurs du formulaire sur la machine."""

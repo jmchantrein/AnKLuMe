@@ -8,7 +8,7 @@ from textual.widgets import TextArea
 from anklume.engine.models import Domain, Machine
 
 
-def _machine_to_dict(m: Machine) -> dict:
+def machine_to_dict(m: Machine) -> dict:
     """Convertit une Machine en dict YAML-ready (champs non-défaut uniquement)."""
     d: dict = {"description": m.description}
     if m.type != "lxc":
@@ -38,7 +38,7 @@ def _machine_to_dict(m: Machine) -> dict:
     return d
 
 
-def _domain_to_dict(d: Domain) -> dict:
+def domain_to_dict(d: Domain) -> dict:
     """Convertit un Domain en dict YAML-ready."""
     out: dict = {"description": d.description}
     if d.trust_level != "semi-trusted":
@@ -49,7 +49,7 @@ def _domain_to_dict(d: Domain) -> dict:
         out["ephemeral"] = True
     if d.machines:
         out["machines"] = {
-            name: _machine_to_dict(m) for name, m in d.machines.items()
+            name: machine_to_dict(m) for name, m in d.machines.items()
         }
     if d.profiles:
         out["profiles"] = {
@@ -75,14 +75,14 @@ class YamlPreview(TextArea):
 
     def show_domain(self, domain: Domain) -> None:
         """Affiche le YAML d'un domaine."""
-        data = _domain_to_dict(domain)
+        data = domain_to_dict(domain)
         text = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
         self.load_text(text)
 
     def show_machine(self, domain: Domain, machine: Machine) -> None:
         """Affiche le YAML d'une machine dans son contexte domaine."""
         lines = [f"# {domain.name} → {machine.name}"]
-        m_data = {"machines": {machine.name: _machine_to_dict(machine)}}
+        m_data = {"machines": {machine.name: machine_to_dict(machine)}}
         text = yaml.dump(m_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
         lines.append(text)
         self.load_text("\n".join(lines))

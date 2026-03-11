@@ -224,3 +224,29 @@ distinctes et volontaires.
 visualiser, étendre (`--add-cols`, `--add-rows`) ou forcer
 (`--set CxR`) la grille de bureaux virtuels indépendamment
 du chargement de workspace.
+
+## ADR-026 : TUI interactif Textual
+
+Éditeur visuel en mode terminal pour les domaines et politiques.
+Complément à la CLI, pas un remplacement.
+
+**Choix Textual** : bibliothèque Python mature (34k+ stars), CSS-like
+styling, widgets riches (Tree, DataTable, Select, SelectionList),
+adapté au domaine Python du projet. Alternatives écartées : urwid
+(bas niveau), prompt_toolkit (orienté formulaire), npyscreen (peu maintenu).
+
+**Dépendance optionnelle** : Textual est sous `[project.optional-dependencies.tui]`.
+L'import est protégé par try/except — anklume fonctionne sans.
+
+**Architecture master-detail** : arbre de navigation (domaines → machines)
+à gauche, formulaire contextuel + preview YAML à droite. Deux onglets :
+Domaines et Politiques. Pattern inspiré de lazydocker et helm-yaml-tui.
+
+**Sérialisation** : `domain_to_dict()` et `machine_to_dict()` dans
+`tui/widgets/yaml_preview.py` — fonctions publiques partagées entre
+le preview temps réel et la sauvegarde. Omission des valeurs par défaut
+pour un YAML compact conforme au modèle PSOT.
+
+**Réutilisation** : `BUILTIN_ROLES_DIR` importé de `provisioner/`,
+`TRUST_LEVELS` et `TRUST_COLORS` importés de `engine/models.py`.
+Aucune duplication avec le reste du codebase.

@@ -73,6 +73,7 @@ nav:
     - Installation: guide/installation.md
     - Démarrage rapide: guide/quickstart.md
     - Structure projet: guide/project-structure.md
+    - Éditeur TUI: guide/tui.md
   - Concepts:
     - concepts/index.md
     - Domaines et machines: concepts/domaines.md

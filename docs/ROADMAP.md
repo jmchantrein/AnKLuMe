@@ -575,7 +575,32 @@ ADR-024.
 - [x] 1204 tests unitaires au total, zéro régression
   (2 E501 pré-existants dans test_gui.py)
 
-## Phase 22 — Workspace layout déclaratif (GUI "tmuxp")
+## Phase 22 — TUI interactif ✅
+
+Éditeur visuel en mode terminal (Textual) pour les domaines et politiques.
+
+- [x] SPEC §37 détaillé (architecture, modules, CLI, raccourcis, sérialisation, tests)
+- [x] ADR-026 dans ARCHITECTURE.md
+- [x] `tui/app.py` — Application Textual master-detail avec onglets
+  - Layout : Header + TabbedContent (Domaines, Politiques) + Footer
+  - Bindings : Ctrl+S sauver, Ctrl+Q quitter, a/d ajouter/supprimer
+  - Sauvegarde YAML (domaines + politiques)
+- [x] `tui/widgets/domain_tree.py` — Arbre Tree[NodeData] coloré par trust-level
+- [x] `tui/widgets/domain_form.py` — Formulaire domaine (description, trust, enabled, ephemeral)
+- [x] `tui/widgets/machine_form.py` — Formulaire machine (type, IP, GPU, GUI, rôles, weight)
+  - Détection automatique des rôles Ansible via `BUILTIN_ROLES_DIR`
+- [x] `tui/widgets/yaml_preview.py` — Preview YAML live (omission valeurs par défaut)
+  - `domain_to_dict()`, `machine_to_dict()` — sérialisation publique
+- [x] `tui/widgets/policy_table.py` — Table DataTable + formulaire inline
+- [x] `tui/styles/app.tcss` — Thème CSS (trust-level colors, layout, validation)
+- [x] `cli/_tui.py` — Point d'entrée CLI avec dépendance optionnelle Textual
+- [x] Commande `anklume tui [--project]`
+- [x] Documentation MkDocs : `docs/guide/tui.md`
+- [x] CLI reference : commande tui ajoutée à `docs/cli/index.md`
+- [x] Tests unitaires : 36 tests (sérialisation, parsing, CLI, rôles, NodeData)
+- [x] 1240+ tests unitaires au total, zéro régression
+
+## Phase 23 — Workspace layout déclaratif (GUI "tmuxp")
 
 Layout déclaratif du bureau graphique : chaque machine GUI déclare
 son bureau virtuel, sa position et son autostart. `anklume workspace load`

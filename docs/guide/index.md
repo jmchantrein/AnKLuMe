@@ -6,3 +6,4 @@ projet anklume.
 - [Installation](installation.md) — prérequis et installation
 - [Démarrage rapide](quickstart.md) — premier projet en 5 minutes
 - [Structure projet](project-structure.md) — comprendre l'arborescence
+- [Éditeur TUI](tui.md) — interface terminal interactive
