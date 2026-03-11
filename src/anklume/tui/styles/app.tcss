@@ -1,0 +1,126 @@
+/* anklume TUI — thème */
+
+Screen {
+    background: $surface;
+}
+
+/* Layout principal */
+#main-container {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#tree-pane {
+    width: 30;
+    min-width: 20;
+    border-right: tall $primary;
+    padding: 0 1;
+}
+
+#detail-pane {
+    width: 1fr;
+    layout: vertical;
+}
+
+#form-pane {
+    height: 2fr;
+    padding: 0 1;
+    overflow-y: auto;
+}
+
+#preview-pane {
+    height: 1fr;
+    border-top: tall $primary;
+    padding: 0 1;
+}
+
+/* Tree */
+DomainTree {
+    height: 1fr;
+}
+
+DomainTree > .tree--cursor {
+    background: $accent;
+    color: $text;
+}
+
+/* Formulaire */
+.form-group {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.form-group Label {
+    width: 16;
+    padding: 0 1 0 0;
+    text-style: bold;
+}
+
+.form-group Input {
+    width: 1fr;
+}
+
+.form-group Select {
+    width: 1fr;
+}
+
+.form-row {
+    layout: horizontal;
+    height: auto;
+}
+
+/* Badges trust level */
+.trust-admin {
+    color: #ff0000;
+}
+.trust-trusted {
+    color: #005faf;
+}
+.trust-semi-trusted {
+    color: #ffd700;
+}
+.trust-untrusted {
+    color: #9B59B6;
+}
+.trust-disposable {
+    color: #5f5f5f;
+}
+
+/* Preview YAML */
+#yaml-preview {
+    height: 1fr;
+}
+
+/* Titre section */
+.section-title {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0 0 0;
+}
+
+/* Boutons action */
+.action-bar {
+    layout: horizontal;
+    height: 3;
+    dock: bottom;
+    padding: 0 1;
+}
+
+.action-bar Button {
+    margin: 0 1;
+}
+
+/* Feedback validation */
+Input.-invalid {
+    border: tall $error;
+}
+
+Input.-valid {
+    border: tall $success;
+}
+
+/* Roles selection */
+#roles-list {
+    height: 8;
+    border: tall $primary;
+}

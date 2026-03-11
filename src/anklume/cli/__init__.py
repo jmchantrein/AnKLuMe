@@ -1028,3 +1028,19 @@ def workspace_grid(
     from anklume.cli._workspace import run_workspace_grid
 
     run_workspace_grid(add_cols=add_cols, add_rows=add_rows, set_grid=set_grid)
+
+
+# --- anklume tui ---
+
+
+@app.command("tui")
+def tui(
+    project: Annotated[
+        str,
+        typer.Option("--project", "-p", help="Répertoire du projet anklume"),
+    ] = ".",
+) -> None:
+    """Éditeur interactif de domaines et politiques (TUI)."""
+    from anklume.cli._tui import run_tui
+
+    run_tui(project_dir=project)
