@@ -69,6 +69,7 @@ def validate(infra: Infrastructure) -> ValidationResult:
     _check_machine_weights(infra, result)
     _check_policies(infra, result)
     _check_machine_config_keys(infra, result)
+    _check_workspace(infra, result)
 
     return result
 
@@ -266,4 +267,55 @@ def _check_machine_config_keys(
                         f"(escalade de privilèges potentielle).",
                         "Cette clé est gérée automatiquement par le nesting. "
                         "Ne la définir que si vous comprenez les implications.",
+                    )
+
+
+def _check_workspace(infra: Infrastructure, result: ValidationResult) -> None:
+    """Valide la configuration workspace des machines."""
+    for domain_name, domain in infra.domains.items():
+        for machine_name, machine in domain.machines.items():
+            ws = machine.workspace
+            if ws is None:
+                continue
+
+            loc = f"domains/{domain_name}.yml"
+
+            # workspace requiert gui: true
+            if not machine.gui:
+                result.add(
+                    loc,
+                    f"machine '{machine_name}': workspace requiert gui: true.",
+                    "Ajouter 'gui: true' à la machine ou retirer 'workspace:'.",
+                )
+
+            # desktop requis et valide
+            desktop = ws.get("desktop")
+            if not desktop:
+                result.add(
+                    loc,
+                    f"machine '{machine_name}': workspace.desktop requis.",
+                    "Spécifier desktop: [colonne, ligne] (ex: [1, 2]).",
+                )
+            elif not isinstance(desktop, list) or len(desktop) != 2:
+                result.add(
+                    loc,
+                    f"machine '{machine_name}': workspace.desktop doit contenir "
+                    f"exactement 2 entiers [colonne, ligne].",
+                    "Exemple : desktop: [1, 2]",
+                )
+            else:
+                col, row = desktop
+                if not isinstance(col, int) or not isinstance(row, int):
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': workspace.desktop doit contenir "
+                        f"des entiers.",
+                        "Exemple : desktop: [1, 2]",
+                    )
+                elif col < 1 or row < 1:
+                    result.add(
+                        loc,
+                        f"machine '{machine_name}': workspace.desktop [{col}, {row}] "
+                        f"invalide (valeurs 1-indexed, min [1, 1]).",
+                        "Les coordonnées commencent à 1.",
                     )

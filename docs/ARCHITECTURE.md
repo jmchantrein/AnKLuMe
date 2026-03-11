@@ -191,3 +191,36 @@ ce qui permet de tester nftables et le nesting sans corrompre l'hôte.
 
 **Hors VM** (restent sur l'hôte) : GPU passthrough, GUI Wayland,
 clipboard, STT push-to-talk.
+
+## ADR-025 : Workspace layout déclaratif
+
+Layout déclaratif du bureau graphique, équivalent GUI de tmuxp.
+Chaque machine avec `gui: true` déclare optionnellement un
+`workspace:` (bureau virtuel, position, autostart).
+`anklume workspace load` restaure l'environnement complet.
+
+**Mécanisme** : kwinrulesrc (règles KWin déclaratives).
+Appliquées AVANT l'affichage de la fenêtre, idempotentes, persistantes.
+Déjà utilisé pour les couleurs trust (ADR-009) — les deux aspects
+(placement + couleur) sont fusionnés dans la même règle.
+
+**Grille de bureaux virtuels** : créée à la demande via DBus
+(`VirtualDesktopManager.createDesktop()`). L'utilisateur exprime
+les coordonnées en `[colonne, ligne]` (1-indexed, pensée en grille).
+Le moteur convertit en index linéaire puis résout l'UUID KDE.
+
+**Architecture** :
+- `engine/workspace.py` — moteur pur Python (dataclasses, logique
+  de grille, parsing workspace). DE-agnostique.
+- `cli/_workspace.py` — backend KDE (kwinrulesrc, DBus, lancement).
+  Seule partie KDE-spécifique.
+
+**Séparation apply/workspace** : `anklume apply` déploie
+l'infrastructure (Incus + Ansible). `anklume workspace load`
+configure le bureau (KWin + lancement apps). Deux actions
+distinctes et volontaires.
+
+**Gestion de la grille** : `anklume workspace grid` permet de
+visualiser, étendre (`--add-cols`, `--add-rows`) ou forcer
+(`--set CxR`) la grille de bureaux virtuels indépendamment
+du chargement de workspace.

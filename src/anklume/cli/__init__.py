@@ -28,6 +28,7 @@ setup_app = typer.Typer(help="Configuration et import.")
 golden_app = typer.Typer(help="Golden images — images réutilisables.")
 tor_app = typer.Typer(help="Passerelle Tor.")
 telemetry_app = typer.Typer(help="Métriques d'usage.")
+workspace_app = typer.Typer(help="Workspace layout déclaratif (GUI tmuxp).")
 
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
@@ -43,6 +44,7 @@ app.add_typer(setup_app, name="setup")
 app.add_typer(golden_app, name="golden")
 app.add_typer(tor_app, name="tor")
 app.add_typer(telemetry_app, name="telemetry")
+app.add_typer(workspace_app, name="workspace")
 
 
 def _version_callback(value: bool) -> None:
@@ -974,3 +976,55 @@ def telemetry_status() -> None:
     from anklume.cli._telemetry import run_telemetry_status
 
     run_telemetry_status()
+
+
+# --- anklume workspace <load|status|grid> ---
+
+
+@workspace_app.command("load")
+def workspace_load(
+    domain: Annotated[
+        str | None,
+        typer.Argument(help="Domaine (tous si omis)"),
+    ] = None,
+) -> None:
+    """Restaurer le workspace layout (bureaux virtuels + apps)."""
+    from anklume.cli._workspace import run_workspace_load
+
+    run_workspace_load(domain=domain)
+
+
+@workspace_app.command("status")
+def workspace_status() -> None:
+    """Afficher le layout déclaré vs réel."""
+    from anklume.cli._workspace import run_workspace_status
+
+    run_workspace_status()
+
+
+workspace_grid_app = typer.Typer(help="Gestion de la grille de bureaux virtuels.")
+workspace_app.add_typer(workspace_grid_app, name="grid")
+
+
+@workspace_grid_app.callback(invoke_without_command=True)
+def workspace_grid(
+    ctx: typer.Context,
+    add_cols: Annotated[
+        int,
+        typer.Option("--add-cols", help="Ajouter N colonnes à la grille"),
+    ] = 0,
+    add_rows: Annotated[
+        int,
+        typer.Option("--add-rows", help="Ajouter N lignes à la grille"),
+    ] = 0,
+    set_grid: Annotated[
+        str,
+        typer.Option("--set", help="Forcer la grille (ex: 3x2)"),
+    ] = "",
+) -> None:
+    """Afficher ou modifier la grille de bureaux virtuels."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from anklume.cli._workspace import run_workspace_grid
+
+    run_workspace_grid(add_cols=add_cols, add_rows=add_rows, set_grid=set_grid)

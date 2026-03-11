@@ -84,6 +84,7 @@ class Machine:
     persistent: dict[str, str] = field(default_factory=dict)
     vars: dict = field(default_factory=dict)
     weight: int = 1
+    workspace: dict | None = None
 
     @property
     def incus_type(self) -> str:

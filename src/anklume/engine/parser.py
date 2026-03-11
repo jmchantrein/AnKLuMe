@@ -163,6 +163,7 @@ def _parse_domain(path: Path, defaults: Defaults) -> Domain:
             persistent=machine_data.get("persistent", {}),
             vars=machine_data.get("vars", {}),
             weight=machine_data.get("weight", 1),
+            workspace=machine_data.get("workspace"),
         )
 
     return Domain(

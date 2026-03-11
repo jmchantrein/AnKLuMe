@@ -575,6 +575,32 @@ ADR-024.
 - [x] 1204 tests unitaires au total, zéro régression
   (2 E501 pré-existants dans test_gui.py)
 
+## Phase 22 — Workspace layout déclaratif (GUI "tmuxp")
+
+Layout déclaratif du bureau graphique : chaque machine GUI déclare
+son bureau virtuel, sa position et son autostart. `anklume workspace load`
+restaure l'environnement identique à chaque fois. Gestion de la grille
+de bureaux virtuels KDE via DBus.
+
+- [ ] SPEC §36 détaillé (workspace config, grille, kwinrulesrc, CLI, séquence)
+- [ ] ADR-025 dans ARCHITECTURE.md
+- [ ] `engine/workspace.py` — WorkspaceEntry, WorkspaceLayout, compute_grid_needs,
+  resolve_desktop_index, parse_workspace
+- [ ] `cli/_workspace.py` — backend KDE (kwinrulesrc + DBus VirtualDesktopManager)
+  - `ensure_virtual_desktops()` — crée les desktops manquants
+  - `resolve_desktop_uuids()` — mapper [col,row] → UUID
+  - `install_workspace_rules()` — kwinrulesrc (desktop + position + couleur trust)
+  - `launch_workspace_apps()` — lance les apps via `run_instance_gui()`
+- [ ] `anklume workspace load [domaine]` — restaure le layout complet
+- [ ] `anklume workspace status` — affiche layout déclaré vs réel
+- [ ] `anklume workspace grid` — affiche la grille actuelle
+- [ ] `anklume workspace grid --add-cols N --add-rows N` — étend la grille
+- [ ] `anklume workspace grid --set CxR` — force la grille
+- [ ] Modèle : `WorkspaceConfig` dans Machine, parsing + validation
+- [ ] Fusion kwinrulesrc : workspace + couleur trust dans la même règle
+- [ ] Tests unitaires : workspace engine + CLI registration + validation
+- [ ] Tests réels : grille DBus, kwinrulesrc, lancement apps
+
 ### En réflexion
 
 - **MCP services** — canal de communication contrôlé pour les instances

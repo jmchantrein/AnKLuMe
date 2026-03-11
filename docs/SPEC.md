@@ -4840,3 +4840,269 @@ développement d'anklume :
 | CLI crée le fichier | Fichier domaine écrit dans domains/ |
 | CLI refuse doublon | Erreur si domaine existe |
 | CLI refuse sans domains/ | Erreur si init pas fait |
+
+## 36. Workspace layout déclaratif
+
+Équivalent GUI de tmuxp : disposition déclarative des applications
+sur les bureaux virtuels KDE. Chaque machine avec `gui: true`
+déclare optionnellement son placement. `anklume workspace load`
+restaure l'environnement complet.
+
+### 36.1 Philosophie
+
+Le bureau graphique est reproductible. L'utilisateur déclare
+**une fois** son environnement de travail (quelle app, quel bureau
+virtuel, quelle position) et le restaure d'une commande après
+chaque redémarrage. Comme `tmuxp load` pour le terminal.
+
+### 36.2 Configuration workspace (domaine YAML)
+
+Champ optionnel `workspace:` sur chaque machine :
+
+```yaml
+# domains/perso.yml
+machines:
+  firefox:
+    description: "Navigateur principal"
+    gui: true
+    workspace:
+      desktop: [1, 2]         # colonne 1, ligne 2 (1-indexed)
+      autostart: true          # lancer au workspace load
+      app: firefox             # commande à lancer
+      # Optionnel :
+      # position: [100, 50]    # x, y pixels (coin supérieur gauche)
+      # size: [1200, 800]      # largeur, hauteur en pixels
+      # fullscreen: true       # plein écran (défaut: false)
+      # screen: 0              # index écran (défaut: 0)
+```
+
+**Champs** :
+
+| Champ | Type | Requis | Défaut | Description |
+|-------|------|--------|--------|-------------|
+| `desktop` | `[int, int]` | oui | — | Colonne, ligne dans la grille (1-indexed) |
+| `autostart` | `bool` | non | `false` | Lancer au `workspace load` |
+| `app` | `str` | non | `""` | Commande à lancer (vide = pas de lancement) |
+| `position` | `[int, int]` | non | `null` | Position x, y en pixels |
+| `size` | `[int, int]` | non | `null` | Taille largeur, hauteur en pixels |
+| `fullscreen` | `bool` | non | `false` | Plein écran forcé |
+| `screen` | `int` | non | `0` | Index de l'écran |
+
+**Contraintes** :
+- `workspace:` requiert `gui: true` sur la machine
+- `desktop:` doit contenir exactement 2 entiers positifs
+- `position:` et `size:` doivent contenir exactement 2 entiers positifs
+- `screen:` doit être un entier >= 0
+
+### 36.3 Grille de bureaux virtuels
+
+KDE organise les bureaux virtuels en grille (colonnes × lignes).
+L'API DBus `VirtualDesktopManager` expose :
+- `count` (uint) — nombre total de desktops
+- `rows` (uint, rw) — nombre de lignes
+- `desktops` (array) — liste ordonnée `(position, uuid, name)`
+- `createDesktop(position, name)` — créer un desktop
+- `removeDesktop(id)` — supprimer un desktop
+
+**Correspondance grille → index** :
+```
+index = (row - 1) * cols + col    (1-indexed → 0-indexed en interne)
+cols = count / rows
+```
+
+Exemple pour une grille 3×2 (3 colonnes, 2 lignes) :
+
+```
+         col 1    col 2    col 3
+row 1  │ [1,1]  │ [2,1]  │ [3,1]  │
+row 2  │ [1,2]  │ [2,2]  │ [3,2]  │
+```
+
+### 36.4 Module engine/workspace.py
+
+Moteur pur Python, DE-agnostique.
+
+```python
+@dataclass
+class WorkspaceEntry:
+    """Placement d'une machine GUI sur le bureau."""
+    machine_name: str       # full_name de la machine
+    domain_name: str
+    trust_level: str
+    desktop: tuple[int, int]  # (colonne, ligne) 1-indexed
+    autostart: bool = False
+    app: str = ""
+    position: tuple[int, int] | None = None  # (x, y) pixels
+    size: tuple[int, int] | None = None      # (w, h) pixels
+    fullscreen: bool = False
+    screen: int = 0
+
+@dataclass
+class WorkspaceLayout:
+    """Layout complet du bureau."""
+    entries: list[WorkspaceEntry]
+    grid_cols: int    # colonnes nécessaires
+    grid_rows: int    # lignes nécessaires
+
+@dataclass
+class GridInfo:
+    """État de la grille de bureaux virtuels."""
+    cols: int
+    rows: int
+    count: int
+    desktops: list[DesktopInfo]  # (position, uuid, name)
+
+@dataclass
+class DesktopInfo:
+    """Un bureau virtuel."""
+    position: int
+    uuid: str
+    name: str
+```
+
+**Fonctions** :
+- `parse_workspace(infra) → WorkspaceLayout` — extrait tous
+  les `workspace:` des domaines activés, calcule la grille minimale
+- `compute_grid_needs(entries) → (cols, rows)` — max col/row
+  parmi toutes les entrées
+- `resolve_desktop_index(col, row, grid_cols) → int` — convertit
+  coordonnées grille en index linéaire (0-indexed)
+- `validate_workspace_entries(entries) → list[str]` — erreurs
+
+### 36.5 Module cli/_workspace.py
+
+Backend KDE Plasma (kwinrulesrc + DBus).
+
+**Fonctions** :
+- `get_grid_info(dbus_env) → GridInfo` — lit l'état de la grille
+  via `qdbus6 VirtualDesktopManager`
+- `ensure_virtual_desktops(needed_cols, needed_rows, dbus_env)` —
+  crée les desktops manquants, ajuste `rows`
+- `resolve_desktop_uuids(layout, grid_info) → dict[tuple, str]` —
+  mapper `(col, row)` → UUID
+- `install_workspace_rules(layout, uuid_map, gui_uid)` — écrit
+  kwinrulesrc avec desktop + position + couleur trust fusionnés
+- `launch_workspace_apps(layout)` — lance les apps autostart
+  via `run_instance_gui()`
+- `add_grid(add_cols, add_rows, dbus_env)` — étend la grille
+- `set_grid(cols, rows, dbus_env)` — force la grille
+
+### 36.6 Commandes CLI
+
+```bash
+anklume workspace load [domaine]    # Restaure le layout
+anklume workspace status            # Layout déclaré vs réel
+anklume workspace grid              # Affiche la grille
+anklume workspace grid --add-cols N # Ajoute N colonnes
+anklume workspace grid --add-rows N # Ajoute N lignes
+anklume workspace grid --set CxR    # Force C colonnes × R lignes
+```
+
+### 36.7 Séquence `anklume workspace load`
+
+1. **Parse** — lire `workspace:` des domaines (ou du domaine filtré)
+2. **Grille** — `compute_grid_needs()` → grille minimale requise
+3. **Créer desktops** — `ensure_virtual_desktops()` via DBus
+4. **Résoudre UUIDs** — `resolve_desktop_uuids()` via DBus
+5. **kwinrulesrc** — `install_workspace_rules()` (desktop UUID +
+   position + couleur trust dans la même section)
+6. **Reconfigure KWin** — `qdbus6 org.kde.KWin /KWin reconfigure`
+7. **Lancer apps** — `launch_workspace_apps()` pour autostart
+
+### 36.8 Format kwinrulesrc
+
+Champs KWin utilisés (source : `/usr/include/kwin/rules.h`) :
+
+```ini
+[anklume-perso-firefox]
+Description=anklume: perso-firefox (semi-trusted) workspace
+wmclass=firefox
+wmclassmatch=2
+# Couleur trust (existant, fusionné)
+decocolor=anklume-semi-trusted
+decocolorrule=2
+# Bureau virtuel (UUID KDE)
+desktops=d0a709bd-9a38-433f-ae56-11c5a700c1bc
+desktopsrule=2
+# Position (optionnel)
+position=100,50
+positionrule=3
+# Taille (optionnel)
+size=1200,800
+sizerule=3
+# Plein écran (optionnel)
+fullscreen=true
+fullscreenrule=2
+# Écran (optionnel)
+screen=0
+screenrule=3
+```
+
+Valeurs des règles : `2`=Force, `3`=Apply (initial seulement).
+`desktopsrule=2` (Force) : la fenêtre est toujours sur ce desktop.
+`positionrule=3` (Apply) : position initiale, déplaçable ensuite.
+
+### 36.9 Grille CLI (`workspace grid`)
+
+```bash
+# Afficher la grille actuelle
+anklume workspace grid
+# → Grille : 3 colonnes × 2 lignes (6 desktops)
+# →   [1,1] Bureau 1    [2,1] Bureau 2    [3,1] Bureau 3
+# →   [1,2] Bureau 4    [2,2] Bureau 5    [3,2] Bureau 6
+
+# Ajouter des colonnes/lignes
+anklume workspace grid --add-cols 1
+# → Grille : 4 colonnes × 2 lignes (8 desktops)
+
+anklume workspace grid --add-rows 1
+# → Grille : 4 colonnes × 3 lignes (12 desktops)
+
+# Forcer une taille
+anklume workspace grid --set 2x3
+# → Grille : 2 colonnes × 3 lignes (6 desktops)
+```
+
+**Logique `--add-cols N`** :
+1. Lire `grid_info` → cols=C, rows=R, count=C×R
+2. Nouveau count = (C+N) × R
+3. Créer `(C+N)×R - count` desktops via `createDesktop()`
+4. Écrire `rows=R` (inchangé)
+
+**Logique `--add-rows N`** :
+1. Lire `grid_info` → cols=C, rows=R, count=C×R
+2. Nouveau count = C × (R+N)
+3. Créer `C×(R+N) - count` desktops via `createDesktop()`
+4. Écrire `rows=R+N`
+
+**Logique `--set CxR`** :
+1. Lire `grid_info` → count actuel
+2. Si C×R > count : créer les desktops manquants
+3. Si C×R < count : supprimer les desktops excédentaires (du dernier)
+4. Écrire `rows=R`
+
+### 36.10 Tests
+
+| Test | Vérification |
+|------|-------------|
+| `WorkspaceEntry` defaults | `autostart=False`, `app=""`, `fullscreen=False`, `screen=0` |
+| `parse_workspace` minimal | Un domaine, une machine avec workspace |
+| `parse_workspace` sans workspace | Machines sans workspace ignorées |
+| `parse_workspace` multi-domaines | Entrées de tous les domaines activés |
+| `compute_grid_needs` | Max col/row calculé correctement |
+| `resolve_desktop_index` | `[1,1]→0`, `[2,1]→1`, `[1,2]→cols` |
+| `validate_workspace_entries` desktop | `[0,1]` et `[-1,2]` rejetés |
+| `validate_workspace_entries` position | `[-100,50]` rejeté |
+| `validate_workspace_entries` gui | Machine sans `gui:true` rejetée |
+| `WorkspaceConfig` dans Machine | Parsing YAML → dataclass |
+| Validation workspace sans gui | Erreur si `workspace:` sans `gui: true` |
+| Validation desktop format | Erreur si pas exactement 2 entiers positifs |
+| kwinrulesrc desktop UUID | Champ `desktops=<uuid>` écrit |
+| kwinrulesrc position | Champ `position=x,y` écrit |
+| kwinrulesrc fullscreen | Champ `fullscreen=true` écrit |
+| kwinrulesrc fusion trust | `decocolor` et `desktops` dans la même section |
+| CLI `workspace` enregistrée | Commande workspace dans app |
+| CLI `workspace grid` enregistrée | Sous-commande grid |
+| Grid add-cols | count augmente de cols × rows_ajoutés |
+| Grid add-rows | count augmente et rows augmente |
+| Grid set | count et rows forcés |
