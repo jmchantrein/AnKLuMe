@@ -48,9 +48,7 @@ def domain_to_dict(d: Domain) -> dict:
     if d.ephemeral:
         out["ephemeral"] = True
     if d.machines:
-        out["machines"] = {
-            name: machine_to_dict(m) for name, m in d.machines.items()
-        }
+        out["machines"] = {name: machine_to_dict(m) for name, m in d.machines.items()}
     if d.profiles:
         out["profiles"] = {
             name: {"devices": p.devices, "config": p.config}

@@ -122,7 +122,9 @@ class TestMachineToDict:
 
     def test_roles(self) -> None:
         m = Machine(
-            name="dev", full_name="pro-dev", description="Dev",
+            name="dev",
+            full_name="pro-dev",
+            description="Dev",
             roles=["base", "dev-tools"],
         )
         d = machine_to_dict(m)
@@ -140,7 +142,9 @@ class TestMachineToDict:
 
     def test_ip_explicit(self) -> None:
         m = Machine(
-            name="fixed", full_name="pro-fixed", description="IP fixe",
+            name="fixed",
+            full_name="pro-fixed",
+            description="IP fixe",
             ip="10.120.0.5",
         )
         d = machine_to_dict(m)
@@ -153,7 +157,9 @@ class TestMachineToDict:
 
     def test_persistent_volumes(self) -> None:
         m = Machine(
-            name="vol", full_name="pro-vol", description="Volumes",
+            name="vol",
+            full_name="pro-vol",
+            description="Volumes",
             persistent={"data": "/mnt/data"},
         )
         d = machine_to_dict(m)
@@ -161,7 +167,9 @@ class TestMachineToDict:
 
     def test_vars(self) -> None:
         m = Machine(
-            name="var", full_name="pro-var", description="Vars",
+            name="var",
+            full_name="pro-var",
+            description="Vars",
             vars={"llm_backend": "local"},
         )
         d = machine_to_dict(m)
@@ -169,7 +177,9 @@ class TestMachineToDict:
 
     def test_profiles_non_default(self) -> None:
         m = Machine(
-            name="prof", full_name="pro-prof", description="Profils",
+            name="prof",
+            full_name="pro-prof",
+            description="Profils",
             profiles=["default", "gpu"],
         )
         d = machine_to_dict(m)
@@ -182,7 +192,9 @@ class TestMachineToDict:
 
     def test_ephemeral_explicit(self) -> None:
         m = Machine(
-            name="tmp", full_name="pro-tmp", description="Temp",
+            name="tmp",
+            full_name="pro-tmp",
+            description="Temp",
             ephemeral=True,
         )
         d = machine_to_dict(m)
@@ -195,7 +207,9 @@ class TestMachineToDict:
 
     def test_workspace(self) -> None:
         m = Machine(
-            name="gui", full_name="pro-gui", description="GUI",
+            name="gui",
+            full_name="pro-gui",
+            description="GUI",
             workspace={"desktop": [1, 1], "tile": "left"},
         )
         d = machine_to_dict(m)
@@ -203,7 +217,9 @@ class TestMachineToDict:
 
     def test_config_overrides(self) -> None:
         m = Machine(
-            name="cfg", full_name="pro-cfg", description="Config",
+            name="cfg",
+            full_name="pro-cfg",
+            description="Config",
             config={"limits.cpu": "4"},
         )
         d = machine_to_dict(m)

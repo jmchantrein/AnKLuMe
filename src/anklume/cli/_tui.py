@@ -13,8 +13,7 @@ def run_tui(project_dir: str) -> None:
         import typer
 
         typer.echo(
-            "Le TUI nécessite textual. Installer avec :\n"
-            "  uv pip install textual",
+            "Le TUI nécessite textual. Installer avec :\n  uv pip install textual",
             err=True,
         )
         raise typer.Exit(1) from None

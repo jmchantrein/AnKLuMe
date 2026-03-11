@@ -11,11 +11,11 @@ from textual.widgets import Input, Label, Select, SelectionList, Static, Switch
 from anklume.engine.models import Machine
 from anklume.provisioner import BUILTIN_ROLES_DIR
 
-BUILTIN_ROLES = sorted(
-    d.name
-    for d in BUILTIN_ROLES_DIR.iterdir()
-    if d.is_dir() and not d.name.startswith(".")
-) if BUILTIN_ROLES_DIR.is_dir() else []
+BUILTIN_ROLES = (
+    sorted(d.name for d in BUILTIN_ROLES_DIR.iterdir() if d.is_dir() and not d.name.startswith("."))
+    if BUILTIN_ROLES_DIR.is_dir()
+    else []
+)
 
 
 class MachineForm(Vertical):

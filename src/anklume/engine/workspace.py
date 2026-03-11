@@ -32,15 +32,17 @@ class GridInfo:
     desktops: list[DesktopInfo] = field(default_factory=list)
 
 
-VALID_TILES = frozenset({
-    "left",
-    "right",
-    "top-left",
-    "top-right",
-    "bottom-left",
-    "bottom-right",
-    "maximize",
-})
+VALID_TILES = frozenset(
+    {
+        "left",
+        "right",
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right",
+        "maximize",
+    }
+)
 
 
 @dataclass
@@ -137,9 +139,7 @@ def validate_workspace_entries(entries: list[WorkspaceEntry]) -> list[str]:
                     f"{entry.machine_name}: tile et position sont mutuellement exclusifs."
                 )
             if entry.size is not None:
-                errors.append(
-                    f"{entry.machine_name}: tile et size sont mutuellement exclusifs."
-                )
+                errors.append(f"{entry.machine_name}: tile et size sont mutuellement exclusifs.")
 
     return errors
 

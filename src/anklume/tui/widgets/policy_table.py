@@ -94,8 +94,7 @@ class PolicyTable(Vertical):
         table.clear()
         for p in self._policies:
             ports_str = (
-                str(p.ports) if isinstance(p.ports, str)
-                else ", ".join(str(x) for x in p.ports)
+                str(p.ports) if isinstance(p.ports, str) else ", ".join(str(x) for x in p.ports)
             )
             table.add_row(
                 p.from_target,
