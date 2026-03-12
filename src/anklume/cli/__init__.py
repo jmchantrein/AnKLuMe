@@ -27,6 +27,7 @@ portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
 setup_app = typer.Typer(help="Configuration et import.")
 golden_app = typer.Typer(help="Golden images — images réutilisables.")
 tor_app = typer.Typer(help="Passerelle Tor.")
+resource_app = typer.Typer(help="Allocation des ressources.")
 telemetry_app = typer.Typer(help="Métriques d'usage.")
 workspace_app = typer.Typer(help="Workspace layout déclaratif (GUI tmuxp).")
 
@@ -43,6 +44,7 @@ app.add_typer(portal_app, name="portal")
 app.add_typer(setup_app, name="setup")
 app.add_typer(golden_app, name="golden")
 app.add_typer(tor_app, name="tor")
+app.add_typer(resource_app, name="resource")
 app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(workspace_app, name="workspace")
 
@@ -1028,6 +1030,22 @@ def workspace_grid(
     from anklume.cli._workspace import run_workspace_grid
 
     run_workspace_grid(add_cols=add_cols, add_rows=add_rows, set_grid=set_grid)
+
+
+# --- anklume resource <show> ---
+
+
+@resource_app.command("show")
+def resource_show(
+    project: Annotated[
+        str,
+        typer.Option("--project", "-p", help="Répertoire du projet anklume"),
+    ] = ".",
+) -> None:
+    """Afficher l'allocation de ressources calculée."""
+    from anklume.cli._resource import run_resource_show
+
+    run_resource_show(project_dir=project)
 
 
 # --- anklume tui ---

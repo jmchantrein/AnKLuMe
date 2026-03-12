@@ -99,11 +99,11 @@ Posture de sécurité d'un domaine, encodée dans l'adressage IP :
 
 | Niveau | Offset zone | 2e octet par défaut | Couleur |
 |--------|-------------|---------------------|---------|
-| admin | 0 | 100 | bleu |
-| trusted | 10 | 110 | vert |
+| admin | 0 | 100 | rouge |
+| trusted | 10 | 110 | bleu |
 | semi-trusted | 20 | 120 | jaune |
-| untrusted | 40 | 140 | rouge |
-| disposable | 50 | 150 | magenta |
+| untrusted | 40 | 140 | violet |
+| disposable | 50 | 150 | gris |
 
 Depuis `10.140.0.5`, un admin sait : zone 140 = 100+40 = untrusted.
 
@@ -156,6 +156,16 @@ addressing:
 
 nesting:
   prefix: true        # préfixer les ressources Incus par le niveau
+
+resource_policy:          # allocation CPU/mémoire (voir §9)
+  mode: proportional
+  cpu_mode: allowance
+  memory_enforce: soft
+  host_reserve_cpu: "20%"
+  host_reserve_memory: "20%"
+
+gpu_policy: exclusive     # exclusive ou shared (voir §16)
+ai_access_policy: exclusive  # exclusive ou open (voir §20)
 ```
 
 `schema_version` permet la migration automatique quand le format
@@ -231,6 +241,8 @@ policies:
 | `persistent` | {} | Volumes persistants (`nom: chemin`) |
 | `vars` | {} | Variables Ansible pour cette machine |
 | `weight` | 1 | Poids pour l'allocation de ressources (voir resource_policy) |
+| `gui` | false | Interface graphique (Wayland forwarding) |
+| `workspace` | {} | Placement déclaratif : bureau virtuel, position, tile (voir §36) |
 
 ### Convention d'adressage
 
@@ -330,6 +342,12 @@ policies:
 | `anklume network rules` | Générer les règles nftables |
 | `anklume network deploy` | Appliquer les règles sur l'hôte |
 | `anklume network status` | État réseau (bridges, IPs, nftables) |
+
+### Ressources
+
+| Commande | Description |
+|----------|-------------|
+| `anklume resource show` | Afficher l'allocation de ressources calculée |
 
 ### LLM
 

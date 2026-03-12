@@ -108,6 +108,7 @@ anklume snapshot restore <inst> <snap>  # Restaurer
 # Opérations
 anklume portal push <inst> <src> <dst>  # Envoyer un fichier
 anklume golden create <inst>            # Publier une image
+anklume resource show                   # Allocation CPU/mémoire
 anklume doctor                          # Diagnostic automatique
 anklume console                         # Console tmux colorée
 ```

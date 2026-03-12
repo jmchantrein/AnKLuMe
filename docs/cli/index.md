@@ -102,6 +102,12 @@ Makefile, pas d'API web.
 | `anklume stt stop` | Arrêter le push-to-talk |
 | `anklume stt status` | État du service STT |
 
+## Ressources
+
+| Commande | Description |
+|---|---|
+| `anklume resource show` | Afficher l'allocation de ressources calculée |
+
 ## Éditeur TUI
 
 | Commande | Description |
@@ -151,6 +157,7 @@ graph TD
     CLI --> stt
     CLI --> dev
     CLI --> setup
+    CLI --> resource
     CLI --> tui
     CLI --> telemetry
 
