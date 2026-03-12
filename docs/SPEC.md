@@ -3610,18 +3610,35 @@ anklume setup import [--dir <répertoire>]
 
 **Flux** :
 1. Scanner les projets Incus (hors `default`)
-2. Pour chaque projet : scanner les réseaux et instances
-3. Mapper vers le format domaine anklume :
+2. Pour chaque instance : lire `devices.eth0.network` pour le réseau
+3. Détecter GPU (`gpu-passthrough` profile) et GUI (`gui` profile)
+4. Mapper vers le format domaine anklume :
    - Projet → domaine
-   - Réseau `net-*` → subnet (déduit du config CIDR)
+   - `devices.eth0.network` → réseau du domaine (subnet déduit du config CIDR)
    - Instance → machine (nom déduit en retirant le préfixe projet)
-4. Générer les fichiers `domains/<projet>.yml`
-5. Afficher un récapitulatif
+   - Profiles GPU/GUI → flags `gpu: true` / `gui: true`
+5. Générer les fichiers `domains/<projet>.yml`
+6. Afficher un récapitulatif + limitations
 
-**Limitations** :
-- Les rôles Ansible ne sont pas détectés (config manuelle)
-- Les trust levels ne sont pas déduits (défaut `semi-trusted`)
-- Le `anklume.yml` existant est préservé (créé si absent)
+**Limitations** (bootstrap approximatif, pas un roundtrip parfait) :
+
+| Information | Récupérable | Raison |
+|---|---|---|
+| Noms machines, type (lxc/vm) | Oui | Stocké dans Incus |
+| Réseau du domaine | Oui | `devices.eth0.network` sur les instances |
+| GPU | Oui | Profile `gpu-passthrough` |
+| GUI | Oui | Profile `gui` |
+| Rôles Ansible | **Non** | Aucune trace dans Incus après provisioning |
+| Descriptions originales | **Non** | Description Incus souvent vide |
+| Trust level | **Non** | Dépend de `anklume.yml` (addressing.base), défaut `semi-trusted` |
+| Variables (vars) | **Non** | Données Ansible, pas Incus |
+| Weight, workspace | **Non** | Métadonnées anklume pures |
+| IPs statiques | **Non** | DHCP dans le subnet |
+| Ephemeral | **Non** | Flag domaine, pas instance |
+
+L'import est conçu pour **adopter** une infrastructure existante, pas pour
+sauvegarder/restaurer une configuration anklume. La source de vérité
+reste les fichiers `domains/*.yml` (modèle PSOT).
 
 #### Module `engine/import_infra.py`
 
@@ -3633,6 +3650,8 @@ class ScannedInstance:
     status: str
     instance_type: str    # "container" | "virtual-machine"
     project: str
+    gpu: bool = False     # déduit du profile gpu-passthrough
+    gui: bool = False     # déduit du profile gui
 
 @dataclass
 class ScannedDomain:

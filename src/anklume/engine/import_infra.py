@@ -2,6 +2,14 @@
 
 Scanne un Incus déjà configuré et génère les fichiers
 domaine correspondants pour adoption par anklume.
+
+Limitations connues (import approximatif, pas un roundtrip parfait) :
+- Rôles Ansible : non récupérables (aucune trace dans Incus après provisioning)
+- Descriptions : génériques ("Importé depuis ...")
+- Trust level : toujours "semi-trusted" (le niveau réel dépend de
+  la config addressing dans anklume.yml, absente côté Incus)
+- Variables machines (vars), weight, workspace, ephemeral : non récupérables
+- IPs statiques : non extraites (DHCP dans le subnet)
 """
 
 from __future__ import annotations
@@ -14,6 +22,8 @@ from typing import Literal
 
 import yaml
 
+from anklume.engine.gpu import GPU_PROFILE_NAME
+from anklume.engine.gui import GUI_PROFILE_NAME
 from anklume.engine.incus_driver import IncusDriver
 
 _DNS_SAFE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
@@ -22,6 +32,17 @@ log = logging.getLogger(__name__)
 
 # Projets Incus à ignorer lors du scan
 _SKIP_PROJECTS = {"default"}
+_GPU_PROFILES = {GPU_PROFILE_NAME}
+_GUI_PROFILES = {GUI_PROFILE_NAME}
+
+# Limitations exportées pour le CLI et les tests
+IMPORT_LIMITATIONS = [
+    "Rôles Ansible : non récupérables (aucune trace dans Incus)",
+    "Descriptions : génériques (pas les originales)",
+    "Trust level : toujours semi-trusted (dépend de anklume.yml absent)",
+    "Variables (vars), weight, workspace, ephemeral : non récupérables",
+    "IPs statiques : non extraites",
+]
 
 
 @dataclass
@@ -32,6 +53,8 @@ class ScannedInstance:
     status: str
     instance_type: Literal["container", "virtual-machine"]
     project: str
+    gpu: bool = False
+    gui: bool = False
 
 
 @dataclass
@@ -55,8 +78,9 @@ class ImportResult:
 def scan_incus(driver: IncusDriver) -> list[ScannedDomain]:
     """Scanne les projets Incus et reconstruit les domaines.
 
-    Ignore le projet `default`. Pour chaque projet :
-    - Détecte le réseau `net-*` et son subnet
+    Ignore le projet ``default``. Pour chaque projet :
+    - Détecte le réseau depuis les devices de chaque instance (eth0.network)
+    - Déduit GPU/GUI depuis les profiles Incus
     - Liste les instances avec leur type et état
     """
     projects = driver.project_list()
@@ -66,24 +90,30 @@ def scan_incus(driver: IncusDriver) -> list[ScannedDomain]:
         if proj.name in _SKIP_PROJECTS:
             continue
 
-        # Réseaux
+        instances = driver.instance_list(proj.name)
         networks = driver.network_list(proj.name)
-        network_name = None
-        subnet = None
-        for net in networks:
-            if net.name.startswith("net-"):
-                network_name = net.name
-                subnet = net.config.get("ipv4.address")
+
+        # Réseau : lu depuis devices.eth0.network de la première instance
+        domain_network = None
+        domain_subnet = None
+        for inst in instances:
+            net_name = inst.devices.get("eth0", {}).get("network")
+            if net_name and net_name.startswith("net-"):
+                domain_network = net_name
+                for net in networks:
+                    if net.name == net_name:
+                        domain_subnet = net.config.get("ipv4.address")
+                        break
                 break
 
-        # Instances
-        instances = driver.instance_list(proj.name)
         scanned_instances = [
             ScannedInstance(
                 name=inst.name,
                 status=inst.status,
                 instance_type=inst.type,
                 project=proj.name,
+                gpu=bool(_GPU_PROFILES & set(inst.profiles)),
+                gui=bool(_GUI_PROFILES & set(inst.profiles)),
             )
             for inst in instances
         ]
@@ -91,8 +121,8 @@ def scan_incus(driver: IncusDriver) -> list[ScannedDomain]:
         domains.append(
             ScannedDomain(
                 project=proj.name,
-                network=network_name,
-                subnet=subnet,
+                network=domain_network,
+                subnet=domain_subnet,
                 instances=scanned_instances,
             )
         )
@@ -108,7 +138,7 @@ def _instance_to_machine_name(instance_name: str, project: str) -> str:
     """
     prefix = f"{project}-"
     if instance_name.startswith(prefix):
-        return instance_name[len(prefix) :]
+        return instance_name[len(prefix):]
     return instance_name
 
 
@@ -137,10 +167,15 @@ def generate_domain_files(
         machines = {}
         for inst in domain.instances:
             machine_name = _instance_to_machine_name(inst.name, domain.project)
-            machines[machine_name] = {
+            machine_data: dict = {
                 "description": f"Importé depuis {inst.name}",
                 "type": _instance_type_to_anklume(inst.instance_type),
             }
+            if inst.gpu:
+                machine_data["gpu"] = True
+            if inst.gui:
+                machine_data["gui"] = True
+            machines[machine_name] = machine_data
 
         domain_data = {
             "description": f"Domaine importé depuis le projet {domain.project}",

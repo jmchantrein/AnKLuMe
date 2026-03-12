@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from anklume.engine.import_infra import (
+    IMPORT_LIMITATIONS,
     ImportResult,
     ScannedDomain,
     ScannedInstance,
@@ -24,6 +25,26 @@ from anklume.engine.incus_driver import (
 from tests.conftest import mock_driver
 
 
+def _inst(
+    name: str,
+    project: str,
+    *,
+    net: str = "net-pro",
+    status: str = "Running",
+    type: str = "container",
+    profiles: list[str] | None = None,
+) -> IncusInstance:
+    """Helper pour créer une IncusInstance avec devices.eth0.network."""
+    return IncusInstance(
+        name=name,
+        status=status,
+        type=type,
+        project=project,
+        profiles=profiles or ["default"],
+        devices={"eth0": {"network": net, "type": "nic"}} if net else {},
+    )
+
+
 class TestScanIncus:
     """Tests pour scan_incus."""
 
@@ -35,18 +56,8 @@ class TestScanIncus:
             networks={"pro": [IncusNetwork(name="net-pro", config=net_cfg)]},
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-dev",
-                        status="Running",
-                        type="container",
-                        project="pro",
-                    ),
-                    IncusInstance(
-                        name="pro-mail",
-                        status="Stopped",
-                        type="container",
-                        project="pro",
-                    ),
+                    _inst("pro-dev", "pro"),
+                    _inst("pro-mail", "pro", status="Stopped"),
                 ]
             },
         )
@@ -82,14 +93,7 @@ class TestScanIncus:
                 "perso": [IncusNetwork(name="net-perso")],
             },
             instances={
-                "pro": [
-                    IncusInstance(
-                        name="pro-dev",
-                        status="Running",
-                        type="container",
-                        project="pro",
-                    )
-                ],
+                "pro": [_inst("pro-dev", "pro")],
                 "perso": [],
             },
         )
@@ -106,7 +110,7 @@ class TestScanIncus:
         driver = mock_driver(
             projects=[IncusProject(name="pro")],
             networks={"pro": [IncusNetwork(name="lxdbr0")]},
-            instances={"pro": []},
+            instances={"pro": [_inst("pro-dev", "pro", net="lxdbr0")]},
         )
 
         domains = scan_incus(driver)
@@ -120,12 +124,7 @@ class TestScanIncus:
             projects=[IncusProject(name="pro")],
             instances={
                 "pro": [
-                    IncusInstance(
-                        name="pro-router",
-                        status="Running",
-                        type="virtual-machine",
-                        project="pro",
-                    ),
+                    _inst("pro-router", "pro", type="virtual-machine"),
                 ]
             },
         )
@@ -133,6 +132,73 @@ class TestScanIncus:
         domains = scan_incus(driver)
 
         assert domains[0].instances[0].instance_type == "virtual-machine"
+
+    def test_scan_detects_gpu(self):
+        """Détection GPU depuis le profile gpu-passthrough."""
+        driver = mock_driver(
+            projects=[IncusProject(name="ai")],
+            instances={
+                "ai": [
+                    _inst("ai-gpu", "ai", net="net-ai", profiles=["default", "gpu-passthrough"]),
+                    _inst("ai-web", "ai", net="net-ai"),
+                ]
+            },
+        )
+
+        domains = scan_incus(driver)
+
+        gpu_inst = next(i for i in domains[0].instances if i.name == "ai-gpu")
+        web_inst = next(i for i in domains[0].instances if i.name == "ai-web")
+        assert gpu_inst.gpu is True
+        assert web_inst.gpu is False
+
+    def test_scan_detects_gui(self):
+        """Détection GUI depuis le profile gui."""
+        driver = mock_driver(
+            projects=[IncusProject(name="perso")],
+            instances={
+                "perso": [
+                    _inst("perso-desktop", "perso", net="net-perso", profiles=["default", "gui"]),
+                    _inst("perso-server", "perso", net="net-perso"),
+                ]
+            },
+        )
+
+        domains = scan_incus(driver)
+
+        desktop = next(i for i in domains[0].instances if i.name == "perso-desktop")
+        server = next(i for i in domains[0].instances if i.name == "perso-server")
+        assert desktop.gui is True
+        assert server.gui is False
+
+    def test_scan_network_from_instance_devices(self):
+        """Le réseau est lu depuis devices.eth0.network, pas le project-level scan."""
+        driver = mock_driver(
+            projects=[IncusProject(name="pro"), IncusProject(name="perso")],
+            networks={
+                "pro": [
+                    IncusNetwork(name="net-ai", config={"ipv4.address": "10.110.0.254/24"}),
+                    IncusNetwork(name="net-pro", config={"ipv4.address": "10.120.1.254/24"}),
+                ],
+                "perso": [
+                    IncusNetwork(name="net-ai", config={"ipv4.address": "10.110.0.254/24"}),
+                    IncusNetwork(name="net-perso", config={"ipv4.address": "10.120.0.254/24"}),
+                ],
+            },
+            instances={
+                "pro": [_inst("pro-dev", "pro", net="net-pro")],
+                "perso": [_inst("perso-desktop", "perso", net="net-perso")],
+            },
+        )
+
+        domains = scan_incus(driver)
+
+        pro = next(d for d in domains if d.project == "pro")
+        perso = next(d for d in domains if d.project == "perso")
+        assert pro.network == "net-pro"
+        assert pro.subnet == "10.120.1.254/24"
+        assert perso.network == "net-perso"
+        assert perso.subnet == "10.120.0.254/24"
 
 
 class TestInstanceToMachineName:
@@ -218,6 +284,46 @@ class TestGenerateDomainFiles:
         content = yaml.safe_load(Path(files[0]).read_text())
         assert content["machines"]["router"]["type"] == "vm"
 
+    def test_generate_gpu_gui(self, tmp_path):
+        """GPU et GUI sont inclus dans le YAML quand détectés."""
+        domains = [
+            ScannedDomain(
+                project="ai",
+                instances=[
+                    ScannedInstance(
+                        name="ai-gpu",
+                        status="Running",
+                        instance_type="container",
+                        project="ai",
+                        gpu=True,
+                    ),
+                    ScannedInstance(
+                        name="ai-desktop",
+                        status="Running",
+                        instance_type="container",
+                        project="ai",
+                        gui=True,
+                    ),
+                    ScannedInstance(
+                        name="ai-plain",
+                        status="Running",
+                        instance_type="container",
+                        project="ai",
+                    ),
+                ],
+            )
+        ]
+
+        files = generate_domain_files(domains, tmp_path)
+
+        content = yaml.safe_load(Path(files[0]).read_text())
+        assert content["machines"]["gpu"]["gpu"] is True
+        assert "gui" not in content["machines"]["gpu"]
+        assert content["machines"]["desktop"]["gui"] is True
+        assert "gpu" not in content["machines"]["desktop"]
+        assert "gpu" not in content["machines"]["plain"]
+        assert "gui" not in content["machines"]["plain"]
+
     def test_generate_creates_domains_dir(self, tmp_path):
         """Le répertoire domains/ est créé si absent."""
         output = tmp_path / "new-project"
@@ -259,14 +365,7 @@ class TestImportInfrastructure:
             projects=[IncusProject(name="pro"), IncusProject(name="default")],
             networks={"pro": [IncusNetwork(name="net-pro", config=net_cfg)]},
             instances={
-                "pro": [
-                    IncusInstance(
-                        name="pro-dev",
-                        status="Running",
-                        type="container",
-                        project="pro",
-                    ),
-                ]
+                "pro": [_inst("pro-dev", "pro")]
             },
         )
 
@@ -287,3 +386,19 @@ class TestImportInfrastructure:
 
         assert result.domains == []
         assert result.files_written == []
+
+
+class TestImportLimitations:
+    """Les limitations sont documentées et exportées."""
+
+    def test_limitations_list_exists(self):
+        assert isinstance(IMPORT_LIMITATIONS, list)
+        assert len(IMPORT_LIMITATIONS) >= 4
+
+    def test_limitations_mention_roles(self):
+        text = " ".join(IMPORT_LIMITATIONS)
+        assert "Ansible" in text
+
+    def test_limitations_mention_trust(self):
+        text = " ".join(IMPORT_LIMITATIONS)
+        assert "trust" in text.lower()

@@ -134,6 +134,8 @@ def run_setup_aliases(remove: bool = False, shell: str | None = None) -> None:
 
 def run_setup_import(output_dir: str = ".") -> None:
     """Scanne Incus et génère les fichiers domaine."""
+    from anklume.engine.import_infra import IMPORT_LIMITATIONS
+
     driver = IncusDriver()
 
     try:
@@ -155,3 +157,7 @@ def run_setup_import(output_dir: str = ".") -> None:
     typer.echo("\nFichiers générés :")
     for f in result.files_written:
         typer.echo(f"  {f}")
+
+    typer.echo("\nLimitations de l'import (bootstrap approximatif) :")
+    for lim in IMPORT_LIMITATIONS:
+        typer.echo(f"  - {lim}")

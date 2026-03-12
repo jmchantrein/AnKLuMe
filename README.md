@@ -152,6 +152,49 @@ anklume dev test-real         # Tests E2E dans VM KVM
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — décisions d'architecture (26 ADRs)
 - [ROADMAP.md](docs/ROADMAP.md) — 22 phases complétées
 
+## Remerciements
+
+anklume s'appuie sur ces projets remarquables :
+
+**Infrastructure**
+
+- [Incus](https://linuxcontainers.org/incus/) — gestionnaire de conteneurs et VMs (LXC/KVM)
+- [nftables](https://nftables.org/) — pare-feu Linux
+- [Ansible](https://www.ansible.com/) — provisioning et configuration
+- [Tor](https://www.torproject.org/) — réseau d'anonymisation
+
+**Python**
+
+- [Typer](https://typer.tiangolo.com/) — framework CLI
+- [Rich](https://github.com/Textualize/rich) — formatage terminal
+- [Textual](https://textual.textualize.io/) — framework TUI
+- [PyYAML](https://pyyaml.org/) — parsing YAML
+- [uv](https://docs.astral.sh/uv/) — gestionnaire de paquets Python
+
+**IA et LLM**
+
+- [Ollama](https://ollama.com/) — inférence LLM locale
+- [Speaches](https://github.com/speaches-ai/speaches) — serveur STT (Speech-to-Text)
+- [Open WebUI](https://github.com/open-webui/open-webui) — interface web pour LLM
+- [LobeChat](https://github.com/lobehub/lobe-chat) — chat multi-providers
+
+**Qualité et documentation**
+
+- [pytest](https://pytest.org/) — framework de tests
+- [Ruff](https://docs.astral.sh/ruff/) — linter et formateur Python
+- [Molecule](https://molecule.readthedocs.io/) — tests de rôles Ansible
+- [MkDocs](https://www.mkdocs.org/) + [Material](https://squidfunk.github.io/mkdocs-material/) — documentation
+- [Mermaid](https://mermaid.js.org/) — diagrammes
+- [ShellCheck](https://www.shellcheck.net/) — analyse statique shell
+- [behave](https://behave.readthedocs.io/) — tests BDD
+
+**Desktop (KDE/Wayland)**
+
+- [tmux](https://github.com/tmux/tmux) — multiplexeur de terminaux
+- [PipeWire](https://pipewire.org/) — capture audio
+- [wtype](https://github.com/atx/wtype) — saisie clavier Wayland
+- [kdotool](https://github.com/jinliu/kdotool) — interaction fenêtres KDE
+
 ## Licence
 
 AGPL-3.0

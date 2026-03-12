@@ -67,6 +67,7 @@ class IncusInstance:
     project: str
     profiles: list[str] = field(default_factory=list)
     config: dict = field(default_factory=dict)
+    devices: dict = field(default_factory=dict)
 
 
 class IncusDriver:
@@ -164,6 +165,7 @@ class IncusDriver:
                 project=project,
                 profiles=i.get("profiles", []),
                 config=i.get("config", {}),
+                devices=i.get("devices", {}),
             )
             for i in data
         ]

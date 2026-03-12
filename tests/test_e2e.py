@@ -309,3 +309,73 @@ class TestE2EDevWorkflow:
         assert len(result.actions) == 0, (
             f"Second apply devrait être idempotent : {[a.detail for a in result.actions]}"
         )
+
+
+class TestE2EImportRoundtrip:
+    """Roundtrip : deploy → import → comparer la structure.
+
+    Vérifie que ``anklume setup import`` reconstruit correctement
+    la structure (machines, types, réseau) depuis Incus.
+
+    Limitations connues de l'import (non vérifiées ici) :
+    - Rôles Ansible, descriptions originales, trust level, vars, weight
+    """
+
+    def test_import_matches_deployed_structure(self, e2e_project):
+        from anklume.engine.import_infra import import_infrastructure
+
+        path, project_name = e2e_project
+        write_test_project(
+            path,
+            {
+                project_name: {
+                    "description": "E2E import roundtrip",
+                    "trust_level": "semi-trusted",
+                    "machines": {
+                        "web": {"description": "Web server", "type": "lxc"},
+                        "db": {"description": "Database", "type": "lxc"},
+                    },
+                },
+            },
+        )
+
+        # 1. Déployer
+        run_apply(dry_run=False)
+        assert instance_status(f"{project_name}-web", project_name) == "Running"
+        assert instance_status(f"{project_name}-db", project_name) == "Running"
+
+        # 2. Importer dans un répertoire séparé
+        import_dir = path / "imported"
+        driver = IncusDriver()
+        result = import_infrastructure(driver, import_dir)
+
+        # 3. Trouver le domaine importé
+        imported = next(
+            (d for d in result.domains if d.project == project_name), None
+        )
+        assert imported is not None, (
+            f"Domaine {project_name} absent de l'import. "
+            f"Trouvés : {[d.project for d in result.domains]}"
+        )
+
+        # 4. Vérifier la structure
+        imported_names = {
+            inst.name.removeprefix(f"{project_name}-")
+            for inst in imported.instances
+        }
+        assert imported_names == {"web", "db"}
+
+        # 5. Vérifier les types (tous LXC)
+        for inst in imported.instances:
+            assert inst.instance_type == "container"
+
+        # 6. Vérifier le réseau
+        assert imported.network == f"net-{project_name}"
+
+        # 7. Vérifier le fichier YAML généré
+        yml_path = import_dir / "domains" / f"{project_name}.yml"
+        assert yml_path.is_file()
+        content = yaml.safe_load(yml_path.read_text())
+        assert set(content["machines"].keys()) == {"web", "db"}
+        for m in content["machines"].values():
+            assert m["type"] == "lxc"
