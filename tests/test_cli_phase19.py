@@ -59,32 +59,40 @@ class TestMkDocs:
         assert (ROOT / "mkdocs.yml").is_file()
 
     def test_mkdocs_yml_valid_yaml(self) -> None:
-        data = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
+        data = yaml.load((ROOT / "mkdocs.yml").read_text(), Loader=yaml.BaseLoader)  # noqa: S506
         assert isinstance(data, dict)
 
     def test_mkdocs_has_site_name(self) -> None:
-        data = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
+        data = yaml.load((ROOT / "mkdocs.yml").read_text(), Loader=yaml.BaseLoader)  # noqa: S506
         assert "site_name" in data
 
     def test_mkdocs_has_theme(self) -> None:
-        data = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
+        data = yaml.load((ROOT / "mkdocs.yml").read_text(), Loader=yaml.BaseLoader)  # noqa: S506
         assert "theme" in data
 
     def test_mkdocs_has_nav(self) -> None:
-        data = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
+        data = yaml.load((ROOT / "mkdocs.yml").read_text(), Loader=yaml.BaseLoader)  # noqa: S506
         assert "nav" in data
 
     def test_index_md_exists(self) -> None:
         assert (ROOT / "docs" / "index.md").is_file()
 
     def test_nav_references_existing_files(self) -> None:
-        data = yaml.safe_load((ROOT / "mkdocs.yml").read_text())
+        data = yaml.load((ROOT / "mkdocs.yml").read_text(), Loader=yaml.BaseLoader)  # noqa: S506
         nav = data.get("nav", [])
-        for entry in nav:
-            if isinstance(entry, dict):
-                for _label, filepath in entry.items():
-                    full = ROOT / "docs" / filepath
-                    assert full.is_file(), f"Manquant : {filepath}"
+
+        def check_nav(items: list) -> None:
+            for entry in items:
+                if isinstance(entry, str):
+                    assert (ROOT / "docs" / entry).is_file(), f"Manquant : {entry}"
+                elif isinstance(entry, dict):
+                    for _label, value in entry.items():
+                        if isinstance(value, str):
+                            assert (ROOT / "docs" / value).is_file(), f"Manquant : {value}"
+                        elif isinstance(value, list):
+                            check_nav(value)
+
+        check_nav(nav)
 
 
 # ---------------------------------------------------------------------------
