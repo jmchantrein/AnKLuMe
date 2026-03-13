@@ -45,6 +45,18 @@ def run_apply(
 
     gui_info = apply_gui_profiles(infra)
 
+    # Resource policy : allocation CPU/mémoire par poids
+    from anklume.engine.resources import (
+        apply_resource_config,
+        compute_resource_allocation,
+        detect_hardware,
+    )
+
+    if infra.config.resource_policy:
+        hw = detect_hardware()
+        allocations = compute_resource_allocation(infra, hw)
+        apply_resource_config(infra, allocations)
+
     driver = IncusDriver()
     nesting_ctx = detect_nesting_context()
 
