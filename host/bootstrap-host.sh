@@ -2,7 +2,7 @@
 # bootstrap-host.sh — Prépare un hôte Debian 13 pour anklume
 #
 # Prérequis :
-#   - Debian 13 installé (LUKS + btrfs recommandé, voir docs/guide/host-setup.md)
+#   - Debian 13 installé (btrfs recommandé, voir docs/guide/host-setup.md)
 #   - Pool ZFS "tank" déjà créé (chiffrement, mirror, etc.)
 #   - Exécuter en root
 #
@@ -13,6 +13,7 @@
 #   --skip-nvidia         Ne pas installer le driver NVIDIA
 #   --skip-toram          Ne pas configurer le mode toram
 #   --skip-zfs-datasets   Ne pas créer les datasets ZFS
+#   --skip-credentials    Ne pas migrer les credentials vers ZFS
 #   --nvidia-run <path>   Chemin vers le .run NVIDIA (défaut : auto-détecté)
 #
 # Ce script est idempotent : il peut être relancé sans danger.
@@ -25,6 +26,7 @@ set -euo pipefail
 
 POOL="tank"
 INCUS_STORAGE="tank-zfs"
+SYSTEM_DIR="/home/.system"
 
 # Driver NVIDIA par défaut pour RTX PRO 5000 Blackwell (open kernel modules)
 # Surcharger avec --nvidia-run <chemin> si nécessaire.
@@ -41,6 +43,7 @@ NC='\033[0m'
 SKIP_NVIDIA=false
 SKIP_TORAM=false
 SKIP_ZFS_DATASETS=false
+SKIP_CREDENTIALS=false
 
 # ---------------------------------------------------------------------------
 # Parsing des arguments
@@ -51,6 +54,7 @@ while [[ $# -gt 0 ]]; do
         --skip-nvidia)       SKIP_NVIDIA=true; shift ;;
         --skip-toram)        SKIP_TORAM=true; shift ;;
         --skip-zfs-datasets) SKIP_ZFS_DATASETS=true; shift ;;
+        --skip-credentials)  SKIP_CREDENTIALS=true; shift ;;
         --nvidia-run)
             if [[ -z "${2:-}" ]]; then
                 echo "Erreur : --nvidia-run nécessite un chemin." >&2
@@ -65,7 +69,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Option inconnue : $1" >&2
-            echo "Usage : $0 [--skip-nvidia] [--skip-toram] [--skip-zfs-datasets] [--nvidia-run <path>]"
+            echo "Usage : $0 [--skip-nvidia] [--skip-toram] [--skip-zfs-datasets] [--skip-credentials] [--nvidia-run <path>]"
             exit 1
             ;;
     esac
@@ -196,11 +200,136 @@ create_zfs_datasets() {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Systemd — ZFS avant Incus
+# 3. Migration des credentials vers ZFS
+# ---------------------------------------------------------------------------
+
+setup_credentials() {
+    if [[ "$SKIP_CREDENTIALS" == true ]]; then
+        info "Migration credentials : ignoré (--skip-credentials)."
+        return
+    fi
+
+    # Vérifier que /home est bien monté (ZFS)
+    if ! mountpoint -q /home; then
+        warn "/home n'est pas un point de montage. Credentials non migrés."
+        warn "Relancez après le montage ZFS."
+        return
+    fi
+
+    info "Migration des credentials vers ZFS chiffré..."
+
+    mkdir -p "$SYSTEM_DIR"
+    chmod 700 "$SYSTEM_DIR"
+
+    # --- Shadow hash ---
+    # Détecter le premier utilisateur non-root avec un vrai shell
+    local target_user
+    target_user=$(awk -F: '$3 >= 1000 && $7 ~ /\/(bash|zsh|fish)$/ { print $1; exit }' /etc/passwd)
+
+    if [[ -z "$target_user" ]]; then
+        warn "Aucun utilisateur standard trouvé. Shadow hash non migré."
+    elif [[ -f "${SYSTEM_DIR}/shadow-hash" ]]; then
+        info "  Shadow hash déjà migré (${SYSTEM_DIR}/shadow-hash)."
+    else
+        # Extraire le hash du mot de passe
+        local hash
+        hash=$(grep "^${target_user}:" /etc/shadow | cut -d: -f2)
+
+        if [[ "$hash" == "!" ]] || [[ "$hash" == "*" ]] || [[ -z "$hash" ]]; then
+            warn "  Utilisateur '${target_user}' n'a pas de mot de passe. Shadow non migré."
+        else
+            echo "$hash" > "${SYSTEM_DIR}/shadow-hash"
+            echo "$target_user" > "${SYSTEM_DIR}/shadow-user"
+            chmod 600 "${SYSTEM_DIR}/shadow-hash" "${SYSTEM_DIR}/shadow-user"
+
+            # Verrouiller le compte dans /etc/shadow
+            usermod -L "$target_user"
+
+            info "  Hash de '${target_user}' migré vers ZFS. Compte verrouillé."
+        fi
+    fi
+
+    # --- Script d'injection ---
+    local inject_script="/usr/local/sbin/inject-shadow.sh"
+    if [[ ! -f "$inject_script" ]]; then
+        cat > "$inject_script" << 'SCRIPT'
+#!/bin/sh
+set -eu
+HASH_FILE="/home/.system/shadow-hash"
+USER_FILE="/home/.system/shadow-user"
+[ -f "$HASH_FILE" ] || exit 0
+[ -f "$USER_FILE" ] || exit 0
+USER=$(cat "$USER_FILE")
+HASH=$(cat "$HASH_FILE")
+usermod -p "$HASH" "$USER"
+SCRIPT
+        chmod 755 "$inject_script"
+        info "  Script inject-shadow.sh installé."
+    else
+        info "  Script inject-shadow.sh existe déjà."
+    fi
+
+    # --- Service systemd ---
+    local service_file="/etc/systemd/system/inject-shadow.service"
+    if [[ ! -f "$service_file" ]]; then
+        cat > "$service_file" << 'UNIT'
+[Unit]
+Description=Injecter le hash utilisateur depuis ZFS chiffré
+After=zfs-mount.service
+Before=getty@.service display-manager.service sshd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/inject-shadow.sh
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+        systemctl daemon-reload
+        systemctl enable inject-shadow.service
+        info "  Service inject-shadow activé."
+    else
+        info "  Service inject-shadow existe déjà."
+    fi
+
+    # --- NetworkManager : secrets WiFi sur ZFS ---
+    local nm_zfs_dir="${SYSTEM_DIR}/nm-connections"
+    local nm_conf="/etc/NetworkManager/conf.d/secrets-on-zfs.conf"
+
+    if [[ ! -f "$nm_conf" ]]; then
+        mkdir -p "$nm_zfs_dir"
+        chmod 700 "$nm_zfs_dir"
+
+        # Migrer les connexions existantes
+        if [[ -d /etc/NetworkManager/system-connections ]]; then
+            local count
+            count=$(find /etc/NetworkManager/system-connections -maxdepth 1 -type f 2>/dev/null | wc -l)
+            if [[ "$count" -gt 0 ]]; then
+                cp -a /etc/NetworkManager/system-connections/* "$nm_zfs_dir/"
+                info "  ${count} connexion(s) NM migrée(s) vers ZFS."
+            fi
+        fi
+
+        cat > "$nm_conf" << NMCONF
+[keyfile]
+path=${nm_zfs_dir}
+NMCONF
+        info "  NetworkManager configuré pour stocker les secrets sur ZFS."
+        info "  Redémarrer NetworkManager pour appliquer : systemctl restart NetworkManager"
+    else
+        info "  NetworkManager déjà configuré pour ZFS."
+    fi
+
+    info "Credentials OK."
+}
+
+# ---------------------------------------------------------------------------
+# 4. Systemd — ZFS avant Incus + injection credentials
 # ---------------------------------------------------------------------------
 
 setup_systemd_ordering() {
-    info "Configuration systemd : ZFS avant Incus..."
+    info "Configuration systemd : ZFS → credentials → Incus..."
 
     # Service de déverrouillage ZFS
     local key_service="/etc/systemd/system/zfs-load-key-tank.service"
@@ -245,7 +374,7 @@ DROPIN
 }
 
 # ---------------------------------------------------------------------------
-# 4. Mode toram (optionnel)
+# 5. Mode toram (optionnel)
 # ---------------------------------------------------------------------------
 
 setup_toram() {
@@ -328,7 +457,7 @@ GRUB
 }
 
 # ---------------------------------------------------------------------------
-# 5. NVIDIA GPU (optionnel)
+# 6. NVIDIA GPU (optionnel)
 # ---------------------------------------------------------------------------
 
 setup_nvidia() {
@@ -391,7 +520,7 @@ CONF
 }
 
 # ---------------------------------------------------------------------------
-# 6. anklume
+# 7. anklume
 # ---------------------------------------------------------------------------
 
 install_anklume() {
@@ -423,6 +552,7 @@ main() {
 
     install_base_packages
     create_zfs_datasets
+    setup_credentials
     setup_systemd_ordering
     setup_toram
     setup_nvidia
@@ -433,10 +563,11 @@ main() {
     echo ""
     echo "Prochaines étapes :"
     echo "  1. Rebooter si nouveau a été blacklisté"
-    echo "  2. mkdir mon-infra && cd mon-infra"
-    echo "  3. anklume init"
-    echo "  4. anklume tui  (éditer les domaines)"
-    echo "  5. anklume apply all"
+    echo "  2. Vérifier l'injection shadow : systemctl status inject-shadow"
+    echo "  3. mkdir mon-infra && cd mon-infra"
+    echo "  4. anklume init"
+    echo "  5. anklume tui  (éditer les domaines)"
+    echo "  6. anklume apply all"
     echo ""
 }
 
