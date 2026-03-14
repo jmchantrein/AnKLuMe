@@ -70,6 +70,7 @@ nav:
   - Accueil: index.md
   - Guide:
     - guide/index.md
+    - Préparation hôte: guide/host-setup.md
     - Installation: guide/installation.md
     - Démarrage rapide: guide/quickstart.md
     - Structure projet: guide/project-structure.md
