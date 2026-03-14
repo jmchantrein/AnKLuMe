@@ -21,8 +21,9 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror)
 
 - **LUKS sur `/`** — tout le système chiffré, pas besoin de hooks
 - `/` sur btrfs avec subvolume `@rootfs` (créé par l'installeur) — snapshots avant chaque MAJ
-- Données persistantes sur **ZFS** — clé auto depuis `/` (LUKS), pas de 2e passphrase
-- **Une seule passphrase au boot** (LUKS) — ZFS se déverrouille automatiquement
+- Données persistantes sur **ZFS** — passphrase + keyfile sur LUKS pour le boot auto
+- **Une seule passphrase au boot** (LUKS) — ZFS se déverrouille automatiquement via keyfile
+- Passphrase ZFS utilisable en secours (live USB, LUKS indisponible)
 - Mode toram optionnel — `/` chargé en RAM, immutable au runtime
 - GPU NVIDIA via `.run` + DKMS — compatible kernel updates
 
@@ -102,15 +103,12 @@ immédiate.
 
 ### Création du pool
 
-Le pool ZFS utilise un **keyfile** stocké sur `/` (chiffré par LUKS).
-Pas de passphrase supplémentaire au boot.
+Le pool est créé avec une **passphrase** (saisie interactive). Ensuite,
+on stocke cette passphrase dans un keyfile sur `/` (chiffré par LUKS)
+pour le déverrouillage automatique au boot.
 
 ```bash
-# Générer la clé
-dd if=/dev/urandom of=/root/.zfs-key bs=32 count=1
-chmod 600 /root/.zfs-key
-
-# Créer le pool avec la clé
+# Créer le pool avec passphrase
 zpool create \
   -o ashift=12 \
   -o autotrim=on \
@@ -121,14 +119,30 @@ zpool create \
   -O dedup=off \
   -O mountpoint=none \
   -O encryption=aes-256-gcm \
-  -O keyformat=raw \
-  -O keylocation=file:///root/.zfs-key \
+  -O keyformat=passphrase \
+  -O keylocation=prompt \
   -o compatibility=openzfs-2.3-linux \
   tank mirror /dev/disk/by-id/<nvme-corsair-1> /dev/disk/by-id/<nvme-corsair-2>
 ```
 
-La clé est sur `/root/.zfs-key`, qui est sur LUKS → accessible
-seulement après déverrouillage LUKS → ZFS se monte automatiquement.
+### Keyfile pour le boot automatique
+
+Stocker la passphrase dans un fichier sur `/` (protégé par LUKS) :
+
+```bash
+echo -n "ta-passphrase-zfs" > /root/.zfs-key
+chmod 600 /root/.zfs-key
+```
+
+Le service systemd essaie le keyfile d'abord, fall back sur prompt :
+
+- **Boot normal** (LUKS ouvert) → keyfile disponible → ZFS se monte tout seul
+- **Live USB de secours** (pas de LUKS) → keyfile absent → demande la passphrase
+
+!!! tip "Pool existant avec passphrase"
+    Si le pool existe déjà avec une passphrase, il suffit de créer le
+    keyfile ci-dessus. Pas besoin de `zfs change-key` — la passphrase
+    reste la même, le service systemd la lit depuis le fichier.
 
 ### Création des datasets
 
@@ -180,9 +194,8 @@ Incus crée ses propres sous-datasets (`tank/_incus/containers/xxx`,
 
 ### Déverrouillage automatique du pool
 
-Grâce au keyfile sur LUKS, ZFS se déverrouille automatiquement.
-Le service `zfs-load-key` charge la clé depuis `/root/.zfs-key`
-(disponible car LUKS est déjà ouvert à ce stade).
+Le service essaie le keyfile d'abord (boot normal), puis fall back
+sur la passphrase interactive (secours) :
 
 ```ini
 # /etc/systemd/system/zfs-load-key-tank.service
@@ -194,7 +207,7 @@ After=zfs-import.target local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/zfs load-key tank
+ExecStart=/bin/sh -c '/sbin/zfs load-key -L file:///root/.zfs-key tank 2>/dev/null || /sbin/zfs load-key -L prompt tank'
 
 [Install]
 WantedBy=zfs-mount.service
@@ -212,7 +225,7 @@ Requires=zfs-mount.service
 **Ordre de boot** :
 
 ```
-LUKS (passphrase) → local-fs → zfs-load-key (auto) → zfs-mount → incus → services
+LUKS (passphrase) → local-fs → zfs-load-key (auto via keyfile) → zfs-mount → incus → services
 ```
 
 Une seule passphrase (LUKS au boot), tout le reste est automatique.
@@ -384,7 +397,7 @@ et ne les recrée pas.
 
 1. Installe les paquets (build-essential, dkms, zfs, incus, ansible, uv)
 2. Crée les datasets ZFS selon la convention `_path` + le storage pool Incus
-3. Configure la clé ZFS automatique (`/root/.zfs-key`)
+3. Configure le keyfile ZFS (`/root/.zfs-key`) si absent
 4. Configure systemd (chargement clé ZFS → montage → Incus)
 5. Installe le hook initramfs toram + entrée GRUB
 6. Blackliste nouveau et installe le driver NVIDIA `.run` avec DKMS

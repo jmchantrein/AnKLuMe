@@ -203,10 +203,17 @@ create_zfs_datasets() {
 setup_systemd_ordering() {
     info "Configuration systemd : LUKS → ZFS → Incus..."
 
-    # Service de chargement de la clé ZFS (auto depuis keyfile sur LUKS)
+    # Keyfile : stocker la passphrase pour le boot auto
+    if [[ ! -f "$ZFS_KEY" ]]; then
+        warn "Keyfile $ZFS_KEY absent."
+        warn "Pour activer le déverrouillage automatique de ZFS :"
+        warn "  echo -n 'ta-passphrase-zfs' > $ZFS_KEY && chmod 600 $ZFS_KEY"
+    fi
+
+    # Service de chargement de la clé ZFS (keyfile d'abord, prompt en secours)
     local key_service="/etc/systemd/system/zfs-load-key-tank.service"
     if [[ ! -f "$key_service" ]]; then
-        cat > "$key_service" << 'UNIT'
+        cat > "$key_service" << UNIT
 [Unit]
 Description=Charger la clé ZFS tank
 Before=zfs-mount.service
@@ -215,7 +222,7 @@ After=zfs-import.target local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/zfs load-key tank
+ExecStart=/bin/sh -c '/sbin/zfs load-key -L file://${ZFS_KEY} tank 2>/dev/null || /sbin/zfs load-key -L prompt tank'
 
 [Install]
 WantedBy=zfs-mount.service
