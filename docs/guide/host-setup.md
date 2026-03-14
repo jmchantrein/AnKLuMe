@@ -10,7 +10,7 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
 ┌────────────────────┐          ┌──────────────────────────────┐
 │ p1  512M  EFI      │          │ tank/_home        → /home   │
 │ p2  reste btrfs    │          │ tank/_incus       → (Incus) │
-│   @debian   → /    │          │ tank/_srv_models  → /srv/…  │
+│   @rootfs   → /    │          │ tank/_srv_models  → /srv/…  │
 │   @snapshots       │          │ tank/_srv_shared  → /srv/…  │
 └────────────────────┘          │ tank/_srv_backups → /srv/…  │
                                 │ tank/_var_lib_anklume → …   │
@@ -21,7 +21,7 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
 
 - **Pas de LUKS sur `/`** — le système est jetable et remplaçable
 - Données persistantes sur **ZFS chiffré** — seul point de chiffrement
-- `/` sur btrfs avec subvolume `@debian` — snapshots avant chaque MAJ
+- `/` sur btrfs avec subvolume `@rootfs` (créé par l'installeur) — snapshots avant chaque MAJ
 - **Injection de credentials** — hash mot de passe stocké sur ZFS chiffré,
   injecté dans `/etc/shadow` au montage → pas de login possible sans ZFS
 - Secrets NetworkManager sur ZFS → pas de fuite WiFi en clair
@@ -37,7 +37,7 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
 | Partition | Taille | Type | Usage |
 |---|---|---|---|
 | `/dev/nvmeXn1p1` | 512 MB | EFI (FAT32) | `/boot/efi` |
-| `/dev/nvmeXn1p2` | Reste | btrfs | `/` via subvolume `@debian` |
+| `/dev/nvmeXn1p2` | Reste | btrfs | `/` via subvolume `@rootfs` (auto) |
 
 ### Installation depuis l'installeur Debian
 
@@ -47,49 +47,22 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
 4. Mettre un **mot de passe temporaire** (sera migré vers ZFS par le bootstrap)
 5. Terminer l'installation normalement
 
-### Restructuration en subvolumes (après le premier boot)
+L'installeur Debian crée automatiquement un subvolume `@rootfs` pour `/`.
 
-L'installeur Debian met tout à la racine du btrfs (pas de subvolume).
-Il faut restructurer pour pouvoir faire des snapshots propres.
+### Créer le subvolume snapshots (premier boot)
+
+Au premier boot, créer le subvolume pour les snapshots :
 
 ```bash
-# Depuis un live USB (ou mode rescue de l'installeur Debian)
+# Monter la racine btrfs (hors subvolume)
 mount /dev/nvmeXn1p2 /mnt
-
-# Créer le subvolume @debian à partir du contenu actuel
-btrfs subvolume snapshot /mnt /mnt/@debian
-
-# Créer le subvolume pour les snapshots
 btrfs subvolume create /mnt/@snapshots
-
-# Nettoyer la racine (garder uniquement les subvolumes)
-find /mnt -maxdepth 1 -not -name '@*' -not -path /mnt -exec rm -rf {} +
-
 umount /mnt
-```
 
-### Mise à jour fstab et GRUB
-
-```bash
-# Monter le subvolume @debian
-mount -o subvol=@debian /dev/nvmeXn1p2 /mnt
-mount /dev/nvmeXn1p1 /mnt/boot/efi
-
-# Éditer fstab
-cat > /mnt/etc/fstab << 'EOF'
-# <device>         <mount>      <type>  <options>                                    <dump> <pass>
-/dev/nvmeXn1p2     /            btrfs   subvol=@debian,compress=zstd,noatime         0 1
-/dev/nvmeXn1p1     /boot/efi    vfat    umask=0077                                   0 1
-/dev/nvmeXn1p2     /.snapshots  btrfs   subvol=@snapshots,compress=zstd,noatime      0 2
-EOF
-
-# Mettre à jour GRUB
-mount --bind /dev /mnt/dev
-mount --bind /proc /mnt/proc
-mount --bind /sys /mnt/sys
-chroot /mnt update-grub
-umount /mnt/sys /mnt/proc /mnt/dev
-umount -R /mnt
+# Créer le point de montage et ajouter à fstab
+mkdir -p /.snapshots
+echo '/dev/nvmeXn1p2  /.snapshots  btrfs  subvol=@snapshots,compress=zstd,noatime  0 2' >> /etc/fstab
+mount /.snapshots
 ```
 
 ### Snapshots avant mise à jour
@@ -390,7 +363,7 @@ update-initramfs -u
 #!/bin/sh
 cat << 'EOF'
 menuentry "Debian (toram — immutable)" {
-    linux /vmlinuz root=UUID=<uuid-partition> ro BOOT_MODE=toram rootflags=subvol=@debian
+    linux /vmlinuz root=UUID=<uuid-partition> ro BOOT_MODE=toram rootflags=subvol=@rootfs
     initrd /initrd.img
 }
 EOF
