@@ -1,30 +1,27 @@
 # Préparation de l'hôte
 
 Guide de déploiement de référence pour un hôte anklume :
-Debian 13 + btrfs (multiboot) + ZFS chiffré (données) + NVIDIA GPU.
+Debian 13 + btrfs (snapshots) + ZFS chiffré (données) + NVIDIA GPU.
 
 ## Vue d'ensemble
 
 ```
-NVMe système                              Pool ZFS "tank" (2x NVMe mirror)
-┌──────────────────────────────┐           ┌──────────────────────────────┐
-│ p1  512M   EFI (FAT32)      │           │ tank/_home        → /home   │
-│ p2  ~200G  NTFS (Windows)   │  chiffré  │ tank/_incus       → (Incus) │
-│ p3  reste  btrfs            │  ───────→ │ tank/_srv_models  → /srv/…  │
-│   @debian      → /          │           │ tank/_srv_shared  → /srv/…  │
-│   @debian-boot → /boot      │           │ tank/_srv_backups → /srv/…  │
-│   @fedora      → /          │           │ tank/_var_lib_anklume → …   │
-│   @fedora-boot → /boot      │           └──────────────────────────────┘
-│   @snapshots                │
-└──────────────────────────────┘
+NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
+┌────────────────────┐          ┌──────────────────────────────┐
+│ p1  512M  EFI      │          │ tank/_home        → /home   │
+│ p2  reste btrfs    │          │ tank/_incus       → (Incus) │
+│   @debian   → /    │          │ tank/_srv_models  → /srv/…  │
+│   @snapshots       │          │ tank/_srv_shared  → /srv/…  │
+└────────────────────┘          │ tank/_srv_backups → /srv/…  │
+                                │ tank/_var_lib_anklume → …   │
+                                └──────────────────────────────┘
 ```
 
 **Principes** :
 
 - **Pas de LUKS sur `/`** — le système est jetable et remplaçable
 - Données persistantes sur **ZFS chiffré** — seul point de chiffrement
-- `/` sur btrfs avec subvolumes — multiboot, snapshots, espace partagé
-- Chaque distro a son propre subvolume `/boot` (kernel + initramfs isolés)
+- `/` sur btrfs avec subvolume `@debian` — snapshots avant chaque MAJ
 - **Injection de credentials** — hash mot de passe stocké sur ZFS chiffré,
   injecté dans `/etc/shadow` au montage → pas de login possible sans ZFS
 - Secrets NetworkManager sur ZFS → pas de fuite WiFi en clair
@@ -33,50 +30,37 @@ NVMe système                              Pool ZFS "tank" (2x NVMe mirror)
 
 ---
 
-## 1. Installation Debian + partitionnement btrfs
-
-### Ordre d'installation (multiboot)
-
-1. **Windows d'abord** — il crée la partition EFI et écrase le bootloader
-2. **Debian ensuite** — GRUB détecte Windows et l'ajoute au menu
-3. **Autre Linux** — dans un subvolume btrfs, GRUB le détecte aussi
+## 1. Installation Debian
 
 ### Schéma de partitions
 
 | Partition | Taille | Type | Usage |
 |---|---|---|---|
-| `/dev/nvmeXn1p1` | 512 MB | EFI (FAT32) | `/boot/efi` (partagé) |
-| `/dev/nvmeXn1p2` | ~200 GB | NTFS | Windows (optionnel) |
-| `/dev/nvmeXn1p3` | Reste | btrfs | Subvolumes Linux |
+| `/dev/nvmeXn1p1` | 512 MB | EFI (FAT32) | `/boot/efi` |
+| `/dev/nvmeXn1p2` | Reste | btrfs | `/` via subvolume `@debian` |
 
-!!! note "Sans Windows"
-    Sans Windows, supprimer p2 et donner tout l'espace à p3.
-
-### Installation Debian depuis l'installeur
+### Installation depuis l'installeur Debian
 
 1. Choisir le partitionnement **« Manuel »** (pas le guidé avec LVM chiffré)
-2. Créer p1 (EFI) si elle n'existe pas déjà (Windows la crée)
-3. Créer p3, formater en **btrfs**, monter sur `/`
+2. Créer p1 en EFI (512 MB)
+3. Créer p2, formater en **btrfs**, monter sur `/`
 4. Mettre un **mot de passe temporaire** (sera migré vers ZFS par le bootstrap)
 5. Terminer l'installation normalement
 
 ### Restructuration en subvolumes (après le premier boot)
 
 L'installeur Debian met tout à la racine du btrfs (pas de subvolume).
-Il faut restructurer pour le multiboot.
+Il faut restructurer pour pouvoir faire des snapshots propres.
 
 ```bash
-# Depuis un live USB
-mount /dev/nvmeXn1p3 /mnt
+# Depuis un live USB (ou mode rescue de l'installeur Debian)
+mount /dev/nvmeXn1p2 /mnt
 
-# Créer les subvolumes
+# Créer le subvolume @debian à partir du contenu actuel
 btrfs subvolume snapshot /mnt /mnt/@debian
-btrfs subvolume create /mnt/@snapshots
 
-# Déplacer /boot dans son propre subvolume
-btrfs subvolume create /mnt/@debian-boot
-cp -a /mnt/@debian/boot/* /mnt/@debian-boot/
-rm -rf /mnt/@debian/boot/*
+# Créer le subvolume pour les snapshots
+btrfs subvolume create /mnt/@snapshots
 
 # Nettoyer la racine (garder uniquement les subvolumes)
 find /mnt -maxdepth 1 -not -name '@*' -not -path /mnt -exec rm -rf {} +
@@ -87,17 +71,16 @@ umount /mnt
 ### Mise à jour fstab et GRUB
 
 ```bash
-mount -o subvol=@debian /dev/nvmeXn1p3 /mnt
-mount -o subvol=@debian-boot /dev/nvmeXn1p3 /mnt/boot
+# Monter le subvolume @debian
+mount -o subvol=@debian /dev/nvmeXn1p2 /mnt
 mount /dev/nvmeXn1p1 /mnt/boot/efi
 
 # Éditer fstab
 cat > /mnt/etc/fstab << 'EOF'
 # <device>         <mount>      <type>  <options>                                    <dump> <pass>
-/dev/nvmeXn1p3     /            btrfs   subvol=@debian,compress=zstd,noatime         0 1
-/dev/nvmeXn1p3     /boot        btrfs   subvol=@debian-boot,compress=zstd,noatime    0 2
+/dev/nvmeXn1p2     /            btrfs   subvol=@debian,compress=zstd,noatime         0 1
 /dev/nvmeXn1p1     /boot/efi    vfat    umask=0077                                   0 1
-/dev/nvmeXn1p3     /.snapshots  btrfs   subvol=@snapshots,compress=zstd,noatime      0 2
+/dev/nvmeXn1p2     /.snapshots  btrfs   subvol=@snapshots,compress=zstd,noatime      0 2
 EOF
 
 # Mettre à jour GRUB
@@ -109,39 +92,23 @@ umount /mnt/sys /mnt/proc /mnt/dev
 umount -R /mnt
 ```
 
-### Ajouter un autre Linux (Fedora, NixOS…)
+### Snapshots avant mise à jour
 
 ```bash
-mount /dev/nvmeXn1p3 /mnt
-btrfs subvolume create /mnt/@fedora
-btrfs subvolume create /mnt/@fedora-boot
-umount /mnt
-
-# Installer dans le subvolume
-mount -o subvol=@fedora /dev/nvmeXn1p3 /mnt
-# dnf --installroot=/mnt ... (Fedora)
-# nixos-install --root /mnt  (NixOS)
+# Avant chaque apt upgrade
+btrfs subvolume snapshot / /.snapshots/@debian-$(date +%F)
+apt upgrade
 ```
 
-Chaque distro a son propre fstab avec son subvolume :
-
-```
-# fstab de @fedora
-/dev/nvmeXn1p3  /      btrfs  subvol=@fedora,compress=zstd,noatime       0 1
-/dev/nvmeXn1p3  /boot  btrfs  subvol=@fedora-boot,compress=zstd,noatime  0 2
-```
-
-!!! tip "Avantage btrfs"
-    L'espace disque est partagé dynamiquement entre tous les Linux.
-    Pas besoin de deviner les tailles à l'avance. Supprimer un subvolume
-    libère l'espace pour les autres.
+En cas de casse, booter sur le snapshot via GRUB
+(`rootflags=subvol=@snapshots/@debian-YYYY-MM-DD`).
 
 ---
 
 ## 2. Pool ZFS — données persistantes chiffrées
 
 Le pool ZFS est le **seul point de chiffrement**. Toutes les données
-sensibles (home, modèles, credentials, secrets NM) y résident.
+sensibles (home, modèles, credentials, secrets WiFi) y résident.
 
 ### Convention de nommage
 
@@ -532,21 +499,6 @@ sudo ./host/bootstrap-host.sh
 | `--nvidia-run <path>` | Chemin vers un `.run` NVIDIA spécifique |
 | `-h`, `--help` | Afficher l'aide |
 
-**Driver NVIDIA** : par défaut, le script auto-détecte un fichier
-`NVIDIA-Linux-x86_64-*.run` dans le répertoire courant et l'installe
-avec `--dkms --open --silent`. Le flag `--open` est requis pour les
-GPU Blackwell (RTX PRO 5000, RTX 5090, etc.) qui exigent les open
-kernel modules. Pour un GPU plus ancien (Turing, Ampere, Ada Lovelace),
-les open modules fonctionnent aussi mais les propriétaires restent
-supportés.
-
-Pour surcharger le driver :
-
-```bash
-# GPU spécifique ou version précise
-sudo ./host/bootstrap-host.sh --nvidia-run /tmp/NVIDIA-Linux-x86_64-595.44.run
-```
-
 Le script est **idempotent** : il détecte les composants déjà installés
 et ne les recrée pas.
 
@@ -554,7 +506,7 @@ et ne les recrée pas.
 
 1. Installe les paquets (build-essential, dkms, zfs, incus, ansible, uv)
 2. Crée les datasets ZFS selon la convention `_path` + le storage pool Incus
-3. Migre les credentials vers ZFS (shadow hash, NetworkManager)
+3. Migre les credentials vers ZFS (shadow hash, connexions WiFi)
 4. Configure systemd (déverrouillage ZFS → injection shadow → Incus)
 5. Installe le hook initramfs toram + entrée GRUB
 6. Blackliste nouveau et installe le driver NVIDIA `.run` avec DKMS
