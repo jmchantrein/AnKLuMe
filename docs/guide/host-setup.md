@@ -1,30 +1,28 @@
 # Préparation de l'hôte
 
 Guide de déploiement de référence pour un hôte anklume :
-Debian 13 + btrfs (snapshots) + ZFS chiffré (données) + NVIDIA GPU.
+Debian 13 + LUKS + btrfs (snapshots) + ZFS (données) + NVIDIA GPU.
 
 ## Vue d'ensemble
 
 ```
-NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
+NVMe système                    Pool ZFS "tank" (2x NVMe mirror)
 ┌────────────────────┐          ┌──────────────────────────────┐
 │ p1  512M  EFI      │          │ tank/_home        → /home   │
-│ p2  reste btrfs    │          │ tank/_incus       → (Incus) │
-│   @rootfs   → /    │          │ tank/_srv_models  → /srv/…  │
-│   @snapshots       │          │ tank/_srv_shared  → /srv/…  │
-└────────────────────┘          │ tank/_srv_backups → /srv/…  │
-                                │ tank/_var_lib_anklume → …   │
+│ p2  reste LUKS     │          │ tank/_incus       → (Incus) │
+│   → btrfs          │          │ tank/_srv_models  → /srv/…  │
+│     @rootfs → /    │          │ tank/_srv_shared  → /srv/…  │
+│     @snapshots     │          │ tank/_srv_backups → /srv/…  │
+└────────────────────┘          │ tank/_var_lib_anklume → …   │
                                 └──────────────────────────────┘
 ```
 
 **Principes** :
 
-- **Pas de LUKS sur `/`** — le système est jetable et remplaçable
-- Données persistantes sur **ZFS chiffré** — seul point de chiffrement
+- **LUKS sur `/`** — tout le système chiffré, pas besoin de hooks
 - `/` sur btrfs avec subvolume `@rootfs` (créé par l'installeur) — snapshots avant chaque MAJ
-- **Injection de credentials** — hash mot de passe stocké sur ZFS chiffré,
-  injecté dans `/etc/shadow` au montage → pas de login possible sans ZFS
-- Secrets NetworkManager sur ZFS → pas de fuite WiFi en clair
+- Données persistantes sur **ZFS** — clé auto depuis `/` (LUKS), pas de 2e passphrase
+- **Une seule passphrase au boot** (LUKS) — ZFS se déverrouille automatiquement
 - Mode toram optionnel — `/` chargé en RAM, immutable au runtime
 - GPU NVIDIA via `.run` + DKMS — compatible kernel updates
 
@@ -37,17 +35,22 @@ NVMe système                    Pool ZFS "tank" (2x NVMe mirror, chiffré)
 | Partition | Taille | Type | Usage |
 |---|---|---|---|
 | `/dev/nvmeXn1p1` | 512 MB | EFI (FAT32) | `/boot/efi` |
-| `/dev/nvmeXn1p2` | Reste | btrfs | `/` via subvolume `@rootfs` (auto) |
+| `/dev/nvmeXn1p2` | Reste | LUKS → btrfs | `/` via subvolume `@rootfs` (auto) |
 
 ### Installation depuis l'installeur Debian
 
-1. Choisir le partitionnement **« Manuel »** (pas le guidé avec LVM chiffré)
+1. Choisir le partitionnement **« Manuel »**
 2. Créer p1 en EFI (512 MB)
-3. Créer p2, formater en **btrfs**, monter sur `/`
-4. Mettre un **mot de passe temporaire** (sera migré vers ZFS par le bootstrap)
+3. Créer p2, configurer comme **volume chiffré** (LUKS)
+4. Formater le volume chiffré en **btrfs**, monter sur `/`
 5. Terminer l'installation normalement
 
 L'installeur Debian crée automatiquement un subvolume `@rootfs` pour `/`.
+
+!!! note "Pas de LVM"
+    L'installeur propose LUKS + LVM par défaut. Choisir LUKS seul
+    (sans LVM) pour garder btrfs direct — plus simple, pas besoin de
+    redimensionner des volumes logiques.
 
 ### Créer le subvolume snapshots (premier boot)
 
@@ -55,13 +58,13 @@ Au premier boot, créer le subvolume pour les snapshots :
 
 ```bash
 # Monter la racine btrfs (hors subvolume)
-mount /dev/nvmeXn1p2 /mnt
+mount /dev/mapper/crypt-root /mnt
 btrfs subvolume create /mnt/@snapshots
 umount /mnt
 
 # Créer le point de montage et ajouter à fstab
 mkdir -p /.snapshots
-echo '/dev/nvmeXn1p2  /.snapshots  btrfs  subvol=@snapshots,compress=zstd,noatime  0 2' >> /etc/fstab
+echo '/dev/mapper/crypt-root  /.snapshots  btrfs  subvol=@snapshots,compress=zstd,noatime  0 2' >> /etc/fstab
 mount /.snapshots
 ```
 
@@ -78,10 +81,7 @@ En cas de casse, booter sur le snapshot via GRUB
 
 ---
 
-## 2. Pool ZFS — données persistantes chiffrées
-
-Le pool ZFS est le **seul point de chiffrement**. Toutes les données
-sensibles (home, modèles, credentials, secrets WiFi) y résident.
+## 2. Pool ZFS — données persistantes
 
 ### Convention de nommage
 
@@ -102,7 +102,15 @@ immédiate.
 
 ### Création du pool
 
+Le pool ZFS utilise un **keyfile** stocké sur `/` (chiffré par LUKS).
+Pas de passphrase supplémentaire au boot.
+
 ```bash
+# Générer la clé
+dd if=/dev/urandom of=/root/.zfs-key bs=32 count=1
+chmod 600 /root/.zfs-key
+
+# Créer le pool avec la clé
 zpool create \
   -o ashift=12 \
   -o autotrim=on \
@@ -113,11 +121,14 @@ zpool create \
   -O dedup=off \
   -O mountpoint=none \
   -O encryption=aes-256-gcm \
-  -O keyformat=passphrase \
-  -O keylocation=prompt \
+  -O keyformat=raw \
+  -O keylocation=file:///root/.zfs-key \
   -o compatibility=openzfs-2.3-linux \
   tank mirror /dev/disk/by-id/<nvme-corsair-1> /dev/disk/by-id/<nvme-corsair-2>
 ```
+
+La clé est sur `/root/.zfs-key`, qui est sur LUKS → accessible
+seulement après déverrouillage LUKS → ZFS se monte automatiquement.
 
 ### Création des datasets
 
@@ -165,117 +176,20 @@ Incus crée ses propres sous-datasets (`tank/_incus/containers/xxx`,
 
 ---
 
-## 3. Sécurité sans LUKS — injection de credentials
+## 3. Boot ordering — ZFS après LUKS
 
-### Problème
+### Déverrouillage automatique du pool
 
-Sans LUKS sur `/`, `/etc/shadow` contient le hash du mot de passe
-en clair sur le disque. Même si un hash solide (yescrypt) est difficile
-à brute-forcer, on peut faire mieux.
-
-### Solution : shadow vide + injection au montage ZFS
-
-Le hash du mot de passe est stocké sur ZFS chiffré. Le système boot
-avec un compte verrouillé (aucun login possible). Au déverrouillage
-du pool ZFS, un service systemd injecte le hash dans `/etc/shadow`.
-
-```
-Boot → /etc/shadow : compte verrouillé → aucun login possible
-  ↓
-Déverrouillage ZFS (passphrase)
-  ↓
-Service inject-shadow → usermod -p "$(cat hash)" user
-  ↓
-Login possible
-```
-
-En mode toram, `/etc/shadow` est en tmpfs → le hash disparaît au reboot.
-
-### Configuration
-
-**Stocker le hash sur ZFS** :
-
-```bash
-mkdir -p /home/.system
-# Extraire le hash depuis shadow (après l'install avec mdp temporaire)
-grep "^$(whoami):" /etc/shadow | cut -d: -f2 > /home/.system/shadow-hash
-echo "$(whoami)" > /home/.system/shadow-user
-chmod 600 /home/.system/shadow-hash /home/.system/shadow-user
-```
-
-**Verrouiller le compte** :
-
-```bash
-# Remplacer le hash par '!' (compte verrouillé)
-sudo usermod -L $(whoami)
-```
-
-**Service systemd** :
-
-```ini
-# /etc/systemd/system/inject-shadow.service
-[Unit]
-Description=Injecter le hash utilisateur depuis ZFS chiffré
-After=zfs-mount.service
-Before=getty@.service display-manager.service sshd.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/sbin/inject-shadow.sh
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Script d'injection** :
-
-```bash
-#!/bin/sh
-# /usr/local/sbin/inject-shadow.sh
-set -eu
-HASH_FILE="/home/.system/shadow-hash"
-USER_FILE="/home/.system/shadow-user"
-[ -f "$HASH_FILE" ] || exit 0
-[ -f "$USER_FILE" ] || exit 0
-USER=$(cat "$USER_FILE")
-HASH=$(cat "$HASH_FILE")
-usermod -p "$HASH" "$USER"
-```
-
-### Secrets NetworkManager sur ZFS
-
-Les connexions WiFi (contenant les mots de passe) sont stockées sur
-ZFS chiffré au lieu de `/etc` :
-
-```ini
-# /etc/NetworkManager/conf.d/secrets-on-zfs.conf
-[keyfile]
-path=/home/.system/nm-connections
-```
-
-```bash
-mkdir -p /home/.system/nm-connections
-# Migrer les connexions existantes
-mv /etc/NetworkManager/system-connections/* /home/.system/nm-connections/
-systemctl restart NetworkManager
-```
-
-Avant le déverrouillage ZFS, NetworkManager ne voit aucune connexion
-enregistrée — pas de fuite de credentials.
-
----
-
-## 4. Boot ordering — ZFS avant les services
-
-### Déverrouillage automatique du pool chiffré
+Grâce au keyfile sur LUKS, ZFS se déverrouille automatiquement.
+Le service `zfs-load-key` charge la clé depuis `/root/.zfs-key`
+(disponible car LUKS est déjà ouvert à ce stade).
 
 ```ini
 # /etc/systemd/system/zfs-load-key-tank.service
 [Unit]
-Description=Déverrouiller le pool ZFS tank
+Description=Charger la clé ZFS tank
 Before=zfs-mount.service
-After=zfs-import.target
+After=zfs-import.target local-fs.target
 
 [Service]
 Type=oneshot
@@ -298,26 +212,18 @@ Requires=zfs-mount.service
 **Ordre de boot** :
 
 ```
-zfs-import → zfs-load-key-tank → zfs-mount → inject-shadow → incus → getty/sshd
+LUKS (passphrase) → local-fs → zfs-load-key (auto) → zfs-mount → incus → services
 ```
 
-!!! warning "Passphrase au boot"
-    Le service `zfs-load-key-tank` attend la passphrase sur la console.
-    C'est la seule passphrase nécessaire — elle déverrouille les données
-    ET active le login (via inject-shadow).
-    Pour un serveur headless, envisager `keylocation=file:///root/.zfs-key`
-    stocké sur une clé USB amovible.
+Une seule passphrase (LUKS au boot), tout le reste est automatique.
 
 ---
 
-## 5. Mode toram — OS immutable au runtime
+## 4. Mode toram — OS immutable au runtime
 
 Optionnel. Charge `/` en RAM au boot via overlayfs : le disque est
 read-only, toutes les écritures vont en tmpfs (perdues au reboot).
 Les données persistent via le pool ZFS.
-
-Bonus sécurité : `/etc/shadow` est en tmpfs, le hash injecté disparaît
-au reboot.
 
 ### Hook initramfs
 
@@ -363,7 +269,7 @@ update-initramfs -u
 #!/bin/sh
 cat << 'EOF'
 menuentry "Debian (toram — immutable)" {
-    linux /vmlinuz root=UUID=<uuid-partition> ro BOOT_MODE=toram rootflags=subvol=@rootfs
+    linux /vmlinuz root=UUID=<uuid-luks> ro BOOT_MODE=toram rootflags=subvol=@rootfs
     initrd /initrd.img
 }
 EOF
@@ -383,7 +289,7 @@ update-grub
 
 ---
 
-## 6. NVIDIA GPU — driver .run + DKMS
+## 5. NVIDIA GPU — driver .run + DKMS
 
 ### Prérequis
 
@@ -426,7 +332,7 @@ nvidia-smi
 
 ---
 
-## 7. Premier déploiement anklume
+## 6. Premier déploiement anklume
 
 Une fois l'hôte prêt :
 
@@ -451,9 +357,9 @@ anklume status
 
 ---
 
-## 8. Script de bootstrap automatisé
+## 7. Script de bootstrap automatisé
 
-Le script `host/bootstrap-host.sh` automatise les étapes 2 à 7
+Le script `host/bootstrap-host.sh` automatise les étapes 2 à 6
 (sauf la création du pool ZFS et le partitionnement, qui restent
 manuels par sécurité).
 
@@ -468,7 +374,6 @@ sudo ./host/bootstrap-host.sh
 | `--skip-nvidia` | Ne pas installer le driver NVIDIA |
 | `--skip-toram` | Ne pas configurer le mode toram |
 | `--skip-zfs-datasets` | Ne pas créer les datasets ZFS |
-| `--skip-credentials` | Ne pas migrer les credentials vers ZFS |
 | `--nvidia-run <path>` | Chemin vers un `.run` NVIDIA spécifique |
 | `-h`, `--help` | Afficher l'aide |
 
@@ -479,14 +384,14 @@ et ne les recrée pas.
 
 1. Installe les paquets (build-essential, dkms, zfs, incus, ansible, uv)
 2. Crée les datasets ZFS selon la convention `_path` + le storage pool Incus
-3. Migre les credentials vers ZFS (shadow hash, connexions WiFi)
-4. Configure systemd (déverrouillage ZFS → injection shadow → Incus)
+3. Configure la clé ZFS automatique (`/root/.zfs-key`)
+4. Configure systemd (chargement clé ZFS → montage → Incus)
 5. Installe le hook initramfs toram + entrée GRUB
 6. Blackliste nouveau et installe le driver NVIDIA `.run` avec DKMS
 7. Installe anklume via uv
 
 **Ce que le script ne fait PAS** (opérations manuelles) :
 
-- Partitionnement du disque système (btrfs + subvolumes)
+- Partitionnement du disque système (LUKS + btrfs)
 - Création du pool ZFS (`zpool create ... tank mirror ...`)
 - Téléchargement du driver NVIDIA `.run`
