@@ -1,49 +1,51 @@
-# FAI.me — ISO live AnKLuMe pour test matériel
+# FAI.me — ISO personnalisée pour AnKLuMe
 
-Génère une ISO Debian live personnalisée via [FAI.me](https://fai-project.org/FAIme/live/)
-pour tester AnKLuMe sur du matériel cible avant installation.
+Créer une ISO d'installation ou live via le service web
+[FAI.me](https://fai-project.org/FAIme/) pour tester ou installer
+AnKLuMe sur du matériel cible.
 
-## Principe
+## URLs FAI.me
 
-```
-build-iso.sh → FAI.me (web) → ISO Debian live → boot USB → test matériel
-                                                           → si OK : bootstrap.sh
-```
+| Type | URL | Usage |
+|---|---|---|
+| Debian install | [fai-project.org/FAIme/](https://fai-project.org/FAIme/) | Installation hors-ligne sur disque |
+| Debian live | [fai-project.org/FAIme/live](https://fai-project.org/FAIme/live) | Test matériel sans toucher au disque |
+| Ubuntu / Mint | [fai-project.org/FAIme-ubuntu](https://fai-project.org/FAIme-ubuntu) | Ubuntu 24.04, Mint 22.2 (Xfce) |
 
-L'ISO inclut :
-- Debian trixie + **backports** (kernel récent pour matériel récent)
-- Firmware **non-free** (WiFi, GPU)
-- Incus, ZFS, Ansible, nftables pré-installés
-- Script `postinst.sh` qui détecte et installe le driver NVIDIA :
-  - GPU pré-Blackwell → `nvidia-driver` depuis les dépôts
-  - GPU Blackwell (RTX 50xx) → driver `.run` 570+ téléchargé automatiquement
+## Réglages recommandés
 
-## Usage
+Sur le formulaire web, remplir :
 
-```bash
-# Générer une ISO live KDE (voir la commande sans exécuter)
-./build-iso.sh --dry-run
+| Champ | Valeur |
+|---|---|
+| Distribution | **trixie** (Debian) ou **Ubuntu 24.04** |
+| Backports / HWE | coché (kernel récent) |
+| Non-free firmware | coché |
+| Desktop | KDE, GNOME ou Xfce selon préférence |
+| SSH server | coché |
+| Paquets supplémentaires | `curl git jq tmux build-essential dkms ansible-core zfsutils-linux incus nftables pciutils lshw` |
+| Custom script | uploader `postinst.sh` (ce répertoire) |
+| Execute during first boot | coché |
 
-# Lancer la génération sur FAI.me
-./build-iso.sh --email moi@example.com
+## Le postinst.sh
 
-# ISO d'installation (écrit sur le disque — ATTENTION)
-./build-iso.sh --install --desktop kde
+Script exécuté automatiquement au premier boot. Il :
 
-# Sans bureau (headless)
-./build-iso.sh --desktop none
-```
+1. Détecte le GPU NVIDIA et installe le driver adapté :
+   - GPU pré-Blackwell → `nvidia-driver` depuis les dépôts
+   - GPU Blackwell (RTX 50xx) → driver `.run` 570+
+2. Configure Incus (storage dir, réseau)
+3. Installe AnKLuMe via `uv` + alias `ank`
 
 ## Workflow
 
-1. `./build-iso.sh` → soumet à FAI.me → télécharger l'ISO
-2. `dd if=anklume-live.iso of=/dev/sdX bs=4M` → clé USB bootable
-3. Booter sur la clé → tester GPU, réseau, stockage
-4. Si tout fonctionne → installer ou lancer `bootstrap.sh`
-
-## Fichiers
-
-| Fichier | Rôle |
-|---|---|
-| `build-iso.sh` | Génère la requête FAI.me (curl) |
-| `postinst.sh` | Exécuté au premier boot de l'ISO (NVIDIA + Incus + AnKLuMe) |
+1. Aller sur l'URL FAI.me correspondante
+2. Remplir le formulaire (voir réglages ci-dessus)
+3. Uploader `postinst.sh` dans le champ "Custom script"
+4. Cliquer sur "Create image" → attendre la génération (~30 min)
+5. Télécharger l'ISO, flasher sur clé USB :
+   ```bash
+   dd if=fai-live-*.iso of=/dev/sdX bs=4M status=progress
+   ```
+6. Booter → tester GPU (`nvidia-smi`), réseau, stockage
+7. Si OK → installer ou lancer `bootstrap.sh`

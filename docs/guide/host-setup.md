@@ -432,31 +432,31 @@ Idéal pour découvrir AnKLuMe avant de passer au bootstrap complet.
 
 ## 9. Test matériel via ISO live (FAI.me)
 
-Avant d'installer sur du matériel neuf, il est possible de générer une
-ISO Debian live via [FAI.me](https://fai-project.org/FAIme/live/) pour
-tester la compatibilité (GPU, réseau, stockage).
+Avant d'installer sur du matériel neuf, générer une ISO via le service
+web [FAI.me](https://fai-project.org/FAIme/) pour tester la
+compatibilité (GPU, réseau, stockage).
 
-```bash
-# Voir la commande sans exécuter
-./host/faime/build-iso.sh --dry-run
+| Type | URL | Usage |
+|---|---|---|
+| Debian live | [FAIme/live](https://fai-project.org/FAIme/live) | Test matériel sans toucher au disque |
+| Debian install | [FAIme/](https://fai-project.org/FAIme/) | Installation hors-ligne sur disque |
+| Ubuntu / Mint | [FAIme-ubuntu](https://fai-project.org/FAIme-ubuntu) | Ubuntu 24.04, Mint 22.2 |
 
-# Générer l'ISO (KDE, backports, NVIDIA auto-detect)
-./host/faime/build-iso.sh --email moi@example.com
+**Réglages recommandés** sur le formulaire :
 
-# Sans bureau (headless)
-./host/faime/build-iso.sh --desktop none
-```
+- Distribution : **trixie** (Debian) ou **Ubuntu 24.04**
+- Backports / HWE : coché (kernel récent pour matériel récent)
+- Non-free firmware : coché
+- Paquets : `curl git jq tmux build-essential dkms ansible-core zfsutils-linux incus nftables pciutils lshw`
+- Custom script : uploader `host/faime/postinst.sh`
+- Execute during first boot : coché
 
-L'ISO inclut :
-
-- Debian trixie + **backports** (kernel récent)
-- Firmware non-free (WiFi, GPU)
-- Incus, ZFS, Ansible pré-installés
-- Détection NVIDIA automatique (Blackwell → driver .run 570+)
-- AnKLuMe pré-installé avec alias `ank`
+Le `postinst.sh` détecte le GPU NVIDIA, installe le driver adapté
+(Blackwell → `.run` 570+), configure Incus et installe AnKLuMe.
 
 **Workflow** :
 
-1. Générer l'ISO → télécharger → `dd` sur clé USB
-2. Booter → tester GPU (`nvidia-smi`), réseau, stockage
-3. Si tout fonctionne → installer ou lancer `bootstrap.sh`
+1. Remplir le formulaire FAI.me → "Create image" (~30 min)
+2. Télécharger l'ISO → `dd if=fai-*.iso of=/dev/sdX bs=4M`
+3. Booter → tester GPU (`nvidia-smi`), réseau, stockage
+4. Si OK → installer ou lancer `bootstrap.sh`
