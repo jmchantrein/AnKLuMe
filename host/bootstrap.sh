@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# bootstrap-cachyos.sh — Prépare un hôte CachyOS (Arch) pour AnKLuMe
+# bootstrap.sh — Prépare un hôte GNU/Linux pour AnKLuMe
 #
-# Point de départ : CachyOS fresh install (LUKS + btrfs sur NVMe système)
+# Distributions supportées :
+#   - CachyOS (recommandé — kernels optimisés, GPU récent out of the box)
+#   - Arch Linux
+#   - Debian 13+
+#
+# Point de départ : OS fraîchement installé (LUKS + btrfs sur NVMe système)
 # Résultat : ZFS chiffré (mirror) + Incus + AnKLuMe prêt à l'emploi
 #
-# Matériel cible (ThinkPad) :
+# Matériel cible (exemple ThinkPad) :
 #   nvme2n1  — Samsung 512G  — système (LUKS + btrfs, déjà installé)
 #   nvme0n1  — Corsair 3.6T  — ZFS mirror leg 1
 #   nvme1n1  — Corsair 3.6T  — ZFS mirror leg 2
 #
 # Usage :
-#   sudo ./bootstrap-cachyos.sh [options]
+#   sudo ./bootstrap.sh [options]
 #
 # Options :
 #   --skip-nvidia         Ne pas vérifier le driver NVIDIA
@@ -18,9 +23,11 @@
 #   --skip-zfs-pool       Ne pas créer/recréer le pool ZFS
 #   --skip-incus          Ne pas configurer Incus
 #   --zfs-passphrase      Lire la passphrase depuis stdin (non interactif)
+#   --zfs-disk1 <by-id>   Disque ZFS mirror leg 1 (obligatoire si pool à créer)
+#   --zfs-disk2 <by-id>   Disque ZFS mirror leg 2 (obligatoire si pool à créer)
 #
 # Ce script est idempotent : il peut être relancé sans danger.
-# Shellcheck clean : shellcheck -o all bootstrap-cachyos.sh
+# Shellcheck clean : shellcheck -o all bootstrap.sh
 
 set -euo pipefail
 
@@ -38,14 +45,11 @@ readonly ZFS_KEY_DIR="/etc/zfs"
 readonly ZFS_KEY_FILE="${ZFS_KEY_DIR}/tank.key"       # 32 bytes raw
 readonly ZFS_KEY_ENC="${ZFS_KEY_DIR}/tank.key.enc"    # backup chiffré (passphrase)
 
-# Disques ZFS (by-id pour la stabilité)
-readonly ZFS_DISK_1="nvme-Corsair_MP600_PRO_LPX_A5KOB412202JOL"
-readonly ZFS_DISK_2="nvme-Corsair_MP600_PRO_LPX_A5KOB412202QAL"
-
 # Couleurs
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
 # Flags
@@ -54,6 +58,13 @@ SKIP_TORAM=false
 SKIP_ZFS_POOL=false
 SKIP_INCUS=false
 PASSPHRASE_STDIN=false
+ZFS_DISK_1=""
+ZFS_DISK_2=""
+
+# Détection de la distribution (rempli par detect_distro)
+DISTRO=""          # "cachyos", "arch", "debian"
+DISTRO_FAMILY=""   # "arch" ou "debian"
+PKG_INSTALL=""     # commande d'installation de paquets
 
 # ---------------------------------------------------------------------------
 # Parsing des arguments
@@ -66,6 +77,12 @@ while [[ $# -gt 0 ]]; do
         --skip-zfs-pool)     SKIP_ZFS_POOL=true; shift ;;
         --skip-incus)        SKIP_INCUS=true; shift ;;
         --zfs-passphrase)    PASSPHRASE_STDIN=true; shift ;;
+        --zfs-disk1)
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk1 nécessite un by-id.\n" >&2; exit 1; }
+            ZFS_DISK_1="$2"; shift 2 ;;
+        --zfs-disk2)
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk2 nécessite un by-id.\n" >&2; exit 1; }
+            ZFS_DISK_2="$2"; shift 2 ;;
         -h|--help)
             sed -n '2,/^$/s/^# \?//p' "$0"
             exit 0
@@ -81,9 +98,10 @@ done
 # Fonctions utilitaires
 # ---------------------------------------------------------------------------
 
-info()  { printf "${GREEN}[INFO]${NC} %s\n" "$1"; }
-warn()  { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; }
+info()  { printf "${GREEN}[INFO]${NC}  %s\n" "$1"; }
+warn()  { printf "${YELLOW}[WARN]${NC}  %s\n" "$1"; }
 error() { printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2; }
+step()  { printf "\n${BLUE}── %s${NC}\n\n" "$1"; }
 
 check_root() {
     if [[ ${EUID} -ne 0 ]]; then
@@ -123,50 +141,133 @@ ask_passphrase() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Paquets de base (pacman)
+# 0. Détection de la distribution
+# ---------------------------------------------------------------------------
+
+detect_distro() {
+    step "Détection de la distribution"
+
+    if [[ ! -f /etc/os-release ]]; then
+        error "/etc/os-release introuvable. Distribution non supportée."
+        exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    source /etc/os-release
+
+    case "${ID:-}" in
+        cachyos)
+            DISTRO="cachyos"
+            DISTRO_FAMILY="arch"
+            ;;
+        arch|endeavouros|manjaro)
+            DISTRO="arch"
+            DISTRO_FAMILY="arch"
+            ;;
+        debian)
+            DISTRO="debian"
+            DISTRO_FAMILY="debian"
+            ;;
+        *)
+            error "Distribution '${ID:-inconnue}' non supportée."
+            error "Distributions supportées : CachyOS, Arch, Debian."
+            exit 1
+            ;;
+    esac
+
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        PKG_INSTALL="pacman -S --noconfirm --needed"
+    else
+        PKG_INSTALL="apt-get install -y -qq"
+    fi
+
+    info "Distribution détectée : ${PRETTY_NAME:-${ID}} (famille ${DISTRO_FAMILY})"
+}
+
+# ---------------------------------------------------------------------------
+# 1. Paquets de base
 # ---------------------------------------------------------------------------
 
 install_base_packages() {
-    info "Installation des paquets de base..."
+    step "Installation des paquets de base"
 
-    # Synchroniser et installer en une passe
-    pacman -Sy --noconfirm --needed \
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        install_packages_arch
+    else
+        install_packages_debian
+    fi
+
+    # uv (Python package manager) — commun
+    if ! command -v uv &> /dev/null; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="/root/.local/bin:${PATH}"
+        info "uv installé."
+    fi
+
+    info "Paquets de base OK."
+}
+
+install_packages_arch() {
+    # Synchroniser, upgrader et installer en une passe
+    pacman -Syu --noconfirm --needed \
         base-devel dkms pkg-config \
-        curl git tmux jq vim \
+        curl git tmux jq \
         ansible-core python \
         > /dev/null 2>&1
 
-    # ZFS : zfs-utils + module pré-compilé CachyOS
+    # ZFS
     if ! command -v zfs &> /dev/null; then
-        info "  Installation de ZFS..."
-        pacman -S --noconfirm --needed zfs-utils > /dev/null 2>&1
-        # cachyos-zfs tire le module ZFS pré-compilé pour les kernels CachyOS
-        pacman -S --noconfirm --needed cachyos-zfs > /dev/null 2>&1 || {
-            # Fallback : compilation DKMS
-            warn "  cachyos-zfs indisponible, fallback sur zfs-dkms..."
-            pacman -S --noconfirm --needed zfs-dkms > /dev/null 2>&1
-        }
+        info "Installation de ZFS..."
+        ${PKG_INSTALL} zfs-utils > /dev/null 2>&1
+
+        if [[ "${DISTRO}" == "cachyos" ]]; then
+            # CachyOS fournit des modules ZFS pré-compilés
+            ${PKG_INSTALL} cachyos-zfs > /dev/null 2>&1 || {
+                warn "cachyos-zfs indisponible, fallback sur zfs-dkms..."
+                ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
+            }
+        else
+            ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
+        fi
     fi
 
     # Charger le module ZFS
     if ! lsmod | grep -q "^zfs "; then
         modprobe zfs
-        info "  Module ZFS chargé."
+        info "Module ZFS chargé."
     fi
 
     # Incus
     if ! command -v incus &> /dev/null; then
-        pacman -S --noconfirm --needed incus > /dev/null 2>&1
+        ${PKG_INSTALL} incus > /dev/null 2>&1
+    fi
+}
+
+install_packages_debian() {
+    apt-get update -qq || { error "apt-get update échoué"; exit 1; }
+
+    apt-get install -y -qq \
+        build-essential dkms pkg-config \
+        curl git tmux jq \
+        ansible-core python3 \
+        "linux-headers-$(uname -r)" \
+        > /dev/null
+
+    # ZFS
+    if ! command -v zfs &> /dev/null; then
+        apt-get install -y -qq zfsutils-linux > /dev/null
     fi
 
-    # uv (Python package manager)
-    if ! command -v uv &> /dev/null; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="${HOME}/.local/bin:${PATH}"
-        info "  uv installé."
+    # Charger le module ZFS
+    if ! lsmod | grep -q "^zfs "; then
+        modprobe zfs
+        info "Module ZFS chargé."
     fi
 
-    info "Paquets de base OK."
+    # Incus
+    if ! command -v incus &> /dev/null; then
+        apt-get install -y -qq incus > /dev/null
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -179,11 +280,22 @@ create_zfs_pool() {
         return
     fi
 
+    step "Pool ZFS"
+
     # Si le pool existe déjà, on ne le recrée pas (idempotence)
     if zpool list "${POOL}" &> /dev/null; then
         info "Pool ZFS '${POOL}' existe déjà."
         unlock_zfs_pool
         return
+    fi
+
+    # Vérifier que les disques sont spécifiés
+    if [[ -z "${ZFS_DISK_1}" || -z "${ZFS_DISK_2}" ]]; then
+        error "Disques ZFS non spécifiés."
+        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id."
+        error "Disques disponibles :"
+        ls /dev/disk/by-id/nvme-* 2>/dev/null | head -20 || true
+        exit 1
     fi
 
     # Vérifier que les disques existent
@@ -201,7 +313,7 @@ create_zfs_pool() {
     (umask 077 && dd if=/dev/urandom of="${ZFS_KEY_FILE}" bs=32 count=1 2>/dev/null)
     chmod 400 "${ZFS_KEY_FILE}"
     chown root:root "${ZFS_KEY_FILE}"
-    info "  Keyfile généré : ${ZFS_KEY_FILE} (32 bytes aléatoires)"
+    info "Keyfile généré : ${ZFS_KEY_FILE} (32 bytes aléatoires)"
 
     # 2. Chiffrer une copie du keyfile avec une passphrase (backup de secours)
     local passphrase
@@ -212,7 +324,7 @@ create_zfs_pool() {
         -pass "pass:${passphrase}"
     chmod 400 "${ZFS_KEY_ENC}"
     chown root:root "${ZFS_KEY_ENC}"
-    info "  Backup chiffré : ${ZFS_KEY_ENC} (déchiffrable avec la passphrase)"
+    info "Backup chiffré : ${ZFS_KEY_ENC} (déchiffrable avec la passphrase)"
 
     # 3. Créer le pool avec la clé raw
     zpool create \
@@ -232,9 +344,7 @@ create_zfs_pool() {
         "/dev/disk/by-id/${ZFS_DISK_1}" \
         "/dev/disk/by-id/${ZFS_DISK_2}"
 
-    info "  Pool '${POOL}' créé (mirror, chiffré, keyformat=raw)."
-    info "  Boot auto  : ${ZFS_KEY_FILE}"
-    info "  Secours    : passphrase → déchiffre ${ZFS_KEY_ENC} → unlock"
+    info "Pool '${POOL}' créé (mirror, chiffré, keyformat=raw)."
 }
 
 unlock_zfs_pool() {
@@ -249,9 +359,9 @@ unlock_zfs_pool() {
 
     info "Déverrouillage du pool ZFS '${POOL}'..."
 
-    # 1. Essayer la keylocation configurée (normalement file:// vers le keyfile)
+    # 1. Essayer la keylocation configurée
     if zfs load-key "${POOL}" 2>/dev/null; then
-        info "  Déverrouillé via keylocation configurée."
+        info "Déverrouillé via keylocation configurée."
         zfs mount -a 2>/dev/null || true
         return
     fi
@@ -259,7 +369,7 @@ unlock_zfs_pool() {
     # 2. Essayer le keyfile explicitement
     if [[ -f "${ZFS_KEY_FILE}" ]]; then
         if zfs load-key -L "file://${ZFS_KEY_FILE}" "${POOL}" 2>/dev/null; then
-            info "  Déverrouillé via keyfile."
+            info "Déverrouillé via keyfile."
             zfs mount -a 2>/dev/null || true
             return
         fi
@@ -267,7 +377,7 @@ unlock_zfs_pool() {
 
     # 3. Fallback : déchiffrer le backup avec la passphrase
     if [[ -f "${ZFS_KEY_ENC}" ]]; then
-        warn "  Keyfile absent ou invalide. Déchiffrement du backup..."
+        warn "Keyfile absent ou invalide. Déchiffrement du backup..."
         local tmp_key
         tmp_key=$(mktemp)
         local attempts=3
@@ -284,12 +394,12 @@ unlock_zfs_pool() {
                     chmod 400 "${ZFS_KEY_FILE}"
                     chown root:root "${ZFS_KEY_FILE}"
                     rm -f "${tmp_key}"
-                    info "  Déverrouillé via passphrase. Keyfile restauré."
+                    info "Déverrouillé via passphrase. Keyfile restauré."
                     zfs mount -a 2>/dev/null || true
                     return
                 fi
             fi
-            warn "  Passphrase incorrecte ou backup corrompu."
+            warn "Passphrase incorrecte ou backup corrompu."
         done
         rm -f "${tmp_key}"
     fi
@@ -303,6 +413,7 @@ unlock_zfs_pool() {
 # ---------------------------------------------------------------------------
 
 create_zfs_datasets() {
+    step "Datasets ZFS"
     info "Création des datasets ZFS (idempotent)..."
 
     # Helper : créer un dataset s'il n'existe pas
@@ -323,12 +434,12 @@ create_zfs_datasets() {
     # Modèles IA — gros blobs séquentiels, déjà compressés
     ensure_dataset "${POOL}/_srv_models" \
         -o mountpoint=/srv/models -o recordsize=1M -o compression=off
-    ensure_dataset "${POOL}/_srv_models_ollama" -o mountpoint=none
-    ensure_dataset "${POOL}/_srv_models_stt"    -o mountpoint=none
+    ensure_dataset "${POOL}/_srv_models_ollama" -o mountpoint=/srv/models/ollama
+    ensure_dataset "${POOL}/_srv_models_stt"    -o mountpoint=/srv/models/stt
 
     # Home — canmount=noauto : ne se monte pas automatiquement à la création.
     # On le monte explicitement à la fin du script (mount_zfs_home) pour
-    # éviter de masquer /home btrfs pendant que mkinitcpio tourne.
+    # éviter de masquer /home btrfs pendant que mkinitcpio/initramfs tourne.
     ensure_dataset "${POOL}/_home" -o mountpoint=/home -o canmount=noauto
 
     # État anklume (JSON, logs) — quota de sécurité
@@ -346,12 +457,18 @@ create_zfs_datasets() {
 }
 
 # ---------------------------------------------------------------------------
-# 3b. Montage final de /home (après mkinitcpio)
+# 3b. Montage /home + droits utilisateur
 # ---------------------------------------------------------------------------
 
 mount_zfs_home() {
+    step "Montage /home ZFS"
+
     # Activer le montage automatique pour les futurs boots
     zfs set canmount=on "${POOL}/_home" 2>/dev/null || true
+
+    # Identifier l'utilisateur principal (celui qui a lancé sudo)
+    local main_user
+    main_user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
 
     local home_fstype
     home_fstype=$(findmnt -no FSTYPE /home 2>/dev/null) || home_fstype=""
@@ -361,6 +478,25 @@ mount_zfs_home() {
     else
         info "/home déjà monté depuis ZFS."
     fi
+
+    # S'assurer que le répertoire home de l'utilisateur existe avec les bons droits
+    if [[ -n "${main_user}" ]]; then
+        local user_home user_uid user_gid
+        user_home=$(getent passwd "${main_user}" | cut -d: -f6)
+        user_uid=$(id -u "${main_user}")
+        user_gid=$(id -g "${main_user}")
+
+        if [[ -n "${user_home}" && ! -d "${user_home}" ]]; then
+            mkdir -p "${user_home}"
+            info "Répertoire ${user_home} créé."
+        fi
+
+        if [[ -n "${user_home}" && -d "${user_home}" ]]; then
+            chown "${user_uid}:${user_gid}" "${user_home}"
+            chmod 700 "${user_home}"
+            info "Droits ${user_home} : ${main_user} (${user_uid}:${user_gid})"
+        fi
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -368,7 +504,7 @@ mount_zfs_home() {
 # ---------------------------------------------------------------------------
 
 setup_systemd() {
-    info "Configuration systemd..."
+    step "Configuration systemd"
 
     # --- Script de déverrouillage ---
     local unlock_script="/usr/local/bin/zfs-unlock-tank"
@@ -430,7 +566,7 @@ echo "ÉCHEC : impossible de déverrouiller le pool ZFS $POOL." >&2
 exit 1
 SCRIPT
     chmod 755 "${unlock_script}"
-    info "  Script ${unlock_script} installé."
+    info "Script ${unlock_script} installé."
 
     # --- Service systemd ---
     local key_service="/etc/systemd/system/zfs-load-key-tank.service"
@@ -453,7 +589,7 @@ StandardError=journal+console
 [Install]
 WantedBy=zfs-mount.service
 UNIT
-    info "  Service zfs-load-key-tank.service installé."
+    info "Service zfs-load-key-tank.service installé."
 
     # --- Drop-in Incus : après ZFS ---
     local incus_dropin="/etc/systemd/system/incus.service.d"
@@ -463,7 +599,7 @@ UNIT
 After=zfs-mount.service
 Requires=zfs-mount.service
 DROPIN
-    info "  Drop-in Incus after-zfs.conf installé."
+    info "Drop-in Incus after-zfs.conf installé."
 
     # --- Activation ---
     systemctl daemon-reload
@@ -493,7 +629,7 @@ setup_incus() {
         return
     fi
 
-    info "Configuration Incus..."
+    step "Configuration Incus"
 
     systemctl enable --now incus.socket incus.service 2>/dev/null || true
 
@@ -507,20 +643,20 @@ setup_incus() {
         error "Incus ne démarre pas. Vérifier : journalctl -xeu incus"
         exit 1
     fi
-    info "  Incus actif."
+    info "Incus actif."
 
     # Initialisation minimale
     if ! incus profile show default &> /dev/null 2>&1; then
         incus admin init --minimal
-        info "  Incus initialisé (minimal)."
+        info "Incus initialisé (minimal)."
     fi
 
     # Storage pool ZFS
     if ! incus storage show "${INCUS_STORAGE}" &> /dev/null 2>&1; then
         incus storage create "${INCUS_STORAGE}" zfs source="${POOL}/_incus"
-        info "  Storage pool '${INCUS_STORAGE}' créé."
+        info "Storage pool '${INCUS_STORAGE}' créé."
     else
-        info "  Storage pool '${INCUS_STORAGE}' existe déjà."
+        info "Storage pool '${INCUS_STORAGE}' existe déjà."
     fi
 
     # Groupe incus-admin
@@ -528,7 +664,7 @@ setup_incus() {
     main_user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
     if [[ -n "${main_user}" ]] && ! id -nG "${main_user}" 2>/dev/null | grep -qw incus-admin; then
         usermod -aG incus-admin "${main_user}"
-        info "  Utilisateur '${main_user}' ajouté au groupe incus-admin."
+        info "Utilisateur '${main_user}' ajouté au groupe incus-admin."
     fi
 
     info "Incus OK."
@@ -544,18 +680,24 @@ check_nvidia() {
         return
     fi
 
+    step "Vérification NVIDIA"
+
     if command -v nvidia-smi &> /dev/null; then
         info "NVIDIA driver OK :"
         nvidia-smi --query-gpu=driver_version,name,memory.total \
             --format=csv,noheader 2>/dev/null || true
     else
         warn "NVIDIA driver non détecté."
-        warn "  sudo pacman -S nvidia-open-dkms nvidia-utils"
+        if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+            warn "  sudo pacman -S nvidia-open-dkms nvidia-utils"
+        else
+            warn "  Installer le driver via le .run NVIDIA (voir docs/guide/host-setup.md)"
+        fi
     fi
 }
 
 # ---------------------------------------------------------------------------
-# 7. Mode toram (Limine + mkinitcpio)
+# 7. Mode toram (bootloader spécifique à la distro)
 # ---------------------------------------------------------------------------
 
 setup_toram() {
@@ -564,9 +706,20 @@ setup_toram() {
         return
     fi
 
-    info "Configuration du mode toram..."
+    step "Configuration du mode toram"
 
-    # --- Hook mkinitcpio (install) ---
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        setup_toram_mkinitcpio
+    else
+        setup_toram_initramfs
+    fi
+
+    info "Mode toram OK."
+}
+
+# --- Arch / CachyOS : mkinitcpio + Limine/GRUB ---
+setup_toram_mkinitcpio() {
+    # Hook mkinitcpio (install)
     local hook_install="/usr/lib/initcpio/install/toram"
     cat > "${hook_install}" << 'EOF'
 #!/bin/bash
@@ -582,7 +735,7 @@ HELPEOF
 EOF
     chmod +x "${hook_install}"
 
-    # --- Hook mkinitcpio (runtime) ---
+    # Hook mkinitcpio (runtime)
     local hook_runtime="/usr/lib/initcpio/hooks/toram"
     cat > "${hook_runtime}" << 'EOF'
 #!/usr/bin/ash
@@ -602,79 +755,260 @@ run_hook() {
 }
 EOF
     chmod +x "${hook_runtime}"
-    info "  Hooks mkinitcpio toram installés."
+    info "Hooks mkinitcpio toram installés."
 
     # Ajouter à HOOKS si absent
     if ! grep -q "toram" /etc/mkinitcpio.conf; then
         sed -i 's/\(HOOKS=.*\)filesystems/\1toram filesystems/' /etc/mkinitcpio.conf
         mkinitcpio -P
-        info "  mkinitcpio regénéré avec hook toram."
+        info "mkinitcpio regénéré avec hook toram."
     else
-        info "  Hook toram déjà dans mkinitcpio.conf."
+        info "Hook toram déjà dans mkinitcpio.conf."
     fi
 
-    # --- Entrée Limine ---
-    local limine_conf="/boot/limine.conf"
-    if [[ -f "${limine_conf}" ]] && ! grep -q "BOOT_MODE=toram" "${limine_conf}"; then
-        local luks_uuid luks_name root_subvol
-        root_subvol=$(findmnt -no OPTIONS / | grep -oP 'subvol=\K[^,]+' || true)
-        luks_uuid=$(blkid -t TYPE=crypto_LUKS -o value -s UUID | head -1)
-
-        # Trouver le device mapper LUKS sans ls|grep
-        luks_name=""
-        for mapper in /dev/mapper/luks-*; do
-            if [[ -e "${mapper}" ]]; then
-                luks_name=$(basename "${mapper}")
-                break
-            fi
-        done
-
-        local cmdline="root=/dev/mapper/${luks_name}"
-        cmdline+=" rd.luks.uuid=${luks_uuid}"
-        cmdline+=" ro BOOT_MODE=toram"
-        if [[ -n "${root_subvol}" ]]; then
-            cmdline+=" rootflags=subvol=${root_subvol}"
-        fi
-
-        # Ajouter avant la section /EFI fallback (ou à la fin)
-        cat >> "${limine_conf}" << ENTRY
-
-/CachyOS (toram -- immutable)
-    protocol: linux
-    kernel_path: boot():/vmlinuz-linux-cachyos-lts
-    kernel_cmdline: ${cmdline}
-    module_path: boot():/intel-ucode.img
-    module_path: boot():/initramfs-linux-cachyos-lts.img
-ENTRY
-        info "  Entrée Limine toram ajoutée."
+    # Entrée bootloader (Limine si présent, sinon GRUB)
+    if [[ -f "/boot/limine.conf" ]]; then
+        setup_toram_limine
+    elif command -v grub-mkconfig &> /dev/null; then
+        setup_toram_grub
     else
-        info "  Entrée Limine toram existe déjà."
+        warn "Aucun bootloader supporté détecté pour l'entrée toram."
     fi
-
-    info "Mode toram OK."
 }
 
-# ---------------------------------------------------------------------------
-# 8. AnKLuMe
-# ---------------------------------------------------------------------------
+setup_toram_limine() {
+    local limine_conf="/boot/limine.conf"
 
-install_anklume() {
-    export PATH="${HOME}/.local/bin:/root/.local/bin:${PATH}"
-
-    if command -v anklume &> /dev/null; then
-        info "anklume déjà installé."
+    if grep -q "BOOT_MODE=toram" "${limine_conf}"; then
+        info "Entrée Limine toram existe déjà."
         return
     fi
 
-    info "Installation d'anklume..."
-    if command -v uv &> /dev/null; then
-        if uv tool install anklume 2>/dev/null; then
+    local luks_uuid luks_name root_subvol
+    root_subvol=$(findmnt -no OPTIONS / | grep -oP 'subvol=\K[^,]+' || true)
+    luks_uuid=$(blkid -t TYPE=crypto_LUKS -o value -s UUID | head -1)
+
+    # Trouver le device mapper LUKS
+    luks_name=""
+    for mapper in /dev/mapper/luks-*; do
+        if [[ -e "${mapper}" ]]; then
+            luks_name=$(basename "${mapper}")
+            break
+        fi
+    done
+
+    local cmdline="root=/dev/mapper/${luks_name}"
+    cmdline+=" rd.luks.uuid=${luks_uuid}"
+    cmdline+=" ro BOOT_MODE=toram"
+    if [[ -n "${root_subvol}" ]]; then
+        cmdline+=" rootflags=subvol=${root_subvol}"
+    fi
+
+    # Détecter le kernel CachyOS
+    local kernel_name="linux-cachyos"
+    if [[ -f "/boot/vmlinuz-linux-cachyos-lts" ]]; then
+        kernel_name="linux-cachyos-lts"
+    fi
+
+    cat >> "${limine_conf}" << ENTRY
+
+/CachyOS (toram -- immutable)
+    protocol: linux
+    kernel_path: boot():/vmlinuz-${kernel_name}
+    kernel_cmdline: ${cmdline}
+    module_path: boot():/intel-ucode.img
+    module_path: boot():/initramfs-${kernel_name}.img
+ENTRY
+    info "Entrée Limine toram ajoutée."
+}
+
+# --- Debian : initramfs-tools + GRUB ---
+setup_toram_initramfs() {
+    local hook="/etc/initramfs-tools/scripts/init-bottom/toram"
+    if [[ ! -f "${hook}" ]]; then
+        cat > "${hook}" << 'HOOK'
+#!/bin/sh
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case $1 in prereqs) prereqs; exit 0;; esac
+
+grep -q "BOOT_MODE=toram" /proc/cmdline || exit 0
+
+mkdir -p /mnt/lower /mnt/upper-tmpfs
+mount -o remount,ro "${rootmnt}"
+mount -o move "${rootmnt}" /mnt/lower
+mount -t tmpfs -o size=80% tmpfs /mnt/upper-tmpfs
+mkdir -p /mnt/upper-tmpfs/upper /mnt/upper-tmpfs/work
+mount -t overlay overlay \
+  -o "lowerdir=/mnt/lower,upperdir=/mnt/upper-tmpfs/upper,workdir=/mnt/upper-tmpfs/work" \
+  "${rootmnt}"
+mkdir -p "${rootmnt}/mnt/rootfs-disk"
+mount -o move /mnt/lower "${rootmnt}/mnt/rootfs-disk"
+HOOK
+        chmod +x "${hook}"
+        info "Hook initramfs toram installé."
+    fi
+
+    update-initramfs -u
+    setup_toram_grub
+}
+
+setup_toram_grub() {
+    local grub_entry="/etc/grub.d/42_toram"
+
+    if [[ -f "${grub_entry}" ]]; then
+        info "Entrée GRUB toram existe déjà."
+        return
+    fi
+
+    local root_uuid root_subvol rootflags=""
+    root_uuid=$(findmnt -no UUID /)
+    root_subvol=$(findmnt -no OPTIONS / | grep -oP 'subvol=\K[^,]+' || true)
+    if [[ -n "${root_subvol}" ]]; then
+        rootflags=" rootflags=subvol=${root_subvol}"
+    fi
+
+    local menu_label="$(. /etc/os-release && echo "${NAME:-Linux}") (toram -- immutable)"
+
+    cat > "${grub_entry}" << GRUB
+#!/bin/sh
+cat << 'EOF'
+menuentry "${menu_label}" {
+    linux /vmlinuz root=UUID=${root_uuid} ro BOOT_MODE=toram${rootflags}
+    initrd /initrd.img
+}
+EOF
+GRUB
+    chmod +x "${grub_entry}"
+    update-grub 2>/dev/null || grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
+    info "Entrée GRUB toram ajoutée."
+}
+
+# ---------------------------------------------------------------------------
+# 8. AnKLuMe + alias ank (bash, zsh, fish)
+# ---------------------------------------------------------------------------
+
+install_anklume() {
+    step "Installation d'AnKLuMe"
+
+    # Identifier l'utilisateur principal
+    local main_user
+    main_user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
+    local user_home=""
+    if [[ -n "${main_user}" ]]; then
+        user_home=$(getent passwd "${main_user}" | cut -d: -f6)
+    fi
+
+    # S'assurer que uv est dans le PATH pour l'utilisateur
+    local uv_bin=""
+    if [[ -n "${user_home}" && -x "${user_home}/.local/bin/uv" ]]; then
+        uv_bin="${user_home}/.local/bin/uv"
+    elif command -v uv &> /dev/null; then
+        uv_bin=$(command -v uv)
+    elif [[ -x "/root/.local/bin/uv" ]]; then
+        uv_bin="/root/.local/bin/uv"
+    fi
+
+    # Installer uv pour l'utilisateur s'il ne l'a pas encore
+    if [[ -n "${main_user}" && "${main_user}" != "root" ]]; then
+        if [[ ! -x "${user_home}/.local/bin/uv" ]]; then
+            su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
+            uv_bin="${user_home}/.local/bin/uv"
+            info "uv installé pour ${main_user}."
+        fi
+    fi
+
+    # Installer anklume via uv tool (en tant qu'utilisateur)
+    if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
+        if su - "${main_user}" -c "${uv_bin} tool install anklume" 2>/dev/null; then
+            info "anklume installé via uv pour ${main_user}."
+        else
+            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
+            warn "  ${uv_bin} tool install anklume"
+        fi
+    elif [[ -n "${uv_bin}" ]]; then
+        if "${uv_bin}" tool install anklume 2>/dev/null; then
             info "anklume installé via uv."
         else
-            warn "anklume pas encore publié sur PyPI. Installer manuellement."
+            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
         fi
+    fi
+
+    # Configurer PATH + alias ank pour tous les shells
+    setup_shell_integration "${main_user}" "${user_home}"
+
+    info "AnKLuMe OK."
+}
+
+setup_shell_integration() {
+    local main_user="$1"
+    local user_home="$2"
+
+    if [[ -z "${user_home}" ]]; then
+        warn "Impossible de déterminer le home de l'utilisateur."
+        return
+    fi
+
+    local local_bin="${user_home}/.local/bin"
+
+    # Bloc à injecter dans bash/zsh
+    local shell_block
+    shell_block=$(cat << 'BLOCK'
+# AnKLuMe — PATH + alias
+export PATH="${HOME}/.local/bin:${PATH}"
+command -v anklume &> /dev/null && alias ank='anklume'
+BLOCK
+)
+
+    # --- Bash ---
+    local bashrc="${user_home}/.bashrc"
+    if [[ -f "${bashrc}" ]] && ! grep -q "alias ank=" "${bashrc}" 2>/dev/null; then
+        printf '\n%s\n' "${shell_block}" >> "${bashrc}"
+        info "bash : alias ank ajouté dans ${bashrc}"
+    elif [[ ! -f "${bashrc}" ]]; then
+        printf '%s\n' "${shell_block}" > "${bashrc}"
+        info "bash : ${bashrc} créé avec alias ank"
     else
-        warn "uv introuvable. Installer manuellement : uv tool install anklume"
+        info "bash : alias ank déjà présent."
+    fi
+
+    # --- Zsh ---
+    local zshrc="${user_home}/.zshrc"
+    if [[ -f "${zshrc}" ]] && ! grep -q "alias ank=" "${zshrc}" 2>/dev/null; then
+        printf '\n%s\n' "${shell_block}" >> "${zshrc}"
+        info "zsh  : alias ank ajouté dans ${zshrc}"
+    elif [[ -f "${zshrc}" ]]; then
+        info "zsh  : alias ank déjà présent."
+    fi
+    # On ne crée pas .zshrc s'il n'existe pas (l'utilisateur n'utilise peut-être pas zsh)
+
+    # --- Fish ---
+    local fish_conf_dir="${user_home}/.config/fish"
+    local fish_conf="${fish_conf_dir}/config.fish"
+    if command -v fish &> /dev/null || [[ -d "${fish_conf_dir}" ]]; then
+        mkdir -p "${fish_conf_dir}"
+        if ! grep -q "alias ank" "${fish_conf}" 2>/dev/null; then
+            cat >> "${fish_conf}" << 'FISH'
+
+# AnKLuMe — PATH + alias
+fish_add_path ~/.local/bin
+alias ank='anklume'
+FISH
+            info "fish : alias ank ajouté dans ${fish_conf}"
+        else
+            info "fish : alias ank déjà présent."
+        fi
+    fi
+
+    # Fixer les droits (les fichiers ont été écrits en root)
+    if [[ -n "${main_user}" && "${main_user}" != "root" ]]; then
+        local user_uid user_gid
+        user_uid=$(id -u "${main_user}")
+        user_gid=$(id -g "${main_user}")
+        for f in "${bashrc}" "${zshrc}" "${fish_conf}"; do
+            [[ -f "${f}" ]] && chown "${user_uid}:${user_gid}" "${f}"
+        done
+        [[ -d "${fish_conf_dir}" ]] && chown -R "${user_uid}:${user_gid}" "${fish_conf_dir}"
     fi
 }
 
@@ -683,11 +1017,13 @@ install_anklume() {
 # ---------------------------------------------------------------------------
 
 summary() {
-    echo ""
-    echo "=== Résumé ==="
-    echo ""
+    step "Résumé"
 
     local label result
+
+    label="Distribution"
+    result="${DISTRO} (${DISTRO_FAMILY})"
+    printf "  %-20s %s\n" "${label}" "${result}"
 
     label="ZFS pool"
     result=$(zpool list "${POOL}" -H -o health 2>/dev/null) || result="?"
@@ -742,17 +1078,18 @@ summary() {
 
 main() {
     echo ""
-    echo "=== bootstrap-cachyos.sh — Préparation hôte AnKLuMe (CachyOS) ==="
+    echo "=== bootstrap.sh — Préparation hôte AnKLuMe ==="
     echo ""
 
     check_root
+    detect_distro
     install_base_packages
     create_zfs_pool
     create_zfs_datasets
     setup_systemd
     setup_incus
     check_nvidia
-    setup_toram          # mkinitcpio tourne ici — /home doit être btrfs
+    setup_toram          # mkinitcpio/initramfs tourne ici — /home doit être btrfs
     mount_zfs_home       # maintenant on peut masquer /home btrfs par ZFS
     install_anklume
     summary
@@ -760,7 +1097,7 @@ main() {
     info "Bootstrap terminé."
     echo ""
     echo "Prochaines étapes :"
-    echo "  1. Se reloguer (groupe incus-admin)"
+    echo "  1. Se reloguer (groupe incus-admin + alias ank)"
     echo "  2. anklume init mon-infra && cd mon-infra"
     echo "  3. anklume tui"
     echo "  4. anklume apply all"
@@ -769,7 +1106,6 @@ main() {
     echo "  - Keyfile raw  : ${ZFS_KEY_FILE} (32B, déverrouillage auto au boot)"
     echo "  - Backup chiffré : ${ZFS_KEY_ENC} (déchiffrable avec passphrase)"
     echo "  - Si keyfile perdu → passphrase demandée au boot → keyfile restauré"
-    echo "  - Clé et passphrase sont INDÉPENDANTES (keyformat=raw)"
     echo ""
 }
 
