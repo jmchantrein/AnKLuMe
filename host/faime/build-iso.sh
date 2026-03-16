@@ -145,12 +145,49 @@ fi
 CURL_ARGS+=(-F "sbm=0")
 CURL_ARGS+=("${FAIME_URL}")
 
+# ---------------------------------------------------------------------------
+# Extraction du path de téléchargement depuis la réponse HTML
+# ---------------------------------------------------------------------------
+
+# FAI.me retourne du HTML contenant un lien vers l'ISO générée.
+# On cherche un path de type /fai-cd/*.iso ou une URL complète.
+extract_download_path() {
+    local html="$1"
+    local path
+
+    # Chercher un href contenant .iso (lien de téléchargement)
+    path=$(echo "${html}" | grep -oP 'href="[^"]*\.iso[^"]*"' | head -1 | tr -d '"' | sed 's/^href=//')
+
+    if [[ -z "${path}" ]]; then
+        # Chercher un path fai-cd/ dans le texte brut
+        path=$(echo "${html}" | grep -oP '/fai-cd/[^\s<"]+' | head -1)
+    fi
+
+    if [[ -z "${path}" ]]; then
+        # Chercher toute URL contenant fai-project.org et .iso
+        path=$(echo "${html}" | grep -oP 'https?://fai-project\.org[^\s<"]*\.iso[^\s<"]*' | head -1)
+    fi
+
+    echo "${path}"
+}
+
 if [[ "${DRY_RUN}" == true ]]; then
     echo "Commande curl (dry-run) :"
     echo ""
-    echo "curl \\"
-    for arg in "${CURL_ARGS[@]}"; do
-        echo "  ${arg} \\"
+    echo "curl -L \\"
+    i=0
+    total=${#CURL_ARGS[@]}
+    while [[ $i -lt $total ]]; do
+        if [[ "${CURL_ARGS[$i]}" == "-F" ]] && [[ $((i + 1)) -lt $total ]]; then
+            echo "  -F '${CURL_ARGS[$((i + 1))]}' \\"
+            i=$((i + 2))
+        elif [[ "${CURL_ARGS[$i]}" == -* ]]; then
+            echo "  ${CURL_ARGS[$i]} \\"
+            i=$((i + 1))
+        else
+            echo "  '${CURL_ARGS[$i]}'"
+            i=$((i + 1))
+        fi
     done
     echo ""
     echo "Le postinst.sh sera uploadé et exécuté au premier boot."
@@ -158,15 +195,37 @@ else
     echo "Envoi de la requête à FAI.me..."
     echo "(La génération peut prendre jusqu'à 30 minutes pour une ISO live)"
     echo ""
-    response=$(curl "${CURL_ARGS[@]}" 2>&1) || {
+    response=$(curl -L "${CURL_ARGS[@]}" 2>&1) || {
         echo "Erreur lors de la requête FAI.me." >&2
         echo "${response}" >&2
         exit 1
     }
 
-    echo "${response}"
-    echo ""
-    echo "Consultez l'email (si fourni) ou la page FAI.me pour le lien de téléchargement."
+    download_path=$(extract_download_path "${response}")
+
+    if [[ -n "${download_path}" ]]; then
+        # Construire l'URL complète si c'est un path relatif
+        if [[ "${download_path}" == /* ]]; then
+            download_url="https://fai-project.org${download_path}"
+        elif [[ "${download_path}" == http* ]]; then
+            download_url="${download_path}"
+        else
+            download_url="https://fai-project.org/${download_path}"
+        fi
+        echo "ISO prête à télécharger :"
+        echo ""
+        echo "  ${download_url}"
+        echo ""
+        echo "Pour télécharger :"
+        echo "  curl -LO ${download_url}"
+    else
+        # Fallback : afficher la réponse brute si on ne trouve pas le path
+        echo "Réponse FAI.me (path de téléchargement non détecté automatiquement) :"
+        echo ""
+        echo "${response}" | sed 's/<[^>]*>//g' | sed '/^$/d' | head -30
+        echo ""
+        echo "Consultez la page FAI.me ou l'email (si fourni) pour le lien de téléchargement."
+    fi
 fi
 
 echo ""
