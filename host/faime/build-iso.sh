@@ -175,8 +175,19 @@ if [[ "${DRY_RUN}" == true ]]; then
     echo "Commande curl (dry-run) :"
     echo ""
     echo "curl -L \\"
-    for arg in "${CURL_ARGS[@]}"; do
-        echo "  ${arg} \\"
+    i=0
+    total=${#CURL_ARGS[@]}
+    while [[ $i -lt $total ]]; do
+        if [[ "${CURL_ARGS[$i]}" == "-F" ]] && [[ $((i + 1)) -lt $total ]]; then
+            echo "  -F '${CURL_ARGS[$((i + 1))]}' \\"
+            i=$((i + 2))
+        elif [[ "${CURL_ARGS[$i]}" == -* ]]; then
+            echo "  ${CURL_ARGS[$i]} \\"
+            i=$((i + 1))
+        else
+            echo "  '${CURL_ARGS[$i]}'"
+            i=$((i + 1))
+        fi
     done
     echo ""
     echo "Le postinst.sh sera uploadé et exécuté au premier boot."
