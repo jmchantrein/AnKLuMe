@@ -119,19 +119,36 @@ echo "  Postinst    : ${POSTINST}"
 echo ""
 
 # Construire les arguments curl
+# Noms de champs exacts du formulaire FAI.me :
+#   suite     = distribution (bookworm, trixie, ...)
+#   cl1       = BACKPORTS
+#   cl5       = SSH_SERVER
+#   cl6       = STANDARD
+#   cl7       = NONFREE
+#   keyboard  = langue + clavier
+#   addpkgs   = paquets supplémentaires
+#   hostname  = nom d'hôte (live uniquement)
+#   username  = utilisateur (live uniquement)
+#   rclocal   = exécuter postinst au premier boot
 CURL_ARGS=(
     -s
     -F "type=${ISO_TYPE}"
-    -F "distro=trixie"
-    -F "BACKPORTS=on"
-    -F "NONFREE=on"
-    -F "SSH_SERVER=on"
-    -F "STANDARD=on"
-    -F "lang=fr"
+    -F "suite=trixie"
+    -F "cl1=BACKPORTS"
+    -F "cl5=SSH_SERVER"
+    -F "cl6=STANDARD"
+    -F "cl7=NONFREE"
     -F "keyboard=fr"
-    -F "packages=${PACKAGES_STR}"
+    -F "addpkgs=${PACKAGES_STR}"
     -F "postinst=@${POSTINST}"
+    -F "rclocal=1"
 )
+
+# Champs spécifiques au live
+if [[ "${ISO_TYPE}" == "live" ]]; then
+    CURL_ARGS+=(-F "hostname=anklume")
+    CURL_ARGS+=(-F "username=anklume")
+fi
 
 if [[ -n "${DESKTOP_PARAM}" ]]; then
     CURL_ARGS+=(-F "desktop=${DESKTOP_PARAM}")
@@ -141,7 +158,7 @@ if [[ -n "${EMAIL}" ]]; then
     CURL_ARGS+=(-F "email=${EMAIL}")
 fi
 
-# sbm=0 = créer l'image, sbm=1 = afficher l'URL API
+# sbm=0 = créer l'image (submit button)
 CURL_ARGS+=(-F "sbm=0")
 CURL_ARGS+=("${FAIME_URL}")
 
