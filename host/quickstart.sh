@@ -177,24 +177,18 @@ setup_incus() {
 # 3. NVIDIA GPU (optionnel, --gpu)
 # ---------------------------------------------------------------------------
 
-# PCI device IDs par génération NVIDIA (préfixe 10de:)
-# Blackwell (RTX 50xx) : nécessite driver 570+ et open kernel modules
+# PCI device IDs Blackwell (RTX 50xx) : nécessite driver 570+ et open kernel modules
+# Source : lspci 10de:XXXX confirmés sur hardware réel
 readonly -a BLACKWELL_IDS=(
-    "2684" # RTX 5090
-    "2685" # RTX 5090 (variante)
-    "2687" # RTX 5080
-    "2688" # RTX 5080 (variante)
-    "2689" # RTX 5070 Ti
-    "268a" # RTX 5070 Ti (variante)
-    "268b" # RTX 5070
-    "268c" # RTX 5070 (variante)
-    "2702" # RTX PRO 5000
-    "2703" # RTX PRO 5000 (variante)
+    "2b85" # RTX 5090  (GB202)
+    "2c02" # RTX 5080  (GB203)
+    "2c05" # RTX 5070 Ti (GB203)
+    "2f04" # RTX 5070  (GB205)
+    "2bb3" # RTX PRO 5000 (GB202)
 )
 
-# URL du driver NVIDIA .run pour Blackwell (570+ requis)
-readonly NVIDIA_BLACKWELL_VERSION="570.133.07"
-readonly NVIDIA_BLACKWELL_RUN="https://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
+readonly NVIDIA_BLACKWELL_VERSION="570.195.03"
+readonly NVIDIA_BLACKWELL_RUN="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
 
 detect_nvidia_gpu() {
     # Retourne : "blackwell", "supported", ou "none"

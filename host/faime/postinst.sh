@@ -22,16 +22,17 @@ error() { printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2; }
 # ---------------------------------------------------------------------------
 
 # PCI device IDs Blackwell (RTX 50xx)
+# Source : lspci 10de:XXXX confirmés sur hardware réel
 readonly -a BLACKWELL_IDS=(
-    "2684" "2685" # RTX 5090
-    "2687" "2688" # RTX 5080
-    "2689" "268a" # RTX 5070 Ti
-    "268b" "268c" # RTX 5070
-    "2702" "2703" # RTX PRO 5000
+    "2b85" # RTX 5090  (GB202)
+    "2c02" # RTX 5080  (GB203)
+    "2c05" # RTX 5070 Ti (GB203)
+    "2f04" # RTX 5070  (GB205)
+    "2bb3" # RTX PRO 5000 (GB202)
 )
 
-readonly NVIDIA_BLACKWELL_VERSION="570.133.07"
-readonly NVIDIA_BLACKWELL_RUN="https://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
+readonly NVIDIA_BLACKWELL_VERSION="570.195.03"
+readonly NVIDIA_BLACKWELL_RUN="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
 
 detect_nvidia_gpu() {
     if ! lspci -nn 2>/dev/null | grep -qi "nvidia"; then
