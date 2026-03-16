@@ -45,8 +45,11 @@ machines:
 ## Démarrage rapide
 
 ```bash
-# Installer
-uv tool install anklume
+# Installer AnKLuMe et ses dépendances
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe/host
+less quickstart.sh        # lire avant d'exécuter
+sudo ./quickstart.sh
 
 # Créer un projet
 anklume init mon-infra
@@ -58,6 +61,8 @@ anklume apply all
 # Vérifier
 anklume status
 ```
+
+→ [Guide d'installation détaillé](guide/installation.md)
 
 ## Fonctionnalités
 

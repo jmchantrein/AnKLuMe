@@ -5,50 +5,46 @@
 | Composant | Version | Usage |
 |---|---|---|
 | **Linux** | Kernel 5.15+ | Hôte (toute distribution) |
-| **Python** | 3.11+ | Runtime anklume |
-| **uv** | 0.4+ | Gestion des dépendances Python |
 | **Incus** | 6.0+ | Conteneurs LXC et VMs KVM |
 | **Ansible** | 2.16+ | Provisioning (optionnel) |
 
-## Installer anklume
+## Installer avec le script quickstart
 
-=== "Via uv (recommandé)"
-
-    ```bash
-    uv tool install anklume
-    ```
-
-=== "Depuis les sources"
-
-    ```bash
-    git clone https://github.com/jmchantrein/AnKLuMe.git
-    cd AnKLuMe
-    uv sync
-    ```
-
-## Installer Incus
-
-Suivre la [documentation officielle Incus](https://linuxcontainers.org/incus/docs/main/installing/).
+Le moyen le plus simple d'installer AnKLuMe et ses dépendances :
 
 ```bash
-# Exemple sur Debian/Ubuntu
-sudo apt install incus
-sudo incus admin init --minimal
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe/host
+
+# Lire le script avant de l'exécuter
+less quickstart.sh
+
+# Exécuter
+sudo ./quickstart.sh
 ```
 
-!!! tip "Vérification"
-    ```bash
-    incus list
-    ```
-    Doit retourner un tableau vide sans erreur.
+Le script installe automatiquement : Incus, uv, Python, Ansible,
+AnKLuMe et l'alias `ank`. Voir [Préparation de l'hôte](host-setup.md)
+pour les détails et les options.
 
-## Installer Ansible (optionnel)
-
-Ansible est nécessaire uniquement si vous utilisez des rôles de
-provisioning (`roles:` dans les fichiers domaine).
+## Installer depuis les sources (développement)
 
 ```bash
-uv tool install ansible-core
+git clone https://github.com/jmchantrein/AnKLuMe.git
+cd AnKLuMe
+uv sync
+```
+
+!!! note "uv"
+    [uv](https://docs.astral.sh/uv/) est installé automatiquement par
+    les scripts de bootstrap. Pour l'installer manuellement :
+    `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+## Vérification
+
+```bash
+anklume --version
+incus list        # tableau vide sans erreur
 ```
 
 ## GPU (optionnel)
@@ -58,6 +54,13 @@ Pour le passthrough GPU (Ollama, STT, LLM) :
 - GPU NVIDIA avec drivers installés
 - `nvidia-smi` accessible depuis l'hôte
 
+Le script quickstart peut installer les drivers automatiquement
+avec l'option `--gpu` :
+
 ```bash
-nvidia-smi  # doit afficher le GPU
+sudo ./quickstart.sh --gpu
 ```
+
+## Étape suivante
+
+→ [Démarrage rapide](quickstart.md) — créer et déployer un premier projet
