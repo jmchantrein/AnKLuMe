@@ -307,8 +307,15 @@ requis par les GPU Blackwell. Rien d'autre à faire.
 
 ### Debian
 
-Sur Debian, le kernel stock peut être trop ancien pour les GPU récents.
-Il faut installer le driver manuellement via le `.run` NVIDIA :
+Le bootstrap détecte automatiquement le GPU et installe le bon driver :
+
+- **GPU pré-Blackwell** (Turing, Ampere, Ada Lovelace) : `nvidia-driver` +
+  `nvidia-open-kernel-dkms` depuis les dépôts Debian (non-free activé auto)
+- **GPU Blackwell** (RTX 50xx) : le driver 570+ n'est pas dans les dépôts
+  Debian. Le bootstrap télécharge et installe automatiquement le `.run`
+  NVIDIA avec `--dkms --open --silent`
+
+Installation manuelle (si besoin) :
 
 ```bash
 # Prérequis
@@ -393,7 +400,7 @@ et ne les recrée pas.
 4. Crée les datasets ZFS selon la convention `_path`
 5. Configure systemd (déverrouillage ZFS → montage → Incus)
 6. Configure le storage pool Incus sur ZFS
-7. Vérifie le driver NVIDIA
+7. Détecte le GPU NVIDIA et installe le driver adapté (Blackwell → .run auto)
 8. Installe le hook toram + entrée bootloader (Limine ou GRUB)
 9. Monte `/home` ZFS avec les bons droits utilisateur
 10. Installe AnKLuMe via uv + alias `ank` (bash, zsh, fish)
@@ -402,4 +409,54 @@ et ne les recrée pas.
 
 - Partitionnement du disque système (LUKS + btrfs)
 - Installation de la distribution
-- Téléchargement du driver NVIDIA `.run` (Debian uniquement)
+
+---
+
+## 8. Installation rapide (quickstart)
+
+Pour essayer AnKLuMe sur un système existant, sans ZFS ni toram :
+
+```bash
+# Minimum : Incus + AnKLuMe
+sudo ./host/quickstart.sh
+
+# Avec support GPU (pour tester ai-tools)
+sudo ./host/quickstart.sh --gpu
+```
+
+Le quickstart installe uniquement : Incus, uv, Ansible, AnKLuMe et
+l'alias `ank`. Pas de ZFS, pas de toram, pas de partitionnement.
+Idéal pour découvrir AnKLuMe avant de passer au bootstrap complet.
+
+---
+
+## 9. Test matériel via ISO live (FAI.me)
+
+Avant d'installer sur du matériel neuf, il est possible de générer une
+ISO Debian live via [FAI.me](https://fai-project.org/FAIme/live/) pour
+tester la compatibilité (GPU, réseau, stockage).
+
+```bash
+# Voir la commande sans exécuter
+./host/faime/build-iso.sh --dry-run
+
+# Générer l'ISO (KDE, backports, NVIDIA auto-detect)
+./host/faime/build-iso.sh --email moi@example.com
+
+# Sans bureau (headless)
+./host/faime/build-iso.sh --desktop none
+```
+
+L'ISO inclut :
+
+- Debian trixie + **backports** (kernel récent)
+- Firmware non-free (WiFi, GPU)
+- Incus, ZFS, Ansible pré-installés
+- Détection NVIDIA automatique (Blackwell → driver .run 570+)
+- AnKLuMe pré-installé avec alias `ank`
+
+**Workflow** :
+
+1. Générer l'ISO → télécharger → `dd` sur clé USB
+2. Booter → tester GPU (`nvidia-smi`), réseau, stockage
+3. Si tout fonctionne → installer ou lancer `bootstrap.sh`

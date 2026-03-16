@@ -671,28 +671,157 @@ setup_incus() {
 }
 
 # ---------------------------------------------------------------------------
-# 6. NVIDIA (vérification)
+# 6. NVIDIA GPU (détection auto + installation)
 # ---------------------------------------------------------------------------
 
-check_nvidia() {
+# PCI device IDs Blackwell (RTX 50xx) : nécessite driver 570+ et open kernel modules
+readonly -a BLACKWELL_IDS=(
+    "2684" "2685" # RTX 5090
+    "2687" "2688" # RTX 5080
+    "2689" "268a" # RTX 5070 Ti
+    "268b" "268c" # RTX 5070
+    "2702" "2703" # RTX PRO 5000
+)
+
+readonly NVIDIA_BLACKWELL_VERSION="570.133.07"
+readonly NVIDIA_BLACKWELL_RUN="https://us.download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
+
+# Retourne "blackwell", "supported" ou "none"
+detect_nvidia_gpu() {
+    if ! lspci -nn 2>/dev/null | grep -qi "nvidia"; then
+        echo "none"
+        return
+    fi
+
+    local pci_ids
+    pci_ids=$(lspci -nn | grep -i nvidia | grep -oP '10de:\K[0-9a-f]{4}' || true)
+
+    for id in ${pci_ids}; do
+        for blackwell_id in "${BLACKWELL_IDS[@]}"; do
+            if [[ "${id,,}" == "${blackwell_id,,}" ]]; then
+                echo "blackwell"
+                return
+            fi
+        done
+    done
+
+    echo "supported"
+}
+
+setup_nvidia() {
     if [[ "${SKIP_NVIDIA}" == true ]]; then
         info "NVIDIA : ignoré (--skip-nvidia)."
         return
     fi
 
-    step "Vérification NVIDIA"
+    step "NVIDIA GPU"
 
+    # Déjà installé ?
     if command -v nvidia-smi &> /dev/null; then
         info "NVIDIA driver OK :"
         nvidia-smi --query-gpu=driver_version,name,memory.total \
             --format=csv,noheader 2>/dev/null || true
+        return
+    fi
+
+    local gpu_gen
+    gpu_gen=$(detect_nvidia_gpu)
+
+    case "${gpu_gen}" in
+        none)
+            info "Aucun GPU NVIDIA détecté."
+            return
+            ;;
+        blackwell)
+            info "GPU NVIDIA Blackwell détecté."
+            install_nvidia_blackwell
+            ;;
+        supported)
+            info "GPU NVIDIA détecté (pré-Blackwell)."
+            install_nvidia_standard
+            ;;
+    esac
+}
+
+install_nvidia_standard() {
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        info "Installation via pacman (nvidia-open-dkms)..."
+        pacman -S --noconfirm --needed \
+            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
+        info "NVIDIA driver installé (open kernel modules)."
     else
-        warn "NVIDIA driver non détecté."
-        if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-            warn "  sudo pacman -S nvidia-open-dkms nvidia-utils"
-        else
-            warn "  Installer le driver via le .run NVIDIA (voir docs/guide/host-setup.md)"
+        # Debian : activer non-free si nécessaire
+        if ! grep -q "non-free" /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; then
+            warn "Activation des dépôts non-free/contrib..."
+            sed -i 's/main$/main contrib non-free non-free-firmware/' \
+                /etc/apt/sources.list 2>/dev/null || true
+            apt-get update -qq
         fi
+
+        apt-get install -y -qq \
+            "linux-headers-$(uname -r)" \
+            nvidia-driver nvidia-open-kernel-dkms \
+            firmware-nvidia-gsp \
+            > /dev/null 2>&1
+        info "NVIDIA driver installé."
+    fi
+}
+
+install_nvidia_blackwell() {
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        # CachyOS/Arch : le driver 570+ est dans les dépôts
+        info "Installation via pacman (nvidia-open-dkms, 570+)..."
+        pacman -S --noconfirm --needed \
+            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
+        info "NVIDIA Blackwell driver installé."
+    else
+        # Debian : le driver 570+ n'est PAS dans les dépôts.
+        warn "Blackwell nécessite le driver ${NVIDIA_BLACKWELL_VERSION}."
+        warn "Ce driver n'est pas dans les dépôts Debian — installation via .run"
+
+        apt-get install -y -qq \
+            "linux-headers-$(uname -r)" \
+            build-essential dkms pkg-config \
+            > /dev/null
+
+        # Blacklister nouveau
+        if ! grep -q "blacklist nouveau" /etc/modprobe.d/blacklist-nouveau.conf 2>/dev/null; then
+            cat > /etc/modprobe.d/blacklist-nouveau.conf << 'CONF'
+blacklist nouveau
+options nouveau modeset=0
+CONF
+            if [[ "${DISTRO_FAMILY}" == "debian" ]]; then
+                update-initramfs -u 2>/dev/null || true
+            else
+                mkinitcpio -P 2>/dev/null || true
+            fi
+            info "Module nouveau blacklisté."
+        fi
+
+        if lsmod | grep -q nouveau; then
+            warn "Le module nouveau est encore chargé."
+            warn "Rebootez puis relancez ce script."
+            return
+        fi
+
+        local run_file="/tmp/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
+        if [[ ! -f "${run_file}" ]]; then
+            info "Téléchargement du driver ${NVIDIA_BLACKWELL_VERSION}..."
+            curl -L -o "${run_file}" "${NVIDIA_BLACKWELL_RUN}" || {
+                error "Échec du téléchargement. URL : ${NVIDIA_BLACKWELL_RUN}"
+                exit 1
+            }
+        fi
+
+        chmod +x "${run_file}"
+        info "Installation du driver NVIDIA ${NVIDIA_BLACKWELL_VERSION} (open kernel modules)..."
+        "${run_file}" --dkms --open --silent || {
+            error "Échec de l'installation. Vérifier : /var/log/nvidia-installer.log"
+            exit 1
+        }
+
+        rm -f "${run_file}"
+        info "NVIDIA Blackwell driver ${NVIDIA_BLACKWELL_VERSION} installé."
     fi
 }
 
@@ -1088,7 +1217,7 @@ main() {
     create_zfs_datasets
     setup_systemd
     setup_incus
-    check_nvidia
+    setup_nvidia
     setup_toram          # mkinitcpio/initramfs tourne ici — /home doit être btrfs
     mount_zfs_home       # maintenant on peut masquer /home btrfs par ZFS
     install_anklume
