@@ -198,37 +198,25 @@ stop_zfs_consumers() {
     # Le service de déverrouillage
     systemctl stop zfs-load-key-tank.service 2>/dev/null || true
 
-    # Arrêter le display manager AVANT de tuer les processus sur /home :
-    # sinon SDDM/GDM relance les sessions et on boucle.
-    if systemctl is-active --quiet display-manager.service 2>/dev/null; then
-        systemctl stop display-manager.service 2>/dev/null || true
-        # Empêcher le redémarrage automatique (ex: Restart=on-failure)
-        systemctl mask --runtime display-manager.service 2>/dev/null || true
-        info "Display manager arrêté et masqué (runtime)."
-        sleep 2  # Laisser les sessions graphiques se terminer
+    # Basculer en mode texte : systemctl isolate multi-user.target
+    # C'est la méthode standard systemd pour quitter le mode graphique.
+    # - Arrête le DM (SDDM/GDM) et tous les services graphiques
+    # - Préserve les getty (sessions TTY)
+    # - Ferme les sessions Wayland/X11 proprement via logind
+    #
+    # On NE fait PAS "systemctl stop display-manager" car sur certains
+    # systèmes (CachyOS/SDDM), ça déclenche un nettoyage de seat/VT
+    # qui tue aussi les sessions TTY.
+    if systemctl is-active --quiet graphical.target 2>/dev/null; then
+        info "Bascule en mode texte (multi-user.target)..."
+        systemctl isolate multi-user.target 2>/dev/null || true
+        sleep 3  # Laisser systemd terminer la transition
+        info "Mode texte actif."
     fi
 
-    # Fermer toutes les sessions utilisateur sauf la nôtre.
-    # loginctl termine proprement les sessions, ce qui ferme les shells
-    # sur les autres TTY, les sessions graphiques résiduelles, etc.
-    local my_session
-    my_session=$(loginctl session-status $$ 2>/dev/null \
-        | head -1 | awk '{print $1}') || my_session=""
-    local session_id
-    loginctl list-sessions --no-legend 2>/dev/null \
-        | awk '{print $1}' | while read -r session_id; do
-        [[ "${session_id}" == "${my_session}" ]] && continue
-        loginctl terminate-session "${session_id}" 2>/dev/null || true
-    done
-    info "Sessions utilisateur tierces terminées."
-
-    # Stopper les services systemd --user (ils gardent des fichiers ouverts
-    # sous /home même après la fermeture des sessions)
+    # Arrêter les services systemd --user résiduels (ils gardent des
+    # fichiers ouverts sous /home même après la fermeture des sessions)
     systemctl stop 'user@*.service' 2>/dev/null || true
-    systemctl stop user-runtime-dir@*.service 2>/dev/null || true
-    info "Services utilisateur systemd arrêtés."
-
-    sleep 1
 
     # Collecter les PIDs ancêtres à protéger (notre shell et toute la chaîne
     # jusqu'à PID 1). Sans ça, fuser -km /home tue le shell appelant.
