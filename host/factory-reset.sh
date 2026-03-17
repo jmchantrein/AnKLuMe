@@ -9,6 +9,9 @@
 # ⚠ DESTRUCTIF — toutes les données ZFS sont perdues.
 # ⚠ Conçu pour le développement du bootstrap, PAS pour la production.
 #
+# ⚠ DOIT être exécuté depuis un TTY root (Ctrl+Alt+F2, login root).
+#   NE PAS lancer depuis une session graphique (Konsole, terminal Wayland…).
+#
 # Usage :
 #   sudo ./factory-reset.sh [options]
 #
@@ -23,13 +26,6 @@
 # prête pour un nouveau ./bootstrap.sh.
 
 set -euo pipefail
-
-# Chemin absolu du script, capturé AVANT le cd /root
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-readonly SCRIPT_PATH
-
-# Toujours travailler depuis un répertoire stable (hors ZFS /home)
-cd /root
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -51,7 +47,6 @@ ZFS_ONLY=false
 BTRFS_ONLY=false
 AUTO_YES=false
 SKIP_REBOOT=false
-DETACHED=false       # true quand re-exec via systemd-run
 
 # ---------------------------------------------------------------------------
 # Parsing des arguments
@@ -63,7 +58,6 @@ while [[ $# -gt 0 ]]; do
         --btrfs-only)   BTRFS_ONLY=true; shift ;;
         --yes)          AUTO_YES=true; shift ;;
         --skip-reboot)  SKIP_REBOOT=true; shift ;;
-        --detached)     DETACHED=true; shift ;;
         -h|--help)
             sed -n '2,/^$/s/^# \?//p' "$0"
             exit 0
@@ -94,6 +88,32 @@ check_root() {
         error "Ce script doit être exécuté en root."
         exit 1
     fi
+}
+
+# Vérifie qu'on tourne depuis un TTY, pas depuis une session graphique.
+# Depuis un terminal graphique (Konsole, gnome-terminal…), fuser -km /home
+# tue la session et le script avec. Depuis un TTY c'est sans risque.
+check_tty() {
+    local current_tty
+    current_tty=$(tty 2>/dev/null) || current_tty=""
+
+    # /dev/ttyN = TTY physique, /dev/pts/N = pseudo-terminal (graphique ou SSH)
+    if [[ "${current_tty}" == /dev/tty[0-9]* ]]; then
+        return 0
+    fi
+
+    echo ""
+    error "Ce script doit être exécuté depuis un TTY physique."
+    echo ""
+    warn "Depuis un terminal graphique, fuser -km /home tue votre session"
+    warn "et le script s'arrête en plein milieu."
+    echo ""
+    info "Procédure :"
+    info "  1. Ctrl+Alt+F2 (ouvre un TTY)"
+    info "  2. Se connecter en root"
+    info "  3. cd $(pwd) && ./factory-reset.sh"
+    echo ""
+    exit 1
 }
 
 # Nettoyage automatique des montages temporaires à la sortie
@@ -158,22 +178,11 @@ stop_zfs_consumers() {
     # Le service de déverrouillage
     systemctl stop zfs-load-key-tank.service 2>/dev/null || true
 
-    # Arrêter le display manager AVANT de tuer les processus sur /home.
-    # Sinon SDDM/GDM relance les sessions, fuser tourne en boucle.
+    # Arrêter le display manager AVANT fuser -km /home :
+    # sinon SDDM/GDM relance les sessions et fuser boucle.
     if systemctl is-active --quiet display-manager.service 2>/dev/null; then
         systemctl stop display-manager.service 2>/dev/null || true
         info "Display manager arrêté."
-    fi
-
-    # Terminer les sessions utilisateur (non bloquant — loginctl peut deadlock
-    # si notre propre scope systemd est lié à l'utilisateur)
-    local real_user
-    real_user=$(logname 2>/dev/null) || real_user="${SUDO_USER:-}"
-    if [[ -n "${real_user}" ]]; then
-        # Lancer en arrière-plan avec timeout pour éviter le blocage
-        timeout 5 loginctl terminate-user "${real_user}" &>/dev/null &
-        info "Terminaison des sessions de ${real_user} demandée."
-        sleep 3
     fi
 
     # Tuer les processus restants sur les points de montage ZFS
@@ -513,46 +522,6 @@ rollback_timeshift() {
 }
 
 # ---------------------------------------------------------------------------
-# Détachement de la session utilisateur
-# ---------------------------------------------------------------------------
-# fuser -km /home tue TOUS les processus sur /home, y compris le shell
-# de l'utilisateur. Si le script tourne dans cette session, il meurt aussi.
-# Solution : après la confirmation interactive, se re-exécuter via
-# systemd-run --scope pour être indépendant de la session.
-
-readonly RESET_LOG="/root/factory-reset.log"
-
-# Re-exec le script détaché de la session utilisateur.
-# La confirmation interactive est déjà passée → on passe --yes --detached.
-# Le script est copié dans /root/ car le chemin original peut être sur ZFS/home.
-detach_and_rerun() {
-    local args=("--yes" "--detached")
-    [[ "${ZFS_ONLY}" == true ]]    && args+=("--zfs-only")
-    [[ "${BTRFS_ONLY}" == true ]]  && args+=("--btrfs-only")
-    [[ "${SKIP_REBOOT}" == true ]] && args+=("--skip-reboot")
-
-    # Copier le script vers /root/ (chemin stable, hors ZFS)
-    local safe_copy="/root/.factory-reset-detached.sh"
-    cp "${SCRIPT_PATH}" "${safe_copy}"
-    chmod +x "${safe_copy}"
-
-    info "Détachement du script de la session utilisateur..."
-    info "La suite est loggée dans ${RESET_LOG}"
-    info "Votre session va être coupée — c'est normal."
-    echo ""
-
-    # systemd-run --scope crée un scope systemd indépendant du login session
-    systemd-run --scope --unit=factory-reset \
-        bash "${safe_copy}" "${args[@]}" \
-        &> "${RESET_LOG}" &
-
-    # Laisser systemd-run démarrer avant de quitter
-    sleep 2
-    info "Script détaché (PID $!). Consultez ${RESET_LOG} après reboot."
-    exit 0
-}
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -562,12 +531,10 @@ main() {
     echo ""
 
     check_root
+    check_tty
 
-    # Si on tourne détaché, la sortie va dans le log — on redirige stdout/stderr
-    if [[ "${DETACHED}" == true ]]; then
-        exec > >(tee -a "${RESET_LOG}") 2>&1
-        info "=== Exécution détachée — $(date) ==="
-    fi
+    # Toujours travailler depuis /root (pas /home qui va être démonté)
+    cd /root
 
     # Résumé de ce qui va se passer
     printf "%bCe script va :%b\n" "${BOLD}" "${NC}"
@@ -581,14 +548,7 @@ main() {
     fi
     echo ""
 
-    # Phase interactive : confirmation puis détachement
-    if [[ "${DETACHED}" != true ]]; then
-        confirm "FACTORY RESET — Cette opération est IRRÉVERSIBLE. Continuer ?"
-        detach_and_rerun
-        # On ne revient jamais ici (exit dans detach_and_rerun)
-    fi
-
-    # --- À partir d'ici, on tourne détaché de la session ---
+    confirm "FACTORY RESET — Cette opération est IRRÉVERSIBLE. Continuer ?"
 
     if [[ "${BTRFS_ONLY}" != true ]]; then
         destroy_zfs_pool
