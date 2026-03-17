@@ -165,14 +165,15 @@ stop_zfs_consumers() {
         info "Display manager arrêté."
     fi
 
-    # Terminer proprement les sessions utilisateur (loginctl)
+    # Terminer les sessions utilisateur (non bloquant — loginctl peut deadlock
+    # si notre propre scope systemd est lié à l'utilisateur)
     local real_user
     real_user=$(logname 2>/dev/null) || real_user="${SUDO_USER:-}"
     if [[ -n "${real_user}" ]]; then
-        loginctl terminate-user "${real_user}" 2>/dev/null || true
-        info "Sessions de ${real_user} terminées."
-        # Laisser le temps à systemd de nettoyer les cgroups
-        sleep 2
+        # Lancer en arrière-plan avec timeout pour éviter le blocage
+        timeout 5 loginctl terminate-user "${real_user}" &>/dev/null &
+        info "Terminaison des sessions de ${real_user} demandée."
+        sleep 3
     fi
 
     # Tuer les processus restants sur les points de montage ZFS
