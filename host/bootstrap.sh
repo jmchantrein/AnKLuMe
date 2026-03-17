@@ -834,7 +834,7 @@ CONF
             if [[ "${DISTRO_FAMILY}" == "debian" ]]; then
                 update-initramfs -u 2>/dev/null || true
             else
-                mkinitcpio -P 2>/dev/null || true
+                regenerate_initramfs 2>/dev/null || true
             fi
             info "Module nouveau blacklisté."
         fi
@@ -894,6 +894,25 @@ setup_toram() {
     info "Mode toram OK."
 }
 
+# Régénère l'initramfs avec le bon outil :
+#   - limine-mkinitcpio si présent (CachyOS + Limine : gère les chemins /boot/<machine-id>/)
+#   - mkinitcpio -P sinon (Arch standard)
+regenerate_initramfs() {
+    if command -v limine-mkinitcpio &> /dev/null; then
+        limine-mkinitcpio
+        info "Initramfs regénéré via limine-mkinitcpio."
+    elif command -v mkinitcpio &> /dev/null; then
+        mkinitcpio -P
+        info "Initramfs regénéré via mkinitcpio -P."
+    elif command -v dracut &> /dev/null; then
+        dracut --force
+        info "Initramfs regénéré via dracut."
+    else
+        warn "Aucun outil de génération d'initramfs trouvé."
+        return 1
+    fi
+}
+
 # --- Arch / CachyOS : mkinitcpio + Limine/GRUB ---
 setup_toram_mkinitcpio() {
     # Hook mkinitcpio (install)
@@ -938,19 +957,22 @@ EOF
     info "Hooks mkinitcpio toram installés."
 
     # Ajouter à HOOKS si absent (après filesystems — c'est un latehook)
+    local need_regen=false
     if ! grep -q "toram" /etc/mkinitcpio.conf; then
         sed -i 's/\(HOOKS=.*filesystems\)/\1 toram/' /etc/mkinitcpio.conf
-        mkinitcpio -P
-        info "mkinitcpio regénéré avec hook toram (après filesystems)."
-    else
+        need_regen=true
+        info "Hook toram ajouté après filesystems."
+    elif grep -q 'toram filesystems' /etc/mkinitcpio.conf; then
         # Si toram est AVANT filesystems (ancienne version), corriger
-        if grep -q 'toram filesystems' /etc/mkinitcpio.conf; then
-            sed -i 's/toram filesystems/filesystems toram/' /etc/mkinitcpio.conf
-            mkinitcpio -P
-            info "Position du hook toram corrigée (déplacé après filesystems)."
-        else
-            info "Hook toram déjà dans mkinitcpio.conf."
-        fi
+        sed -i 's/toram filesystems/filesystems toram/' /etc/mkinitcpio.conf
+        need_regen=true
+        info "Position du hook toram corrigée (déplacé après filesystems)."
+    else
+        info "Hook toram déjà dans mkinitcpio.conf (position correcte)."
+    fi
+
+    if [[ "${need_regen}" == true ]]; then
+        regenerate_initramfs
     fi
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
@@ -1012,8 +1034,7 @@ CONF
     fi
 
     # Regénérer l'initramfs
-    dracut --force
-    info "Initramfs dracut regénéré."
+    regenerate_initramfs
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
     if [[ -f "/boot/limine.conf" ]]; then
