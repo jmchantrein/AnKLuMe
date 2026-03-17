@@ -46,6 +46,10 @@ readonly ZFS_KEY_DIR="/etc/zfs"
 readonly ZFS_KEY_FILE="${ZFS_KEY_DIR}/tank.key"       # 32 bytes raw
 readonly ZFS_KEY_ENC="${ZFS_KEY_DIR}/tank.key.enc"    # backup chiffré (passphrase)
 
+# Chemin du repo source (celui d'où tourne ce script).
+# Calculé une fois, avant que mount_zfs_home ne masque /home btrfs.
+BOOTSTRAP_REPO_DIR=""
+
 # Couleurs
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -1058,6 +1062,39 @@ GRUB
 }
 
 # ---------------------------------------------------------------------------
+# 7b. Sauvegarde du repo source avant montage ZFS
+# ---------------------------------------------------------------------------
+
+save_repo_source() {
+    step "Sauvegarde du dépôt source"
+
+    # Le script tourne depuis host/bootstrap.sh → le repo est dirname(dirname($0))
+    local script_dir
+    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    local repo_dir
+    repo_dir=$(cd "${script_dir}/.." && pwd)
+
+    if [[ ! -f "${repo_dir}/pyproject.toml" ]]; then
+        warn "Repo source introuvable (${repo_dir}). Le clone sera fait depuis GitHub."
+        return
+    fi
+
+    # Si le repo est sous /home, il sera masqué par le montage ZFS.
+    # Le copier dans /tmp pour pouvoir le restaurer après.
+    # Si le repo est ailleurs (/root, /opt, etc.), pas besoin de copier.
+    if [[ "${repo_dir}" == /home/* ]]; then
+        local tmp_repo="/tmp/anklume-repo-backup"
+        rm -rf "${tmp_repo}"
+        cp -a "${repo_dir}" "${tmp_repo}"
+        BOOTSTRAP_REPO_DIR="${tmp_repo}"
+        info "Repo sauvegardé dans ${tmp_repo} (source : ${repo_dir})"
+    else
+        BOOTSTRAP_REPO_DIR="${repo_dir}"
+        info "Repo source : ${repo_dir} (pas sous /home, pas besoin de sauvegarde)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # 8. AnKLuMe + alias ank (bash, zsh, fish)
 # ---------------------------------------------------------------------------
 
@@ -1072,9 +1109,18 @@ install_anklume() {
         user_home=$(getent passwd "${main_user}" | cut -d: -f6)
     fi
 
-    # S'assurer que uv est dans le PATH pour l'utilisateur
+    if [[ -z "${user_home}" || -z "${main_user}" ]]; then
+        warn "Impossible de déterminer l'utilisateur principal."
+        return
+    fi
+
+    local user_uid user_gid
+    user_uid=$(id -u "${main_user}")
+    user_gid=$(id -g "${main_user}")
+
+    # --- 1. uv pour l'utilisateur ---
     local uv_bin=""
-    if [[ -n "${user_home}" && -x "${user_home}/.local/bin/uv" ]]; then
+    if [[ -x "${user_home}/.local/bin/uv" ]]; then
         uv_bin="${user_home}/.local/bin/uv"
     elif command -v uv &> /dev/null; then
         uv_bin=$(command -v uv)
@@ -1082,79 +1128,72 @@ install_anklume() {
         uv_bin="/root/.local/bin/uv"
     fi
 
-    # Installer uv pour l'utilisateur s'il ne l'a pas encore
-    if [[ -n "${main_user}" && "${main_user}" != "root" ]]; then
-        if [[ ! -x "${user_home}/.local/bin/uv" ]]; then
-            su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
-            uv_bin="${user_home}/.local/bin/uv"
-            info "uv installé pour ${main_user}."
-        fi
+    if [[ "${main_user}" != "root" && ! -x "${user_home}/.local/bin/uv" ]]; then
+        su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
+        uv_bin="${user_home}/.local/bin/uv"
+        info "uv installé pour ${main_user}."
     fi
 
-    # --- Dépôt AnKLuMe dans la home ZFS ---
-    # Après le montage ZFS sur /home, le repo cloné sur btrfs n'est plus
-    # visible. On s'assure qu'il existe dans la nouvelle home (clone ou pull).
+    # --- 2. Dépôt AnKLuMe dans la home ZFS ---
+    # Après le montage ZFS, le repo btrfs est masqué.
+    # On utilise le repo sauvegardé par save_repo_source() (dans /tmp)
+    # ou le repo déjà présent dans la home ZFS (re-bootstrap).
     local anklume_dir="${user_home}/AnKLuMe"
-    local anklume_repo="https://github.com/jmchantrein/AnKLuMe.git"
 
-    if [[ -n "${user_home}" && -n "${main_user}" ]]; then
-        local user_uid user_gid
-        user_uid=$(id -u "${main_user}")
-        user_gid=$(id -g "${main_user}")
-
-        if [[ -d "${anklume_dir}/.git" ]]; then
-            # Déjà cloné → pull pour récupérer les éventuelles MAJ
-            info "Dépôt AnKLuMe existant, mise à jour (git pull)..."
-            su - "${main_user}" -c "cd '${anklume_dir}' && git pull --ff-only" 2>/dev/null || {
-                warn "git pull échoué (modifications locales ?). Dépôt existant conservé."
-            }
-        else
-            # Pas de repo → cloner
-            info "Clonage d'AnKLuMe dans ${anklume_dir}..."
-            su - "${main_user}" -c "git clone '${anklume_repo}' '${anklume_dir}'" 2>/dev/null || {
-                warn "git clone échoué. Cloner manuellement :"
-                warn "  git clone ${anklume_repo} ${anklume_dir}"
-            }
+    if [[ -d "${anklume_dir}/.git" ]]; then
+        # Déjà présent dans la home ZFS → pull pour MAJ
+        info "Dépôt AnKLuMe existant dans ${anklume_dir}, mise à jour..."
+        su - "${main_user}" -c "cd '${anklume_dir}' && git pull --ff-only" 2>/dev/null || {
+            warn "git pull échoué (modifications locales ?). Dépôt conservé tel quel."
+        }
+    elif [[ -n "${BOOTSTRAP_REPO_DIR}" && -d "${BOOTSTRAP_REPO_DIR}/.git" ]]; then
+        # Copier depuis la sauvegarde /tmp (repo source sauvé avant montage ZFS)
+        info "Restauration du dépôt depuis ${BOOTSTRAP_REPO_DIR}..."
+        cp -a "${BOOTSTRAP_REPO_DIR}" "${anklume_dir}"
+        chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
+        info "Dépôt restauré dans ${anklume_dir}"
+        # Nettoyage de la copie temporaire
+        if [[ "${BOOTSTRAP_REPO_DIR}" == /tmp/* ]]; then
+            rm -rf "${BOOTSTRAP_REPO_DIR}"
         fi
-
-        # Fixer les droits si le répertoire existe
-        if [[ -d "${anklume_dir}" ]]; then
-            chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
-        fi
+    else
+        # Dernier recours : cloner depuis GitHub
+        warn "Repo source introuvable. Clonage depuis GitHub..."
+        su - "${main_user}" -c \
+            "git clone https://github.com/jmchantrein/AnKLuMe.git '${anklume_dir}'" 2>/dev/null || {
+            error "git clone échoué. Installer manuellement :"
+            error "  git clone https://github.com/jmchantrein/AnKLuMe.git ${anklume_dir}"
+            error "  cd ${anklume_dir} && uv tool install --with textual ."
+            return
+        }
     fi
 
-    # --- Installer la CLI anklume via uv ---
-    # Depuis le repo local (pas PyPI — pas encore publié).
-    # uv tool install depuis le chemin local installe le binaire dans ~/.local/bin.
-    if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
-        if [[ -d "${anklume_dir}" ]]; then
-            # Installation depuis le repo local (avec textual pour le TUI)
-            if su - "${main_user}" -c "${uv_bin} tool install --with textual '${anklume_dir}'" 2>/dev/null; then
-                info "anklume CLI installée via uv pour ${main_user} (avec TUI)."
-            else
+    # Fixer les droits
+    if [[ -d "${anklume_dir}" ]]; then
+        chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
+    fi
+
+    # --- 3. Installer la CLI via uv depuis le repo local ---
+    if [[ -n "${uv_bin}" && -d "${anklume_dir}" && ! -f "${anklume_dir}/pyproject.toml" ]]; then
+        warn "pyproject.toml introuvable dans ${anklume_dir}. Installation CLI ignorée."
+    elif [[ -n "${uv_bin}" && -d "${anklume_dir}" ]]; then
+        info "Installation de la CLI anklume depuis ${anklume_dir}..."
+        if [[ "${main_user}" != "root" ]]; then
+            su - "${main_user}" -c \
+                "${uv_bin} tool install --force --with textual '${anklume_dir}'" || {
                 warn "Installation CLI échouée. Installer manuellement :"
-                warn "  cd ${anklume_dir} && ${uv_bin} tool install --with textual ."
-            fi
+                warn "  cd ${anklume_dir} && uv tool install --with textual ."
+            }
         else
-            # Pas de repo local → tenter PyPI (fallback)
-            if su - "${main_user}" -c "${uv_bin} tool install --with textual anklume" 2>/dev/null; then
-                info "anklume CLI installée via uv pour ${main_user} (avec TUI)."
-            else
-                warn "anklume pas encore publié sur PyPI et repo local absent."
-                warn "Cloner puis : ${uv_bin} tool install --with textual ~/AnKLuMe"
-            fi
+            "${uv_bin}" tool install --force --with textual "${anklume_dir}" || {
+                warn "Installation CLI échouée."
+            }
         fi
-    elif [[ -n "${uv_bin}" ]]; then
-        local install_src="anklume"
-        [[ -d "${anklume_dir}" ]] && install_src="${anklume_dir}"
-        if "${uv_bin}" tool install --with textual "${install_src}" 2>/dev/null; then
-            info "anklume CLI installée via uv (avec TUI)."
-        else
-            warn "Installation CLI échouée."
-        fi
+    else
+        warn "uv ou repo local absent. Installation CLI ignorée."
     fi
 
-    # Configurer PATH + alias ank pour tous les shells
+    # --- 4. PATH + alias ank ---
     setup_shell_integration "${main_user}" "${user_home}"
 
     info "AnKLuMe OK."
@@ -1310,6 +1349,7 @@ main() {
     setup_incus
     setup_nvidia
     setup_toram          # mkinitcpio/initramfs tourne ici — /home doit être btrfs
+    save_repo_source     # sauvegarder le repo dans /tmp AVANT que ZFS masque /home
     mount_zfs_home       # maintenant on peut masquer /home btrfs par ZFS
     install_anklume
     summary
