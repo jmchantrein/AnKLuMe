@@ -1448,39 +1448,6 @@ summary() {
     echo ""
 }
 
-# S'assurer que root peut se connecter sur un TTY.
-# CachyOS (et beaucoup d'Arch) lock le compte root par défaut (passwd -l root).
-# factory-reset.sh DOIT tourner depuis un TTY root (car il tue toutes les
-# sessions utilisateur + le display manager). Sans mot de passe root,
-# on se retrouve bricked si on perd l'accès sudo.
-ensure_root_login() {
-    step "Vérification du compte root"
-
-    # passwd -S root → "root L ..." (Locked) ou "root P ..." (Password set)
-    local root_status
-    root_status=$(passwd -S root 2>/dev/null | awk '{print $2}') || root_status="?"
-
-    if [[ "${root_status}" == "P" ]]; then
-        info "Compte root déjà déverrouillé."
-        return
-    fi
-
-    warn "Le compte root est verrouillé (état : ${root_status})."
-    warn "factory-reset.sh nécessite un login root direct sur TTY."
-    echo ""
-    info "Définissez un mot de passe root maintenant :"
-    echo ""
-
-    # passwd root est interactif — on le laisse tel quel
-    if passwd root; then
-        info "Mot de passe root défini."
-    else
-        warn "Mot de passe root non défini — factory-reset.sh ne sera pas"
-        warn "utilisable depuis un TTY root. Vous pouvez le faire plus tard :"
-        warn "  sudo passwd root"
-    fi
-}
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1502,7 +1469,6 @@ main() {
     save_repo_source     # sauvegarder le repo dans /tmp AVANT que ZFS masque /home
     mount_zfs_home       # maintenant on peut masquer /home btrfs par ZFS
     install_anklume
-    ensure_root_login
     summary
 
     info "Bootstrap terminé."
