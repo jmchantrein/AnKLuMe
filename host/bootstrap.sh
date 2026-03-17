@@ -879,7 +879,14 @@ setup_toram() {
     step "Configuration du mode toram"
 
     if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        setup_toram_mkinitcpio
+        if command -v dracut &> /dev/null; then
+            setup_toram_dracut
+        elif command -v mkinitcpio &> /dev/null; then
+            setup_toram_mkinitcpio
+        else
+            error "Aucun générateur d'initramfs trouvé (mkinitcpio ou dracut)."
+            return 1
+        fi
     else
         setup_toram_initramfs
     fi
@@ -945,6 +952,68 @@ EOF
             info "Hook toram déjà dans mkinitcpio.conf."
         fi
     fi
+
+    # Entrée bootloader (Limine si présent, sinon GRUB)
+    if [[ -f "/boot/limine.conf" ]]; then
+        setup_toram_limine
+    elif command -v grub-mkconfig &> /dev/null; then
+        setup_toram_grub
+    else
+        warn "Aucun bootloader supporté détecté pour l'entrée toram."
+    fi
+}
+
+# --- Arch / CachyOS : dracut + Limine/GRUB ---
+setup_toram_dracut() {
+    local module_dir="/usr/lib/dracut/modules.d/90toram"
+    mkdir -p "${module_dir}"
+
+    # module-setup.sh — déclare le module dracut
+    cat > "${module_dir}/module-setup.sh" << 'EOF'
+#!/bin/bash
+check() { return 0; }
+depends() { return 0; }
+install() {
+    inst_hook pre-pivot 90 "$moddir/toram-overlay.sh"
+    instmods overlay
+}
+EOF
+    chmod +x "${module_dir}/module-setup.sh"
+
+    # Script overlay (pre-pivot = après montage racine sur $NEWROOT)
+    cat > "${module_dir}/toram-overlay.sh" << 'EOF'
+#!/bin/sh
+grep -q "BOOT_MODE=toram" /proc/cmdline || exit 0
+
+NEWROOT="${NEWROOT:-/sysroot}"
+
+mkdir -p /mnt/lower /mnt/upper-tmpfs
+mount -o remount,ro "${NEWROOT}"
+mount -o move "${NEWROOT}" /mnt/lower
+mount -t tmpfs -o size=80% tmpfs /mnt/upper-tmpfs
+mkdir -p /mnt/upper-tmpfs/upper /mnt/upper-tmpfs/work
+mount -t overlay overlay \
+    -o "lowerdir=/mnt/lower,upperdir=/mnt/upper-tmpfs/upper,workdir=/mnt/upper-tmpfs/work" \
+    "${NEWROOT}"
+mkdir -p "${NEWROOT}/mnt/rootfs-disk"
+mount -o move /mnt/lower "${NEWROOT}/mnt/rootfs-disk"
+EOF
+    chmod +x "${module_dir}/toram-overlay.sh"
+    info "Module dracut toram installé dans ${module_dir}."
+
+    # Ajouter le module toram à la config dracut
+    local dracut_conf="/etc/dracut.conf.d/toram.conf"
+    if [[ ! -f "${dracut_conf}" ]]; then
+        cat > "${dracut_conf}" << 'CONF'
+# Module toram overlay (AnKLuMe)
+add_dracutmodules+=" toram "
+CONF
+        info "Config dracut toram ajoutée."
+    fi
+
+    # Regénérer l'initramfs
+    dracut --force
+    info "Initramfs dracut regénéré."
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
     if [[ -f "/boot/limine.conf" ]]; then
