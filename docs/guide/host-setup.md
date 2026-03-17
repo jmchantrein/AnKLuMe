@@ -105,6 +105,20 @@ fournit tout cela out of the box. Sur Debian, le kernel stock est
 souvent trop ancien. Sur Arch vanilla, ça fonctionne mais demande
 plus de configuration manuelle.
 
+!!! tip "Kernel CachyOS-LTS recommandé"
+    Sur CachyOS, privilégier le kernel **cachyos-lts** plutôt que le
+    kernel rolling. Le module ZFS doit être recompilé à chaque mise à
+    jour du kernel ; avec le kernel LTS, les mises à jour sont moins
+    fréquentes, ce qui réduit le risque de casse après un `pacman -Syu`.
+
+    ```bash
+    # Installer le kernel LTS
+    sudo pacman -S linux-cachyos-lts linux-cachyos-lts-headers
+
+    # Vérifier que le bootloader (Limine/GRUB) a une entrée LTS
+    # Le bootstrap.sh détecte automatiquement le kernel LTS s'il est installé
+    ```
+
 ### Exécuter le bootstrap
 
 ```bash
@@ -118,10 +132,14 @@ less bootstrap.sh
 # 3. Identifier les disques ZFS
 ls /dev/disk/by-id/ | grep nvme
 
-# 4. Exécuter
+# 4. Exécuter (by-id recommandé, mais chemins classiques acceptés)
 sudo ./bootstrap.sh \
     --zfs-disk1 nvme-Corsair_MP600_XXX \
     --zfs-disk2 nvme-Corsair_MP600_YYY
+
+# Alternatives équivalentes :
+#   --zfs-disk1 /dev/disk/by-id/nvme-Corsair_MP600_XXX
+#   --zfs-disk1 /dev/nvme0n1
 ```
 
 !!! warning "Alternative non recommandée"
@@ -134,8 +152,8 @@ sudo ./bootstrap.sh \
 
 | Flag | Effet |
 |---|---|
-| `--zfs-disk1 <by-id>` | Disque ZFS mirror leg 1 (obligatoire si pool à créer) |
-| `--zfs-disk2 <by-id>` | Disque ZFS mirror leg 2 (obligatoire si pool à créer) |
+| `--zfs-disk1 <disque>` | Disque ZFS mirror leg 1 — by-id nu, chemin complet, ou `/dev/nvmeXnY` |
+| `--zfs-disk2 <disque>` | Disque ZFS mirror leg 2 — by-id nu, chemin complet, ou `/dev/nvmeXnY` |
 | `--skip-nvidia` | Ne pas vérifier le driver NVIDIA |
 | `--skip-toram` | Ne pas configurer le mode toram |
 | `--skip-zfs-pool` | Ne pas créer le pool ZFS |

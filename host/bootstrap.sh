@@ -23,8 +23,9 @@
 #   --skip-zfs-pool       Ne pas créer/recréer le pool ZFS
 #   --skip-incus          Ne pas configurer Incus
 #   --zfs-passphrase      Lire la passphrase depuis stdin (non interactif)
-#   --zfs-disk1 <by-id>   Disque ZFS mirror leg 1 (obligatoire si pool à créer)
-#   --zfs-disk2 <by-id>   Disque ZFS mirror leg 2 (obligatoire si pool à créer)
+#   --zfs-disk1 <disque>  Disque ZFS mirror leg 1 (obligatoire si pool à créer)
+#                         Accepte : by-id nu, chemin complet, ou /dev/nvmeXnY
+#   --zfs-disk2 <disque>  Disque ZFS mirror leg 2 (obligatoire si pool à créer)
 #
 # Ce script est idempotent : il peut être relancé sans danger.
 # Shellcheck clean : shellcheck -o all bootstrap.sh
@@ -78,10 +79,10 @@ while [[ $# -gt 0 ]]; do
         --skip-incus)        SKIP_INCUS=true; shift ;;
         --zfs-passphrase)    PASSPHRASE_STDIN=true; shift ;;
         --zfs-disk1)
-            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk1 nécessite un by-id.\n" >&2; exit 1; }
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk1 nécessite un disque.\n" >&2; exit 1; }
             ZFS_DISK_1="$2"; shift 2 ;;
         --zfs-disk2)
-            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk2 nécessite un by-id.\n" >&2; exit 1; }
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk2 nécessite un disque.\n" >&2; exit 1; }
             ZFS_DISK_2="$2"; shift 2 ;;
         -h|--help)
             sed -n '2,/^$/s/^# \?//p' "$0"
@@ -253,9 +254,9 @@ install_packages_debian() {
         "linux-headers-$(uname -r)" \
         > /dev/null
 
-    # ZFS
+    # ZFS (userspace + DKMS pour les kernels non-stock)
     if ! command -v zfs &> /dev/null; then
-        apt-get install -y -qq zfsutils-linux > /dev/null
+        apt-get install -y -qq zfsutils-linux zfs-dkms > /dev/null
     fi
 
     # Charger le module ZFS
@@ -292,19 +293,50 @@ create_zfs_pool() {
     # Vérifier que les disques sont spécifiés
     if [[ -z "${ZFS_DISK_1}" || -z "${ZFS_DISK_2}" ]]; then
         error "Disques ZFS non spécifiés."
-        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id."
+        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id ou chemins complets."
+        error "Exemples :"
+        error "  --zfs-disk1 nvme-Corsair_MP600_XXX          (by-id, recommandé)"
+        error "  --zfs-disk1 /dev/disk/by-id/nvme-Corsair_XXX (chemin complet by-id)"
+        error "  --zfs-disk1 /dev/nvme0n1                     (chemin classique)"
+        error ""
         error "Disques disponibles :"
         ls /dev/disk/by-id/nvme-* 2>/dev/null | head -20 || true
         exit 1
     fi
 
-    # Vérifier que les disques existent
-    for disk in "${ZFS_DISK_1}" "${ZFS_DISK_2}"; do
-        if [[ ! -e "/dev/disk/by-id/${disk}" ]]; then
-            error "Disque introuvable : /dev/disk/by-id/${disk}"
-            exit 1
+    # Résoudre les chemins de disques : accepter by-id nu, chemin complet,
+    # ou device classique (/dev/nvmeXnY, /dev/sdX)
+    resolve_disk_path() {
+        local disk="$1"
+        if [[ -e "${disk}" ]]; then
+            # Chemin complet valide (/dev/nvme0n1, /dev/disk/by-id/xxx, etc.)
+            echo "${disk}"
+        elif [[ -e "/dev/disk/by-id/${disk}" ]]; then
+            # Nom by-id nu (sans préfixe)
+            echo "/dev/disk/by-id/${disk}"
+        else
+            echo ""
         fi
-    done
+    }
+
+    local disk1_path disk2_path
+    disk1_path=$(resolve_disk_path "${ZFS_DISK_1}")
+    disk2_path=$(resolve_disk_path "${ZFS_DISK_2}")
+
+    if [[ -z "${disk1_path}" ]]; then
+        error "Disque 1 introuvable : ${ZFS_DISK_1}"
+        error "Essayé : ${ZFS_DISK_1} et /dev/disk/by-id/${ZFS_DISK_1}"
+        exit 1
+    fi
+    if [[ -z "${disk2_path}" ]]; then
+        error "Disque 2 introuvable : ${ZFS_DISK_2}"
+        error "Essayé : ${ZFS_DISK_2} et /dev/disk/by-id/${ZFS_DISK_2}"
+        exit 1
+    fi
+
+    # Mettre à jour les variables pour la création du pool
+    ZFS_DISK_1="${disk1_path}"
+    ZFS_DISK_2="${disk2_path}"
 
     info "Création du pool ZFS '${POOL}' (mirror, chiffré AES-256-GCM)..."
 
@@ -341,8 +373,8 @@ create_zfs_pool() {
         -O keylocation="file://${ZFS_KEY_FILE}" \
         -O mountpoint=none \
         "${POOL}" mirror \
-        "/dev/disk/by-id/${ZFS_DISK_1}" \
-        "/dev/disk/by-id/${ZFS_DISK_2}"
+        "${ZFS_DISK_1}" \
+        "${ZFS_DISK_2}"
 
     info "Pool '${POOL}' créé (mirror, chiffré, keyformat=raw)."
 }
@@ -473,7 +505,34 @@ mount_zfs_home() {
     local home_fstype
     home_fstype=$(findmnt -no FSTYPE /home 2>/dev/null) || home_fstype=""
     if ! mountpoint -q /home || [[ "${home_fstype}" != "zfs" ]]; then
+        # --- Migration : copier le contenu btrfs /home vers ZFS ---
+        # Avant le montage ZFS, sauvegarder le contenu existant de /home
+        # pour le restaurer dans le dataset ZFS (dotfiles, .local/bin, etc.)
+        local need_migration=false
+        local tmp_home=""
+        if [[ -d "/home" ]] && [[ -n "$(ls -A /home 2>/dev/null)" ]]; then
+            tmp_home=$(mktemp -d /tmp/home-migration.XXXXXX)
+            info "Sauvegarde du contenu de /home (btrfs) avant montage ZFS..."
+            cp -a /home/. "${tmp_home}/" 2>/dev/null || true
+            need_migration=true
+        fi
+
         zfs mount "${POOL}/_home" 2>/dev/null || true
+
+        # Restaurer le contenu btrfs dans le dataset ZFS (sans écraser)
+        if [[ "${need_migration}" == true && -n "${tmp_home}" ]]; then
+            info "Migration du contenu btrfs → ZFS /home..."
+            # rsync -a sans écraser les fichiers existants (premier montage
+            # ou re-bootstrap), préserve permissions et symlinks
+            if command -v rsync &> /dev/null; then
+                rsync -a --ignore-existing "${tmp_home}/" /home/ 2>/dev/null || true
+            else
+                cp -a --no-clobber "${tmp_home}/." /home/ 2>/dev/null || true
+            fi
+            rm -rf "${tmp_home}"
+            info "Migration terminée."
+        fi
+
         info "/home monté depuis ZFS (${POOL}/_home)."
     else
         info "/home déjà monté depuis ZFS."
@@ -854,12 +913,15 @@ setup_toram_mkinitcpio() {
     cat > "${hook_install}" << 'EOF'
 #!/bin/bash
 build() {
+    add_module overlay
     add_runscript
 }
 
 help() {
     cat <<HELPEOF
 Enables toram overlay when BOOT_MODE=toram is on the kernel cmdline.
+Loads the overlay kernel module and sets up a tmpfs-backed overlayfs
+so that all writes go to RAM, leaving the root filesystem immutable.
 HELPEOF
 }
 EOF
@@ -964,6 +1026,8 @@ case $1 in prereqs) prereqs; exit 0;; esac
 
 grep -q "BOOT_MODE=toram" /proc/cmdline || exit 0
 
+modprobe overlay 2>/dev/null || true
+
 mkdir -p /mnt/lower /mnt/upper-tmpfs
 mount -o remount,ro "${rootmnt}"
 mount -o move "${rootmnt}" /mnt/lower
@@ -977,6 +1041,12 @@ mount -o move /mnt/lower "${rootmnt}/mnt/rootfs-disk"
 HOOK
         chmod +x "${hook}"
         info "Hook initramfs toram installé."
+    fi
+
+    # S'assurer que le module overlay est inclus dans l'initramfs
+    if ! grep -q "^overlay$" /etc/initramfs-tools/modules 2>/dev/null; then
+        echo "overlay" >> /etc/initramfs-tools/modules
+        info "Module overlay ajouté à /etc/initramfs-tools/modules."
     fi
 
     update-initramfs -u
@@ -1049,16 +1119,17 @@ install_anklume() {
     fi
 
     # Installer anklume via uv tool (en tant qu'utilisateur)
+    # --with textual : inclut le TUI pour `anklume tui`
     if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
-        if su - "${main_user}" -c "${uv_bin} tool install anklume" 2>/dev/null; then
-            info "anklume installé via uv pour ${main_user}."
+        if su - "${main_user}" -c "${uv_bin} tool install --with textual anklume" 2>/dev/null; then
+            info "anklume installé via uv pour ${main_user} (avec TUI)."
         else
             warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
-            warn "  ${uv_bin} tool install anklume"
+            warn "  ${uv_bin} tool install --with textual anklume"
         fi
     elif [[ -n "${uv_bin}" ]]; then
-        if "${uv_bin}" tool install anklume 2>/dev/null; then
-            info "anklume installé via uv."
+        if "${uv_bin}" tool install --with textual anklume 2>/dev/null; then
+            info "anklume installé via uv (avec TUI)."
         else
             warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
         fi
@@ -1226,8 +1297,15 @@ main() {
 
     info "Bootstrap terminé."
     echo ""
+    warn "IMPORTANT : un redémarrage est nécessaire."
+    echo ""
+    echo "Le montage ZFS sur /home a remplacé le contenu btrfs d'origine."
+    echo "Au redémarrage, systemd recréera les répertoires utilisateur"
+    echo "standard (Desktop, Documents, etc.) et le shell sera correctement"
+    echo "initialisé avec le PATH et les alias."
+    echo ""
     echo "Prochaines étapes :"
-    echo "  1. Se reloguer (groupe incus-admin + alias ank)"
+    echo "  1. sudo reboot"
     echo "  2. anklume init mon-infra && cd mon-infra"
     echo "  3. anklume tui"
     echo "  4. anklume apply all"
