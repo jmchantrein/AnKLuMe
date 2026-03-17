@@ -208,6 +208,28 @@ stop_zfs_consumers() {
         sleep 2  # Laisser les sessions graphiques se terminer
     fi
 
+    # Fermer toutes les sessions utilisateur sauf la nôtre.
+    # loginctl termine proprement les sessions, ce qui ferme les shells
+    # sur les autres TTY, les sessions graphiques résiduelles, etc.
+    local my_session
+    my_session=$(loginctl session-status $$ 2>/dev/null \
+        | head -1 | awk '{print $1}') || my_session=""
+    local session_id
+    loginctl list-sessions --no-legend 2>/dev/null \
+        | awk '{print $1}' | while read -r session_id; do
+        [[ "${session_id}" == "${my_session}" ]] && continue
+        loginctl terminate-session "${session_id}" 2>/dev/null || true
+    done
+    info "Sessions utilisateur tierces terminées."
+
+    # Stopper les services systemd --user (ils gardent des fichiers ouverts
+    # sous /home même après la fermeture des sessions)
+    systemctl stop 'user@*.service' 2>/dev/null || true
+    systemctl stop user-runtime-dir@*.service 2>/dev/null || true
+    info "Services utilisateur systemd arrêtés."
+
+    sleep 1
+
     # Collecter les PIDs ancêtres à protéger (notre shell et toute la chaîne
     # jusqu'à PID 1). Sans ça, fuser -km /home tue le shell appelant.
     local protected_pids=" $$ "
@@ -237,21 +259,69 @@ stop_zfs_consumers() {
 unmount_zfs() {
     step "Démontage ZFS"
 
-    # Démonter /home en premier (peut être le cwd d'un shell)
+    # Se déplacer hors de /home (peut être le cwd)
+    cd /root
+
+    # Démonter /home en premier — c'est le point de montage le plus occupé
     if mountpoint -q /home 2>/dev/null; then
         local home_fstype
         home_fstype=$(findmnt -no FSTYPE /home 2>/dev/null) || home_fstype=""
         if [[ "${home_fstype}" == "zfs" ]]; then
-            # Se déplacer hors de /home
-            cd /root
-            umount -l /home 2>/dev/null || zfs unmount -f "${POOL}/_home" 2>/dev/null || true
-            info "/home ZFS démonté."
+            _unmount_retry /home
         fi
     fi
 
-    # Démonter tous les datasets ZFS
+    # Démonter tous les datasets ZFS restants
     zfs unmount -a -f 2>/dev/null || true
     info "Tous les datasets ZFS démontés."
+}
+
+# Démonte un point de montage avec retry + kill des processus récalcitrants.
+# Après 3 tentatives normales, passe en lazy unmount (dernier recours).
+_unmount_retry() {
+    local mp="$1"
+    local attempt
+
+    for attempt in 1 2 3; do
+        if ! mountpoint -q "${mp}" 2>/dev/null; then
+            info "${mp} déjà démonté."
+            return
+        fi
+
+        # Tentative de démontage propre
+        if umount "${mp}" 2>/dev/null; then
+            info "${mp} démonté (tentative ${attempt})."
+            return
+        fi
+
+        # Tentative via ZFS
+        zfs unmount -f "${POOL}/_home" 2>/dev/null && {
+            info "${mp} démonté via zfs unmount -f (tentative ${attempt})."
+            return
+        }
+
+        # Afficher ce qui bloque
+        warn "Tentative ${attempt}/3 — ${mp} occupé. Processus :"
+        fuser -vm "${mp}" 2>&1 | head -20 || true
+
+        # Tuer les processus récalcitrants (nos ancêtres sont déjà protégés
+        # dans stop_zfs_consumers, mais on reconstruit ici par sécurité)
+        local protected_pids=" $$ "
+        local _pid=$$
+        while [[ ${_pid} -gt 1 ]]; do
+            _pid=$(ps -o ppid= -p "${_pid}" 2>/dev/null | tr -d ' ') || break
+            [[ -z "${_pid}" ]] && break
+            protected_pids+="${_pid} "
+        done
+        _kill_except_ancestors "${mp}" "${protected_pids}"
+
+        sleep 2
+    done
+
+    # Dernier recours : lazy unmount
+    warn "${mp} toujours occupé après 3 tentatives — lazy unmount."
+    umount -l "${mp}" 2>/dev/null || zfs unmount -f "${POOL}/_home" 2>/dev/null || true
+    info "${mp} lazy-démonté."
 }
 
 # Détruire le pool et nettoyer les traces
@@ -270,9 +340,21 @@ destroy_zfs_pool() {
     stop_zfs_consumers
     unmount_zfs
 
-    # Détruire le pool
-    zpool destroy -f "${POOL}"
-    info "Pool '${POOL}' détruit."
+    # Détruire le pool (retry si lazy unmount en cours)
+    local attempt
+    for attempt in 1 2 3; do
+        if zpool destroy -f "${POOL}" 2>/dev/null; then
+            info "Pool '${POOL}' détruit (tentative ${attempt})."
+            break
+        fi
+        if [[ ${attempt} -eq 3 ]]; then
+            error "Impossible de détruire le pool '${POOL}' après 3 tentatives."
+            zpool status "${POOL}" 2>/dev/null || true
+            return 1
+        fi
+        warn "zpool destroy échoué (tentative ${attempt}/3), retry dans 3s..."
+        sleep 3
+    done
 
     # Nettoyer les keyfiles
     rm -f "${ZFS_KEY_DIR}/tank.key" "${ZFS_KEY_DIR}/tank.key.enc"
