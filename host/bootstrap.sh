@@ -908,35 +908,42 @@ HELPEOF
 EOF
     chmod +x "${hook_install}"
 
-    # Hook mkinitcpio (runtime)
+    # Hook mkinitcpio (runtime — latehook, après montage racine sur /new_root)
     local hook_runtime="/usr/lib/initcpio/hooks/toram"
     cat > "${hook_runtime}" << 'EOF'
 #!/usr/bin/ash
-run_hook() {
+run_latehook() {
     grep -q "BOOT_MODE=toram" /proc/cmdline || return
 
     mkdir -p /mnt/lower /mnt/upper-tmpfs
-    mount -o remount,ro "$root"
-    mount -o move "$root" /mnt/lower
+    mount -o remount,ro /new_root
+    mount -o move /new_root /mnt/lower
     mount -t tmpfs -o size=80% tmpfs /mnt/upper-tmpfs
     mkdir -p /mnt/upper-tmpfs/upper /mnt/upper-tmpfs/work
     mount -t overlay overlay \
         -o "lowerdir=/mnt/lower,upperdir=/mnt/upper-tmpfs/upper,workdir=/mnt/upper-tmpfs/work" \
-        "$root"
-    mkdir -p "${root}/mnt/rootfs-disk"
-    mount -o move /mnt/lower "${root}/mnt/rootfs-disk"
+        /new_root
+    mkdir -p /new_root/mnt/rootfs-disk
+    mount -o move /mnt/lower /new_root/mnt/rootfs-disk
 }
 EOF
     chmod +x "${hook_runtime}"
     info "Hooks mkinitcpio toram installés."
 
-    # Ajouter à HOOKS si absent
+    # Ajouter à HOOKS si absent (après filesystems — c'est un latehook)
     if ! grep -q "toram" /etc/mkinitcpio.conf; then
-        sed -i 's/\(HOOKS=.*\)filesystems/\1toram filesystems/' /etc/mkinitcpio.conf
+        sed -i 's/\(HOOKS=.*filesystems\)/\1 toram/' /etc/mkinitcpio.conf
         mkinitcpio -P
-        info "mkinitcpio regénéré avec hook toram."
+        info "mkinitcpio regénéré avec hook toram (après filesystems)."
     else
-        info "Hook toram déjà dans mkinitcpio.conf."
+        # Si toram est AVANT filesystems (ancienne version), corriger
+        if grep -q 'toram filesystems' /etc/mkinitcpio.conf; then
+            sed -i 's/toram filesystems/filesystems toram/' /etc/mkinitcpio.conf
+            mkinitcpio -P
+            info "Position du hook toram corrigée (déplacé après filesystems)."
+        else
+            info "Hook toram déjà dans mkinitcpio.conf."
+        fi
     fi
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
