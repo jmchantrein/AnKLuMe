@@ -505,34 +505,7 @@ mount_zfs_home() {
     local home_fstype
     home_fstype=$(findmnt -no FSTYPE /home 2>/dev/null) || home_fstype=""
     if ! mountpoint -q /home || [[ "${home_fstype}" != "zfs" ]]; then
-        # --- Migration : copier le contenu btrfs /home vers ZFS ---
-        # Avant le montage ZFS, sauvegarder le contenu existant de /home
-        # pour le restaurer dans le dataset ZFS (dotfiles, .local/bin, etc.)
-        local need_migration=false
-        local tmp_home=""
-        if [[ -d "/home" ]] && [[ -n "$(ls -A /home 2>/dev/null)" ]]; then
-            tmp_home=$(mktemp -d /tmp/home-migration.XXXXXX)
-            info "Sauvegarde du contenu de /home (btrfs) avant montage ZFS..."
-            cp -a /home/. "${tmp_home}/" 2>/dev/null || true
-            need_migration=true
-        fi
-
         zfs mount "${POOL}/_home" 2>/dev/null || true
-
-        # Restaurer le contenu btrfs dans le dataset ZFS (sans écraser)
-        if [[ "${need_migration}" == true && -n "${tmp_home}" ]]; then
-            info "Migration du contenu btrfs → ZFS /home..."
-            # rsync -a sans écraser les fichiers existants (premier montage
-            # ou re-bootstrap), préserve permissions et symlinks
-            if command -v rsync &> /dev/null; then
-                rsync -a --ignore-existing "${tmp_home}/" /home/ 2>/dev/null || true
-            else
-                cp -a --no-clobber "${tmp_home}/." /home/ 2>/dev/null || true
-            fi
-            rm -rf "${tmp_home}"
-            info "Migration terminée."
-        fi
-
         info "/home monté depuis ZFS (${POOL}/_home)."
     else
         info "/home déjà monté depuis ZFS."
@@ -1118,20 +1091,66 @@ install_anklume() {
         fi
     fi
 
-    # Installer anklume via uv tool (en tant qu'utilisateur)
-    # --with textual : inclut le TUI pour `anklume tui`
-    if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
-        if su - "${main_user}" -c "${uv_bin} tool install --with textual anklume" 2>/dev/null; then
-            info "anklume installé via uv pour ${main_user} (avec TUI)."
+    # --- Dépôt AnKLuMe dans la home ZFS ---
+    # Après le montage ZFS sur /home, le repo cloné sur btrfs n'est plus
+    # visible. On s'assure qu'il existe dans la nouvelle home (clone ou pull).
+    local anklume_dir="${user_home}/AnKLuMe"
+    local anklume_repo="https://github.com/jmchantrein/AnKLuMe.git"
+
+    if [[ -n "${user_home}" && -n "${main_user}" ]]; then
+        local user_uid user_gid
+        user_uid=$(id -u "${main_user}")
+        user_gid=$(id -g "${main_user}")
+
+        if [[ -d "${anklume_dir}/.git" ]]; then
+            # Déjà cloné → pull pour récupérer les éventuelles MAJ
+            info "Dépôt AnKLuMe existant, mise à jour (git pull)..."
+            su - "${main_user}" -c "cd '${anklume_dir}' && git pull --ff-only" 2>/dev/null || {
+                warn "git pull échoué (modifications locales ?). Dépôt existant conservé."
+            }
         else
-            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
-            warn "  ${uv_bin} tool install --with textual anklume"
+            # Pas de repo → cloner
+            info "Clonage d'AnKLuMe dans ${anklume_dir}..."
+            su - "${main_user}" -c "git clone '${anklume_repo}' '${anklume_dir}'" 2>/dev/null || {
+                warn "git clone échoué. Cloner manuellement :"
+                warn "  git clone ${anklume_repo} ${anklume_dir}"
+            }
+        fi
+
+        # Fixer les droits si le répertoire existe
+        if [[ -d "${anklume_dir}" ]]; then
+            chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
+        fi
+    fi
+
+    # --- Installer la CLI anklume via uv ---
+    # Depuis le repo local (pas PyPI — pas encore publié).
+    # uv tool install depuis le chemin local installe le binaire dans ~/.local/bin.
+    if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
+        if [[ -d "${anklume_dir}" ]]; then
+            # Installation depuis le repo local (avec textual pour le TUI)
+            if su - "${main_user}" -c "${uv_bin} tool install --with textual '${anklume_dir}'" 2>/dev/null; then
+                info "anklume CLI installée via uv pour ${main_user} (avec TUI)."
+            else
+                warn "Installation CLI échouée. Installer manuellement :"
+                warn "  cd ${anklume_dir} && ${uv_bin} tool install --with textual ."
+            fi
+        else
+            # Pas de repo local → tenter PyPI (fallback)
+            if su - "${main_user}" -c "${uv_bin} tool install --with textual anklume" 2>/dev/null; then
+                info "anklume CLI installée via uv pour ${main_user} (avec TUI)."
+            else
+                warn "anklume pas encore publié sur PyPI et repo local absent."
+                warn "Cloner puis : ${uv_bin} tool install --with textual ~/AnKLuMe"
+            fi
         fi
     elif [[ -n "${uv_bin}" ]]; then
-        if "${uv_bin}" tool install --with textual anklume 2>/dev/null; then
-            info "anklume installé via uv (avec TUI)."
+        local install_src="anklume"
+        [[ -d "${anklume_dir}" ]] && install_src="${anklume_dir}"
+        if "${uv_bin}" tool install --with textual "${install_src}" 2>/dev/null; then
+            info "anklume CLI installée via uv (avec TUI)."
         else
-            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
+            warn "Installation CLI échouée."
         fi
     fi
 
