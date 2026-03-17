@@ -198,25 +198,31 @@ stop_zfs_consumers() {
     # Le service de déverrouillage
     systemctl stop zfs-load-key-tank.service 2>/dev/null || true
 
-    # Basculer en mode texte : systemctl isolate multi-user.target
-    # C'est la méthode standard systemd pour quitter le mode graphique.
-    # - Arrête le DM (SDDM/GDM) et tous les services graphiques
-    # - Préserve les getty (sessions TTY)
-    # - Ferme les sessions Wayland/X11 proprement via logind
-    #
-    # On NE fait PAS "systemctl stop display-manager" car sur certains
-    # systèmes (CachyOS/SDDM), ça déclenche un nettoyage de seat/VT
-    # qui tue aussi les sessions TTY.
-    if systemctl is-active --quiet graphical.target 2>/dev/null; then
-        info "Bascule en mode texte (multi-user.target)..."
-        systemctl isolate multi-user.target 2>/dev/null || true
-        sleep 3  # Laisser systemd terminer la transition
-        info "Mode texte actif."
-    fi
+    # Tuer le display manager et tout le graphique à la dure.
+    # On NE fait PAS "systemctl stop display-manager" ni "isolate" car
+    # sur CachyOS/SDDM, ça déclenche un nettoyage de seat/VT par logind
+    # qui tue aussi les sessions TTY. kill -9 est fiable et sans effet
+    # de bord systemd.
+    info "Arrêt brutal du display manager et des processus graphiques..."
+    # Masquer d'abord pour empêcher le respawn
+    systemctl mask --runtime display-manager.service 2>/dev/null || true
+    # Tuer les DM connus
+    pkill -9 -x sddm 2>/dev/null || true
+    pkill -9 -x gdm 2>/dev/null || true
+    pkill -9 -x gdm3 2>/dev/null || true
+    pkill -9 -x lightdm 2>/dev/null || true
+    # Tuer les compositeurs/serveurs graphiques
+    pkill -9 -x Xorg 2>/dev/null || true
+    pkill -9 -x Xwayland 2>/dev/null || true
+    pkill -9 -x kwin_wayland 2>/dev/null || true
+    pkill -9 -x gnome-shell 2>/dev/null || true
+    pkill -9 -x plasmashell 2>/dev/null || true
+    sleep 2
+    info "Processus graphiques tués."
 
-    # Arrêter les services systemd --user résiduels (ils gardent des
-    # fichiers ouverts sous /home même après la fermeture des sessions)
+    # Arrêter les services systemd --user (gardent des fd sur /home)
     systemctl stop 'user@*.service' 2>/dev/null || true
+    systemctl stop 'user-runtime-dir@*.service' 2>/dev/null || true
 
     # Collecter les PIDs ancêtres à protéger (notre shell et toute la chaîne
     # jusqu'à PID 1). Sans ça, fuser -km /home tue le shell appelant.
@@ -449,10 +455,13 @@ rollback_btrfs() {
         info "Snapshots Snapper détectés dans ${snap_dir}"
 
         # Le snapshot le plus ancien (numéro le plus bas, tri numérique)
-        local oldest_num
-        oldest_num=$(find "${snap_dir}" -maxdepth 2 -name snapshot -type d 2>/dev/null \
+        # Note : on passe par une variable pour éviter le SIGPIPE de
+        # head -1 qui crash avec pipefail.
+        local oldest_num all_nums
+        all_nums=$(find "${snap_dir}" -maxdepth 2 -name snapshot -type d 2>/dev/null \
             | sed 's|.*/\([0-9]*\)/snapshot|\1|' \
-            | sort -n | head -1) || true
+            | sort -n) || true
+        oldest_num=$(head -1 <<< "${all_nums}") || true
 
         if [[ -n "${oldest_num}" ]]; then
             snapshots_found=true
@@ -466,9 +475,10 @@ rollback_btrfs() {
         if [[ -d "${ts_dir}" ]]; then
             info "Snapshots Timeshift détectés dans ${ts_dir}"
 
-            local oldest_snap
-            oldest_snap=$(find "${ts_dir}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null \
-                | sort | head -1) || true
+            local oldest_snap all_snaps
+            all_snaps=$(find "${ts_dir}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null \
+                | sort) || true
+            oldest_snap=$(head -1 <<< "${all_snaps}") || true
 
             if [[ -n "${oldest_snap}" ]]; then
                 snapshots_found=true
@@ -479,9 +489,10 @@ rollback_btrfs() {
 
     # --- Subvolumes @_snapshot_* (convention manuelle) ---
     if [[ "${snapshots_found}" == false ]]; then
-        local manual_snaps
-        manual_snaps=$(find "${toplevel}" -maxdepth 1 -name '@_snapshot_*' -type d 2>/dev/null \
-            | sort | head -1) || true
+        local manual_snaps all_manual
+        all_manual=$(find "${toplevel}" -maxdepth 1 -name '@_snapshot_*' -type d 2>/dev/null \
+            | sort) || true
+        manual_snaps=$(head -1 <<< "${all_manual}") || true
 
         if [[ -n "${manual_snaps}" ]]; then
             snapshots_found=true
@@ -496,7 +507,7 @@ rollback_btrfs() {
         warn "Aucun snapshot btrfs trouvé."
         warn "Le système ne peut pas être rollback au premier snapshot."
         warn "Subvolumes présents sur le toplevel :"
-        find "${toplevel}" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | head -20
+        { find "${toplevel}" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null || true; } | head -20
     fi
 
     # Le trap EXIT se charge du umount/rmdir
@@ -524,8 +535,8 @@ rollback_snapper() {
     # Lister TOUS les subvolumes à rollback (@ @home @log @cache etc.)
     # On cherche les paires : subvol actif + snapshot correspondant
     info "Subvolumes sur le toplevel :"
-    btrfs subvolume list -o "${toplevel}" 2>/dev/null \
-        | awk '{print $NF}' | head -20 || ls -1 "${toplevel}"/
+    { btrfs subvolume list -o "${toplevel}" 2>/dev/null \
+        | awk '{print $NF}' || true; } | head -20 || ls -1 "${toplevel}"/
 
     confirm "ROLLBACK BTRFS : remplacer les subvolumes actifs par le snapshot #${snap_num} ?"
 
