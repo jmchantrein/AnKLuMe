@@ -158,7 +158,24 @@ stop_zfs_consumers() {
     # Le service de déverrouillage
     systemctl stop zfs-load-key-tank.service 2>/dev/null || true
 
-    # Tuer les processus qui utilisent les points de montage ZFS
+    # Arrêter le display manager AVANT de tuer les processus sur /home.
+    # Sinon SDDM/GDM relance les sessions, fuser tourne en boucle.
+    if systemctl is-active --quiet display-manager.service 2>/dev/null; then
+        systemctl stop display-manager.service 2>/dev/null || true
+        info "Display manager arrêté."
+    fi
+
+    # Terminer proprement les sessions utilisateur (loginctl)
+    local real_user
+    real_user=$(logname 2>/dev/null) || real_user="${SUDO_USER:-}"
+    if [[ -n "${real_user}" ]]; then
+        loginctl terminate-user "${real_user}" 2>/dev/null || true
+        info "Sessions de ${real_user} terminées."
+        # Laisser le temps à systemd de nettoyer les cgroups
+        sleep 2
+    fi
+
+    # Tuer les processus restants sur les points de montage ZFS
     local zfs_mounts
     zfs_mounts=$(zfs list -H -o mountpoint "${POOL}" -r 2>/dev/null \
         | grep -v '^-$' | grep -v '^none$' | grep -v '^legacy$') || true
