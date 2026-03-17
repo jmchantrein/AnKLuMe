@@ -32,6 +32,10 @@
 
 set -euo pipefail
 
+# Chemin absolu du script, capturé AVANT le cd /root
+# (sinon les chemins relatifs dans BASH_SOURCE[0] sont résolus depuis /root).
+SCRIPT_REAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Toujours travailler depuis un répertoire stable (btrfs rootfs).
 # Les montages ZFS (ex: tank/_home → /home) peuvent invalider le cwd.
 cd /root
@@ -1068,11 +1072,10 @@ GRUB
 save_repo_source() {
     step "Sauvegarde du dépôt source"
 
-    # Le script tourne depuis host/bootstrap.sh → le repo est dirname(dirname($0))
-    local script_dir
-    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    # Le script tourne depuis host/bootstrap.sh → le repo est le parent
+    # SCRIPT_REAL_DIR a été capturé au lancement, avant cd /root.
     local repo_dir
-    repo_dir=$(cd "${script_dir}/.." && pwd)
+    repo_dir=$(cd "${SCRIPT_REAL_DIR}/.." && pwd)
 
     if [[ ! -f "${repo_dir}/pyproject.toml" ]]; then
         warn "Repo source introuvable (${repo_dir}). Le clone sera fait depuis GitHub."
