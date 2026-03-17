@@ -1,5 +1,9 @@
 # Démarrage rapide
 
+!!! note "Prérequis"
+    AnKLuMe et Incus doivent être installés.
+    Voir [Installation](installation.md) si ce n'est pas fait.
+
 ## Créer un projet
 
 ```bash
