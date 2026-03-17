@@ -277,7 +277,7 @@ rollback_btrfs() {
     # Extraire le device sous-jacent (sans le subvolume)
     # /dev/mapper/luks-xxx[/@] → /dev/mapper/luks-xxx
     local btrfs_dev
-    btrfs_dev=$(echo "${root_dev}" | sed 's/\[.*\]//')
+    btrfs_dev="${root_dev%%\[*}"
 
     info "Device btrfs : ${btrfs_dev}"
 
@@ -329,7 +329,8 @@ rollback_btrfs() {
             info "Snapshots Timeshift détectés dans ${ts_dir}"
 
             local oldest_snap
-            oldest_snap=$(ls -1d "${ts_dir}"/*/ 2>/dev/null | head -1) || true
+            oldest_snap=$(find "${ts_dir}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null \
+                | sort | head -1) || true
 
             if [[ -n "${oldest_snap}" ]]; then
                 snapshots_found=true
@@ -341,7 +342,8 @@ rollback_btrfs() {
     # --- Subvolumes @_snapshot_* (convention manuelle) ---
     if [[ "${snapshots_found}" == false ]]; then
         local manual_snaps
-        manual_snaps=$(ls -1d "${toplevel}"/@_snapshot_* 2>/dev/null | head -1) || true
+        manual_snaps=$(find "${toplevel}" -maxdepth 1 -name '@_snapshot_*' -type d 2>/dev/null \
+            | sort | head -1) || true
 
         if [[ -n "${manual_snaps}" ]]; then
             snapshots_found=true
@@ -356,7 +358,7 @@ rollback_btrfs() {
         warn "Aucun snapshot btrfs trouvé."
         warn "Le système ne peut pas être rollback au premier snapshot."
         warn "Subvolumes présents sur le toplevel :"
-        ls -1 "${toplevel}"/ 2>/dev/null | head -20
+        find "${toplevel}" -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | head -20
     fi
 
     # Le trap EXIT se charge du umount/rmdir

@@ -1152,7 +1152,10 @@ setup_toram_grub() {
         rootflags=" rootflags=subvol=${root_subvol}"
     fi
 
-    local menu_label="$(. /etc/os-release && echo "${NAME:-Linux}") (toram -- immutable)"
+    local os_name
+    # shellcheck source=/dev/null
+    os_name="$(. /etc/os-release && echo "${NAME:-Linux}")"
+    local menu_label="${os_name} (toram -- immutable)"
 
     cat > "${grub_entry}" << GRUB
 #!/bin/sh
@@ -1313,8 +1316,6 @@ setup_shell_integration() {
         warn "Impossible de déterminer le home de l'utilisateur."
         return
     fi
-
-    local local_bin="${user_home}/.local/bin"
 
     # Bloc à injecter dans bash/zsh
     local shell_block
