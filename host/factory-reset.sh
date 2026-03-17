@@ -44,6 +44,7 @@ ZFS_ONLY=false
 BTRFS_ONLY=false
 AUTO_YES=false
 SKIP_REBOOT=false
+DETACHED=false       # true quand re-exec via systemd-run
 
 # ---------------------------------------------------------------------------
 # Parsing des arguments
@@ -55,6 +56,7 @@ while [[ $# -gt 0 ]]; do
         --btrfs-only)   BTRFS_ONLY=true; shift ;;
         --yes)          AUTO_YES=true; shift ;;
         --skip-reboot)  SKIP_REBOOT=true; shift ;;
+        --detached)     DETACHED=true; shift ;;
         -h|--help)
             sed -n '2,/^$/s/^# \?//p' "$0"
             exit 0
@@ -157,7 +159,6 @@ stop_zfs_consumers() {
     if [[ -n "${zfs_mounts}" ]]; then
         for mp in ${zfs_mounts}; do
             if mountpoint -q "${mp}" 2>/dev/null; then
-                # Sortir du répertoire si on y est
                 fuser -km "${mp}" 2>/dev/null || true
                 info "Processus tués sur ${mp}."
             fi
@@ -487,6 +488,43 @@ rollback_timeshift() {
 }
 
 # ---------------------------------------------------------------------------
+# Détachement de la session utilisateur
+# ---------------------------------------------------------------------------
+# fuser -km /home tue TOUS les processus sur /home, y compris le shell
+# de l'utilisateur. Si le script tourne dans cette session, il meurt aussi.
+# Solution : après la confirmation interactive, se re-exécuter via
+# systemd-run --scope pour être indépendant de la session.
+
+readonly RESET_LOG="/root/factory-reset.log"
+
+# Re-exec le script détaché de la session utilisateur.
+# La confirmation interactive est déjà passée → on passe --yes --detached.
+detach_and_rerun() {
+    local args=("--yes" "--detached")
+    [[ "${ZFS_ONLY}" == true ]]    && args+=("--zfs-only")
+    [[ "${BTRFS_ONLY}" == true ]]  && args+=("--btrfs-only")
+    [[ "${SKIP_REBOOT}" == true ]] && args+=("--skip-reboot")
+
+    local self
+    self="$(readlink -f "$0")"
+
+    info "Détachement du script de la session utilisateur..."
+    info "La suite est loggée dans ${RESET_LOG}"
+    info "Votre session va être coupée — c'est normal."
+    echo ""
+
+    # systemd-run --scope crée un scope systemd indépendant du login session
+    systemd-run --scope --unit=factory-reset \
+        bash "${self}" "${args[@]}" \
+        &> "${RESET_LOG}" &
+
+    # Laisser systemd-run démarrer avant de quitter
+    sleep 2
+    info "Script détaché (PID $!). Consultez ${RESET_LOG} après reboot."
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -500,6 +538,12 @@ main() {
     # Toujours travailler depuis /root (pas /home qui va être démonté)
     cd /root
 
+    # Si on tourne détaché, la sortie va dans le log — on redirige stdout/stderr
+    if [[ "${DETACHED}" == true ]]; then
+        exec > >(tee -a "${RESET_LOG}") 2>&1
+        info "=== Exécution détachée — $(date) ==="
+    fi
+
     # Résumé de ce qui va se passer
     printf "%bCe script va :%b\n" "${BOLD}" "${NC}"
     if [[ "${BTRFS_ONLY}" != true ]]; then
@@ -512,7 +556,14 @@ main() {
     fi
     echo ""
 
-    confirm "FACTORY RESET — Cette opération est IRRÉVERSIBLE. Continuer ?"
+    # Phase interactive : confirmation puis détachement
+    if [[ "${DETACHED}" != true ]]; then
+        confirm "FACTORY RESET — Cette opération est IRRÉVERSIBLE. Continuer ?"
+        detach_and_rerun
+        # On ne revient jamais ici (exit dans detach_and_rerun)
+    fi
+
+    # --- À partir d'ici, on tourne détaché de la session ---
 
     if [[ "${BTRFS_ONLY}" != true ]]; then
         destroy_zfs_pool
@@ -543,7 +594,7 @@ main() {
         warn "Redémarrage ignoré (--skip-reboot)."
         warn "Redémarrez manuellement : sudo reboot"
     else
-        warn "Redémarrage dans 10 secondes... (Ctrl+C pour annuler)"
+        warn "Redémarrage dans 10 secondes..."
         sleep 10
         reboot
     fi
