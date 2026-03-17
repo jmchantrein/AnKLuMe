@@ -111,6 +111,31 @@ check_not_graphical() {
     fi
 }
 
+# Tue les processus utilisant un point de montage, SAUF nos ancêtres.
+# Usage : _kill_except_ancestors /home " 1234 5678 "
+_kill_except_ancestors() {
+    local mountpoint="$1"
+    local protected="$2"
+    local pids
+    # fuser -m liste les PIDs, avec parfois des suffixes (c, e, f…)
+    pids=$(fuser -m "${mountpoint}" 2>/dev/null | tr -s ' ' '\n') || true
+    [[ -z "${pids}" ]] && return
+
+    local killed=0
+    for raw_pid in ${pids}; do
+        local pid="${raw_pid//[^0-9]/}"
+        [[ -z "${pid}" ]] && continue
+        # Protéger nos ancêtres
+        if [[ "${protected}" == *" ${pid} "* ]]; then
+            warn "PID ${pid} protégé (ancêtre du script), ignoré."
+            continue
+        fi
+        kill -9 "${pid}" 2>/dev/null || true
+        ((killed++)) || true
+    done
+    info "${killed} processus tués sur ${mountpoint}."
+}
+
 # Nettoyage automatique des montages temporaires à la sortie
 cleanup() {
     umount /mnt/btrfs-toplevel 2>/dev/null || true
@@ -173,14 +198,28 @@ stop_zfs_consumers() {
     # Le service de déverrouillage
     systemctl stop zfs-load-key-tank.service 2>/dev/null || true
 
-    # Arrêter le display manager AVANT fuser -km /home :
-    # sinon SDDM/GDM relance les sessions et fuser boucle.
+    # Arrêter le display manager AVANT de tuer les processus sur /home :
+    # sinon SDDM/GDM relance les sessions et on boucle.
     if systemctl is-active --quiet display-manager.service 2>/dev/null; then
         systemctl stop display-manager.service 2>/dev/null || true
-        info "Display manager arrêté."
+        # Empêcher le redémarrage automatique (ex: Restart=on-failure)
+        systemctl mask --runtime display-manager.service 2>/dev/null || true
+        info "Display manager arrêté et masqué (runtime)."
+        sleep 2  # Laisser les sessions graphiques se terminer
     fi
 
-    # Tuer les processus restants sur les points de montage ZFS
+    # Collecter les PIDs ancêtres à protéger (notre shell et toute la chaîne
+    # jusqu'à PID 1). Sans ça, fuser -km /home tue le shell appelant.
+    local protected_pids=" $$ "
+    local _pid=$$
+    while [[ ${_pid} -gt 1 ]]; do
+        _pid=$(ps -o ppid= -p "${_pid}" 2>/dev/null | tr -d ' ') || break
+        [[ -z "${_pid}" ]] && break
+        protected_pids+="${_pid} "
+    done
+
+    # Tuer les processus restants sur les points de montage ZFS,
+    # SAUF notre propre arborescence de processus.
     local zfs_mounts
     zfs_mounts=$(zfs list -H -o mountpoint "${POOL}" -r 2>/dev/null \
         | grep -v '^-$' | grep -v '^none$' | grep -v '^legacy$') || true
@@ -188,8 +227,7 @@ stop_zfs_consumers() {
     if [[ -n "${zfs_mounts}" ]]; then
         for mp in ${zfs_mounts}; do
             if mountpoint -q "${mp}" 2>/dev/null; then
-                fuser -km "${mp}" 2>/dev/null || true
-                info "Processus tués sur ${mp}."
+                _kill_except_ancestors "${mp}" "${protected_pids}"
             fi
         done
     fi
