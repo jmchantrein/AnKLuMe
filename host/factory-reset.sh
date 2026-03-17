@@ -9,7 +9,8 @@
 # ⚠ DESTRUCTIF — toutes les données ZFS sont perdues.
 # ⚠ Conçu pour le développement du bootstrap, PAS pour la production.
 #
-# ⚠ DOIT être exécuté depuis un TTY root (Ctrl+Alt+F2, login root).
+# ⚠ DOIT être exécuté depuis un TTY (Ctrl+Alt+F2).
+#   Idéal : login root direct. Sinon : sudo -i puis lancer le script.
 #   NE PAS lancer depuis une session graphique (Konsole, terminal Wayland…).
 #
 # Usage :
@@ -104,10 +105,21 @@ check_not_graphical() {
         echo ""
         info "Procédure :"
         info "  1. Ctrl+Alt+F2 (ouvre un TTY)"
-        info "  2. Se connecter en root"
-        info "  3. ./factory-reset.sh"
+        info "  2. Se connecter en root (ou sudo -i)"
+        info "  3. cd /root && ./factory-reset.sh"
         echo ""
         exit 1
+    fi
+
+    # Avertir si on tourne via sudo depuis un user (pas un vrai login root).
+    # Ça marche, mais la session user sera tuée — il faut que le script
+    # survive en tant que processus root orphelin.
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        warn "Exécution via sudo (user: ${SUDO_USER})."
+        warn "Votre session TTY sera tuée en cours de route."
+        warn "Le script continuera en arrière-plan jusqu'au reboot."
+        warn "Pour un contrôle total, connectez-vous directement en root."
+        echo ""
     fi
 }
 
