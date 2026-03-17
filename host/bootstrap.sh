@@ -20,6 +20,7 @@
 # Options :
 #   --skip-nvidia         Ne pas vérifier le driver NVIDIA
 #   --skip-toram          Ne pas configurer le mode toram
+#   --force-toram         Forcer la reconstruction complète du toram
 #   --skip-zfs-pool       Ne pas créer/recréer le pool ZFS
 #   --skip-incus          Ne pas configurer Incus
 #   --zfs-passphrase      Lire la passphrase depuis stdin (non interactif)
@@ -64,6 +65,7 @@ readonly NC='\033[0m'
 # Flags
 SKIP_NVIDIA=false
 SKIP_TORAM=false
+FORCE_TORAM=false
 SKIP_ZFS_POOL=false
 SKIP_INCUS=false
 PASSPHRASE_STDIN=false
@@ -83,6 +85,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-nvidia)       SKIP_NVIDIA=true; shift ;;
         --skip-toram)        SKIP_TORAM=true; shift ;;
+        --force-toram)       FORCE_TORAM=true; shift ;;
         --skip-zfs-pool)     SKIP_ZFS_POOL=true; shift ;;
         --skip-incus)        SKIP_INCUS=true; shift ;;
         --zfs-passphrase)    PASSPHRASE_STDIN=true; shift ;;
@@ -972,7 +975,7 @@ EOF
         info "Hook toram déjà dans mkinitcpio.conf (position correcte)."
     fi
 
-    if [[ "${need_regen}" == true ]]; then
+    if [[ "${need_regen}" == true ]] || [[ "${FORCE_TORAM}" == true ]]; then
         regenerate_initramfs
     fi
 
@@ -1027,7 +1030,7 @@ EOF
     # Ajouter le module toram à la config dracut
     local dracut_conf="/etc/dracut.conf.d/toram.conf"
     local need_regen=false
-    if [[ ! -f "${dracut_conf}" ]]; then
+    if [[ ! -f "${dracut_conf}" ]] || [[ "${FORCE_TORAM}" == true ]]; then
         cat > "${dracut_conf}" << 'CONF'
 # Module toram overlay (AnKLuMe)
 add_dracutmodules+=" toram "
@@ -1038,7 +1041,7 @@ CONF
         info "Config dracut toram déjà présente."
     fi
 
-    if [[ "${need_regen}" == true ]]; then
+    if [[ "${need_regen}" == true ]] || [[ "${FORCE_TORAM}" == true ]]; then
         regenerate_initramfs
     fi
 
@@ -1055,9 +1058,16 @@ CONF
 setup_toram_limine() {
     local limine_conf="/boot/limine.conf"
 
-    if grep -q "BOOT_MODE=toram" "${limine_conf}"; then
+    if grep -q "BOOT_MODE=toram" "${limine_conf}" && [[ "${FORCE_TORAM}" != true ]]; then
         info "Entrée Limine toram existe déjà."
         return
+    fi
+
+    # En mode force, supprimer l'ancienne entrée toram avant de recréer
+    if [[ "${FORCE_TORAM}" == true ]] && grep -q "toram -- immutable" "${limine_conf}"; then
+        info "Mode force : suppression de l'ancienne entrée Limine toram."
+        # Supprimer le bloc : de "/...toram -- immutable)" jusqu'à la prochaine ligne vide ou fin
+        sed -i '/toram -- immutable/,/^$/d' "${limine_conf}"
     fi
 
     local luks_uuid luks_name root_subvol
@@ -1101,7 +1111,7 @@ ENTRY
 # --- Debian : initramfs-tools + GRUB ---
 setup_toram_initramfs() {
     local hook="/etc/initramfs-tools/scripts/init-bottom/toram"
-    if [[ ! -f "${hook}" ]]; then
+    if [[ ! -f "${hook}" ]] || [[ "${FORCE_TORAM}" == true ]]; then
         cat > "${hook}" << 'HOOK'
 #!/bin/sh
 PREREQ=""
@@ -1140,7 +1150,7 @@ HOOK
 setup_toram_grub() {
     local grub_entry="/etc/grub.d/42_toram"
 
-    if [[ -f "${grub_entry}" ]]; then
+    if [[ -f "${grub_entry}" ]] && [[ "${FORCE_TORAM}" != true ]]; then
         info "Entrée GRUB toram existe déjà."
         return
     fi
