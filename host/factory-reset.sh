@@ -90,30 +90,25 @@ check_root() {
     fi
 }
 
-# Vérifie qu'on tourne depuis un TTY, pas depuis une session graphique.
+# Vérifie qu'on ne tourne PAS depuis une session graphique.
 # Depuis un terminal graphique (Konsole, gnome-terminal…), fuser -km /home
 # tue la session et le script avec. Depuis un TTY c'est sans risque.
-check_tty() {
-    local current_tty
-    current_tty=$(tty 2>/dev/null) || current_tty=""
-
-    # /dev/ttyN = TTY physique, /dev/pts/N = pseudo-terminal (graphique ou SSH)
-    if [[ "${current_tty}" == /dev/tty[0-9]* ]]; then
-        return 0
+check_not_graphical() {
+    # DISPLAY = X11, WAYLAND_DISPLAY = Wayland
+    if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        echo ""
+        error "Ce script ne doit PAS être lancé depuis une session graphique."
+        echo ""
+        warn "Depuis un terminal graphique, fuser -km /home tue votre session"
+        warn "et le script s'arrête en plein milieu."
+        echo ""
+        info "Procédure :"
+        info "  1. Ctrl+Alt+F2 (ouvre un TTY)"
+        info "  2. Se connecter en root"
+        info "  3. ./factory-reset.sh"
+        echo ""
+        exit 1
     fi
-
-    echo ""
-    error "Ce script doit être exécuté depuis un TTY physique."
-    echo ""
-    warn "Depuis un terminal graphique, fuser -km /home tue votre session"
-    warn "et le script s'arrête en plein milieu."
-    echo ""
-    info "Procédure :"
-    info "  1. Ctrl+Alt+F2 (ouvre un TTY)"
-    info "  2. Se connecter en root"
-    info "  3. cd $(pwd) && ./factory-reset.sh"
-    echo ""
-    exit 1
 }
 
 # Nettoyage automatique des montages temporaires à la sortie
@@ -531,7 +526,7 @@ main() {
     echo ""
 
     check_root
-    check_tty
+    check_not_graphical
 
     # Toujours travailler depuis /root (pas /home qui va être démonté)
     cd /root
