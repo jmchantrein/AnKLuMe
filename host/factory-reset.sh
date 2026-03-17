@@ -24,6 +24,13 @@
 
 set -euo pipefail
 
+# Chemin absolu du script, capturé AVANT le cd /root
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+readonly SCRIPT_PATH
+
+# Toujours travailler depuis un répertoire stable (hors ZFS /home)
+cd /root
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -508,7 +515,7 @@ detach_and_rerun() {
 
     # Copier le script vers /root/ (chemin stable, hors ZFS)
     local safe_copy="/root/.factory-reset-detached.sh"
-    cp "$(readlink -f "$0")" "${safe_copy}"
+    cp "${SCRIPT_PATH}" "${safe_copy}"
     chmod +x "${safe_copy}"
 
     info "Détachement du script de la session utilisateur..."
@@ -537,9 +544,6 @@ main() {
     echo ""
 
     check_root
-
-    # Toujours travailler depuis /root (pas /home qui va être démonté)
-    cd /root
 
     # Si on tourne détaché, la sortie va dans le log — on redirige stdout/stderr
     if [[ "${DETACHED}" == true ]]; then
