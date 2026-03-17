@@ -318,6 +318,19 @@ _unmount_retry() {
     info "${mp} lazy-démonté."
 }
 
+# Supprimer les services systemd ZFS et scripts associés.
+# Appelé par destroy_zfs_pool ET après le rollback btrfs (le rollback peut
+# restaurer ces fichiers depuis un snapshot pris après bootstrap.sh).
+cleanup_zfs_systemd() {
+    rm -f /etc/systemd/system/zfs-load-key-tank.service
+    rm -f /etc/systemd/system/incus.service.d/after-zfs.conf
+    rm -rf /etc/systemd/system/zfs-mount.service.d
+    rm -f /usr/local/bin/zfs-unlock-tank
+    rm -f "${ZFS_KEY_DIR}/tank.key" "${ZFS_KEY_DIR}/tank.key.enc"
+    systemctl daemon-reload 2>/dev/null || true
+    info "Services systemd ZFS nettoyés."
+}
+
 # Détruire le pool et nettoyer les traces
 destroy_zfs_pool() {
     step "Destruction du pool ZFS '${POOL}'"
@@ -354,12 +367,7 @@ destroy_zfs_pool() {
     rm -f "${ZFS_KEY_DIR}/tank.key" "${ZFS_KEY_DIR}/tank.key.enc"
     info "Keyfiles ZFS supprimés."
 
-    # Nettoyer les services systemd
-    rm -f /etc/systemd/system/zfs-load-key-tank.service
-    rm -f /etc/systemd/system/incus.service.d/after-zfs.conf
-    rm -f /usr/local/bin/zfs-unlock-tank
-    systemctl daemon-reload 2>/dev/null || true
-    info "Services systemd ZFS nettoyés."
+    cleanup_zfs_systemd
 
     # Recréer les tables GPT vierges
     if [[ -n "${disks}" ]]; then
@@ -670,6 +678,14 @@ main() {
 
     if [[ "${ZFS_ONLY}" != true ]]; then
         rollback_btrfs
+    fi
+
+    # Le rollback btrfs peut restaurer les services systemd ZFS depuis un
+    # snapshot pris après bootstrap.sh. On les re-supprime pour éviter que
+    # le prochain boot tente de déverrouiller un pool qui n'existe plus
+    # → échec → emergency mode → "root account is locked".
+    if [[ "${BTRFS_ONLY}" != true ]]; then
+        cleanup_zfs_systemd
     fi
 
     step "Factory reset terminé"

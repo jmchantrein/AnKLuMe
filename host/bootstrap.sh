@@ -620,6 +620,8 @@ DefaultDependencies=no
 Before=zfs-mount.service
 After=zfs-import.target
 ConditionPathExists=/dev/zfs
+# Ne jamais causer un emergency mode si le déverrouillage échoue
+FailureAction=none
 
 [Service]
 Type=oneshot
@@ -628,6 +630,8 @@ ExecStart=/usr/local/bin/zfs-unlock-tank
 StandardInput=tty-force
 StandardOutput=journal+console
 StandardError=journal+console
+# Timeout pour ne pas bloquer le boot indéfiniment sur la passphrase
+TimeoutStartSec=120
 
 [Install]
 WantedBy=zfs-mount.service
@@ -643,6 +647,21 @@ After=zfs-mount.service
 Requires=zfs-mount.service
 DROPIN
     info "Drop-in Incus after-zfs.conf installé."
+
+    # --- Drop-in zfs-mount : ne pas causer d'emergency mode ---
+    local zfs_mount_dropin="/etc/systemd/system/zfs-mount.service.d"
+    mkdir -p "${zfs_mount_dropin}"
+    cat > "${zfs_mount_dropin}/no-emergency.conf" << 'DROPIN'
+[Unit]
+# Empêcher le montage ZFS de bloquer le boot en emergency mode.
+# Si ZFS échoue, le système démarre quand même (dégradé mais accessible).
+FailureAction=none
+
+[Service]
+# Empêcher zfs mount -a de bloquer si un dataset est stuck
+TimeoutStartSec=90
+DROPIN
+    info "Drop-in zfs-mount no-emergency.conf installé."
 
     # --- Activation ---
     systemctl daemon-reload
