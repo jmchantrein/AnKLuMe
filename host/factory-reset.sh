@@ -499,14 +499,17 @@ readonly RESET_LOG="/root/factory-reset.log"
 
 # Re-exec le script détaché de la session utilisateur.
 # La confirmation interactive est déjà passée → on passe --yes --detached.
+# Le script est copié dans /root/ car le chemin original peut être sur ZFS/home.
 detach_and_rerun() {
     local args=("--yes" "--detached")
     [[ "${ZFS_ONLY}" == true ]]    && args+=("--zfs-only")
     [[ "${BTRFS_ONLY}" == true ]]  && args+=("--btrfs-only")
     [[ "${SKIP_REBOOT}" == true ]] && args+=("--skip-reboot")
 
-    local self
-    self="$(readlink -f "$0")"
+    # Copier le script vers /root/ (chemin stable, hors ZFS)
+    local safe_copy="/root/.factory-reset-detached.sh"
+    cp "$(readlink -f "$0")" "${safe_copy}"
+    chmod +x "${safe_copy}"
 
     info "Détachement du script de la session utilisateur..."
     info "La suite est loggée dans ${RESET_LOG}"
@@ -515,7 +518,7 @@ detach_and_rerun() {
 
     # systemd-run --scope crée un scope systemd indépendant du login session
     systemd-run --scope --unit=factory-reset \
-        bash "${self}" "${args[@]}" \
+        bash "${safe_copy}" "${args[@]}" \
         &> "${RESET_LOG}" &
 
     # Laisser systemd-run démarrer avant de quitter
