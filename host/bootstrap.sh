@@ -895,8 +895,9 @@ setup_toram() {
 }
 
 # Régénère l'initramfs avec le bon outil :
-#   - limine-mkinitcpio si présent (CachyOS + Limine : gère les chemins /boot/<machine-id>/)
-#   - mkinitcpio -P sinon (Arch standard)
+#   1. limine-mkinitcpio si présent (CachyOS + Limine : gère les chemins /boot/<machine-id>/)
+#   2. mkinitcpio -P sinon (Arch standard)
+#   3. dracut --force (Fedora, CachyOS avec dracut)
 regenerate_initramfs() {
     if command -v limine-mkinitcpio &> /dev/null; then
         limine-mkinitcpio
@@ -1025,16 +1026,21 @@ EOF
 
     # Ajouter le module toram à la config dracut
     local dracut_conf="/etc/dracut.conf.d/toram.conf"
+    local need_regen=false
     if [[ ! -f "${dracut_conf}" ]]; then
         cat > "${dracut_conf}" << 'CONF'
 # Module toram overlay (AnKLuMe)
 add_dracutmodules+=" toram "
 CONF
         info "Config dracut toram ajoutée."
+        need_regen=true
+    else
+        info "Config dracut toram déjà présente."
     fi
 
-    # Regénérer l'initramfs
-    regenerate_initramfs
+    if [[ "${need_regen}" == true ]]; then
+        regenerate_initramfs
+    fi
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
     if [[ -f "/boot/limine.conf" ]]; then

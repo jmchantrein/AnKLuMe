@@ -87,14 +87,21 @@ check_root() {
     fi
 }
 
+# Nettoyage automatique des montages temporaires à la sortie
+cleanup() {
+    umount /mnt/btrfs-toplevel 2>/dev/null || true
+    rmdir /mnt/btrfs-toplevel 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # Demande confirmation sauf si --yes
 confirm() {
     local msg="$1"
     if [[ "${AUTO_YES}" == true ]]; then
         return 0
     fi
-    printf "\n${BOLD}${RED}%s${NC}\n" "${msg}"
-    printf "Tapez ${BOLD}OUI${NC} en majuscules pour confirmer : "
+    printf "\n%b%b%s%b\n" "${BOLD}" "${RED}" "${msg}" "${NC}"
+    printf "Tapez %bOUI%b en majuscules pour confirmer : " "${BOLD}" "${NC}"
     local answer
     read -r answer
     if [[ "${answer}" != "OUI" ]]; then
@@ -303,10 +310,11 @@ rollback_btrfs() {
 
         info "Snapshots Snapper détectés dans ${snap_dir}"
 
-        # Le snapshot le plus ancien (numéro le plus bas)
+        # Le snapshot le plus ancien (numéro le plus bas, tri numérique)
         local oldest_num
-        oldest_num=$(ls -1d "${snap_dir}"/*/snapshot 2>/dev/null \
-            | head -1 | rev | cut -d/ -f2 | rev) || true
+        oldest_num=$(find "${snap_dir}" -maxdepth 2 -name snapshot -type d 2>/dev/null \
+            | sed 's|.*/\([0-9]*\)/snapshot|\1|' \
+            | sort -n | head -1) || true
 
         if [[ -n "${oldest_num}" ]]; then
             snapshots_found=true
@@ -351,8 +359,7 @@ rollback_btrfs() {
         ls -1 "${toplevel}"/ 2>/dev/null | head -20
     fi
 
-    umount "${toplevel}" 2>/dev/null || true
-    rmdir "${toplevel}" 2>/dev/null || true
+    # Le trap EXIT se charge du umount/rmdir
 }
 
 # Rollback Snapper : remplacer @ par le plus ancien snapshot
@@ -417,6 +424,12 @@ rollback_snapper() {
 
         info "Rollback ${sv} → snapshot #${snap_num}..."
 
+        # Supprimer un éventuel backup précédent
+        if [[ -d "${sv_old}" ]]; then
+            btrfs subvolume delete "${sv_old}" 2>/dev/null || rm -rf "${sv_old}"
+            warn "  Ancien backup ${sv}.factory-reset-backup supprimé."
+        fi
+
         # Renommer le subvolume actif
         mv "${sv_path}" "${sv_old}"
         info "  ${sv} → ${sv}.factory-reset-backup"
@@ -450,13 +463,19 @@ rollback_timeshift() {
         return 1
     fi
 
-    # Renommer et remplacer
+    # Renommer et remplacer (supprimer un éventuel backup précédent)
+    if [[ -d "${toplevel}/@.factory-reset-backup" ]]; then
+        btrfs subvolume delete "${toplevel}/@.factory-reset-backup" 2>/dev/null || true
+    fi
     mv "${toplevel}/@" "${toplevel}/@.factory-reset-backup"
     btrfs subvolume snapshot "${snap_root}" "${toplevel}/@"
     info "Rollback Timeshift terminé."
 
     # Idem pour @home si présent
     if [[ -d "${snap_path}/@home" && -d "${toplevel}/@home" ]]; then
+        if [[ -d "${toplevel}/@home.factory-reset-backup" ]]; then
+            btrfs subvolume delete "${toplevel}/@home.factory-reset-backup" 2>/dev/null || true
+        fi
         mv "${toplevel}/@home" "${toplevel}/@home.factory-reset-backup"
         btrfs subvolume snapshot "${snap_path}/@home" "${toplevel}/@home"
         info "Rollback @home Timeshift terminé."
@@ -480,14 +499,14 @@ main() {
     cd /root
 
     # Résumé de ce qui va se passer
-    printf "${BOLD}Ce script va :${NC}\n"
+    printf "%bCe script va :%b\n" "${BOLD}" "${NC}"
     if [[ "${BTRFS_ONLY}" != true ]]; then
-        printf "  ${RED}✗${NC} Détruire le pool ZFS '${POOL}' (TOUTES les données)\n"
-        printf "  ${RED}✗${NC} Recréer des tables GPT vierges sur les disques mirror\n"
-        printf "  ${RED}✗${NC} Supprimer les keyfiles et services systemd ZFS\n"
+        printf "  %b✗%b Détruire le pool ZFS '%s' (TOUTES les données)\n" "${RED}" "${NC}" "${POOL}"
+        printf "  %b✗%b Recréer des tables GPT vierges sur les disques mirror\n" "${RED}" "${NC}"
+        printf "  %b✗%b Supprimer les keyfiles et services systemd ZFS\n" "${RED}" "${NC}"
     fi
     if [[ "${ZFS_ONLY}" != true ]]; then
-        printf "  ${RED}✗${NC} Rollback btrfs vers le premier snapshot (fresh install)\n"
+        printf "  %b✗%b Rollback btrfs vers le premier snapshot (fresh install)\n" "${RED}" "${NC}"
     fi
     echo ""
 
