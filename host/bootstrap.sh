@@ -20,16 +20,22 @@
 # Options :
 #   --skip-nvidia         Ne pas vérifier le driver NVIDIA
 #   --skip-toram          Ne pas configurer le mode toram
+#   --force-toram         Forcer la reconstruction complète du toram
 #   --skip-zfs-pool       Ne pas créer/recréer le pool ZFS
 #   --skip-incus          Ne pas configurer Incus
 #   --zfs-passphrase      Lire la passphrase depuis stdin (non interactif)
-#   --zfs-disk1 <by-id>   Disque ZFS mirror leg 1 (obligatoire si pool à créer)
-#   --zfs-disk2 <by-id>   Disque ZFS mirror leg 2 (obligatoire si pool à créer)
+#   --zfs-disk1 <disque>  Disque ZFS mirror leg 1 (obligatoire si pool à créer)
+#                         Accepte : by-id nu, chemin complet, ou /dev/nvmeXnY
+#   --zfs-disk2 <disque>  Disque ZFS mirror leg 2 (obligatoire si pool à créer)
 #
 # Ce script est idempotent : il peut être relancé sans danger.
 # Shellcheck clean : shellcheck -o all bootstrap.sh
 
 set -euo pipefail
+
+# Chemin absolu du script, capturé AVANT le cd /root
+# (sinon les chemins relatifs dans BASH_SOURCE[0] sont résolus depuis /root).
+SCRIPT_REAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Toujours travailler depuis un répertoire stable (btrfs rootfs).
 # Les montages ZFS (ex: tank/_home → /home) peuvent invalider le cwd.
@@ -45,6 +51,10 @@ readonly ZFS_KEY_DIR="/etc/zfs"
 readonly ZFS_KEY_FILE="${ZFS_KEY_DIR}/tank.key"       # 32 bytes raw
 readonly ZFS_KEY_ENC="${ZFS_KEY_DIR}/tank.key.enc"    # backup chiffré (passphrase)
 
+# Chemin du repo source (celui d'où tourne ce script).
+# Calculé une fois, avant que mount_zfs_home ne masque /home btrfs.
+BOOTSTRAP_REPO_DIR=""
+
 # Couleurs
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -55,6 +65,7 @@ readonly NC='\033[0m'
 # Flags
 SKIP_NVIDIA=false
 SKIP_TORAM=false
+FORCE_TORAM=false
 SKIP_ZFS_POOL=false
 SKIP_INCUS=false
 PASSPHRASE_STDIN=false
@@ -74,14 +85,15 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --skip-nvidia)       SKIP_NVIDIA=true; shift ;;
         --skip-toram)        SKIP_TORAM=true; shift ;;
+        --force-toram)       FORCE_TORAM=true; shift ;;
         --skip-zfs-pool)     SKIP_ZFS_POOL=true; shift ;;
         --skip-incus)        SKIP_INCUS=true; shift ;;
         --zfs-passphrase)    PASSPHRASE_STDIN=true; shift ;;
         --zfs-disk1)
-            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk1 nécessite un by-id.\n" >&2; exit 1; }
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk1 nécessite un disque.\n" >&2; exit 1; }
             ZFS_DISK_1="$2"; shift 2 ;;
         --zfs-disk2)
-            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk2 nécessite un by-id.\n" >&2; exit 1; }
+            [[ -z "${2:-}" ]] && { printf "Erreur : --zfs-disk2 nécessite un disque.\n" >&2; exit 1; }
             ZFS_DISK_2="$2"; shift 2 ;;
         -h|--help)
             sed -n '2,/^$/s/^# \?//p' "$0"
@@ -253,9 +265,9 @@ install_packages_debian() {
         "linux-headers-$(uname -r)" \
         > /dev/null
 
-    # ZFS
+    # ZFS (userspace + DKMS pour les kernels non-stock)
     if ! command -v zfs &> /dev/null; then
-        apt-get install -y -qq zfsutils-linux > /dev/null
+        apt-get install -y -qq zfsutils-linux zfs-dkms > /dev/null
     fi
 
     # Charger le module ZFS
@@ -292,19 +304,50 @@ create_zfs_pool() {
     # Vérifier que les disques sont spécifiés
     if [[ -z "${ZFS_DISK_1}" || -z "${ZFS_DISK_2}" ]]; then
         error "Disques ZFS non spécifiés."
-        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id."
+        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id ou chemins complets."
+        error "Exemples :"
+        error "  --zfs-disk1 nvme-Corsair_MP600_XXX          (by-id, recommandé)"
+        error "  --zfs-disk1 /dev/disk/by-id/nvme-Corsair_XXX (chemin complet by-id)"
+        error "  --zfs-disk1 /dev/nvme0n1                     (chemin classique)"
+        error ""
         error "Disques disponibles :"
         ls /dev/disk/by-id/nvme-* 2>/dev/null | head -20 || true
         exit 1
     fi
 
-    # Vérifier que les disques existent
-    for disk in "${ZFS_DISK_1}" "${ZFS_DISK_2}"; do
-        if [[ ! -e "/dev/disk/by-id/${disk}" ]]; then
-            error "Disque introuvable : /dev/disk/by-id/${disk}"
-            exit 1
+    # Résoudre les chemins de disques : accepter by-id nu, chemin complet,
+    # ou device classique (/dev/nvmeXnY, /dev/sdX)
+    resolve_disk_path() {
+        local disk="$1"
+        if [[ -e "${disk}" ]]; then
+            # Chemin complet valide (/dev/nvme0n1, /dev/disk/by-id/xxx, etc.)
+            echo "${disk}"
+        elif [[ -e "/dev/disk/by-id/${disk}" ]]; then
+            # Nom by-id nu (sans préfixe)
+            echo "/dev/disk/by-id/${disk}"
+        else
+            echo ""
         fi
-    done
+    }
+
+    local disk1_path disk2_path
+    disk1_path=$(resolve_disk_path "${ZFS_DISK_1}")
+    disk2_path=$(resolve_disk_path "${ZFS_DISK_2}")
+
+    if [[ -z "${disk1_path}" ]]; then
+        error "Disque 1 introuvable : ${ZFS_DISK_1}"
+        error "Essayé : ${ZFS_DISK_1} et /dev/disk/by-id/${ZFS_DISK_1}"
+        exit 1
+    fi
+    if [[ -z "${disk2_path}" ]]; then
+        error "Disque 2 introuvable : ${ZFS_DISK_2}"
+        error "Essayé : ${ZFS_DISK_2} et /dev/disk/by-id/${ZFS_DISK_2}"
+        exit 1
+    fi
+
+    # Mettre à jour les variables pour la création du pool
+    ZFS_DISK_1="${disk1_path}"
+    ZFS_DISK_2="${disk2_path}"
 
     info "Création du pool ZFS '${POOL}' (mirror, chiffré AES-256-GCM)..."
 
@@ -341,8 +384,8 @@ create_zfs_pool() {
         -O keylocation="file://${ZFS_KEY_FILE}" \
         -O mountpoint=none \
         "${POOL}" mirror \
-        "/dev/disk/by-id/${ZFS_DISK_1}" \
-        "/dev/disk/by-id/${ZFS_DISK_2}"
+        "${ZFS_DISK_1}" \
+        "${ZFS_DISK_2}"
 
     info "Pool '${POOL}' créé (mirror, chiffré, keyformat=raw)."
 }
@@ -577,6 +620,8 @@ DefaultDependencies=no
 Before=zfs-mount.service
 After=zfs-import.target
 ConditionPathExists=/dev/zfs
+# Ne jamais causer un emergency mode si le déverrouillage échoue
+FailureAction=none
 
 [Service]
 Type=oneshot
@@ -585,6 +630,8 @@ ExecStart=/usr/local/bin/zfs-unlock-tank
 StandardInput=tty-force
 StandardOutput=journal+console
 StandardError=journal+console
+# Timeout pour ne pas bloquer le boot indéfiniment sur la passphrase
+TimeoutStartSec=120
 
 [Install]
 WantedBy=zfs-mount.service
@@ -600,6 +647,21 @@ After=zfs-mount.service
 Requires=zfs-mount.service
 DROPIN
     info "Drop-in Incus after-zfs.conf installé."
+
+    # --- Drop-in zfs-mount : ne pas causer d'emergency mode ---
+    local zfs_mount_dropin="/etc/systemd/system/zfs-mount.service.d"
+    mkdir -p "${zfs_mount_dropin}"
+    cat > "${zfs_mount_dropin}/no-emergency.conf" << 'DROPIN'
+[Unit]
+# Empêcher le montage ZFS de bloquer le boot en emergency mode.
+# Si ZFS échoue, le système démarre quand même (dégradé mais accessible).
+FailureAction=none
+
+[Service]
+# Empêcher zfs mount -a de bloquer si un dataset est stuck
+TimeoutStartSec=90
+DROPIN
+    info "Drop-in zfs-mount no-emergency.conf installé."
 
     # --- Activation ---
     systemctl daemon-reload
@@ -794,7 +856,7 @@ CONF
             if [[ "${DISTRO_FAMILY}" == "debian" ]]; then
                 update-initramfs -u 2>/dev/null || true
             else
-                mkinitcpio -P 2>/dev/null || true
+                regenerate_initramfs 2>/dev/null || true
             fi
             info "Module nouveau blacklisté."
         fi
@@ -839,12 +901,39 @@ setup_toram() {
     step "Configuration du mode toram"
 
     if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        setup_toram_mkinitcpio
+        if command -v dracut &> /dev/null; then
+            setup_toram_dracut
+        elif command -v mkinitcpio &> /dev/null; then
+            setup_toram_mkinitcpio
+        else
+            error "Aucun générateur d'initramfs trouvé (mkinitcpio ou dracut)."
+            return 1
+        fi
     else
         setup_toram_initramfs
     fi
 
     info "Mode toram OK."
+}
+
+# Régénère l'initramfs avec le bon outil :
+#   1. limine-mkinitcpio si présent (CachyOS + Limine : gère les chemins /boot/<machine-id>/)
+#   2. mkinitcpio -P sinon (Arch standard)
+#   3. dracut --force (Fedora, CachyOS avec dracut)
+regenerate_initramfs() {
+    if command -v limine-mkinitcpio &> /dev/null; then
+        limine-mkinitcpio
+        info "Initramfs regénéré via limine-mkinitcpio."
+    elif command -v mkinitcpio &> /dev/null; then
+        mkinitcpio -P
+        info "Initramfs regénéré via mkinitcpio -P."
+    elif command -v dracut &> /dev/null; then
+        dracut --force
+        info "Initramfs regénéré via dracut."
+    else
+        warn "Aucun outil de génération d'initramfs trouvé."
+        return 1
+    fi
 }
 
 # --- Arch / CachyOS : mkinitcpio + Limine/GRUB ---
@@ -854,46 +943,125 @@ setup_toram_mkinitcpio() {
     cat > "${hook_install}" << 'EOF'
 #!/bin/bash
 build() {
+    add_module overlay
     add_runscript
 }
 
 help() {
     cat <<HELPEOF
 Enables toram overlay when BOOT_MODE=toram is on the kernel cmdline.
+Loads the overlay kernel module and sets up a tmpfs-backed overlayfs
+so that all writes go to RAM, leaving the root filesystem immutable.
 HELPEOF
 }
 EOF
     chmod +x "${hook_install}"
 
-    # Hook mkinitcpio (runtime)
+    # Hook mkinitcpio (runtime — latehook, après montage racine sur /new_root)
     local hook_runtime="/usr/lib/initcpio/hooks/toram"
     cat > "${hook_runtime}" << 'EOF'
 #!/usr/bin/ash
-run_hook() {
+run_latehook() {
     grep -q "BOOT_MODE=toram" /proc/cmdline || return
 
     mkdir -p /mnt/lower /mnt/upper-tmpfs
-    mount -o remount,ro "$root"
-    mount -o move "$root" /mnt/lower
+    mount -o remount,ro /new_root
+    mount -o move /new_root /mnt/lower
     mount -t tmpfs -o size=80% tmpfs /mnt/upper-tmpfs
     mkdir -p /mnt/upper-tmpfs/upper /mnt/upper-tmpfs/work
     mount -t overlay overlay \
         -o "lowerdir=/mnt/lower,upperdir=/mnt/upper-tmpfs/upper,workdir=/mnt/upper-tmpfs/work" \
-        "$root"
-    mkdir -p "${root}/mnt/rootfs-disk"
-    mount -o move /mnt/lower "${root}/mnt/rootfs-disk"
+        /new_root
+    mkdir -p /new_root/mnt/rootfs-disk
+    mount -o move /mnt/lower /new_root/mnt/rootfs-disk
 }
 EOF
     chmod +x "${hook_runtime}"
     info "Hooks mkinitcpio toram installés."
 
-    # Ajouter à HOOKS si absent
+    # Ajouter à HOOKS si absent (après filesystems — c'est un latehook)
+    local need_regen=false
     if ! grep -q "toram" /etc/mkinitcpio.conf; then
-        sed -i 's/\(HOOKS=.*\)filesystems/\1toram filesystems/' /etc/mkinitcpio.conf
-        mkinitcpio -P
-        info "mkinitcpio regénéré avec hook toram."
+        sed -i 's/\(HOOKS=.*filesystems\)/\1 toram/' /etc/mkinitcpio.conf
+        need_regen=true
+        info "Hook toram ajouté après filesystems."
+    elif grep -q 'toram filesystems' /etc/mkinitcpio.conf; then
+        # Si toram est AVANT filesystems (ancienne version), corriger
+        sed -i 's/toram filesystems/filesystems toram/' /etc/mkinitcpio.conf
+        need_regen=true
+        info "Position du hook toram corrigée (déplacé après filesystems)."
     else
-        info "Hook toram déjà dans mkinitcpio.conf."
+        info "Hook toram déjà dans mkinitcpio.conf (position correcte)."
+    fi
+
+    if [[ "${need_regen}" == true ]] || [[ "${FORCE_TORAM}" == true ]]; then
+        regenerate_initramfs
+    fi
+
+    # Entrée bootloader (Limine si présent, sinon GRUB)
+    if [[ -f "/boot/limine.conf" ]]; then
+        setup_toram_limine
+    elif command -v grub-mkconfig &> /dev/null; then
+        setup_toram_grub
+    else
+        warn "Aucun bootloader supporté détecté pour l'entrée toram."
+    fi
+}
+
+# --- Arch / CachyOS : dracut + Limine/GRUB ---
+setup_toram_dracut() {
+    local module_dir="/usr/lib/dracut/modules.d/90toram"
+    mkdir -p "${module_dir}"
+
+    # module-setup.sh — déclare le module dracut
+    cat > "${module_dir}/module-setup.sh" << 'EOF'
+#!/bin/bash
+check() { return 0; }
+depends() { return 0; }
+install() {
+    inst_hook pre-pivot 90 "$moddir/toram-overlay.sh"
+    instmods overlay
+}
+EOF
+    chmod +x "${module_dir}/module-setup.sh"
+
+    # Script overlay (pre-pivot = après montage racine sur $NEWROOT)
+    cat > "${module_dir}/toram-overlay.sh" << 'EOF'
+#!/bin/sh
+grep -q "BOOT_MODE=toram" /proc/cmdline || exit 0
+
+NEWROOT="${NEWROOT:-/sysroot}"
+
+mkdir -p /mnt/lower /mnt/upper-tmpfs
+mount -o remount,ro "${NEWROOT}"
+mount -o move "${NEWROOT}" /mnt/lower
+mount -t tmpfs -o size=80% tmpfs /mnt/upper-tmpfs
+mkdir -p /mnt/upper-tmpfs/upper /mnt/upper-tmpfs/work
+mount -t overlay overlay \
+    -o "lowerdir=/mnt/lower,upperdir=/mnt/upper-tmpfs/upper,workdir=/mnt/upper-tmpfs/work" \
+    "${NEWROOT}"
+mkdir -p "${NEWROOT}/mnt/rootfs-disk"
+mount -o move /mnt/lower "${NEWROOT}/mnt/rootfs-disk"
+EOF
+    chmod +x "${module_dir}/toram-overlay.sh"
+    info "Module dracut toram installé dans ${module_dir}."
+
+    # Ajouter le module toram à la config dracut
+    local dracut_conf="/etc/dracut.conf.d/toram.conf"
+    local need_regen=false
+    if [[ ! -f "${dracut_conf}" ]] || [[ "${FORCE_TORAM}" == true ]]; then
+        cat > "${dracut_conf}" << 'CONF'
+# Module toram overlay (AnKLuMe)
+add_dracutmodules+=" toram "
+CONF
+        info "Config dracut toram ajoutée."
+        need_regen=true
+    else
+        info "Config dracut toram déjà présente."
+    fi
+
+    if [[ "${need_regen}" == true ]] || [[ "${FORCE_TORAM}" == true ]]; then
+        regenerate_initramfs
     fi
 
     # Entrée bootloader (Limine si présent, sinon GRUB)
@@ -909,9 +1077,16 @@ EOF
 setup_toram_limine() {
     local limine_conf="/boot/limine.conf"
 
-    if grep -q "BOOT_MODE=toram" "${limine_conf}"; then
+    if grep -q "BOOT_MODE=toram" "${limine_conf}" && [[ "${FORCE_TORAM}" != true ]]; then
         info "Entrée Limine toram existe déjà."
         return
+    fi
+
+    # En mode force, supprimer l'ancienne entrée toram avant de recréer
+    if [[ "${FORCE_TORAM}" == true ]] && grep -q "toram -- immutable" "${limine_conf}"; then
+        info "Mode force : suppression de l'ancienne entrée Limine toram."
+        # Supprimer le bloc : de "/...toram -- immutable)" jusqu'à la prochaine ligne vide ou fin
+        sed -i '/toram -- immutable/,/^$/d' "${limine_conf}"
     fi
 
     local luks_uuid luks_name root_subvol
@@ -955,7 +1130,7 @@ ENTRY
 # --- Debian : initramfs-tools + GRUB ---
 setup_toram_initramfs() {
     local hook="/etc/initramfs-tools/scripts/init-bottom/toram"
-    if [[ ! -f "${hook}" ]]; then
+    if [[ ! -f "${hook}" ]] || [[ "${FORCE_TORAM}" == true ]]; then
         cat > "${hook}" << 'HOOK'
 #!/bin/sh
 PREREQ=""
@@ -963,6 +1138,8 @@ prereqs() { echo "$PREREQ"; }
 case $1 in prereqs) prereqs; exit 0;; esac
 
 grep -q "BOOT_MODE=toram" /proc/cmdline || exit 0
+
+modprobe overlay 2>/dev/null || true
 
 mkdir -p /mnt/lower /mnt/upper-tmpfs
 mount -o remount,ro "${rootmnt}"
@@ -979,6 +1156,12 @@ HOOK
         info "Hook initramfs toram installé."
     fi
 
+    # S'assurer que le module overlay est inclus dans l'initramfs
+    if ! grep -q "^overlay$" /etc/initramfs-tools/modules 2>/dev/null; then
+        echo "overlay" >> /etc/initramfs-tools/modules
+        info "Module overlay ajouté à /etc/initramfs-tools/modules."
+    fi
+
     update-initramfs -u
     setup_toram_grub
 }
@@ -986,7 +1169,7 @@ HOOK
 setup_toram_grub() {
     local grub_entry="/etc/grub.d/42_toram"
 
-    if [[ -f "${grub_entry}" ]]; then
+    if [[ -f "${grub_entry}" ]] && [[ "${FORCE_TORAM}" != true ]]; then
         info "Entrée GRUB toram existe déjà."
         return
     fi
@@ -998,7 +1181,10 @@ setup_toram_grub() {
         rootflags=" rootflags=subvol=${root_subvol}"
     fi
 
-    local menu_label="$(. /etc/os-release && echo "${NAME:-Linux}") (toram -- immutable)"
+    local os_name
+    # shellcheck source=/dev/null
+    os_name="$(. /etc/os-release && echo "${NAME:-Linux}")"
+    local menu_label="${os_name} (toram -- immutable)"
 
     cat > "${grub_entry}" << GRUB
 #!/bin/sh
@@ -1012,6 +1198,38 @@ GRUB
     chmod +x "${grub_entry}"
     update-grub 2>/dev/null || grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
     info "Entrée GRUB toram ajoutée."
+}
+
+# ---------------------------------------------------------------------------
+# 7b. Sauvegarde du repo source avant montage ZFS
+# ---------------------------------------------------------------------------
+
+save_repo_source() {
+    step "Sauvegarde du dépôt source"
+
+    # Le script tourne depuis host/bootstrap.sh → le repo est le parent
+    # SCRIPT_REAL_DIR a été capturé au lancement, avant cd /root.
+    local repo_dir
+    repo_dir=$(cd "${SCRIPT_REAL_DIR}/.." && pwd)
+
+    if [[ ! -f "${repo_dir}/pyproject.toml" ]]; then
+        warn "Repo source introuvable (${repo_dir}). Le clone sera fait depuis GitHub."
+        return
+    fi
+
+    # Si le repo est sous /home, il sera masqué par le montage ZFS.
+    # Le copier dans /tmp pour pouvoir le restaurer après.
+    # Si le repo est ailleurs (/root, /opt, etc.), pas besoin de copier.
+    if [[ "${repo_dir}" == /home/* ]]; then
+        local tmp_repo="/tmp/anklume-repo-backup"
+        rm -rf "${tmp_repo}"
+        cp -a "${repo_dir}" "${tmp_repo}"
+        BOOTSTRAP_REPO_DIR="${tmp_repo}"
+        info "Repo sauvegardé dans ${tmp_repo} (source : ${repo_dir})"
+    else
+        BOOTSTRAP_REPO_DIR="${repo_dir}"
+        info "Repo source : ${repo_dir} (pas sous /home, pas besoin de sauvegarde)"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -1029,9 +1247,18 @@ install_anklume() {
         user_home=$(getent passwd "${main_user}" | cut -d: -f6)
     fi
 
-    # S'assurer que uv est dans le PATH pour l'utilisateur
+    if [[ -z "${user_home}" || -z "${main_user}" ]]; then
+        warn "Impossible de déterminer l'utilisateur principal."
+        return
+    fi
+
+    local user_uid user_gid
+    user_uid=$(id -u "${main_user}")
+    user_gid=$(id -g "${main_user}")
+
+    # --- 1. uv pour l'utilisateur ---
     local uv_bin=""
-    if [[ -n "${user_home}" && -x "${user_home}/.local/bin/uv" ]]; then
+    if [[ -x "${user_home}/.local/bin/uv" ]]; then
         uv_bin="${user_home}/.local/bin/uv"
     elif command -v uv &> /dev/null; then
         uv_bin=$(command -v uv)
@@ -1039,32 +1266,72 @@ install_anklume() {
         uv_bin="/root/.local/bin/uv"
     fi
 
-    # Installer uv pour l'utilisateur s'il ne l'a pas encore
-    if [[ -n "${main_user}" && "${main_user}" != "root" ]]; then
-        if [[ ! -x "${user_home}/.local/bin/uv" ]]; then
-            su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
-            uv_bin="${user_home}/.local/bin/uv"
-            info "uv installé pour ${main_user}."
-        fi
+    if [[ "${main_user}" != "root" && ! -x "${user_home}/.local/bin/uv" ]]; then
+        su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
+        uv_bin="${user_home}/.local/bin/uv"
+        info "uv installé pour ${main_user}."
     fi
 
-    # Installer anklume via uv tool (en tant qu'utilisateur)
-    if [[ -n "${main_user}" && "${main_user}" != "root" && -n "${uv_bin}" ]]; then
-        if su - "${main_user}" -c "${uv_bin} tool install anklume" 2>/dev/null; then
-            info "anklume installé via uv pour ${main_user}."
-        else
-            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
-            warn "  ${uv_bin} tool install anklume"
+    # --- 2. Dépôt AnKLuMe dans la home ZFS ---
+    # Après le montage ZFS, le repo btrfs est masqué.
+    # On utilise le repo sauvegardé par save_repo_source() (dans /tmp)
+    # ou le repo déjà présent dans la home ZFS (re-bootstrap).
+    local anklume_dir="${user_home}/AnKLuMe"
+
+    if [[ -d "${anklume_dir}/.git" ]]; then
+        # Déjà présent dans la home ZFS → pull pour MAJ
+        info "Dépôt AnKLuMe existant dans ${anklume_dir}, mise à jour..."
+        su - "${main_user}" -c "cd '${anklume_dir}' && git pull --ff-only" 2>/dev/null || {
+            warn "git pull échoué (modifications locales ?). Dépôt conservé tel quel."
+        }
+    elif [[ -n "${BOOTSTRAP_REPO_DIR}" && -d "${BOOTSTRAP_REPO_DIR}/.git" ]]; then
+        # Copier depuis la sauvegarde /tmp (repo source sauvé avant montage ZFS)
+        info "Restauration du dépôt depuis ${BOOTSTRAP_REPO_DIR}..."
+        cp -a "${BOOTSTRAP_REPO_DIR}" "${anklume_dir}"
+        chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
+        info "Dépôt restauré dans ${anklume_dir}"
+        # Nettoyage de la copie temporaire
+        if [[ "${BOOTSTRAP_REPO_DIR}" == /tmp/* ]]; then
+            rm -rf "${BOOTSTRAP_REPO_DIR}"
         fi
-    elif [[ -n "${uv_bin}" ]]; then
-        if "${uv_bin}" tool install anklume 2>/dev/null; then
-            info "anklume installé via uv."
-        else
-            warn "anklume pas encore publié sur PyPI. Installation manuelle requise."
-        fi
+    else
+        # Dernier recours : cloner depuis GitHub
+        warn "Repo source introuvable. Clonage depuis GitHub..."
+        su - "${main_user}" -c \
+            "git clone https://github.com/jmchantrein/AnKLuMe.git '${anklume_dir}'" 2>/dev/null || {
+            error "git clone échoué. Installer manuellement :"
+            error "  git clone https://github.com/jmchantrein/AnKLuMe.git ${anklume_dir}"
+            error "  cd ${anklume_dir} && uv tool install --with textual ."
+            return
+        }
     fi
 
-    # Configurer PATH + alias ank pour tous les shells
+    # Fixer les droits
+    if [[ -d "${anklume_dir}" ]]; then
+        chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
+    fi
+
+    # --- 3. Installer la CLI via uv depuis le repo local ---
+    if [[ -n "${uv_bin}" && -d "${anklume_dir}" && ! -f "${anklume_dir}/pyproject.toml" ]]; then
+        warn "pyproject.toml introuvable dans ${anklume_dir}. Installation CLI ignorée."
+    elif [[ -n "${uv_bin}" && -d "${anklume_dir}" ]]; then
+        info "Installation de la CLI anklume depuis ${anklume_dir}..."
+        if [[ "${main_user}" != "root" ]]; then
+            su - "${main_user}" -c \
+                "${uv_bin} tool install --force --with textual '${anklume_dir}'" || {
+                warn "Installation CLI échouée. Installer manuellement :"
+                warn "  cd ${anklume_dir} && uv tool install --with textual ."
+            }
+        else
+            "${uv_bin}" tool install --force --with textual "${anklume_dir}" || {
+                warn "Installation CLI échouée."
+            }
+        fi
+    else
+        warn "uv ou repo local absent. Installation CLI ignorée."
+    fi
+
+    # --- 4. PATH + alias ank ---
     setup_shell_integration "${main_user}" "${user_home}"
 
     info "AnKLuMe OK."
@@ -1078,8 +1345,6 @@ setup_shell_integration() {
         warn "Impossible de déterminer le home de l'utilisateur."
         return
     fi
-
-    local local_bin="${user_home}/.local/bin"
 
     # Bloc à injecter dans bash/zsh
     local shell_block
@@ -1220,14 +1485,22 @@ main() {
     setup_incus
     setup_nvidia
     setup_toram          # mkinitcpio/initramfs tourne ici — /home doit être btrfs
+    save_repo_source     # sauvegarder le repo dans /tmp AVANT que ZFS masque /home
     mount_zfs_home       # maintenant on peut masquer /home btrfs par ZFS
     install_anklume
     summary
 
     info "Bootstrap terminé."
     echo ""
+    warn "IMPORTANT : un redémarrage est nécessaire."
+    echo ""
+    echo "Le montage ZFS sur /home a remplacé le contenu btrfs d'origine."
+    echo "Au redémarrage, systemd recréera les répertoires utilisateur"
+    echo "standard (Desktop, Documents, etc.) et le shell sera correctement"
+    echo "initialisé avec le PATH et les alias."
+    echo ""
     echo "Prochaines étapes :"
-    echo "  1. Se reloguer (groupe incus-admin + alias ank)"
+    echo "  1. sudo reboot"
     echo "  2. anklume init mon-infra && cd mon-infra"
     echo "  3. anklume tui"
     echo "  4. anklume apply all"
