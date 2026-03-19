@@ -412,15 +412,15 @@ create_zfs_pool() {
         done
 
         if [[ -n "${by_id_match}" ]]; then
-            info "  ${input} → ${by_id_match}"
+            info "  ${input} → ${by_id_match}" >&2
             echo "${by_id_match}"
         elif [[ -n "${by_id_fallback}" ]]; then
-            info "  ${input} → ${by_id_fallback}"
+            info "  ${input} → ${by_id_fallback}" >&2
             echo "${by_id_fallback}"
         else
             # Pas de lien by-id trouvé (rare). Utiliser le chemin brut avec avertissement.
-            warn "  ${input} : aucun lien by-id trouvé. Utilisation du chemin brut."
-            warn "  Le pool pourrait ne pas s'importer si l'ordre des disques change."
+            warn "  ${input} : aucun lien by-id trouvé. Utilisation du chemin brut." >&2
+            warn "  Le pool pourrait ne pas s'importer si l'ordre des disques change." >&2
             echo "${resolved}"
         fi
     }
