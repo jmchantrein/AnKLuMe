@@ -5,7 +5,7 @@
 # système (pas de ZFS, pas de toram, pas de partitionnement).
 # Installe uniquement : Incus + uv + AnKLuMe + alias ank.
 #
-# Distributions supportées : CachyOS, Arch, Debian 13+
+# Distributions supportées : Arch Linux, Debian 13+
 #
 # Usage :
 #   sudo ./quickstart.sh [options]
@@ -84,10 +84,6 @@ detect_distro() {
     source /etc/os-release
 
     case "${ID:-}" in
-        cachyos)
-            DISTRO="cachyos"
-            DISTRO_FAMILY="arch"
-            ;;
         arch|endeavouros|manjaro)
             DISTRO="arch"
             DISTRO_FAMILY="arch"
@@ -98,7 +94,7 @@ detect_distro() {
             ;;
         *)
             error "Distribution '${ID:-inconnue}' non supportée."
-            error "Distributions supportées : CachyOS, Arch, Debian."
+            error "Distributions supportées : Arch Linux, Debian."
             exit 1
             ;;
     esac
@@ -275,7 +271,7 @@ install_nvidia_standard() {
 
 install_nvidia_blackwell() {
     if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        # CachyOS/Arch : le driver 570+ est dans les dépôts
+        # Arch : le driver 570+ est dans les dépôts
         info "Installation via pacman (nvidia-open-dkms, 570+)..."
         pacman -S --noconfirm --needed \
             nvidia-open-dkms nvidia-utils > /dev/null 2>&1
