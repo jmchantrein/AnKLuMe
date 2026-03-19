@@ -29,11 +29,14 @@ from anklume.engine.resources import (
 # ---------------------------------------------------------------------------
 
 
-def _machine(name: str, weight: int = 1, config: dict | None = None) -> Machine:
+def _machine(
+    name: str, weight: int = 1, config: dict | None = None, type: str = "lxc",
+) -> Machine:
     return Machine(
         name=name,
         full_name=f"dom-{name}",
         description=f"Machine {name}",
+        type=type,
         weight=weight,
         config=config or {},
     )
@@ -396,6 +399,48 @@ class TestMemoryEnforce:
         infra = _infra(machines, policy)
         allocs = compute_resource_allocation(infra, _hw())
         assert allocs[0].memory_key == "limits.memory"
+
+    def test_vm_forces_hard_memory_key(self):
+        """Les VMs ne supportent pas limits.memory.soft, on force limits.memory."""
+        machines = [_machine("vm1", type="vm")]
+        policy = ResourcePolicyConfig(
+            host_reserve_cpu="0%",
+            host_reserve_memory="0%",
+            memory_enforce="soft",
+        )
+        infra = _infra(machines, policy)
+        allocs = compute_resource_allocation(infra, _hw())
+        assert allocs[0].memory_key == "limits.memory"
+
+    def test_vm_forces_cpu_pin_key(self):
+        """Les VMs ne supportent pas limits.cpu.allowance, on force limits.cpu."""
+        machines = [_machine("vm1", type="vm")]
+        policy = ResourcePolicyConfig(
+            host_reserve_cpu="0%",
+            host_reserve_memory="0%",
+            cpu_mode="allowance",
+        )
+        infra = _infra(machines, policy)
+        allocs = compute_resource_allocation(infra, _hw())
+        assert allocs[0].cpu_key == "limits.cpu"
+
+    def test_mixed_vm_and_container(self):
+        """VM utilise limits.memory, container utilise limits.memory.soft."""
+        machines = [_machine("ct1"), _machine("vm1", type="vm")]
+        policy = ResourcePolicyConfig(
+            host_reserve_cpu="0%",
+            host_reserve_memory="0%",
+            memory_enforce="soft",
+            cpu_mode="allowance",
+        )
+        infra = _infra(machines, policy)
+        allocs = compute_resource_allocation(infra, _hw())
+        ct_alloc = next(a for a in allocs if a.instance_name == "dom-ct1")
+        vm_alloc = next(a for a in allocs if a.instance_name == "dom-vm1")
+        assert ct_alloc.memory_key == "limits.memory.soft"
+        assert vm_alloc.memory_key == "limits.memory"
+        assert ct_alloc.cpu_key == "limits.cpu.allowance"
+        assert vm_alloc.cpu_key == "limits.cpu"
 
     def test_minimum_64mb(self):
         machines = [_machine(f"m{i}") for i in range(1000)]

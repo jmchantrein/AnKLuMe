@@ -199,8 +199,10 @@ def compute_resource_allocation(
             alloc_cpu_key = "limits.cpu"
         else:
             raw_cpu = cpu_parts.get(m.full_name, 0)
-            cpu_val = _format_cpu(raw_cpu, hardware.cpu_threads, policy.cpu_mode)
-            alloc_cpu_key = cpu_key
+            # Les VMs Incus ne supportent pas limits.cpu.allowance (cgroups only)
+            effective_cpu_mode = "pin" if m.type == "vm" else policy.cpu_mode
+            cpu_val = _format_cpu(raw_cpu, hardware.cpu_threads, effective_cpu_mode)
+            alloc_cpu_key = "limits.cpu" if m.type == "vm" else cpu_key
 
         if is_mem_explicit:
             mem_val = m.config["limits.memory"]
@@ -208,7 +210,8 @@ def compute_resource_allocation(
         else:
             raw_mem = mem_parts.get(m.full_name, 0)
             mem_val = _format_memory(raw_mem)
-            alloc_mem_key = mem_key
+            # Les VMs Incus ne supportent pas limits.memory.soft (cgroups only)
+            alloc_mem_key = "limits.memory" if m.type == "vm" else mem_key
 
         source = (
             "explicit"
