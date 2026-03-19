@@ -60,6 +60,14 @@ def run_apply(
     driver = IncusDriver()
     nesting_ctx = detect_nesting_context()
 
+    # Vérifier que le profil default a un root disk (nécessaire sur Incus frais)
+    if not dry_run:
+        try:
+            if driver.ensure_default_root_disk():
+                typer.echo("Profil default : device root disk ajouté automatiquement.")
+        except Exception as e:
+            typer.echo(f"Avertissement root disk : {e}", err=True)
+
     # Pré-fetch des projets existants (un seul appel subprocess pour tout le pipeline)
     existing_projects = {p.name for p in driver.project_list()}
 

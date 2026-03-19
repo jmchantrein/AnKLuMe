@@ -816,6 +816,16 @@ setup_incus() {
         info "Storage pool '${INCUS_STORAGE}' existe déjà."
     fi
 
+    # Root disk dans le profil default → pointe vers le storage pool ZFS.
+    # Sans ça, `incus init` échoue : "Failed detecting root disk device".
+    # `incus admin init --minimal` ne crée pas de device root dans le profil default.
+    if ! incus profile device show default 2>/dev/null | grep -q "path: /"; then
+        incus profile device add default root disk path=/ pool="${INCUS_STORAGE}"
+        info "Device root disk ajouté au profil default (pool ${INCUS_STORAGE})."
+    else
+        info "Profil default : root disk déjà configuré."
+    fi
+
     # Groupe incus-admin
     local main_user
     main_user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
@@ -1208,13 +1218,68 @@ setup_toram_grub() {
         return
     fi
 
+    # --- 1. Détecter le kernel et l'initramfs ---
+    local kernel_path="" initrd_path="" ucode_path=""
+
+    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
+        # Arch : préférer linux-lts (installé par bootstrap), fallback linux
+        if [[ -f /boot/vmlinuz-linux-lts ]]; then
+            kernel_path="/vmlinuz-linux-lts"
+            initrd_path="/initramfs-linux-lts.img"
+        elif [[ -f /boot/vmlinuz-linux ]]; then
+            kernel_path="/vmlinuz-linux"
+            initrd_path="/initramfs-linux.img"
+        fi
+        # Microcode CPU (GRUB charge les initrd dans l'ordre)
+        if [[ -f /boot/intel-ucode.img ]]; then
+            ucode_path="/intel-ucode.img"
+        elif [[ -f /boot/amd-ucode.img ]]; then
+            ucode_path="/amd-ucode.img"
+        fi
+    else
+        # Debian : symlinks standard
+        kernel_path="/vmlinuz"
+        initrd_path="/initrd.img"
+    fi
+
+    if [[ -z "${kernel_path}" ]]; then
+        warn "Kernel introuvable dans /boot/. Entrée GRUB toram non créée."
+        return
+    fi
+
+    # Si /boot est une partition séparée, GRUB voit les fichiers à la racine.
+    # Sinon (/boot sur le rootfs), les chemins sont relatifs à /.
+    # Les chemins /vmlinuz-linux-lts sont déjà relatifs à /boot dans les deux cas
+    # car GRUB utilise son propre root (la partition contenant /boot).
+
+    # --- 2. Paramètres racine ---
     local root_uuid root_subvol rootflags=""
     root_uuid=$(findmnt -no UUID /)
     root_subvol=$(findmnt -no OPTIONS / | grep -oP 'subvol=\K[^,]+' || true)
     if [[ -n "${root_subvol}" ]]; then
-        rootflags=" rootflags=subvol=${root_subvol}"
+        rootflags="rootflags=subvol=${root_subvol}"
     fi
 
+    # --- 3. Paramètres LUKS (cryptdevice, etc.) ---
+    # Lire GRUB_CMDLINE_LINUX depuis /etc/default/grub (contient cryptdevice= sur LUKS)
+    local grub_cmdline_linux=""
+    if [[ -f /etc/default/grub ]]; then
+        # shellcheck source=/dev/null
+        grub_cmdline_linux=$(. /etc/default/grub && echo "${GRUB_CMDLINE_LINUX:-}")
+    fi
+
+    # --- 4. Construire la ligne de commande kernel ---
+    local cmdline="root=UUID=${root_uuid} ro BOOT_MODE=toram"
+    [[ -n "${rootflags}" ]] && cmdline="${cmdline} ${rootflags}"
+    [[ -n "${grub_cmdline_linux}" ]] && cmdline="${cmdline} ${grub_cmdline_linux}"
+
+    # --- 5. Construire la ligne initrd (microcode + initramfs) ---
+    local initrd_line="${initrd_path}"
+    if [[ -n "${ucode_path}" ]]; then
+        initrd_line="${ucode_path} ${initrd_path}"
+    fi
+
+    # --- 6. Générer le script GRUB ---
     local os_name
     # shellcheck source=/dev/null
     os_name="$(. /etc/os-release && echo "${NAME:-Linux}")"
@@ -1224,14 +1289,17 @@ setup_toram_grub() {
 #!/bin/sh
 cat << 'EOF'
 menuentry "${menu_label}" {
-    linux /vmlinuz root=UUID=${root_uuid} ro BOOT_MODE=toram${rootflags}
-    initrd /initrd.img
+    linux ${kernel_path} ${cmdline}
+    initrd ${initrd_line}
 }
 EOF
 GRUB
     chmod +x "${grub_entry}"
     update-grub 2>/dev/null || grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
-    info "Entrée GRUB toram ajoutée."
+    info "Entrée GRUB toram ajoutée :"
+    info "  kernel: ${kernel_path}"
+    info "  initrd: ${initrd_line}"
+    info "  cmdline: ${cmdline}"
 }
 
 # ---------------------------------------------------------------------------

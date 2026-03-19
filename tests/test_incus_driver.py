@@ -378,6 +378,84 @@ class TestSnapshotDelete:
 
 
 # ============================================================
+# ensure_default_root_disk
+# ============================================================
+
+
+class TestEnsureDefaultRootDisk:
+    def test_already_has_root_disk(self, driver: IncusDriver) -> None:
+        """Si le profil default a déjà un root disk, retourne False."""
+        profile_data = {
+            "devices": {
+                "root": {"type": "disk", "path": "/", "pool": "default"},
+            },
+        }
+        with patch("subprocess.run", return_value=_json_ok(profile_data)):
+            assert driver.ensure_default_root_disk() is False
+
+    def test_adds_root_disk_when_missing(self, driver: IncusDriver) -> None:
+        """Si pas de root disk, détecte le pool et ajoute le device."""
+        profile_data = {"devices": {}}
+        pools_data = [{"name": "default"}]
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # profile show
+                return _json_ok(profile_data)
+            elif call_count == 2:
+                # storage list
+                return _json_ok(pools_data)
+            else:
+                # profile device add
+                return _ok()
+
+        with patch("subprocess.run", side_effect=side_effect) as mock:
+            assert driver.ensure_default_root_disk() is True
+
+        # Vérifie que le device add a été appelé
+        last_cmd = mock.call_args_list[-1][0][0]
+        cmd_str = " ".join(last_cmd)
+        assert "profile" in cmd_str
+        assert "device" in cmd_str
+        assert "add" in cmd_str
+        assert "root" in cmd_str
+        assert "disk" in cmd_str
+        assert "path=/" in cmd_str
+        assert "pool=default" in cmd_str
+
+    def test_no_storage_pool_raises(self, driver: IncusDriver) -> None:
+        """Si aucun storage pool, lève IncusError."""
+        profile_data = {"devices": {}}
+        pools_data: list = []
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _json_ok(profile_data)
+            else:
+                return _json_ok(pools_data)
+
+        with patch("subprocess.run", side_effect=side_effect):
+            with pytest.raises(IncusError, match="storage pool"):
+                driver.ensure_default_root_disk()
+
+    def test_root_disk_with_different_device_name(self, driver: IncusDriver) -> None:
+        """Un device disk avec path=/ sous un nom différent de 'root' est accepté."""
+        profile_data = {
+            "devices": {
+                "my-disk": {"type": "disk", "path": "/", "pool": "zfs-pool"},
+            },
+        }
+        with patch("subprocess.run", return_value=_json_ok(profile_data)):
+            assert driver.ensure_default_root_disk() is False
+
+
+# ============================================================
 # IncusError
 # ============================================================
 

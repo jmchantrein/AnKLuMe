@@ -283,6 +283,45 @@ class IncusDriver:
         """Supprime un profil d'un projet."""
         self._run(["profile", "delete", name, "--project", project])
 
+    def profile_show(self, name: str, project: str = "default") -> dict:
+        """Retourne la config complète d'un profil (JSON)."""
+        return self._run_json(["profile", "show", name, "--project", project])
+
+    def storage_pool_list(self) -> list[str]:
+        """Liste les noms des storage pools."""
+        data = self._run_json(["storage", "list"])
+        return [p["name"] for p in data]
+
+    def ensure_default_root_disk(self) -> bool:
+        """Vérifie que le profil default a un device root disk.
+
+        Si absent, détecte le premier storage pool et l'ajoute.
+        Retourne True si le device a été ajouté, False s'il existait déjà.
+        """
+        profile = self.profile_show("default")
+        devices = profile.get("devices", {})
+
+        # Chercher un device de type disk avec path=/
+        for _name, dev in devices.items():
+            if dev.get("type") == "disk" and dev.get("path") == "/":
+                return False
+
+        # Pas de root disk — trouver le pool par défaut
+        pools = self.storage_pool_list()
+        if not pools:
+            raise IncusError(
+                ["incus", "storage", "list"], 1,
+                "Aucun storage pool configuré. Lancez `incus admin init`.",
+            )
+
+        pool = pools[0]
+        self.profile_device_add(
+            "default", "root", "disk",
+            {"path": "/", "pool": pool},
+            project="default",
+        )
+        return True
+
     # --- Info ---
 
     def host_resources(self) -> dict:
