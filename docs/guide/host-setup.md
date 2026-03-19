@@ -93,10 +93,10 @@ ZFS chiffré en mirror, systemd, GPU, toram optionnel, AnKLuMe.
 
 ### Choix de la distribution
 
-| Distribution | GPU récent (Blackwell) | Remarques |
-|---|---|---|
-| **Arch Linux** | `nvidia-open` dans les dépôts | Recommandé pour le matériel récent (GPU, NVMe) |
-| **Debian 13+** | `.run` NVIDIA nécessaire | Recommandé sinon — stable, prévisible |
+| Distribution | GPU récent (Blackwell) | ZFS | Remarques |
+|---|---|---|---|
+| **Arch Linux** | `nvidia-open` dans les dépôts | Dépôt [archzfs](https://github.com/archzfs/archzfs) (auto-configuré) | Recommandé pour le matériel récent |
+| **Debian 13+** | `.run` NVIDIA nécessaire | `zfsutils-linux` dans les dépôts | Recommandé sinon — stable, prévisible |
 
 **Arch Linux** est recommandé quand le matériel est récent (GPU NVIDIA
 Blackwell RTX 50xx, NVMe récents). Le kernel rolling fournit les
@@ -106,10 +106,20 @@ drivers nécessaires (`nvidia-open`) directement dans les dépôts.
 stabilité prime. Le kernel stock peut être trop ancien pour les GPU
 Blackwell, nécessitant le driver `.run` NVIDIA.
 
+!!! note "ZFS sur Arch Linux"
+    ZFS n'est pas dans les dépôts officiels d'Arch (incompatibilité
+    de licence CDDL/GPL). Le bootstrap configure automatiquement le
+    dépôt [archzfs](https://github.com/archzfs/archzfs) (clé PGP
+    importée, signature vérifiée) et installe **linux-lts** comme
+    kernel obligatoire. Le kernel rolling d'Arch peut casser ZFS
+    entre deux mises à jour — `linux-lts` garantit la compatibilité.
+    Après le bootstrap, **booter sur linux-lts dans GRUB**.
+
 !!! tip "Configuration système attendue"
     Le bootstrap suppose la configuration suivante :
 
     - **Bootloader** : GRUB
+    - **Kernel** : `linux-lts` (installé par le bootstrap sur Arch, obligatoire pour ZFS)
     - **Chiffrement** : LUKS2 sur la partition système
     - **Filesystem** : btrfs avec deux sous-volumes : `@` (/) et `@.snapshots` (/.snapshots)
     - **Partition EFI** : FAT32 montée sur `/boot/efi`
@@ -133,34 +143,47 @@ Blackwell, nécessitant le driver `.run` NVIDIA.
 git clone https://github.com/jmchantrein/AnKLuMe.git
 cd AnKLuMe/host
 
-# 2. Lire le script (1200+ lignes, bien commenté)
+# 2. Lire le script (1400+ lignes, bien commenté)
 less bootstrap.sh
 
-# 3. Identifier les disques ZFS
-ls /dev/disk/by-id/ | grep nvme
-
-# 4. Exécuter (by-id recommandé, mais chemins classiques acceptés)
+# 3. Exécuter — n'importe quel format de disque accepté
 sudo ./bootstrap.sh \
-    --zfs-disk1 nvme-Corsair_MP600_XXX \
-    --zfs-disk2 nvme-Corsair_MP600_YYY
-
-# Alternatives équivalentes :
-#   --zfs-disk1 /dev/disk/by-id/nvme-Corsair_MP600_XXX
-#   --zfs-disk1 /dev/nvme0n1
+    --zfs-disk1 /dev/nvme0n1 \
+    --zfs-disk2 /dev/nvme1n1
 ```
+
+Le script résout automatiquement tout format vers **by-id** avant de
+créer le pool ZFS. Les trois formats suivants sont équivalents :
+
+| Format | Exemple | Résolu vers |
+|---|---|---|
+| Device classique | `/dev/nvme0n1` | `/dev/disk/by-id/nvme-Corsair_MP600_XXX` |
+| by-id nu | `nvme-Corsair_MP600_XXX` | `/dev/disk/by-id/nvme-Corsair_MP600_XXX` |
+| by-id complet | `/dev/disk/by-id/nvme-Corsair_MP600_XXX` | (utilisé tel quel) |
+
+!!! info "Pourquoi by-id ?"
+    Les chemins `/dev/nvmeXnY` dépendent de l'ordre d'énumération du
+    kernel au boot. Ajouter un NVMe, mettre à jour le BIOS ou changer
+    un slot peut réassigner les numéros. `by-id` utilise le numéro de
+    série hardware du disque : **stable et unique**.
+
+    `/dev/disk/by-uuid/` ne fonctionne pas ici : les UUIDs sont des
+    identifiants de **filesystem**. Un disque vierge destiné à ZFS n'a
+    pas de filesystem — donc pas d'UUID. Le by-id est le seul
+    identifiant stable pour un block device brut.
 
 !!! warning "Alternative non recommandée"
     ```bash
     curl -fsSL https://raw.githubusercontent.com/jmchantrein/AnKLuMe/main/host/bootstrap.sh \
-        | sudo bash -s -- --zfs-disk1 nvme-XXX --zfs-disk2 nvme-YYY
+        | sudo bash -s -- --zfs-disk1 /dev/nvme0n1 --zfs-disk2 /dev/nvme1n1
     ```
 
 ### Options
 
 | Flag | Effet |
 |---|---|
-| `--zfs-disk1 <disque>` | Disque ZFS mirror leg 1 — by-id nu, chemin complet, ou `/dev/nvmeXnY` |
-| `--zfs-disk2 <disque>` | Disque ZFS mirror leg 2 — by-id nu, chemin complet, ou `/dev/nvmeXnY` |
+| `--zfs-disk1 <disque>` | Disque ZFS mirror leg 1 — tout format accepté (auto-résolu vers by-id) |
+| `--zfs-disk2 <disque>` | Disque ZFS mirror leg 2 — tout format accepté (auto-résolu vers by-id) |
 | `--skip-nvidia` | Ne pas vérifier le driver NVIDIA |
 | `--skip-toram` | Ne pas configurer le mode toram |
 | `--skip-zfs-pool` | Ne pas créer le pool ZFS |
@@ -171,7 +194,7 @@ sudo ./bootstrap.sh \
 ### Ce que fait le script
 
 1. Détecte la distribution (Arch, Debian)
-2. Installe les paquets (dkms, zfs, incus, ansible, uv)
+2. Configure le dépôt archzfs + linux-lts (Arch) ou apt (Debian), installe ZFS, Incus, Ansible, uv
 3. Crée le pool ZFS chiffré (keyfile raw + backup passphrase)
 4. Crée les datasets ZFS (Incus, /home, modèles IA, backups, etc.)
 5. Configure systemd (déverrouillage ZFS → montage → Incus)
@@ -210,6 +233,7 @@ Disque système (NVMe)                 Pool ZFS "tank" (2x NVMe mirror)
 - `/` sur btrfs avec subvolumes — multiboot, snapshots
 - Données persistantes sur ZFS — chiffrement natif (keyfile raw), compression, mirror
 - Mode toram optionnel — `/` chargé en RAM, immutable au runtime
+- Kernel `linux-lts` obligatoire sur Arch (stabilité ZFS)
 - GPU NVIDIA via `nvidia-open` (Arch) ou `.run` + DKMS (Debian)
 
 ### Détails techniques
@@ -221,7 +245,8 @@ Les sections principales :
 | Fonction | Rôle |
 |---|---|
 | `detect_distro()` | Détection Arch/Debian, choix du gestionnaire de paquets |
-| `install_base_packages()` | dkms, zfs, incus, ansible, uv |
+| `setup_archzfs_repo()` | (Arch) Dépôt archzfs + clé PGP dans pacman.conf |
+| `install_base_packages()` | linux-lts, dkms, zfs, incus, ansible, uv |
 | `create_zfs_pool()` | Pool chiffré AES-256-GCM, keyfile raw 32 bytes, mirror |
 | `create_zfs_datasets()` | 7 datasets avec mountpoints et propriétés adaptées |
 | `setup_systemd()` | Service de déverrouillage ZFS + dépendance Incus |

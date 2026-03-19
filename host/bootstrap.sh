@@ -24,7 +24,7 @@
 #   --skip-incus          Ne pas configurer Incus
 #   --zfs-passphrase      Lire la passphrase depuis stdin (non interactif)
 #   --zfs-disk1 <disque>  Disque ZFS mirror leg 1 (obligatoire si pool à créer)
-#                         Accepte : by-id nu, chemin complet, ou /dev/nvmeXnY
+#                         Tout format accepté, auto-résolu vers by-id
 #   --zfs-disk2 <disque>  Disque ZFS mirror leg 2 (obligatoire si pool à créer)
 #
 # Ce script est idempotent : il peut être relancé sans danger.
@@ -46,6 +46,7 @@ cd /root
 
 readonly POOL="tank"
 readonly INCUS_STORAGE="tank-zfs"
+readonly ARCHZFS_KEY="3A9917BF0DED5C13F69AC68FABEC0A1208037BE9"
 readonly ZFS_KEY_DIR="/etc/zfs"
 readonly ZFS_KEY_FILE="${ZFS_KEY_DIR}/tank.key"       # 32 bytes raw
 readonly ZFS_KEY_ENC="${ZFS_KEY_DIR}/tank.key.enc"    # backup chiffré (passphrase)
@@ -214,28 +215,58 @@ install_base_packages() {
     info "Paquets de base OK."
 }
 
+setup_archzfs_repo() {
+    # Idempotent : ne rien faire si déjà configuré
+    if grep -q '^\[archzfs\]' /etc/pacman.conf; then
+        info "Dépôt archzfs déjà configuré."
+        return
+    fi
+
+    info "Configuration du dépôt archzfs..."
+
+    # Importer et signer la clé PGP archzfs (idempotent)
+    pacman-key --init
+    pacman-key --recv-keys "${ARCHZFS_KEY}"
+    pacman-key --lsign-key "${ARCHZFS_KEY}"
+
+    # Ajouter le dépôt avec vérification de signature obligatoire
+    cat >> /etc/pacman.conf << 'ARCHZFS_REPO'
+
+[archzfs]
+SigLevel = Required
+Server = https://github.com/archzfs/archzfs/releases/download/experimental
+ARCHZFS_REPO
+
+    info "Dépôt archzfs ajouté à /etc/pacman.conf (SigLevel = Required)."
+}
+
 install_packages_arch() {
-    # Synchroniser, upgrader et installer en une passe
+    # 1. Configurer le dépôt archzfs (avant le premier pacman -Syu)
+    setup_archzfs_repo
+
+    # 2. Installer linux-lts + headers en premier (DKMS en dépend)
+    #    linux-lts est obligatoire : le kernel rolling d'Arch peut casser
+    #    la compatibilité ZFS entre deux mises à jour.
     pacman -Syu --noconfirm --needed \
+        linux-lts linux-lts-headers \
         base-devel dkms pkg-config \
         curl git tmux jq \
         ansible-core python \
         > /dev/null 2>&1
 
-    # ZFS
+    # 3. ZFS (depuis le dépôt archzfs)
     if ! command -v zfs &> /dev/null; then
-        info "Installation de ZFS..."
-        ${PKG_INSTALL} zfs-utils > /dev/null 2>&1
-        ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
+        info "Installation de ZFS (dépôt archzfs)..."
+        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null 2>&1
     fi
 
-    # Charger le module ZFS
+    # 4. Charger le module ZFS
     if ! lsmod | grep -q "^zfs "; then
         modprobe zfs
         info "Module ZFS chargé."
     fi
 
-    # Incus
+    # 5. Incus
     if ! command -v incus &> /dev/null; then
         ${PKG_INSTALL} incus > /dev/null 2>&1
     fi
@@ -290,29 +321,83 @@ create_zfs_pool() {
     # Vérifier que les disques sont spécifiés
     if [[ -z "${ZFS_DISK_1}" || -z "${ZFS_DISK_2}" ]]; then
         error "Disques ZFS non spécifiés."
-        error "Utilisez --zfs-disk1 et --zfs-disk2 avec les noms by-id ou chemins complets."
-        error "Exemples :"
-        error "  --zfs-disk1 nvme-Corsair_MP600_XXX          (by-id, recommandé)"
-        error "  --zfs-disk1 /dev/disk/by-id/nvme-Corsair_XXX (chemin complet by-id)"
-        error "  --zfs-disk1 /dev/nvme0n1                     (chemin classique)"
+        error "Utilisez --zfs-disk1 et --zfs-disk2."
         error ""
-        error "Disques disponibles :"
-        ls /dev/disk/by-id/nvme-* 2>/dev/null | head -20 || true
+        error "N'importe quel format accepté — le script résout"
+        error "automatiquement vers by-id pour la stabilité du pool :"
+        error "  --zfs-disk1 /dev/nvme0n1                      (résolu vers by-id)"
+        error "  --zfs-disk1 nvme-Corsair_MP600_XXX             (by-id nu)"
+        error "  --zfs-disk1 /dev/disk/by-id/nvme-Corsair_XXX   (by-id complet)"
+        error ""
+        error "Pourquoi by-id ? Les chemins /dev/nvmeXnY dépendent de l'ordre"
+        error "d'énumération du kernel. Si un NVMe est ajouté ou le BIOS mis à"
+        error "jour, nvme0n1 peut pointer vers un autre disque physique."
+        error "by-id utilise le numéro de série du disque : stable et unique."
+        error "by-uuid ne fonctionne pas ici : pas de filesystem sur un disque brut."
+        error ""
+        error "Disques NVMe disponibles :"
+        # shellcheck disable=SC2012
+        ls -l /dev/disk/by-id/nvme-* 2>/dev/null | grep -v "part" | head -20 || true
         exit 1
     fi
 
-    # Résoudre les chemins de disques : accepter by-id nu, chemin complet,
-    # ou device classique (/dev/nvmeXnY, /dev/sdX)
+    # Résoudre les chemins de disques vers by-id.
+    # Accepte : by-id nu, chemin complet by-id, /dev/nvmeXnY, /dev/sdX.
+    # Résout toujours vers /dev/disk/by-id/* pour la stabilité du pool.
     resolve_disk_path() {
-        local disk="$1"
-        if [[ -e "${disk}" ]]; then
-            # Chemin complet valide (/dev/nvme0n1, /dev/disk/by-id/xxx, etc.)
-            echo "${disk}"
-        elif [[ -e "/dev/disk/by-id/${disk}" ]]; then
-            # Nom by-id nu (sans préfixe)
-            echo "/dev/disk/by-id/${disk}"
+        local input="$1"
+        local resolved=""
+
+        # Étape 1 : résoudre l'entrée vers un block device existant
+        if [[ -e "${input}" ]]; then
+            resolved="${input}"
+        elif [[ -e "/dev/disk/by-id/${input}" ]]; then
+            resolved="/dev/disk/by-id/${input}"
         else
             echo ""
+            return
+        fi
+
+        # Étape 2 : si déjà un chemin by-id, l'utiliser directement
+        if [[ "${resolved}" == /dev/disk/by-id/* ]]; then
+            echo "${resolved}"
+            return
+        fi
+
+        # Étape 3 : résoudre /dev/nvmeXnY ou /dev/sdX vers by-id
+        #   Parcourir les symlinks /dev/disk/by-id/ pour trouver celui
+        #   qui pointe vers le même block device. Préférer nvme-* à wwn-*.
+        local real_dev
+        real_dev=$(readlink -f "${resolved}")
+
+        local by_id_match=""
+        local by_id_fallback=""
+        for link in /dev/disk/by-id/*; do
+            [[ -L "${link}" ]] || continue
+            # Ignorer les entrées de partition (nvme-XXX-part1)
+            [[ "${link}" == *-part* ]] && continue
+            local link_target
+            link_target=$(readlink -f "${link}")
+            if [[ "${link_target}" == "${real_dev}" ]]; then
+                if [[ "${link}" == */nvme-* ]]; then
+                    by_id_match="${link}"
+                    break
+                fi
+                by_id_fallback="${link}"
+            fi
+        done
+
+        if [[ -n "${by_id_match}" ]]; then
+            info "  ${input} → ${by_id_match}"
+            echo "${by_id_match}"
+        elif [[ -n "${by_id_fallback}" ]]; then
+            info "  ${input} → ${by_id_fallback}"
+            echo "${by_id_fallback}"
+        else
+            # Pas de lien by-id trouvé (rare). Utiliser le chemin brut avec avertissement.
+            warn "  ${input} : aucun lien by-id trouvé. Utilisation du chemin brut."
+            warn "  Le pool pourrait ne pas s'importer si l'ordre des disques change."
+            echo "${resolved}"
         fi
     }
 
