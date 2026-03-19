@@ -262,17 +262,18 @@ install_packages_arch() {
     #    linux-lts est obligatoire : le kernel rolling d'Arch peut casser
     #    la compatibilité ZFS entre deux mises à jour.
     #    Les headers du kernel courant permettent modprobe zfs sans reboot.
+    info "Installation des paquets de base (pacman -Syu)..."
     pacman -Syu --noconfirm --needed \
         linux-lts linux-lts-headers "${current_headers}" \
         base-devel dkms pkg-config \
         curl git tmux jq \
         ansible-core python \
-        > /dev/null 2>&1
+        > /dev/null
 
     # 4. ZFS (depuis le dépôt archzfs)
     if ! command -v zfs &> /dev/null; then
         info "Installation de ZFS (dépôt archzfs)..."
-        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null 2>&1
+        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null
     fi
 
     # 5. Charger le module ZFS
@@ -283,13 +284,15 @@ install_packages_arch() {
 
     # 6. Incus
     if ! command -v incus &> /dev/null; then
-        ${PKG_INSTALL} incus > /dev/null 2>&1
+        info "Installation d'Incus..."
+        ${PKG_INSTALL} incus > /dev/null
     fi
 }
 
 install_packages_debian() {
     apt-get update -qq || { error "apt-get update échoué"; exit 1; }
 
+    info "Installation des paquets de base (apt)..."
     apt-get install -y -qq \
         build-essential dkms pkg-config \
         curl git tmux jq \
@@ -299,6 +302,7 @@ install_packages_debian() {
 
     # ZFS (userspace + DKMS pour les kernels non-stock)
     if ! command -v zfs &> /dev/null; then
+        info "Installation de ZFS (apt)..."
         apt-get install -y -qq zfsutils-linux zfs-dkms > /dev/null
     fi
 
@@ -310,6 +314,7 @@ install_packages_debian() {
 
     # Incus
     if ! command -v incus &> /dev/null; then
+        info "Installation d'Incus..."
         apt-get install -y -qq incus > /dev/null
     fi
 }
