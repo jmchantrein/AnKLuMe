@@ -244,29 +244,44 @@ install_packages_arch() {
     # 1. Configurer le dépôt archzfs (avant le premier pacman -Syu)
     setup_archzfs_repo
 
-    # 2. Installer linux-lts + headers en premier (DKMS en dépend)
+    # 2. Déterminer les headers du kernel courant.
+    #    DKMS a besoin des headers pour compiler le module ZFS.
+    #    Sans les headers du kernel qui tourne, modprobe zfs échoue.
+    local current_headers="linux-headers"
+    local running_kernel
+    running_kernel=$(uname -r)
+    if [[ "${running_kernel}" == *-lts* ]]; then
+        current_headers="linux-lts-headers"
+    elif [[ "${running_kernel}" == *-zen* ]]; then
+        current_headers="linux-zen-headers"
+    elif [[ "${running_kernel}" == *-hardened* ]]; then
+        current_headers="linux-hardened-headers"
+    fi
+
+    # 3. Installer linux-lts (cible) + headers courant + headers lts
     #    linux-lts est obligatoire : le kernel rolling d'Arch peut casser
     #    la compatibilité ZFS entre deux mises à jour.
+    #    Les headers du kernel courant permettent modprobe zfs sans reboot.
     pacman -Syu --noconfirm --needed \
-        linux-lts linux-lts-headers \
+        linux-lts linux-lts-headers "${current_headers}" \
         base-devel dkms pkg-config \
         curl git tmux jq \
         ansible-core python \
         > /dev/null 2>&1
 
-    # 3. ZFS (depuis le dépôt archzfs)
+    # 4. ZFS (depuis le dépôt archzfs)
     if ! command -v zfs &> /dev/null; then
         info "Installation de ZFS (dépôt archzfs)..."
         ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null 2>&1
     fi
 
-    # 4. Charger le module ZFS
+    # 5. Charger le module ZFS
     if ! lsmod | grep -q "^zfs "; then
         modprobe zfs
         info "Module ZFS chargé."
     fi
 
-    # 5. Incus
+    # 6. Incus
     if ! command -v incus &> /dev/null; then
         ${PKG_INSTALL} incus > /dev/null 2>&1
     fi
