@@ -13,6 +13,7 @@ app = typer.Typer(
 )
 
 # Sous-commandes groupées
+init_app = typer.Typer(help="Créer un nouveau projet anklume.")
 apply_app = typer.Typer(help="Déployer l'infrastructure.")
 dev_app = typer.Typer(help="Outils de développement.")
 instance_app = typer.Typer(help="Gestion des instances.")
@@ -31,6 +32,7 @@ resource_app = typer.Typer(help="Allocation des ressources.")
 telemetry_app = typer.Typer(help="Métriques d'usage.")
 workspace_app = typer.Typer(help="Workspace layout déclaratif (GUI tmuxp).")
 
+app.add_typer(init_app, name="init")
 app.add_typer(apply_app, name="apply")
 app.add_typer(dev_app, name="dev")
 app.add_typer(instance_app, name="instance")
@@ -71,23 +73,28 @@ def main(
     """anklume — isolation compartimentée avec Incus."""
 
 
-# --- anklume init ---
+# --- anklume init <showcase|simple> ---
 
 
-@app.command()
-def init(
-    directory: Annotated[str, typer.Argument(help="Répertoire ou template (showcase)")] = ".",
+@init_app.command("showcase")
+def init_showcase(
+    directory: Annotated[str, typer.Argument(help="Répertoire cible")] = ".",
+) -> None:
+    """Créer un projet showcase complet (tous les domaines)."""
+    from anklume.cli._init import run_init_showcase
+
+    run_init_showcase(directory)
+
+
+@init_app.command("simple")
+def init_simple(
+    directory: Annotated[str, typer.Argument(help="Répertoire cible")] = ".",
     lang: Annotated[str, typer.Option("--lang", "-l", help="Langue (en/fr)")] = "fr",
 ) -> None:
-    """Créer un nouveau projet anklume."""
-    if directory == "showcase":
-        from anklume.cli._init import run_init_showcase
+    """Créer un projet minimal (un domaine exemple)."""
+    from anklume.cli._init import run_init
 
-        run_init_showcase(".")
-    else:
-        from anklume.cli._init import run_init
-
-        run_init(directory, lang=lang)
+    run_init(directory, lang=lang)
 
 
 @app.command()

@@ -1448,34 +1448,51 @@ setup_shell_integration() {
         return
     fi
 
-    # Bloc à injecter dans bash/zsh
+    # --- Générer les fichiers de completion (une seule fois) ---
+    local comp_dir="${user_home}/.bash_completions"
+    local comp_file="${comp_dir}/anklume.sh"
+    if command -v anklume &> /dev/null; then
+        mkdir -p "${comp_dir}"
+        {
+            # Typer génère '$1' dans la ligne COMPREPLY — on remplace par 'anklume'
+            # pour que l'alias 'ank' fonctionne (ank n'est pas un binaire)
+            anklume --show-completion bash 2>/dev/null \
+                | sed 's/_ANKLUME_COMPLETE=complete_bash \$1/_ANKLUME_COMPLETE=complete_bash anklume/'
+            printf '\ncomplete -o default -F _anklume_completion ank\n'
+        } > "${comp_file}"
+        chown -R "$(id -u "${main_user}"):$(id -g "${main_user}")" "${comp_dir}"
+        info "Completion bash générée dans ${comp_file}"
+    fi
+
+    # Bloc à injecter dans bash/zsh (source le fichier statique, pas d'eval)
     local shell_block
     shell_block=$(cat << 'BLOCK'
-# AnKLuMe — PATH + alias
+# AnKLuMe — PATH + alias + completion
 export PATH="${HOME}/.local/bin:${PATH}"
 command -v anklume &> /dev/null && alias ank='anklume'
+[[ -f "${HOME}/.bash_completions/anklume.sh" ]] && source "${HOME}/.bash_completions/anklume.sh"
 BLOCK
 )
 
     # --- Bash ---
     local bashrc="${user_home}/.bashrc"
-    if [[ -f "${bashrc}" ]] && ! grep -q "alias ank=" "${bashrc}" 2>/dev/null; then
+    if [[ -f "${bashrc}" ]] && ! grep -q "AnKLuMe" "${bashrc}" 2>/dev/null; then
         printf '\n%s\n' "${shell_block}" >> "${bashrc}"
-        info "bash : alias ank ajouté dans ${bashrc}"
+        info "bash : bloc AnKLuMe ajouté dans ${bashrc}"
     elif [[ ! -f "${bashrc}" ]]; then
         printf '%s\n' "${shell_block}" > "${bashrc}"
-        info "bash : ${bashrc} créé avec alias ank"
+        info "bash : ${bashrc} créé avec bloc AnKLuMe"
     else
-        info "bash : alias ank déjà présent."
+        info "bash : bloc AnKLuMe déjà présent."
     fi
 
     # --- Zsh ---
     local zshrc="${user_home}/.zshrc"
-    if [[ -f "${zshrc}" ]] && ! grep -q "alias ank=" "${zshrc}" 2>/dev/null; then
+    if [[ -f "${zshrc}" ]] && ! grep -q "AnKLuMe" "${zshrc}" 2>/dev/null; then
         printf '\n%s\n' "${shell_block}" >> "${zshrc}"
-        info "zsh  : alias ank ajouté dans ${zshrc}"
+        info "zsh  : bloc AnKLuMe ajouté dans ${zshrc}"
     elif [[ -f "${zshrc}" ]]; then
-        info "zsh  : alias ank déjà présent."
+        info "zsh  : bloc AnKLuMe déjà présent."
     fi
     # On ne crée pas .zshrc s'il n'existe pas (l'utilisateur n'utilise peut-être pas zsh)
 
@@ -1484,7 +1501,7 @@ BLOCK
     local fish_conf="${fish_conf_dir}/config.fish"
     if command -v fish &> /dev/null || [[ -d "${fish_conf_dir}" ]]; then
         mkdir -p "${fish_conf_dir}"
-        if ! grep -q "alias ank" "${fish_conf}" 2>/dev/null; then
+        if ! grep -q "AnKLuMe" "${fish_conf}" 2>/dev/null; then
             cat >> "${fish_conf}" << 'FISH'
 
 # AnKLuMe — PATH + alias

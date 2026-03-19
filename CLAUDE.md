@@ -102,6 +102,15 @@ Incus directement, puis lance Ansible pour le provisioning.
 La CLI tourne directement sur l'hôte. Dépendances gérées par `uv`.
 Incus et Ansible sont appelés via `subprocess`.
 
+### Réinstallation CLI après modification du code
+
+**IMPORTANT** : `uv tool install --force` utilise un cache et ne
+réinstalle PAS les changements locaux. Toujours utiliser :
+
+```bash
+uv tool install --force --reinstall --with textual ~/AnKLuMe
+```
+
 ## Démarrage de session (après chaque /clear)
 
 **OBLIGATOIRE** — à chaque nouvelle session, avant toute action :

@@ -209,11 +209,15 @@ policies: []
 
 def _find_showcase_dir() -> Path | None:
     """Localise examples/showcase/ dans le dépôt anklume."""
-    # Remonter depuis src/anklume/cli/_init.py → racine du dépôt
+    # 1. Remonter depuis src/anklume/cli/_init.py → racine du dépôt (dev)
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
     showcase = repo_root / "examples" / "showcase"
     if showcase.is_dir():
         return showcase
+    # 2. Chercher dans le repo installé ~/AnKLuMe (uv tool install)
+    home_repo = Path.home() / "AnKLuMe" / "examples" / "showcase"
+    if home_repo.is_dir():
+        return home_repo
     return None
 
 
