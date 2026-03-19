@@ -282,8 +282,12 @@ install_packages_arch() {
         info "Module ZFS chargé."
     fi
 
-    # 6. Incus
+    # 6. Incus (dépend de iptables-nft qui remplace iptables)
     if ! command -v incus &> /dev/null; then
+        if pacman -Qi iptables &> /dev/null && ! pacman -Qi iptables-nft &> /dev/null; then
+            info "Remplacement de iptables par iptables-nft (requis par Incus)..."
+            yes | pacman -S iptables-nft > /dev/null
+        fi
         info "Installation d'Incus..."
         ${PKG_INSTALL} incus > /dev/null
     fi
