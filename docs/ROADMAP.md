@@ -663,25 +663,31 @@ Rendre le showcase 100% fonctionnel pour un utilisateur final.
 Tests interactifs dans le tmux partagé, corrections itératives,
 puis validation complète sur une fresh install simulée en VM KVM.
 
-### 25a — Showcase fonctionnel (tmux partagé)
+### 25a — Showcase fonctionnel (tmux partagé) ✅
 
 Tester chaque fonctionnalité du showcase en tant que jmc :
 
-- [ ] `ank init showcase` + `ank apply all` — déploiement complet
-- [ ] Vérifier chaque domaine : vault, pro, perso, ai-tools, sandbox
-- [ ] `ank status` — état cohérent déclaré vs réel
-- [ ] `ank snapshot create` / `ank snapshot list` / `ank snapshot restore`
-- [ ] `ank network deploy` / `ank network status` — règles nftables
-- [ ] `ank instance list` / `ank instance exec` / `ank instance info`
-- [ ] `ank domain list` / `ank domain status`
-- [ ] `ank portal push/pull` — transfert fichiers
-- [ ] `ank disp` — conteneurs jetables
-- [ ] `ank doctor` — diagnostic sans erreurs
-- [ ] `ank console` — console tmux colorée
-- [ ] `ank ai status` — services IA (si GPU disponible)
-- [ ] `ank resource show` — allocation CPU/RAM
-- [ ] `ank destroy` / `ank destroy --force` — nettoyage propre
-- [ ] Correction itérative de chaque bug rencontré + tests
+- [x] `ank init showcase` + `ank apply all` — déploiement complet
+  - 5 domaines, 20 instances, 56 actions, 0 erreur
+- [x] Vérifier chaque domaine : vault, pro, perso, ai-tools, sandbox
+- [x] `ank status` — 20/20 instances running, état cohérent
+- [x] `ank snapshot create` / `ank snapshot list` / `ank snapshot restore`
+- [x] `ank network rules` / `ank network deploy` / `ank network status`
+- [x] `ank instance list` / `ank instance exec` / `ank instance info`
+- [x] `ank domain list` / `ank domain status`
+- [x] `ank portal push/pull` — transfert fichiers OK
+- [x] `ank disp` — conteneurs jetables (fix bash→sh fallback)
+- [x] `ank doctor` — 15/15 checks OK (GPU RTX PRO 5000 détecté)
+- [x] `ank ai status` — GPU + services détectés
+- [x] `ank resource show` — allocation proportionnelle correcte
+- [x] `ank destroy` — 3 éphémères supprimées, 17 protégées
+- [x] `ank destroy --force` — 17 instances, nettoyage complet
+- [x] Correction itérative de 5 bugs + tests :
+  1. `limits.memory.soft` → `limits.memory` + `limits.memory.enforce=soft`
+  2. `incus profile show --format json` → `incus query /1.0/profiles/...`
+  3. Proxy GUI PipeWire : `_push_gui_tmpfiles` via tmpfiles.d avant start
+  4. Cascade d'erreurs réconciliateur : par instance au lieu du domaine
+  5. `ank disp` : fallback `sh` si `bash` absent (Alpine)
 
 ### 25b — Validation fresh install en VM KVM
 

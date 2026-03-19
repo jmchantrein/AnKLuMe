@@ -387,7 +387,8 @@ class TestMemoryEnforce:
         )
         infra = _infra(machines, policy)
         allocs = compute_resource_allocation(infra, _hw())
-        assert allocs[0].memory_key == "limits.memory.soft"
+        assert allocs[0].memory_key == "limits.memory"
+        assert allocs[0].memory_enforce == "soft"
 
     def test_hard_key(self):
         machines = [_machine("a")]
@@ -399,9 +400,10 @@ class TestMemoryEnforce:
         infra = _infra(machines, policy)
         allocs = compute_resource_allocation(infra, _hw())
         assert allocs[0].memory_key == "limits.memory"
+        assert allocs[0].memory_enforce is None
 
     def test_vm_forces_hard_memory_key(self):
-        """Les VMs ne supportent pas limits.memory.soft, on force limits.memory."""
+        """Les VMs ne supportent pas limits.memory.enforce=soft."""
         machines = [_machine("vm1", type="vm")]
         policy = ResourcePolicyConfig(
             host_reserve_cpu="0%",
@@ -411,6 +413,7 @@ class TestMemoryEnforce:
         infra = _infra(machines, policy)
         allocs = compute_resource_allocation(infra, _hw())
         assert allocs[0].memory_key == "limits.memory"
+        assert allocs[0].memory_enforce is None
 
     def test_vm_forces_cpu_pin_key(self):
         """Les VMs ne supportent pas limits.cpu.allowance, on force limits.cpu."""
@@ -425,7 +428,7 @@ class TestMemoryEnforce:
         assert allocs[0].cpu_key == "limits.cpu"
 
     def test_mixed_vm_and_container(self):
-        """VM utilise limits.memory, container utilise limits.memory.soft."""
+        """VM utilise limits.memory sans enforce, container a enforce=soft."""
         machines = [_machine("ct1"), _machine("vm1", type="vm")]
         policy = ResourcePolicyConfig(
             host_reserve_cpu="0%",
@@ -437,8 +440,10 @@ class TestMemoryEnforce:
         allocs = compute_resource_allocation(infra, _hw())
         ct_alloc = next(a for a in allocs if a.instance_name == "dom-ct1")
         vm_alloc = next(a for a in allocs if a.instance_name == "dom-vm1")
-        assert ct_alloc.memory_key == "limits.memory.soft"
+        assert ct_alloc.memory_key == "limits.memory"
+        assert ct_alloc.memory_enforce == "soft"
         assert vm_alloc.memory_key == "limits.memory"
+        assert vm_alloc.memory_enforce is None
         assert ct_alloc.cpu_key == "limits.cpu.allowance"
         assert vm_alloc.cpu_key == "limits.cpu"
 

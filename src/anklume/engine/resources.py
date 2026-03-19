@@ -45,7 +45,8 @@ class ResourceAllocation:
     cpu_value: str  # "25%" ou "4" selon cpu_mode
     cpu_key: str  # "limits.cpu.allowance" ou "limits.cpu"
     memory_value: str  # "512MB"
-    memory_key: str  # "limits.memory.soft" ou "limits.memory"
+    memory_key: str  # "limits.memory"
+    memory_enforce: str | None  # "soft" ou None (hard par défaut dans Incus)
     source: str  # "auto", "explicit" ou "mixed"
 
 
@@ -186,7 +187,8 @@ def compute_resource_allocation(
 
     # Construire les allocations
     cpu_key = "limits.cpu.allowance" if policy.cpu_mode == "allowance" else "limits.cpu"
-    mem_key = "limits.memory.soft" if policy.memory_enforce == "soft" else "limits.memory"
+    mem_key = "limits.memory"
+    mem_enforce = "soft" if policy.memory_enforce == "soft" else None
 
     allocations: list[ResourceAllocation] = []
 
@@ -207,11 +209,13 @@ def compute_resource_allocation(
         if is_mem_explicit:
             mem_val = m.config["limits.memory"]
             alloc_mem_key = "limits.memory"
+            alloc_mem_enforce = None
         else:
             raw_mem = mem_parts.get(m.full_name, 0)
             mem_val = _format_memory(raw_mem)
-            # Les VMs Incus ne supportent pas limits.memory.soft (cgroups only)
-            alloc_mem_key = "limits.memory" if m.type == "vm" else mem_key
+            alloc_mem_key = mem_key
+            # Les VMs Incus ne supportent pas limits.memory.enforce=soft (cgroups only)
+            alloc_mem_enforce = None if m.type == "vm" else mem_enforce
 
         source = (
             "explicit"
@@ -226,6 +230,7 @@ def compute_resource_allocation(
                 cpu_key=alloc_cpu_key,
                 memory_value=mem_val,
                 memory_key=alloc_mem_key,
+                memory_enforce=alloc_mem_enforce,
                 source=source,
             )
         )
@@ -316,5 +321,7 @@ def apply_resource_config(
                 machine.config[alloc.cpu_key] = alloc.cpu_value
 
             # Mémoire : seulement si pas explicite
-            if "limits.memory" not in machine.config and "limits.memory.soft" not in machine.config:
+            if "limits.memory" not in machine.config:
                 machine.config[alloc.memory_key] = alloc.memory_value
+                if alloc.memory_enforce:
+                    machine.config["limits.memory.enforce"] = alloc.memory_enforce

@@ -284,8 +284,18 @@ class IncusDriver:
         self._run(["profile", "delete", name, "--project", project])
 
     def profile_show(self, name: str, project: str = "default") -> dict:
-        """Retourne la config complète d'un profil (JSON)."""
-        return self._run_json(["profile", "show", name, "--project", project])
+        """Retourne la config complète d'un profil (JSON via API)."""
+        result = self._run(
+            ["query", f"/1.0/profiles/{name}?project={project}"]
+        )
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            raise IncusError(
+                ["incus", "query", f"/1.0/profiles/{name}"],
+                0,
+                f"JSON invalide: {e}\nSortie: {result.stdout[:500]}",
+            ) from None
 
     def storage_pool_list(self) -> list[str]:
         """Liste les noms des storage pools."""
@@ -336,18 +346,21 @@ class IncusDriver:
         project: str,
         local_path: str,
         remote_path: str,
+        *,
+        create_dirs: bool = False,
     ) -> None:
         """Push un fichier vers une instance via incus file push."""
-        self._run(
-            [
-                "file",
-                "push",
-                local_path,
-                f"{instance}{remote_path}",
-                "--project",
-                project,
-            ]
-        )
+        cmd = [
+            "file",
+            "push",
+            local_path,
+            f"{instance}{remote_path}",
+            "--project",
+            project,
+        ]
+        if create_dirs:
+            cmd.append("--create-dirs")
+        self._run(cmd)
 
     def file_pull(
         self,

@@ -84,10 +84,14 @@ def _run_launch(
             if result.stderr:
                 typer.echo(result.stderr, nl=False, err=True)
         else:
-            # Shell interactif (stdin/stdout hérités)
-            subprocess.run(
+            # Shell interactif (stdin/stdout hérités, fallback sh si pas de bash)
+            ret = subprocess.run(
                 ["incus", "exec", disp.name, "--project", DISP_PROJECT, "--", "bash"],
             )
+            if ret.returncode == 127:
+                subprocess.run(
+                    ["incus", "exec", disp.name, "--project", DISP_PROJECT, "--", "sh"],
+                )
     except IncusError as e:
         typer.echo(f"Erreur exec : {e}", err=True)
     finally:

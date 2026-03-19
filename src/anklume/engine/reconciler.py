@@ -289,12 +289,13 @@ def _execute_domain_actions(
     ctx: NestingContext,
     gui_info: GuiInfo | None = None,
 ) -> None:
-    """Exécute les actions d'un domaine. Best-effort."""
-    domain_failed = False
+    """Exécute les actions d'un domaine. Best-effort par instance."""
+    failed_instances: set[str] = set()
     created_machines: dict[str, Machine] = {}
 
     for action in actions:
-        if domain_failed:
+        # Skip les actions sur une instance déjà en erreur
+        if action.resource == "instance" and action.target in failed_instances:
             result.errors.append((action, "Ignoré suite à une erreur précédente"))
             continue
 
@@ -313,7 +314,13 @@ def _execute_domain_actions(
 
         except (IncusError, ValueError) as e:
             result.errors.append((action, str(e)))
-            domain_failed = True
+            if action.resource == "instance":
+                failed_instances.add(action.target)
+            elif action.resource in ("project", "network"):
+                # Projet/réseau en erreur = tout le domaine KO
+                for remaining in actions[actions.index(action) + 1 :]:
+                    result.errors.append((remaining, "Ignoré suite à une erreur précédente"))
+                return
 
 
 def _execute_action(
@@ -399,6 +406,11 @@ def _execute_action(
         )
 
     elif action.verb == "start" and action.resource == "instance":
+        # Préparer les répertoires GUI avant le start si profil GUI présent
+        machine = _find_machine(action.target, domain, infra.config.nesting, ctx)
+        if gui_info and gui_info.detected and GUI_PROFILE_NAME in machine.profiles:
+            if machine.incus_type == "container":
+                _push_gui_tmpfiles(driver, action.target, action.project, gui_info)
         driver.instance_start(action.target, action.project)
 
     elif action.verb == "stop" and action.resource == "instance":
@@ -434,6 +446,48 @@ def _find_machine(
         msg = f"Machine introuvable : {incus_name}"
         raise ValueError(msg)
     return machine
+
+
+def _push_gui_tmpfiles(
+    driver: IncusDriver,
+    instance: str,
+    project: str,
+    gui_info: GuiInfo,
+) -> None:
+    """Pousse un fichier tmpfiles.d dans un conteneur arrêté.
+
+    Crée les répertoires nécessaires aux sockets GUI (Wayland, PipeWire)
+    au boot via systemd-tmpfiles, AVANT le premier start.
+    """
+    import tempfile
+
+    uid = str(gui_info.uid)
+    gid = str(gui_info.gid)
+    runtime_dir = gui_info.runtime_dir
+
+    lines = [
+        f"d {runtime_dir} 0700 {uid} {gid} -",
+        f"d {runtime_dir}/pulse 0700 {uid} {gid} -",
+        "d /tmp/.X11-unix 1777 root root -",
+    ]
+    content = "\n".join(lines) + "\n"
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+        f.write(content)
+        tmpfile = f.name
+
+    try:
+        driver.file_push(
+            instance,
+            project,
+            tmpfile,
+            "/etc/tmpfiles.d/anklume-gui.conf",
+            create_dirs=True,
+        )
+    finally:
+        import os
+
+        os.unlink(tmpfile)
 
 
 def _inject_context_files(
