@@ -551,47 +551,34 @@ rollback_snapper() {
     # Rollback du subvolume principal @
     # Méthode Snapper : le snapshot est sous @/.snapshots/N/snapshot
     # On renomme @ → @.old, puis on snapshot le snapshot vers @
-    local subvols_to_rollback=("@")
+    local sv_path="${toplevel}/@"
+    local sv_old="${toplevel}/@.factory-reset-backup"
 
-    for sv in "${subvols_to_rollback[@]}"; do
-        local sv_path="${toplevel}/${sv}"
-        local sv_old="${toplevel}/${sv}.factory-reset-backup"
-        local sv_snap
+    if [[ ! -d "${snap_path}" ]]; then
+        error "Snapshot ${snap_path} introuvable sur le toplevel."
+        return 1
+    fi
 
-        if [[ "${sv}" == "@" ]]; then
-            sv_snap="${snap_path}"
-        else
-            sv_snap="${toplevel}/${sv}/.snapshots/${snap_num}/snapshot"
-        fi
+    info "Rollback @ → snapshot #${snap_num}..."
 
-        if [[ ! -d "${sv_snap}" ]]; then
-            warn "Pas de snapshot #${snap_num} pour ${sv}, ignoré."
-            continue
-        fi
+    # Supprimer un éventuel backup précédent
+    if [[ -d "${sv_old}" ]]; then
+        btrfs subvolume delete "${sv_old}" 2>/dev/null || rm -rf "${sv_old}"
+        warn "  Ancien backup @.factory-reset-backup supprimé."
+    fi
 
-        info "Rollback ${sv} → snapshot #${snap_num}..."
+    # Renommer le subvolume actif
+    mv "${sv_path}" "${sv_old}"
+    info "  @ → @.factory-reset-backup"
 
-        # Supprimer un éventuel backup précédent
-        if [[ -d "${sv_old}" ]]; then
-            btrfs subvolume delete "${sv_old}" 2>/dev/null || rm -rf "${sv_old}"
-            warn "  Ancien backup ${sv}.factory-reset-backup supprimé."
-        fi
-
-        # Renommer le subvolume actif
-        mv "${sv_path}" "${sv_old}"
-        info "  ${sv} → ${sv}.factory-reset-backup"
-
-        # Créer un nouveau subvolume à partir du snapshot
-        btrfs subvolume snapshot "${sv_snap}" "${sv_path}"
-        info "  Snapshot #${snap_num} → ${sv} (nouveau)"
-    done
+    # Créer un nouveau subvolume à partir du snapshot
+    btrfs subvolume snapshot "${snap_path}" "${sv_path}"
+    info "  Snapshot #${snap_num} → @ (nouveau)"
 
     info "Rollback Snapper terminé."
-    warn "Les anciens subvolumes sont dans *.factory-reset-backup"
-    warn "Après validation, supprimez-les avec :"
-    for sv in "${subvols_to_rollback[@]}"; do
-        warn "  btrfs subvolume delete ${toplevel}/${sv}.factory-reset-backup"
-    done
+    warn "L'ancien subvolume est dans @.factory-reset-backup"
+    warn "Après validation, supprimez-le avec :"
+    warn "  btrfs subvolume delete ${toplevel}/@.factory-reset-backup"
 }
 
 # Rollback Timeshift : remplacer @ par le plus ancien snapshot

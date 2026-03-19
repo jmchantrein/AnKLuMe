@@ -93,16 +93,18 @@ ZFS chiffré en mirror, systemd, GPU, toram optionnel, AnKLuMe.
 
 ### Choix de la distribution
 
-| Distribution | Support GPU récent | Remarques |
+| Distribution | GPU récent (Blackwell) | Remarques |
 |---|---|---|
-| **Arch Linux** (recommandé) | `nvidia-open` dans les dépôts | Kernel rolling, GRUB, LUKS2+btrfs, Snapper |
-| Debian 13+ | Limité | Kernel stock trop ancien pour Blackwell (RTX 50xx), nécessite `.run` NVIDIA |
+| **Arch Linux** | `nvidia-open` dans les dépôts | Recommandé pour le matériel récent (GPU, NVMe) |
+| **Debian 13+** | `.run` NVIDIA nécessaire | Recommandé sinon — stable, prévisible |
 
-**Pourquoi Arch Linux ?** Les GPU NVIDIA récents (architecture Blackwell)
-nécessitent un kernel ≥ 6.12 et les open kernel modules (`nvidia-open`).
-Arch fournit les deux dans ses dépôts officiels. Le bootstrap configure
-GRUB comme bootloader, Snapper pour les snapshots btrfs, et
-grub-btrfs pour les entrées de rollback automatiques.
+**Arch Linux** est recommandé quand le matériel est récent (GPU NVIDIA
+Blackwell RTX 50xx, NVMe récents). Le kernel rolling fournit les
+drivers nécessaires (`nvidia-open`) directement dans les dépôts.
+
+**Debian** est recommandé pour le matériel plus ancien ou quand la
+stabilité prime. Le kernel stock peut être trop ancien pour les GPU
+Blackwell, nécessitant le driver `.run` NVIDIA.
 
 !!! tip "Configuration système attendue"
     Le bootstrap suppose la configuration suivante :
@@ -112,8 +114,17 @@ grub-btrfs pour les entrées de rollback automatiques.
     - **Filesystem** : btrfs avec deux sous-volumes : `@` (/) et `@.snapshots` (/.snapshots)
     - **Partition EFI** : FAT32 montée sur `/boot/efi`
     - **Home** : sur ZFS (créé par le bootstrap)
-    - **Snapshots** : Snapper (config `root`) + grub-btrfs
+    - **Snapshots** : Snapper (config `root`) + snap-pac + grub-btrfs + btrfs-assistant
     - **GPU** : `nvidia-open` (modules open source)
+
+!!! tip "Paquets recommandés pour les snapshots"
+    Sur Arch Linux, installer `snap-pac` (snapshots automatiques
+    avant/après chaque `pacman`) et `btrfs-assistant` (interface
+    graphique pour gérer les snapshots et rollbacks) :
+
+    ```bash
+    sudo pacman -S snap-pac btrfs-assistant
+    ```
 
 ### Exécuter le bootstrap
 
