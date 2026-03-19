@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("textual", reason="textual requis pour les tests TUI")
+
 from anklume.engine.models import (
     Domain,
     GlobalConfig,

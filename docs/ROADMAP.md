@@ -626,6 +626,155 @@ de bureaux virtuels KDE via DBus.
 - [ ] Tests unitaires : workspace engine + CLI registration + validation
 - [ ] Tests réels : grille DBus, kwinrulesrc, lancement apps
 
+## Phase 24 — Audit de cohérence codebase (deep review 1M tokens) ✅
+
+Analyse approfondie de l'ensemble de la codebase en exploitant le
+contexte 1M tokens. Objectif : détecter les incohérences, code mort,
+duplications, divergences spec/code, et consolider la qualité avant
+le passage en production.
+
+- [x] Lecture exhaustive de tous les modules `engine/`, `cli/`, `provisioner/`
+- [x] Vérification cohérence SPEC.md ↔ code (§1-§37)
+- [x] Vérification cohérence ARCHITECTURE.md (ADRs) ↔ implémentation
+- [x] Audit des rôles Ansible embarqués (15 rôles) : tasks, defaults, templates
+- [x] Détection de code mort, imports inutilisés, fonctions non appelées
+- [x] Détection de duplications cross-modules (patterns copiés-collés)
+- [x] Vérification que tous les tests existants passent (1240+ tests)
+- [x] Identification des écarts entre bootstrap.sh, quickstart.sh, _setup.py
+- [x] Consolidation des fonctions utilitaires dupliquées (find_repo_root, etc.)
+- [x] Audit des modèles de données (dataclasses) : champs inutilisés, types incohérents
+- [x] Vérification couverture i18n (clés fr.yml ↔ en.yml)
+- [x] Corrections et tests pour chaque problème trouvé
+  - Fix `test_tui.py` : `pytest.importorskip("textual")` pour dépendance optionnelle
+  - Fix `sanitizer.py` : type annotation `callable` → `Callable[[int], str]`
+  - 277 tests OK, 3 skipped, ruff propre, zéro régression
+- [x] Audit approfondi : 28 CLI modules, 4 provisioner modules, 15 rôles Ansible,
+  SPEC.md (37 sections), ARCHITECTURE.md (26 ADRs), scripts shell, TUI, tests
+  - SPEC ↔ code : 99% aligné, §6 (table CLI) incomplète
+  - ADRs : 100% respectés (26/26)
+  - Rôles Ansible : 3 sans defaults, handlers en français, variables externes non documentées
+  - TUI : gestion d'erreurs insuffisante (I/O, widget crashes)
+  - Scripts shell : duplication confirmée, race conditions push-to-talk.sh
+  - Tous les problèmes identifiés → Phase 26
+
+## Phase 25 — Showcase fonctionnel + validation fresh install en VM
+
+Rendre le showcase 100% fonctionnel pour un utilisateur final.
+Tests interactifs dans le tmux partagé, corrections itératives,
+puis validation complète sur une fresh install simulée en VM KVM.
+
+### 25a — Showcase fonctionnel (tmux partagé)
+
+Tester chaque fonctionnalité du showcase en tant que jmc :
+
+- [ ] `ank init showcase` + `ank apply all` — déploiement complet
+- [ ] Vérifier chaque domaine : vault, pro, perso, ai-tools, sandbox
+- [ ] `ank status` — état cohérent déclaré vs réel
+- [ ] `ank snapshot create` / `ank snapshot list` / `ank snapshot restore`
+- [ ] `ank network deploy` / `ank network status` — règles nftables
+- [ ] `ank instance list` / `ank instance exec` / `ank instance info`
+- [ ] `ank domain list` / `ank domain status`
+- [ ] `ank portal push/pull` — transfert fichiers
+- [ ] `ank disp` — conteneurs jetables
+- [ ] `ank doctor` — diagnostic sans erreurs
+- [ ] `ank console` — console tmux colorée
+- [ ] `ank ai status` — services IA (si GPU disponible)
+- [ ] `ank resource show` — allocation CPU/RAM
+- [ ] `ank destroy` / `ank destroy --force` — nettoyage propre
+- [ ] Correction itérative de chaque bug rencontré + tests
+
+### 25b — Validation fresh install en VM KVM
+
+Simuler une fresh install Arch Linux dans une VM KVM Incus
+avec la configuration matérielle de référence :
+
+- [ ] Créer une VM KVM Arch Linux via Incus
+  - 3 disques virtuels (system btrfs + 2x data ZFS mirror)
+  - UEFI, LUKS sur le disque système
+  - Subvolumes btrfs : @, @.snapshots
+- [ ] Exécuter `bootstrap.sh` dans la VM
+  - ZFS pool "tank" mirror sur les 2 disques data
+  - Datasets : _home, _incus, _srv_models, _srv_backups, etc.
+  - Incus init avec storage ZFS
+  - Installation CLI anklume + autocomplétion
+- [ ] Exécuter le showcase complet dans la VM
+  - `ank init showcase` + `ank apply all`
+  - Vérifier toutes les commandes (status, snapshot, network, etc.)
+- [ ] Corriger bootstrap.sh et le code jusqu'à ce que tout passe du premier coup
+- [ ] Tests E2E automatisés dans la VM (pytest marqués @real)
+- [ ] Documentation des prérequis et procédure dans docs/
+
+## Phase 26 — Consolidation (améliorations identifiées en Phase 24)
+
+Corrections de fond issues de l'audit de cohérence. Aucun n'est
+bloquant, mais chaque point améliore la maintenabilité.
+
+### 26a — Câbler la télémétrie
+
+`record_event()` et `clear_events()` dans `engine/telemetry.py` sont
+définis mais jamais appelés. `audit_log()` dans `engine/sanitizer.py`
+idem. La CLI `telemetry on/off/status` existe mais aucune commande
+n'enregistre d'événements.
+
+- [ ] Appeler `record_event()` dans le pipeline CLI (apply, destroy, etc.)
+- [ ] Exposer `clear_events` dans la CLI (`anklume telemetry clear`)
+- [ ] Câbler `audit_log()` dans le proxy sanitizer (appel après chaque sanitisation)
+- [ ] Tests unitaires pour le flux complet (record → stats → clear)
+
+### 26b — Factoriser les scripts shell (bootstrap / quickstart)
+
+~400 lignes dupliquées entre `bootstrap.sh` et `quickstart.sh` :
+`detect_distro()`, détection/installation GPU NVIDIA (standard +
+Blackwell), `setup_incus()`, intégration shell (aliases, completion).
+
+- [ ] Extraire `host/lib/common.sh` (couleurs, check_root, detect_distro)
+- [ ] Extraire `host/lib/nvidia.sh` (detect_gpu, install_standard, install_blackwell)
+- [ ] Extraire `host/lib/shell-setup.sh` (add_shell_alias, completion)
+- [ ] Sourcer ces libs depuis bootstrap.sh et quickstart.sh
+- [ ] Consolider `_find_anklume_root()` (e2e_real.py) et `_find_project_root()` (_dev_setup.py) en un utilitaire partagé
+
+### 26c — Étendre la couverture i18n
+
+Les catalogues `fr.yml` / `en.yml` sont synchronisés (25 clés) mais
+90%+ des strings CLI sont encore hardcodées en français.
+
+- [ ] Ajouter les clés manquantes pour les commandes principales
+      (snapshot, network, instance, domain, doctor, console, portal)
+- [ ] Remplacer les `typer.echo("...")` hardcodés par `typer.echo(t("..."))`
+- [ ] Ajouter les messages d'erreur courants au catalogue
+- [ ] Test de couverture : vérifier que toutes les clés fr existent en en
+
+### 26d — Consolider les rôles Ansible
+
+Audit des 15 rôles embarqués — incohérences et manques.
+
+- [ ] Ajouter `defaults/main.yml` aux rôles `base`, `desktop`, `dev-tools`
+      (actuellement toutes les valeurs sont hardcodées dans tasks)
+- [ ] Renommer les handlers en anglais (violation CLAUDE.md) :
+      `ollama_server`, `stt_server`, `tor_gateway` ont des noms français
+- [ ] Documenter les variables externes `llm_effective_*` référencées
+      par `lobechat` et `openclaw_server` mais jamais définies dans les defaults
+- [ ] Harmoniser `changed_when`/`failed_when` sur les tasks shell
+      (`lobechat` : `changed_when: false` incorrect, `open_webui` : pas de `failed_when`)
+- [ ] Standardiser templates .j2 vs config inline (5 rôles inlinent, 3 templalisent)
+
+### 26e — Robustifier le TUI
+
+Gestion d'erreurs insuffisante dans les widgets Textual.
+
+- [ ] Ajouter try-except sur les I/O fichier dans `tui/app.py` `action_save()`
+- [ ] Protéger `query_one()` dans les forms (crash si widget non rendu)
+- [ ] Valider les bornes de `weight` dans `machine_form.py` (overflow possible)
+- [ ] Élargir le catch dans `action_delete_domain()` (seul FileNotFoundError attrapé)
+
+### 26f — Mettre à jour SPEC §6
+
+La table des commandes CLI (§6) est incomplète : il manque
+`domain check`, `domain exec`, `resource show`, `setup import`,
+`workspace grid`, `snapshot rollback`, `doctor --fix`.
+
+- [ ] Mettre à jour §6 pour refléter toutes les commandes implémentées
+
 ### En réflexion
 
 - **MCP services** — canal de communication contrôlé pour les instances

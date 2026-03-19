@@ -12,6 +12,7 @@ import functools
 import json
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -99,7 +100,7 @@ _PATTERN_REGISTRY: list[tuple[str, list[re.Pattern[str]]]] = [
 ]
 
 # Pseudonymes par catégorie (idx → texte de remplacement)
-_PSEUDO_TEMPLATES: dict[str, callable] = {
+_PSEUDO_TEMPLATES: dict[str, Callable[[int], str]] = {
     "ip": lambda idx: f"10.ZONE.{idx}.1",
     "fqdn": lambda idx: f"host-{idx}.example",
     "credential": lambda _idx: "[CREDENTIAL]",
