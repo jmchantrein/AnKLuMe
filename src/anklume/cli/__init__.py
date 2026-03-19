@@ -76,13 +76,18 @@ def main(
 
 @app.command()
 def init(
-    directory: Annotated[str, typer.Argument(help="Répertoire du projet à créer")] = ".",
+    directory: Annotated[str, typer.Argument(help="Répertoire ou template (showcase)")] = ".",
     lang: Annotated[str, typer.Option("--lang", "-l", help="Langue (en/fr)")] = "fr",
 ) -> None:
     """Créer un nouveau projet anklume."""
-    from anklume.cli._init import run_init
+    if directory == "showcase":
+        from anklume.cli._init import run_init_showcase
 
-    run_init(directory, lang=lang)
+        run_init_showcase(".")
+    else:
+        from anklume.cli._init import run_init
+
+        run_init(directory, lang=lang)
 
 
 @app.command()
