@@ -200,7 +200,7 @@ stop_zfs_consumers() {
 
     # Tuer le display manager et tout le graphique à la dure.
     # On NE fait PAS "systemctl stop display-manager" ni "isolate" car
-    # sur CachyOS/SDDM, ça déclenche un nettoyage de seat/VT par logind
+    # sur SDDM, ça déclenche un nettoyage de seat/VT par logind
     # qui tue aussi les sessions TTY. kill -9 est fiable et sans effet
     # de bord systemd.
     info "Arrêt brutal du display manager et des processus graphiques..."
@@ -447,11 +447,11 @@ rollback_btrfs() {
     info "Toplevel btrfs monté sur ${toplevel}"
 
     # Lister les snapshots disponibles
-    # CachyOS/Snapper : .snapshots/N/snapshot ou @snapshots/N/snapshot
+    # Snapper : .snapshots/N/snapshot ou @snapshots/N/snapshot
     # Timeshift : timeshift-btrfs/snapshots/YYYY-MM-DD_HH-MM-SS/@
     local snapshots_found=false
 
-    # --- Snapper (CachyOS par défaut) ---
+    # --- Snapper ---
     if [[ -d "${toplevel}/@/.snapshots" || -d "${toplevel}/.snapshots" ]]; then
         local snap_dir
         if [[ -d "${toplevel}/@/.snapshots" ]]; then
@@ -540,30 +540,18 @@ rollback_snapper() {
             | sed 's/<[^>]*>//g; s/^[[:space:]]*/  /' || true
     fi
 
-    # Lister TOUS les subvolumes à rollback (@ @home @log @cache etc.)
-    # On cherche les paires : subvol actif + snapshot correspondant
+    # Lister les subvolumes à rollback
+    # Arch vanilla : uniquement @ et @.snapshots (pas de @home, @log, etc.)
     info "Subvolumes sur le toplevel :"
     { btrfs subvolume list -o "${toplevel}" 2>/dev/null \
         | awk '{print $NF}' || true; } | head -20 || ls -1 "${toplevel}"/
 
-    confirm "ROLLBACK BTRFS : remplacer les subvolumes actifs par le snapshot #${snap_num} ?"
+    confirm "ROLLBACK BTRFS : remplacer @ par le snapshot #${snap_num} ?"
 
     # Rollback du subvolume principal @
     # Méthode Snapper : le snapshot est sous @/.snapshots/N/snapshot
     # On renomme @ → @.old, puis on snapshot le snapshot vers @
     local subvols_to_rollback=("@")
-
-    # Chercher les subvolumes additionnels avec leurs snapshots
-    # CachyOS crée souvent : @, @home, @log, @cache, @tmp
-    for sv in "@home" "@log" "@cache" "@tmp" "@srv"; do
-        if [[ -d "${toplevel}/${sv}" ]]; then
-            # Vérifier si un snapshot existe pour ce subvolume
-            local sv_snap_dir="${toplevel}/${sv}/.snapshots"
-            if [[ -d "${sv_snap_dir}/${snap_num}/snapshot" ]]; then
-                subvols_to_rollback+=("${sv}")
-            fi
-        fi
-    done
 
     for sv in "${subvols_to_rollback[@]}"; do
         local sv_path="${toplevel}/${sv}"
@@ -629,17 +617,6 @@ rollback_timeshift() {
     mv "${toplevel}/@" "${toplevel}/@.factory-reset-backup"
     btrfs subvolume snapshot "${snap_root}" "${toplevel}/@"
     info "Rollback Timeshift terminé."
-
-    # Idem pour @home si présent
-    if [[ -d "${snap_path}/@home" && -d "${toplevel}/@home" ]]; then
-        if [[ -d "${toplevel}/@home.factory-reset-backup" ]]; then
-            btrfs subvolume delete "${toplevel}/@home.factory-reset-backup" 2>/dev/null || true
-        fi
-        mv "${toplevel}/@home" "${toplevel}/@home.factory-reset-backup"
-        btrfs subvolume snapshot "${snap_path}/@home" "${toplevel}/@home"
-        info "Rollback @home Timeshift terminé."
-    fi
-
     warn "Anciens subvolumes dans *.factory-reset-backup"
 }
 

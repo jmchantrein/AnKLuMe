@@ -51,7 +51,7 @@ sudo ./quickstart.sh --gpu
 
 ### Ce que fait le script
 
-1. Détecte la distribution (CachyOS, Arch, Debian)
+1. Détecte la distribution (Arch Linux, Debian)
 2. Installe les paquets de base (curl, git, jq, tmux, ansible)
 3. Configure Incus (init minimal, groupe `incus-admin`)
 4. Installe AnKLuMe via uv + alias `ank` (bash, zsh, fish)
@@ -95,29 +95,25 @@ ZFS chiffré en mirror, systemd, GPU, toram optionnel, AnKLuMe.
 
 | Distribution | Support GPU récent | Remarques |
 |---|---|---|
-| **CachyOS** (recommandé) | Out of the box | Kernels optimisés, drivers NVIDIA pré-packagés, modules ZFS pré-compilés |
-| Arch Linux | Manuellement | `nvidia-open-dkms` disponible, configuration manuelle requise |
+| **Arch Linux** (recommandé) | `nvidia-open` dans les dépôts | Kernel rolling, GRUB, LUKS2+btrfs, Snapper |
 | Debian 13+ | Limité | Kernel stock trop ancien pour Blackwell (RTX 50xx), nécessite `.run` NVIDIA |
 
-**Pourquoi CachyOS ?** Les GPU NVIDIA récents (architecture Blackwell)
-nécessitent un kernel ≥ 6.12 et les open kernel modules. CachyOS
-fournit tout cela out of the box. Sur Debian, le kernel stock est
-souvent trop ancien. Sur Arch vanilla, ça fonctionne mais demande
-plus de configuration manuelle.
+**Pourquoi Arch Linux ?** Les GPU NVIDIA récents (architecture Blackwell)
+nécessitent un kernel ≥ 6.12 et les open kernel modules (`nvidia-open`).
+Arch fournit les deux dans ses dépôts officiels. Le bootstrap configure
+GRUB comme bootloader, Snapper pour les snapshots btrfs, et
+grub-btrfs pour les entrées de rollback automatiques.
 
-!!! tip "Kernel CachyOS-LTS recommandé"
-    Sur CachyOS, privilégier le kernel **cachyos-lts** plutôt que le
-    kernel rolling. Le module ZFS doit être recompilé à chaque mise à
-    jour du kernel ; avec le kernel LTS, les mises à jour sont moins
-    fréquentes, ce qui réduit le risque de casse après un `pacman -Syu`.
+!!! tip "Configuration système attendue"
+    Le bootstrap suppose la configuration suivante :
 
-    ```bash
-    # Installer le kernel LTS
-    sudo pacman -S linux-cachyos-lts linux-cachyos-lts-headers
-
-    # Vérifier que le bootloader (Limine/GRUB) a une entrée LTS
-    # Le bootstrap.sh détecte automatiquement le kernel LTS s'il est installé
-    ```
+    - **Bootloader** : GRUB
+    - **Chiffrement** : LUKS2 sur la partition système
+    - **Filesystem** : btrfs avec deux sous-volumes : `@` (/) et `@.snapshots` (/.snapshots)
+    - **Partition EFI** : FAT32 montée sur `/boot/efi`
+    - **Home** : sur ZFS (créé par le bootstrap)
+    - **Snapshots** : Snapper (config `root`) + grub-btrfs
+    - **GPU** : `nvidia-open` (modules open source)
 
 ### Exécuter le bootstrap
 
@@ -163,14 +159,14 @@ sudo ./bootstrap.sh \
 
 ### Ce que fait le script
 
-1. Détecte la distribution (CachyOS, Arch, Debian)
+1. Détecte la distribution (Arch, Debian)
 2. Installe les paquets (dkms, zfs, incus, ansible, uv)
 3. Crée le pool ZFS chiffré (keyfile raw + backup passphrase)
 4. Crée les datasets ZFS (Incus, /home, modèles IA, backups, etc.)
 5. Configure systemd (déverrouillage ZFS → montage → Incus)
 6. Configure le storage pool Incus sur ZFS
 7. Détecte le GPU NVIDIA et installe le driver adapté
-8. Installe le hook toram + entrée bootloader (Limine ou GRUB)
+8. Installe le hook toram + entrée bootloader GRUB
 9. Monte `/home` ZFS avec les bons droits utilisateur
 10. Installe AnKLuMe via uv + alias `ank`
 
@@ -189,8 +185,8 @@ Disque système (NVMe)                 Pool ZFS "tank" (2x NVMe mirror)
 ┌─────────────────────────┐           ┌─────────────────────────────────────┐
 │ p1  512M  EFI           │           │ tank/_home             → /home     │
 │ p2  reste LUKS → btrfs  │           │ tank/_incus            → (Incus)   │
-│   @cachyos  → /         │           │ tank/_srv_models       → /srv/…    │
-│   @snapshots            │           │ tank/_srv_models_ollama → /srv/…   │
+│   @           → /        │           │ tank/_srv_models       → /srv/…    │
+│   @.snapshots → /.snapshots │       │ tank/_srv_models_ollama → /srv/…   │
 └─────────────────────────┘           │ tank/_srv_models_stt   → /srv/…    │
                                       │ tank/_srv_shared       → /srv/…    │
                                       │ tank/_srv_backups      → /srv/…    │
@@ -203,7 +199,7 @@ Disque système (NVMe)                 Pool ZFS "tank" (2x NVMe mirror)
 - `/` sur btrfs avec subvolumes — multiboot, snapshots
 - Données persistantes sur ZFS — chiffrement natif (keyfile raw), compression, mirror
 - Mode toram optionnel — `/` chargé en RAM, immutable au runtime
-- GPU NVIDIA via paquets distro (CachyOS/Arch) ou `.run` + DKMS (Debian)
+- GPU NVIDIA via `nvidia-open` (Arch) ou `.run` + DKMS (Debian)
 
 ### Détails techniques
 
@@ -213,7 +209,7 @@ Les sections principales :
 
 | Fonction | Rôle |
 |---|---|
-| `detect_distro()` | Détection CachyOS/Arch/Debian, choix du gestionnaire de paquets |
+| `detect_distro()` | Détection Arch/Debian, choix du gestionnaire de paquets |
 | `install_base_packages()` | dkms, zfs, incus, ansible, uv |
 | `create_zfs_pool()` | Pool chiffré AES-256-GCM, keyfile raw 32 bytes, mirror |
 | `create_zfs_datasets()` | 7 datasets avec mountpoints et propriétés adaptées |

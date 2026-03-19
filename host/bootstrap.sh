@@ -2,8 +2,7 @@
 # bootstrap.sh — Prépare un hôte GNU/Linux pour AnKLuMe
 #
 # Distributions supportées :
-#   - CachyOS (recommandé — kernels optimisés, GPU récent out of the box)
-#   - Arch Linux
+#   - Arch Linux (recommandé)
 #   - Debian 13+
 #
 # Point de départ : OS fraîchement installé (LUKS + btrfs sur NVMe système)
@@ -73,7 +72,7 @@ ZFS_DISK_1=""
 ZFS_DISK_2=""
 
 # Détection de la distribution (rempli par detect_distro)
-DISTRO=""          # "cachyos", "arch", "debian"
+DISTRO=""          # "arch", "debian"
 DISTRO_FAMILY=""   # "arch" ou "debian"
 PKG_INSTALL=""     # commande d'installation de paquets
 
@@ -168,10 +167,6 @@ detect_distro() {
     source /etc/os-release
 
     case "${ID:-}" in
-        cachyos)
-            DISTRO="cachyos"
-            DISTRO_FAMILY="arch"
-            ;;
         arch|endeavouros|manjaro)
             DISTRO="arch"
             DISTRO_FAMILY="arch"
@@ -182,7 +177,7 @@ detect_distro() {
             ;;
         *)
             error "Distribution '${ID:-inconnue}' non supportée."
-            error "Distributions supportées : CachyOS, Arch, Debian."
+            error "Distributions supportées : Arch Linux, Debian."
             exit 1
             ;;
     esac
@@ -231,16 +226,7 @@ install_packages_arch() {
     if ! command -v zfs &> /dev/null; then
         info "Installation de ZFS..."
         ${PKG_INSTALL} zfs-utils > /dev/null 2>&1
-
-        if [[ "${DISTRO}" == "cachyos" ]]; then
-            # CachyOS fournit des modules ZFS pré-compilés
-            ${PKG_INSTALL} cachyos-zfs > /dev/null 2>&1 || {
-                warn "cachyos-zfs indisponible, fallback sur zfs-dkms..."
-                ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
-            }
-        else
-            ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
-        fi
+        ${PKG_INSTALL} zfs-dkms > /dev/null 2>&1
     fi
 
     # Charger le module ZFS
@@ -832,7 +818,7 @@ install_nvidia_standard() {
 
 install_nvidia_blackwell() {
     if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        # CachyOS/Arch : le driver 570+ est dans les dépôts
+        # Arch : le driver 570+ est dans les dépôts
         info "Installation via pacman (nvidia-open-dkms, 570+)..."
         pacman -S --noconfirm --needed \
             nvidia-open-dkms nvidia-utils > /dev/null 2>&1
@@ -917,14 +903,10 @@ setup_toram() {
 }
 
 # Régénère l'initramfs avec le bon outil :
-#   1. limine-mkinitcpio si présent (CachyOS + Limine : gère les chemins /boot/<machine-id>/)
-#   2. mkinitcpio -P sinon (Arch standard)
-#   3. dracut --force (Fedora, CachyOS avec dracut)
+#   1. mkinitcpio -P (Arch standard)
+#   2. dracut --force (Fedora, etc.)
 regenerate_initramfs() {
-    if command -v limine-mkinitcpio &> /dev/null; then
-        limine-mkinitcpio
-        info "Initramfs regénéré via limine-mkinitcpio."
-    elif command -v mkinitcpio &> /dev/null; then
+    if command -v mkinitcpio &> /dev/null; then
         mkinitcpio -P
         info "Initramfs regénéré via mkinitcpio -P."
     elif command -v dracut &> /dev/null; then
@@ -936,7 +918,7 @@ regenerate_initramfs() {
     fi
 }
 
-# --- Arch / CachyOS : mkinitcpio + Limine/GRUB ---
+# --- Arch : mkinitcpio + GRUB ---
 setup_toram_mkinitcpio() {
     # Hook mkinitcpio (install)
     local hook_install="/usr/lib/initcpio/install/toram"
@@ -998,17 +980,15 @@ EOF
         regenerate_initramfs
     fi
 
-    # Entrée bootloader (Limine si présent, sinon GRUB)
-    if [[ -f "/boot/limine.conf" ]]; then
-        setup_toram_limine
-    elif command -v grub-mkconfig &> /dev/null; then
+    # Entrée bootloader GRUB
+    if command -v grub-mkconfig &> /dev/null; then
         setup_toram_grub
     else
-        warn "Aucun bootloader supporté détecté pour l'entrée toram."
+        warn "GRUB non détecté — entrée toram non ajoutée."
     fi
 }
 
-# --- Arch / CachyOS : dracut + Limine/GRUB ---
+# --- Arch : dracut + GRUB ---
 setup_toram_dracut() {
     local module_dir="/usr/lib/dracut/modules.d/90toram"
     mkdir -p "${module_dir}"
@@ -1064,67 +1044,12 @@ CONF
         regenerate_initramfs
     fi
 
-    # Entrée bootloader (Limine si présent, sinon GRUB)
-    if [[ -f "/boot/limine.conf" ]]; then
-        setup_toram_limine
-    elif command -v grub-mkconfig &> /dev/null; then
+    # Entrée bootloader GRUB
+    if command -v grub-mkconfig &> /dev/null; then
         setup_toram_grub
     else
-        warn "Aucun bootloader supporté détecté pour l'entrée toram."
+        warn "GRUB non détecté — entrée toram non ajoutée."
     fi
-}
-
-setup_toram_limine() {
-    local limine_conf="/boot/limine.conf"
-
-    if grep -q "BOOT_MODE=toram" "${limine_conf}" && [[ "${FORCE_TORAM}" != true ]]; then
-        info "Entrée Limine toram existe déjà."
-        return
-    fi
-
-    # En mode force, supprimer l'ancienne entrée toram avant de recréer
-    if [[ "${FORCE_TORAM}" == true ]] && grep -q "toram -- immutable" "${limine_conf}"; then
-        info "Mode force : suppression de l'ancienne entrée Limine toram."
-        # Supprimer le bloc : de "/...toram -- immutable)" jusqu'à la prochaine ligne vide ou fin
-        sed -i '/toram -- immutable/,/^$/d' "${limine_conf}"
-    fi
-
-    local luks_uuid luks_name root_subvol
-    root_subvol=$(findmnt -no OPTIONS / | grep -oP 'subvol=\K[^,]+' || true)
-    luks_uuid=$(blkid -t TYPE=crypto_LUKS -o value -s UUID | head -1)
-
-    # Trouver le device mapper LUKS
-    luks_name=""
-    for mapper in /dev/mapper/luks-*; do
-        if [[ -e "${mapper}" ]]; then
-            luks_name=$(basename "${mapper}")
-            break
-        fi
-    done
-
-    local cmdline="root=/dev/mapper/${luks_name}"
-    cmdline+=" rd.luks.uuid=${luks_uuid}"
-    cmdline+=" ro BOOT_MODE=toram"
-    if [[ -n "${root_subvol}" ]]; then
-        cmdline+=" rootflags=subvol=${root_subvol}"
-    fi
-
-    # Détecter le kernel CachyOS
-    local kernel_name="linux-cachyos"
-    if [[ -f "/boot/vmlinuz-linux-cachyos-lts" ]]; then
-        kernel_name="linux-cachyos-lts"
-    fi
-
-    cat >> "${limine_conf}" << ENTRY
-
-/CachyOS (toram -- immutable)
-    protocol: linux
-    kernel_path: boot():/vmlinuz-${kernel_name}
-    kernel_cmdline: ${cmdline}
-    module_path: boot():/intel-ucode.img
-    module_path: boot():/initramfs-${kernel_name}.img
-ENTRY
-    info "Entrée Limine toram ajoutée."
 }
 
 # --- Debian : initramfs-tools + GRUB ---
