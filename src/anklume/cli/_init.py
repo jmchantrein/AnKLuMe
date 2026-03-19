@@ -207,6 +207,54 @@ policies: []
 }
 
 
+def _find_showcase_dir() -> Path | None:
+    """Localise examples/showcase/ dans le dépôt anklume."""
+    # Remonter depuis src/anklume/cli/_init.py → racine du dépôt
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    showcase = repo_root / "examples" / "showcase"
+    if showcase.is_dir():
+        return showcase
+    return None
+
+
+def run_init_showcase(directory: str) -> None:
+    """Initialiser un projet depuis l'exemple showcase."""
+    import shutil
+
+    showcase_dir = _find_showcase_dir()
+    if showcase_dir is None:
+        typer.echo("Répertoire examples/showcase/ introuvable.", err=True)
+        raise typer.Exit(1)
+
+    project_dir = Path(directory).resolve()
+
+    if directory != ".":
+        if project_dir.exists() and any(project_dir.iterdir()):
+            typer.echo(f"Le répertoire {project_dir} n'est pas vide.")
+            raise typer.Exit(1)
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+    if (project_dir / "anklume.yml").exists():
+        typer.echo(f"anklume.yml existe déjà dans {project_dir}")
+        raise typer.Exit(0)
+
+    # Copier tout le contenu du showcase
+    for item in showcase_dir.iterdir():
+        dest = project_dir / item.name
+        if item.is_dir():
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+
+    # Répertoire rôles personnalisés
+    roles_dir = project_dir / "ansible_roles_custom"
+    roles_dir.mkdir(exist_ok=True)
+    (roles_dir / ".gitkeep").touch()
+
+    typer.echo(f"Projet showcase créé dans {project_dir}")
+    typer.echo("Prochaine étape : adapter anklume.yml, puis : anklume apply all")
+
+
 def run_init(directory: str, *, lang: str = "fr") -> None:
     """Créer un répertoire projet anklume."""
     project_dir = Path(directory).resolve()
