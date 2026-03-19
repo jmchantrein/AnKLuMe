@@ -244,37 +244,55 @@ install_packages_arch() {
     # 1. Configurer le dépôt archzfs (avant le premier pacman -Syu)
     setup_archzfs_repo
 
-    # 2. Installer linux-lts + headers en premier (DKMS en dépend)
+    # 2. Déterminer les headers du kernel courant.
+    #    DKMS a besoin des headers pour compiler le module ZFS.
+    #    Sans les headers du kernel qui tourne, modprobe zfs échoue.
+    local current_headers="linux-headers"
+    local running_kernel
+    running_kernel=$(uname -r)
+    if [[ "${running_kernel}" == *-lts* ]]; then
+        current_headers="linux-lts-headers"
+    elif [[ "${running_kernel}" == *-zen* ]]; then
+        current_headers="linux-zen-headers"
+    elif [[ "${running_kernel}" == *-hardened* ]]; then
+        current_headers="linux-hardened-headers"
+    fi
+
+    # 3. Installer linux-lts (cible) + headers courant + headers lts
     #    linux-lts est obligatoire : le kernel rolling d'Arch peut casser
     #    la compatibilité ZFS entre deux mises à jour.
+    #    Les headers du kernel courant permettent modprobe zfs sans reboot.
+    info "Installation des paquets de base (pacman -Syu)..."
     pacman -Syu --noconfirm --needed \
-        linux-lts linux-lts-headers \
+        linux-lts linux-lts-headers "${current_headers}" \
         base-devel dkms pkg-config \
         curl git tmux jq \
         ansible-core python \
-        > /dev/null 2>&1
+        > /dev/null
 
-    # 3. ZFS (depuis le dépôt archzfs)
+    # 4. ZFS (depuis le dépôt archzfs)
     if ! command -v zfs &> /dev/null; then
         info "Installation de ZFS (dépôt archzfs)..."
-        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null 2>&1
+        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null
     fi
 
-    # 4. Charger le module ZFS
+    # 5. Charger le module ZFS
     if ! lsmod | grep -q "^zfs "; then
         modprobe zfs
         info "Module ZFS chargé."
     fi
 
-    # 5. Incus
+    # 6. Incus
     if ! command -v incus &> /dev/null; then
-        ${PKG_INSTALL} incus > /dev/null 2>&1
+        info "Installation d'Incus..."
+        ${PKG_INSTALL} incus > /dev/null
     fi
 }
 
 install_packages_debian() {
     apt-get update -qq || { error "apt-get update échoué"; exit 1; }
 
+    info "Installation des paquets de base (apt)..."
     apt-get install -y -qq \
         build-essential dkms pkg-config \
         curl git tmux jq \
@@ -284,6 +302,7 @@ install_packages_debian() {
 
     # ZFS (userspace + DKMS pour les kernels non-stock)
     if ! command -v zfs &> /dev/null; then
+        info "Installation de ZFS (apt)..."
         apt-get install -y -qq zfsutils-linux zfs-dkms > /dev/null
     fi
 
@@ -295,6 +314,7 @@ install_packages_debian() {
 
     # Incus
     if ! command -v incus &> /dev/null; then
+        info "Installation d'Incus..."
         apt-get install -y -qq incus > /dev/null
     fi
 }
