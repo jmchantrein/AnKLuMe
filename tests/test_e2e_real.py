@@ -902,7 +902,7 @@ class TestRealShowcase:
         write_test_project(
             project_dir,
             {
-                "e2e-sc-alpha": {
+                "e2e-sc-a": {
                     "description": "Mini-showcase alpha (trusted)",
                     "trust_level": "trusted",
                     "machines": {
@@ -910,7 +910,7 @@ class TestRealShowcase:
                         "db": {"description": "Base de données", "type": "lxc"},
                     },
                 },
-                "e2e-sc-beta": {
+                "e2e-sc-b": {
                     "description": "Mini-showcase beta (disposable)",
                     "trust_level": "disposable",
                     "ephemeral": True,
@@ -923,8 +923,8 @@ class TestRealShowcase:
             policies=[
                 {
                     "description": "Alpha → Beta SSH",
-                    "from": "e2e-sc-alpha",
-                    "to": "e2e-sc-beta",
+                    "from": "e2e-sc-a",
+                    "to": "e2e-sc-b",
                     "ports": [22],
                 },
             ],
@@ -934,7 +934,7 @@ class TestRealShowcase:
         yield project_dir
 
         # Cleanup
-        for proj in ("e2e-sc-alpha", "e2e-sc-beta"):
+        for proj in ("e2e-sc-a", "e2e-sc-b"):
             cleanup_project(proj)
 
     def test_showcase_apply_and_status(self, showcase_project):
