@@ -36,6 +36,12 @@ set -euo pipefail
 # (sinon les chemins relatifs dans BASH_SOURCE[0] sont résolus depuis /root).
 SCRIPT_REAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Bibliothèques partagées
+# shellcheck source=host/lib/common.sh
+source "${SCRIPT_REAL_DIR}/lib/common.sh"
+# shellcheck source=host/lib/nvidia.sh
+source "${SCRIPT_REAL_DIR}/lib/nvidia.sh"
+
 # Toujours travailler depuis un répertoire stable (btrfs rootfs).
 # Les montages ZFS (ex: tank/_home → /home) peuvent invalider le cwd.
 cd /root
@@ -55,13 +61,6 @@ readonly ZFS_KEY_ENC="${ZFS_KEY_DIR}/tank.key.enc"    # backup chiffré (passphr
 # Calculé une fois, avant que mount_zfs_home ne masque /home btrfs.
 BOOTSTRAP_REPO_DIR=""
 
-# Couleurs
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[0;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m'
-
 # Flags
 SKIP_NVIDIA=false
 SKIP_TORAM=false
@@ -75,7 +74,7 @@ ZFS_DISK_2=""
 # Détection de la distribution (rempli par detect_distro)
 DISTRO=""          # "arch", "debian"
 DISTRO_FAMILY=""   # "arch" ou "debian"
-PKG_INSTALL=""     # commande d'installation de paquets
+PKG_INSTALL=()     # commande d'installation de paquets (array)
 
 # ---------------------------------------------------------------------------
 # Parsing des arguments
@@ -109,18 +108,6 @@ done
 # ---------------------------------------------------------------------------
 # Fonctions utilitaires
 # ---------------------------------------------------------------------------
-
-info()  { printf "${GREEN}[INFO]${NC}  %s\n" "$1"; }
-warn()  { printf "${YELLOW}[WARN]${NC}  %s\n" "$1"; }
-error() { printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2; }
-step()  { printf "\n${BLUE}── %s${NC}\n\n" "$1"; }
-
-check_root() {
-    if [[ ${EUID} -ne 0 ]]; then
-        error "Ce script doit être exécuté en root."
-        exit 1
-    fi
-}
 
 # Demande la passphrase de secours (interactif ou stdin)
 ask_passphrase() {
@@ -184,9 +171,9 @@ detect_distro() {
     esac
 
     if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        PKG_INSTALL="pacman -S --noconfirm --needed"
+        PKG_INSTALL=(pacman -S --noconfirm --needed)
     else
-        PKG_INSTALL="apt-get install -y -qq"
+        PKG_INSTALL=(apt-get install -y -qq)
     fi
 
     info "Distribution détectée : ${PRETTY_NAME:-${ID}} (famille ${DISTRO_FAMILY})"
@@ -273,7 +260,7 @@ install_packages_arch() {
     # 4. ZFS (depuis le dépôt archzfs)
     if ! command -v zfs &> /dev/null; then
         info "Installation de ZFS (dépôt archzfs)..."
-        ${PKG_INSTALL} zfs-dkms zfs-utils > /dev/null
+        "${PKG_INSTALL[@]}" zfs-dkms zfs-utils > /dev/null
     fi
 
     # 5. Charger le module ZFS
@@ -289,7 +276,7 @@ install_packages_arch() {
             yes | pacman -S iptables-nft > /dev/null
         fi
         info "Installation d'Incus..."
-        ${PKG_INSTALL} incus > /dev/null
+        "${PKG_INSTALL[@]}" incus > /dev/null
     fi
 }
 
@@ -326,6 +313,66 @@ install_packages_debian() {
 # ---------------------------------------------------------------------------
 # 2. Pool ZFS chiffré (mirror) + keyfile
 # ---------------------------------------------------------------------------
+
+# Résoudre les chemins de disques vers by-id.
+# Accepte : by-id nu, chemin complet by-id, /dev/nvmeXnY, /dev/sdX.
+# Résout toujours vers /dev/disk/by-id/* pour la stabilité du pool.
+_resolve_disk_path() {
+    local input="$1"
+    local resolved=""
+
+    # Étape 1 : résoudre l'entrée vers un block device existant
+    if [[ -e "${input}" ]]; then
+        resolved="${input}"
+    elif [[ -e "/dev/disk/by-id/${input}" ]]; then
+        resolved="/dev/disk/by-id/${input}"
+    else
+        echo ""
+        return
+    fi
+
+    # Étape 2 : si déjà un chemin by-id, l'utiliser directement
+    if [[ "${resolved}" == /dev/disk/by-id/* ]]; then
+        echo "${resolved}"
+        return
+    fi
+
+    # Étape 3 : résoudre /dev/nvmeXnY ou /dev/sdX vers by-id
+    #   Parcourir les symlinks /dev/disk/by-id/ pour trouver celui
+    #   qui pointe vers le même block device. Préférer nvme-* à wwn-*.
+    local real_dev
+    real_dev=$(readlink -f "${resolved}")
+
+    local by_id_match=""
+    local by_id_fallback=""
+    for link in /dev/disk/by-id/*; do
+        [[ -L "${link}" ]] || continue
+        # Ignorer les entrées de partition (nvme-XXX-part1)
+        [[ "${link}" == *-part* ]] && continue
+        local link_target
+        link_target=$(readlink -f "${link}")
+        if [[ "${link_target}" == "${real_dev}" ]]; then
+            if [[ "${link}" == */nvme-* ]]; then
+                by_id_match="${link}"
+                break
+            fi
+            by_id_fallback="${link}"
+        fi
+    done
+
+    if [[ -n "${by_id_match}" ]]; then
+        info "  ${input} → ${by_id_match}" >&2
+        echo "${by_id_match}"
+    elif [[ -n "${by_id_fallback}" ]]; then
+        info "  ${input} → ${by_id_fallback}" >&2
+        echo "${by_id_fallback}"
+    else
+        # Pas de lien by-id trouvé (rare). Utiliser le chemin brut avec avertissement.
+        warn "  ${input} : aucun lien by-id trouvé. Utilisation du chemin brut." >&2
+        warn "  Le pool pourrait ne pas s'importer si l'ordre des disques change." >&2
+        echo "${resolved}"
+    fi
+}
 
 create_zfs_pool() {
     if [[ "${SKIP_ZFS_POOL}" == true ]]; then
@@ -365,69 +412,9 @@ create_zfs_pool() {
         exit 1
     fi
 
-    # Résoudre les chemins de disques vers by-id.
-    # Accepte : by-id nu, chemin complet by-id, /dev/nvmeXnY, /dev/sdX.
-    # Résout toujours vers /dev/disk/by-id/* pour la stabilité du pool.
-    resolve_disk_path() {
-        local input="$1"
-        local resolved=""
-
-        # Étape 1 : résoudre l'entrée vers un block device existant
-        if [[ -e "${input}" ]]; then
-            resolved="${input}"
-        elif [[ -e "/dev/disk/by-id/${input}" ]]; then
-            resolved="/dev/disk/by-id/${input}"
-        else
-            echo ""
-            return
-        fi
-
-        # Étape 2 : si déjà un chemin by-id, l'utiliser directement
-        if [[ "${resolved}" == /dev/disk/by-id/* ]]; then
-            echo "${resolved}"
-            return
-        fi
-
-        # Étape 3 : résoudre /dev/nvmeXnY ou /dev/sdX vers by-id
-        #   Parcourir les symlinks /dev/disk/by-id/ pour trouver celui
-        #   qui pointe vers le même block device. Préférer nvme-* à wwn-*.
-        local real_dev
-        real_dev=$(readlink -f "${resolved}")
-
-        local by_id_match=""
-        local by_id_fallback=""
-        for link in /dev/disk/by-id/*; do
-            [[ -L "${link}" ]] || continue
-            # Ignorer les entrées de partition (nvme-XXX-part1)
-            [[ "${link}" == *-part* ]] && continue
-            local link_target
-            link_target=$(readlink -f "${link}")
-            if [[ "${link_target}" == "${real_dev}" ]]; then
-                if [[ "${link}" == */nvme-* ]]; then
-                    by_id_match="${link}"
-                    break
-                fi
-                by_id_fallback="${link}"
-            fi
-        done
-
-        if [[ -n "${by_id_match}" ]]; then
-            info "  ${input} → ${by_id_match}" >&2
-            echo "${by_id_match}"
-        elif [[ -n "${by_id_fallback}" ]]; then
-            info "  ${input} → ${by_id_fallback}" >&2
-            echo "${by_id_fallback}"
-        else
-            # Pas de lien by-id trouvé (rare). Utiliser le chemin brut avec avertissement.
-            warn "  ${input} : aucun lien by-id trouvé. Utilisation du chemin brut." >&2
-            warn "  Le pool pourrait ne pas s'importer si l'ordre des disques change." >&2
-            echo "${resolved}"
-        fi
-    }
-
     local disk1_path disk2_path
-    disk1_path=$(resolve_disk_path "${ZFS_DISK_1}")
-    disk2_path=$(resolve_disk_path "${ZFS_DISK_2}")
+    disk1_path=$(_resolve_disk_path "${ZFS_DISK_1}")
+    disk2_path=$(_resolve_disk_path "${ZFS_DISK_2}")
 
     if [[ -z "${disk1_path}" ]]; then
         error "Disque 1 introuvable : ${ZFS_DISK_1}"
@@ -550,45 +537,45 @@ unlock_zfs_pool() {
 # 3. Datasets ZFS
 # ---------------------------------------------------------------------------
 
+# Helper : créer un dataset s'il n'existe pas
+_ensure_dataset() {
+    local name="$1"
+    shift
+    if ! zfs list "${name}" &> /dev/null; then
+        zfs create "$@" "${name}"
+        info "  Créé : ${name}"
+    else
+        info "  Existe : ${name}"
+    fi
+}
+
 create_zfs_datasets() {
     step "Datasets ZFS"
     info "Création des datasets ZFS (idempotent)..."
 
-    # Helper : créer un dataset s'il n'existe pas
-    ensure_dataset() {
-        local name="$1"
-        shift
-        if ! zfs list "${name}" &> /dev/null; then
-            zfs create "$@" "${name}"
-            info "  Créé : ${name}"
-        else
-            info "  Existe : ${name}"
-        fi
-    }
-
     # Incus — mountpoint legacy, Incus gère ses sous-datasets
-    ensure_dataset "${POOL}/_incus" -o mountpoint=legacy
+    _ensure_dataset "${POOL}/_incus" -o mountpoint=legacy
 
     # Modèles IA — gros blobs séquentiels, déjà compressés
-    ensure_dataset "${POOL}/_srv_models" \
+    _ensure_dataset "${POOL}/_srv_models" \
         -o mountpoint=/srv/models -o recordsize=1M -o compression=off
-    ensure_dataset "${POOL}/_srv_models_ollama" -o mountpoint=/srv/models/ollama
-    ensure_dataset "${POOL}/_srv_models_stt"    -o mountpoint=/srv/models/stt
+    _ensure_dataset "${POOL}/_srv_models_ollama" -o mountpoint=/srv/models/ollama
+    _ensure_dataset "${POOL}/_srv_models_stt"    -o mountpoint=/srv/models/stt
 
     # Home — canmount=noauto : ne se monte pas automatiquement à la création.
     # On le monte explicitement à la fin du script (mount_zfs_home) pour
     # éviter de masquer /home btrfs pendant que mkinitcpio/initramfs tourne.
-    ensure_dataset "${POOL}/_home" -o mountpoint=/home -o canmount=noauto
+    _ensure_dataset "${POOL}/_home" -o mountpoint=/home -o canmount=noauto
 
     # État anklume (JSON, logs) — quota de sécurité
-    ensure_dataset "${POOL}/_var_lib_anklume" \
+    _ensure_dataset "${POOL}/_var_lib_anklume" \
         -o mountpoint=/var/lib/anklume -o quota=10G
 
     # Volumes partagés inter-domaines
-    ensure_dataset "${POOL}/_srv_shared" -o mountpoint=/srv/shared
+    _ensure_dataset "${POOL}/_srv_shared" -o mountpoint=/srv/shared
 
     # Backups, golden images — gros fichiers séquentiels
-    ensure_dataset "${POOL}/_srv_backups" \
+    _ensure_dataset "${POOL}/_srv_backups" \
         -o mountpoint=/srv/backups -o recordsize=1M
 
     info "Datasets ZFS OK."
@@ -841,41 +828,6 @@ setup_incus() {
 # 6. NVIDIA GPU (détection auto + installation)
 # ---------------------------------------------------------------------------
 
-# PCI device IDs Blackwell (RTX 50xx) : nécessite driver 570+ et open kernel modules
-# Source : lspci 10de:XXXX confirmés sur hardware réel
-readonly -a BLACKWELL_IDS=(
-    "2b85" # RTX 5090  (GB202)
-    "2c02" # RTX 5080  (GB203)
-    "2c05" # RTX 5070 Ti (GB203)
-    "2f04" # RTX 5070  (GB205)
-    "2bb3" # RTX PRO 5000 (GB202)
-)
-
-readonly NVIDIA_BLACKWELL_VERSION="570.195.03"
-readonly NVIDIA_BLACKWELL_RUN="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
-
-# Retourne "blackwell", "supported" ou "none"
-detect_nvidia_gpu() {
-    if ! lspci -nn 2>/dev/null | grep -qi "nvidia"; then
-        echo "none"
-        return
-    fi
-
-    local pci_ids
-    pci_ids=$(lspci -nn | grep -i nvidia | grep -oP '10de:\K[0-9a-f]{4}' || true)
-
-    for id in ${pci_ids}; do
-        for blackwell_id in "${BLACKWELL_IDS[@]}"; do
-            if [[ "${id,,}" == "${blackwell_id,,}" ]]; then
-                echo "blackwell"
-                return
-            fi
-        done
-    done
-
-    echo "supported"
-}
-
 setup_nvidia() {
     if [[ "${SKIP_NVIDIA}" == true ]]; then
         info "NVIDIA : ignoré (--skip-nvidia)."
@@ -909,88 +861,6 @@ setup_nvidia() {
             install_nvidia_standard
             ;;
     esac
-}
-
-install_nvidia_standard() {
-    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        info "Installation via pacman (nvidia-open-dkms)..."
-        pacman -S --noconfirm --needed \
-            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
-        info "NVIDIA driver installé (open kernel modules)."
-    else
-        # Debian : activer non-free si nécessaire
-        if ! grep -q "non-free" /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; then
-            warn "Activation des dépôts non-free/contrib..."
-            sed -i 's/main$/main contrib non-free non-free-firmware/' \
-                /etc/apt/sources.list 2>/dev/null || true
-            apt-get update -qq
-        fi
-
-        apt-get install -y -qq \
-            "linux-headers-$(uname -r)" \
-            nvidia-driver nvidia-open-kernel-dkms \
-            firmware-nvidia-gsp \
-            > /dev/null 2>&1
-        info "NVIDIA driver installé."
-    fi
-}
-
-install_nvidia_blackwell() {
-    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        # Arch : le driver 570+ est dans les dépôts
-        info "Installation via pacman (nvidia-open-dkms, 570+)..."
-        pacman -S --noconfirm --needed \
-            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
-        info "NVIDIA Blackwell driver installé."
-    else
-        # Debian : le driver 570+ n'est PAS dans les dépôts.
-        warn "Blackwell nécessite le driver ${NVIDIA_BLACKWELL_VERSION}."
-        warn "Ce driver n'est pas dans les dépôts Debian — installation via .run"
-
-        apt-get install -y -qq \
-            "linux-headers-$(uname -r)" \
-            build-essential dkms pkg-config \
-            > /dev/null
-
-        # Blacklister nouveau
-        if ! grep -q "blacklist nouveau" /etc/modprobe.d/blacklist-nouveau.conf 2>/dev/null; then
-            cat > /etc/modprobe.d/blacklist-nouveau.conf << 'CONF'
-blacklist nouveau
-options nouveau modeset=0
-CONF
-            if [[ "${DISTRO_FAMILY}" == "debian" ]]; then
-                update-initramfs -u 2>/dev/null || true
-            else
-                regenerate_initramfs 2>/dev/null || true
-            fi
-            info "Module nouveau blacklisté."
-        fi
-
-        if lsmod | grep -q nouveau; then
-            warn "Le module nouveau est encore chargé."
-            warn "Rebootez puis relancez ce script."
-            return
-        fi
-
-        local run_file="/tmp/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
-        if [[ ! -f "${run_file}" ]]; then
-            info "Téléchargement du driver ${NVIDIA_BLACKWELL_VERSION}..."
-            curl -L -o "${run_file}" "${NVIDIA_BLACKWELL_RUN}" || {
-                error "Échec du téléchargement. URL : ${NVIDIA_BLACKWELL_RUN}"
-                exit 1
-            }
-        fi
-
-        chmod +x "${run_file}"
-        info "Installation du driver NVIDIA ${NVIDIA_BLACKWELL_VERSION} (open kernel modules)..."
-        "${run_file}" --dkms --open --silent || {
-            error "Échec de l'installation. Vérifier : /var/log/nvidia-installer.log"
-            exit 1
-        }
-
-        rm -f "${run_file}"
-        info "NVIDIA Blackwell driver ${NVIDIA_BLACKWELL_VERSION} installé."
-    fi
 }
 
 # ---------------------------------------------------------------------------

@@ -8,11 +8,13 @@
       - zstd
     state: present
     update_cache: true
+  tags: [install]
 
 - name: Installer Ollama via le script officiel
   ansible.builtin.shell:
     cmd: curl -fsSL https://ollama.com/install.sh | sh
     creates: /usr/local/bin/ollama
+  tags: [install]
 
 - name: Détecter la présence GPU (nvidia-smi)
   ansible.builtin.command:
@@ -20,6 +22,7 @@
   register: gpu_check
   changed_when: false
   failed_when: false
+  tags: [configure]
 
 - name: Créer la configuration systemd Ollama
   ansible.builtin.copy:
@@ -42,7 +45,8 @@
 
       [Install]
       WantedBy=multi-user.target
-  notify: Redémarrer Ollama
+  notify: restart ollama
+  tags: [service]
 
 - name: Activer et démarrer Ollama
   ansible.builtin.systemd:
@@ -50,6 +54,7 @@
     enabled: true
     state: started
     daemon_reload: true
+  tags: [service]
 
 - name: Attendre que Ollama soit prêt
   ansible.builtin.uri:
@@ -59,9 +64,11 @@
   retries: 30
   delay: 2
   until: ollama_health.status == 200
+  tags: [service]
 
 - name: Pull du modèle par défaut
   ansible.builtin.command:
     cmd: "ollama pull {{ ollama_default_model }}"
   when: ollama_default_model | length > 0
   changed_when: true
+  tags: [install]

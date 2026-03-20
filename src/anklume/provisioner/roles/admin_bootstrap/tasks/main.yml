@@ -5,22 +5,27 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
+  tags: [install]
 
 - name: Mise à jour des paquets (apt upgrade)
   ansible.builtin.apt:
     upgrade: safe
   when: bootstrap_upgrade | default(true) | bool
+  tags: [install]
 
 - name: Configurer la locale
   ansible.builtin.locale_gen:
     name: "{{ bootstrap_locale }}"
     state: present
+  tags: [configure]
 
 - name: Configurer le fuseau horaire (timezone)
   ansible.builtin.timezone:
     name: "{{ bootstrap_timezone }}"
+  tags: [configure]
 
 - name: Installer les paquets utilitaires
   ansible.builtin.apt:
     name: "{{ bootstrap_packages }}"
     state: present
+  tags: [install]

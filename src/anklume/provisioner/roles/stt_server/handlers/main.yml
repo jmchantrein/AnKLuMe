@@ -1,6 +1,6 @@
 # Rôle stt_server — handlers
 ---
-- name: Redémarrer Speaches
+- name: restart speaches
   ansible.builtin.systemd:
     name: speaches
     state: restarted

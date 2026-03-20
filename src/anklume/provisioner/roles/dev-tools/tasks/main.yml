@@ -2,14 +2,7 @@
 ---
 - name: Installer les outils de développement
   ansible.builtin.apt:
-    name:
-      - build-essential
-      - git
-      - python3
-      - python3-pip
-      - python3-venv
-      - vim
-      - tmux
-      - jq
+    name: "{{ dev_tools_packages }}"
     state: present
     update_cache: true
+  tags: [install]

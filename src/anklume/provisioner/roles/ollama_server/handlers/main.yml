@@ -1,6 +1,6 @@
 # Rôle ollama_server — handlers
 ---
-- name: Redémarrer Ollama
+- name: restart ollama
   ansible.builtin.systemd:
     name: ollama
     state: restarted

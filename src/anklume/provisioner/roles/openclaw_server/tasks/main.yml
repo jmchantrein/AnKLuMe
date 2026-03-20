@@ -7,6 +7,7 @@
     system: true
     create_home: true
     shell: /bin/bash
+  tags: [configure]
 
 - name: Installer Node.js 20.x
   ansible.builtin.shell: |
@@ -14,12 +15,14 @@
     apt-get install -y nodejs
   args:
     creates: /usr/bin/node
+  tags: [install]
 
 - name: Installer OpenClaw via npm global
   ansible.builtin.shell: |
     npm install -g openclaw@{{ openclaw_version }}
   args:
     creates: /usr/lib/node_modules/openclaw
+  tags: [install]
 
 - name: Exécuter openclaw onboard --install-daemon
   ansible.builtin.command:
@@ -29,12 +32,14 @@
   args:
     creates: "/home/{{ openclaw_user }}/.openclaw/workspace"
   changed_when: false
+  tags: [configure]
 
 - name: Créer le répertoire d'override systemd
   ansible.builtin.file:
     path: /etc/systemd/system/openclaw.service.d
     state: directory
     mode: "0755"
+  tags: [configure]
 
 - name: Déployer l'override systemd llm.conf
   ansible.builtin.template:
@@ -42,6 +47,7 @@
     dest: /etc/systemd/system/openclaw.service.d/llm.conf
     mode: "0644"
   notify: restart openclaw
+  tags: [configure]
 
 - name: Démarrer et activer OpenClaw
   ansible.builtin.systemd:
@@ -49,6 +55,7 @@
     state: started
     enabled: true
     daemon_reload: true
+  tags: [service]
 
 - name: Attendre que OpenClaw soit prêt
   ansible.builtin.uri:
@@ -60,3 +67,4 @@
   delay: 3
   changed_when: false
   failed_when: false
+  tags: [service]

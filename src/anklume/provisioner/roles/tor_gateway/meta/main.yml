@@ -1,0 +1,11 @@
+galaxy_info:
+  author: Jean-Michel Chantrein
+  description: "Passerelle Tor avec règles nftables"
+  min_ansible_version: "2.16"
+  license: AGPL-3.0-only
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+dependencies: []

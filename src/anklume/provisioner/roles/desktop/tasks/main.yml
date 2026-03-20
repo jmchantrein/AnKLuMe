@@ -2,11 +2,7 @@
 ---
 - name: Installer KDE Plasma (minimal)
   ansible.builtin.apt:
-    name:
-      - kde-plasma-desktop
-      - sddm
-      - konsole
-      - dolphin
-      - fonts-noto
+    name: "{{ desktop_packages }}"
     state: present
     update_cache: true
+  tags: [install]

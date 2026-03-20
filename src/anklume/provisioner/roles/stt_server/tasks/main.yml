@@ -11,11 +11,13 @@
       - ffmpeg
     state: present
     update_cache: true
+  tags: [install]
 
 - name: Installer uv (version compatible Speaches)
   ansible.builtin.shell:
     cmd: curl -LsSf https://astral.sh/uv/0.8.14/install.sh | sh
   changed_when: true
+  tags: [install]
 
 - name: Cloner Speaches
   ansible.builtin.git:
@@ -23,23 +25,27 @@
     dest: /opt/speaches
     version: master
     update: true
+  tags: [install]
 
 - name: Installer Speaches via uv
   ansible.builtin.shell:
     cmd: /root/.local/bin/uv sync
     chdir: /opt/speaches
   changed_when: true
+  tags: [install]
 
 - name: Créer le cache HuggingFace
   ansible.builtin.file:
     path: /root/.cache/huggingface/hub
     state: directory
     mode: "0755"
+  tags: [configure]
 
 - name: Détecter la présence de devices GPU
   ansible.builtin.stat:
     path: /dev/nvidia0
   register: gpu_device
+  tags: [configure]
 
 - name: Installer nvidia-smi si GPU détecté
   ansible.builtin.shell:
@@ -51,6 +57,7 @@
   when: gpu_device.stat.exists
   changed_when: true
   failed_when: false
+  tags: [install]
 
 - name: Détecter la présence GPU (nvidia-smi)
   ansible.builtin.command:
@@ -58,6 +65,7 @@
   register: gpu_check
   changed_when: false
   failed_when: false
+  tags: [configure]
 
 - name: Déterminer le device et compute_type
   ansible.builtin.set_fact:
@@ -71,6 +79,7 @@
         (gpu_check.rc == 0) | ternary('float16', 'int8'),
         stt_compute_type
       ) }}
+  tags: [configure]
 
 - name: Installer les dépendances CUDA Python si GPU
   ansible.builtin.shell:
@@ -79,6 +88,7 @@
   when: stt_actual_device == 'cuda'
   changed_when: true
   failed_when: false
+  tags: [install]
 
 - name: Créer la configuration systemd Speaches
   ansible.builtin.copy:
@@ -105,7 +115,8 @@
 
       [Install]
       WantedBy=multi-user.target
-  notify: Redémarrer Speaches
+  notify: restart speaches
+  tags: [service]
 
 - name: Activer et démarrer Speaches
   ansible.builtin.systemd:
@@ -113,9 +124,11 @@
     enabled: true
     state: started
     daemon_reload: true
+  tags: [service]
 
 - name: Attendre que Speaches soit prêt
   ansible.builtin.wait_for:
     port: "{{ stt_port }}"
     host: 127.0.0.1
     timeout: 120
+  tags: [service]

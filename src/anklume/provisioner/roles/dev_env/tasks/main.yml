@@ -11,6 +11,7 @@
     groups: sudo
     append: true
   when: dev_env_user | length > 0
+  tags: [configure]
 
 # --- uv (gestionnaire Python moderne) ---
 - name: Installer uv
@@ -18,6 +19,7 @@
     cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
     creates: /root/.local/bin/uv
   when: dev_env_install_uv
+  tags: [install]
 
 # --- Node.js via NodeSource ---
 - name: Installer Node.js {{ dev_env_node_version }}
@@ -27,6 +29,7 @@
       | bash - && apt-get install -y nodejs
     creates: /usr/bin/node
   when: dev_env_install_node
+  tags: [install]
 
 # --- Outils CLI modernes ---
 - name: Installer ripgrep
@@ -34,24 +37,28 @@
     name: ripgrep
     state: present
   when: dev_env_install_ripgrep
+  tags: [install]
 
 - name: Installer fd-find
   ansible.builtin.apt:
     name: fd-find
     state: present
   when: dev_env_install_fd
+  tags: [install]
 
 - name: Installer fzf
   ansible.builtin.apt:
     name: fzf
     state: present
   when: dev_env_install_fzf
+  tags: [install]
 
 - name: Installer direnv
   ansible.builtin.apt:
     name: direnv
     state: present
   when: dev_env_install_direnv
+  tags: [install]
 
 - name: Installer lazygit
   ansible.builtin.shell:
@@ -64,6 +71,7 @@
       rm /tmp/lazygit.tar.gz
     creates: /usr/local/bin/lazygit
   when: dev_env_install_lazygit
+  tags: [install]
 
 # --- AI coding assistants ---
 - name: Installer Claude Code CLI
@@ -71,12 +79,14 @@
     cmd: npm install -g @anthropic-ai/claude-code
     creates: /usr/lib/node_modules/@anthropic-ai/claude-code
   when: dev_env_install_claude_code and dev_env_install_node
+  tags: [install]
 
 - name: Installer aider
   ansible.builtin.shell:
     cmd: /root/.local/bin/uv tool install aider-chat
     creates: /root/.local/bin/aider
   when: dev_env_install_aider and dev_env_install_uv
+  tags: [install]
 
 # --- Git configuration ---
 - name: Configurer git user.name
@@ -84,12 +94,14 @@
     cmd: git config --global user.name "{{ dev_env_git_name }}"
   when: dev_env_git_name | length > 0
   changed_when: true
+  tags: [configure]
 
 - name: Configurer git user.email
   ansible.builtin.command:
     cmd: git config --global user.email "{{ dev_env_git_email }}"
   when: dev_env_git_email | length > 0
   changed_when: true
+  tags: [configure]
 
 # --- Paquets supplémentaires ---
 - name: Installer les paquets supplémentaires
@@ -97,3 +109,4 @@
     name: "{{ dev_env_extra_packages }}"
     state: present
   when: dev_env_extra_packages | length > 0
+  tags: [install]

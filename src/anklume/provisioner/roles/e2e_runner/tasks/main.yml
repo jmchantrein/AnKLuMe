@@ -7,6 +7,7 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
+  tags: [install]
 
 - name: Vérifier si Incus est installé
   ansible.builtin.command:
@@ -14,9 +15,11 @@
   register: incus_check
   changed_when: false
   failed_when: false
+  tags: [install]
 
 - name: Ajouter le repo Zabbly pour Incus (Debian)
   when: incus_check.rc != 0
+  tags: [install]
   block:
     - name: Installer les prérequis du repo
       ansible.builtin.apt:
@@ -53,6 +56,7 @@
       - incus
       - incus-client
     state: present
+  tags: [install]
 
 - name: Configurer subuid/subgid pour Incus
   ansible.builtin.lineinfile:
@@ -63,18 +67,21 @@
   loop:
     - /etc/subuid
     - /etc/subgid
+  tags: [configure]
 
 - name: Démarrer Incus
   ansible.builtin.systemd:
     name: incus
     state: started
     enabled: true
+  tags: [service]
 
 - name: Initialiser Incus (minimal)
   ansible.builtin.command:
     cmd: incus admin init --minimal
   changed_when: true
   when: e2e_runner_incus_init
+  tags: [configure]
 
 - name: Installer les paquets système
   ansible.builtin.apt:
@@ -88,6 +95,7 @@
       - tmux
       - build-essential
     state: present
+  tags: [install]
 
 - name: Installer uv
   ansible.builtin.shell:
@@ -98,26 +106,31 @@
   delay: 5
   register: uv_install
   until: uv_install.rc == 0
+  tags: [install]
 
 - name: Vérifier uv installé
   ansible.builtin.command:
     cmd: /root/.local/bin/uv --version
   changed_when: false
+  tags: [install]
 
 - name: Ajouter uv au PATH
   ansible.builtin.copy:
     content: 'export PATH="/root/.local/bin:$PATH"'
     dest: /etc/profile.d/uv.sh
     mode: "0644"
+  tags: [configure]
 
 - name: Créer le répertoire anklume
   ansible.builtin.file:
     path: "{{ e2e_runner_anklume_path }}"
     state: directory
     mode: "0755"
+  tags: [configure]
 
 - name: Activer nftables
   ansible.builtin.systemd:
     name: nftables
     enabled: true
     state: started
+  tags: [service]

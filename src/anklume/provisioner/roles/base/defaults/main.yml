@@ -1,0 +1,6 @@
+base_packages:
+  - curl
+  - ca-certificates
+  - sudo
+  - locales
+  - apt-transport-https

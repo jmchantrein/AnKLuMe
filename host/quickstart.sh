@@ -18,15 +18,16 @@
 
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# Couleurs et flags
-# ---------------------------------------------------------------------------
+# Bibliothèques partagées
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=host/lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=host/lib/nvidia.sh
+source "${SCRIPT_DIR}/lib/nvidia.sh"
 
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[0;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m'
+# ---------------------------------------------------------------------------
+# Flags
+# ---------------------------------------------------------------------------
 
 INSTALL_GPU=false
 
@@ -51,22 +52,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# ---------------------------------------------------------------------------
-# Fonctions utilitaires
-# ---------------------------------------------------------------------------
-
-info()  { printf "${GREEN}[INFO]${NC}  %s\n" "$1"; }
-warn()  { printf "${YELLOW}[WARN]${NC}  %s\n" "$1"; }
-error() { printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2; }
-step()  { printf "\n${BLUE}── %s${NC}\n\n" "$1"; }
-
-check_root() {
-    if [[ ${EUID} -ne 0 ]]; then
-        error "Ce script doit être exécuté en root (sudo)."
-        exit 1
-    fi
-}
 
 # ---------------------------------------------------------------------------
 # 0. Détection de la distribution
@@ -173,42 +158,6 @@ setup_incus() {
 # 3. NVIDIA GPU (optionnel, --gpu)
 # ---------------------------------------------------------------------------
 
-# PCI device IDs Blackwell (RTX 50xx) : nécessite driver 570+ et open kernel modules
-# Source : lspci 10de:XXXX confirmés sur hardware réel
-readonly -a BLACKWELL_IDS=(
-    "2b85" # RTX 5090  (GB202)
-    "2c02" # RTX 5080  (GB203)
-    "2c05" # RTX 5070 Ti (GB203)
-    "2f04" # RTX 5070  (GB205)
-    "2bb3" # RTX PRO 5000 (GB202)
-)
-
-readonly NVIDIA_BLACKWELL_VERSION="570.195.03"
-readonly NVIDIA_BLACKWELL_RUN="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
-
-detect_nvidia_gpu() {
-    # Retourne : "blackwell", "supported", ou "none"
-    if ! lspci -nn 2>/dev/null | grep -qi "nvidia"; then
-        echo "none"
-        return
-    fi
-
-    # Vérifier si c'est un GPU Blackwell
-    local pci_ids
-    pci_ids=$(lspci -nn | grep -i nvidia | grep -oP '10de:\K[0-9a-f]{4}' || true)
-
-    for id in ${pci_ids}; do
-        for blackwell_id in "${BLACKWELL_IDS[@]}"; do
-            if [[ "${id,,}" == "${blackwell_id,,}" ]]; then
-                echo "blackwell"
-                return
-            fi
-        done
-    done
-
-    echo "supported"
-}
-
 install_nvidia() {
     if [[ "${INSTALL_GPU}" != true ]]; then
         return
@@ -241,92 +190,6 @@ install_nvidia() {
             install_nvidia_standard
             ;;
     esac
-}
-
-install_nvidia_standard() {
-    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        info "Installation via pacman (nvidia-open-dkms)..."
-        pacman -S --noconfirm --needed \
-            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
-        info "NVIDIA driver installé (open kernel modules)."
-
-    else
-        info "Installation via apt (nvidia-driver)..."
-        # S'assurer que non-free est activé
-        if ! grep -q "non-free" /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; then
-            warn "Activation des dépôts non-free/contrib..."
-            sed -i 's/main$/main contrib non-free non-free-firmware/' \
-                /etc/apt/sources.list 2>/dev/null || true
-            apt-get update -qq
-        fi
-
-        apt-get install -y -qq \
-            "linux-headers-$(uname -r)" \
-            nvidia-driver nvidia-open-kernel-dkms \
-            firmware-nvidia-gsp \
-            > /dev/null 2>&1
-        info "NVIDIA driver installé."
-    fi
-}
-
-install_nvidia_blackwell() {
-    if [[ "${DISTRO_FAMILY}" == "arch" ]]; then
-        # Arch : le driver 570+ est dans les dépôts
-        info "Installation via pacman (nvidia-open-dkms, 570+)..."
-        pacman -S --noconfirm --needed \
-            nvidia-open-dkms nvidia-utils > /dev/null 2>&1
-        info "NVIDIA Blackwell driver installé."
-    else
-        # Debian : le driver 570+ n'est PAS dans les dépôts.
-        # Fallback : télécharger et installer le .run NVIDIA.
-        warn "Blackwell nécessite le driver ${NVIDIA_BLACKWELL_VERSION}."
-        warn "Ce driver n'est pas dans les dépôts Debian — installation via .run"
-
-        # Prérequis
-        apt-get install -y -qq \
-            "linux-headers-$(uname -r)" \
-            build-essential dkms pkg-config \
-            > /dev/null
-
-        # Blacklister nouveau
-        if ! grep -q "blacklist nouveau" /etc/modprobe.d/blacklist-nouveau.conf 2>/dev/null; then
-            cat > /etc/modprobe.d/blacklist-nouveau.conf << 'CONF'
-blacklist nouveau
-options nouveau modeset=0
-CONF
-            update-initramfs -u 2>/dev/null || true
-            info "Module nouveau blacklisté."
-        fi
-
-        # Vérifier que nouveau n'est pas chargé
-        if lsmod | grep -q nouveau; then
-            warn "Le module nouveau est encore chargé."
-            warn "Un reboot est nécessaire avant d'installer le driver Blackwell."
-            warn "Après reboot, relancez : sudo ./quickstart.sh --gpu"
-            return
-        fi
-
-        # Télécharger le .run
-        local run_file="/tmp/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
-        if [[ ! -f "${run_file}" ]]; then
-            info "Téléchargement du driver ${NVIDIA_BLACKWELL_VERSION}..."
-            curl -L -o "${run_file}" "${NVIDIA_BLACKWELL_RUN}" || {
-                error "Échec du téléchargement. URL : ${NVIDIA_BLACKWELL_RUN}"
-                exit 1
-            }
-        fi
-
-        # Installer
-        chmod +x "${run_file}"
-        info "Installation du driver NVIDIA ${NVIDIA_BLACKWELL_VERSION} (open kernel modules)..."
-        "${run_file}" --dkms --open --silent || {
-            error "Échec de l'installation. Vérifier les logs : /var/log/nvidia-installer.log"
-            exit 1
-        }
-
-        rm -f "${run_file}"
-        info "NVIDIA Blackwell driver ${NVIDIA_BLACKWELL_VERSION} installé."
-    fi
 }
 
 # ---------------------------------------------------------------------------

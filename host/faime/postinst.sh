@@ -8,52 +8,16 @@
 
 set -euo pipefail
 
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[0;33m'
-readonly RED='\033[0;31m'
-readonly NC='\033[0m'
-
-info()  { printf "${GREEN}[INFO]${NC}  %s\n" "$1"; }
-warn()  { printf "${YELLOW}[WARN]${NC}  %s\n" "$1"; }
-error() { printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2; }
+# Bibliothèques partagées
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=host/lib/common.sh
+source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck source=host/lib/nvidia.sh
+source "${SCRIPT_DIR}/../lib/nvidia.sh"
 
 # ---------------------------------------------------------------------------
 # NVIDIA — détection auto + installation
 # ---------------------------------------------------------------------------
-
-# PCI device IDs Blackwell (RTX 50xx)
-# Source : lspci 10de:XXXX confirmés sur hardware réel
-readonly -a BLACKWELL_IDS=(
-    "2b85" # RTX 5090  (GB202)
-    "2c02" # RTX 5080  (GB203)
-    "2c05" # RTX 5070 Ti (GB203)
-    "2f04" # RTX 5070  (GB205)
-    "2bb3" # RTX PRO 5000 (GB202)
-)
-
-readonly NVIDIA_BLACKWELL_VERSION="570.195.03"
-readonly NVIDIA_BLACKWELL_RUN="https://download.nvidia.com/XFree86/Linux-x86_64/${NVIDIA_BLACKWELL_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_BLACKWELL_VERSION}.run"
-
-detect_nvidia_gpu() {
-    if ! lspci -nn 2>/dev/null | grep -qi "nvidia"; then
-        echo "none"
-        return
-    fi
-
-    local pci_ids
-    pci_ids=$(lspci -nn | grep -i nvidia | grep -oP '10de:\K[0-9a-f]{4}' || true)
-
-    for id in ${pci_ids}; do
-        for blackwell_id in "${BLACKWELL_IDS[@]}"; do
-            if [[ "${id,,}" == "${blackwell_id,,}" ]]; then
-                echo "blackwell"
-                return
-            fi
-        done
-    done
-
-    echo "supported"
-}
 
 setup_nvidia() {
     if command -v nvidia-smi &> /dev/null; then
@@ -230,18 +194,39 @@ setup_anklume() {
         info "uv installé."
     fi
 
-    # anklume
+    # Créer le wrapper CLI si le repo existe
+    local anklume_dir="${user_home}/AnKLuMe"
     local uv_bin="${user_home}/.local/bin/uv"
     [[ ! -x "${uv_bin}" ]] && uv_bin=$(command -v uv 2>/dev/null || true)
+    [[ "${main_user}" == "root" ]] && anklume_dir="/root/AnKLuMe"
 
-    if [[ -n "${uv_bin}" ]]; then
+    if [[ -n "${uv_bin}" && -d "${anklume_dir}" && -f "${anklume_dir}/pyproject.toml" ]]; then
+        local bin_dir="${user_home}/.local/bin"
+        [[ "${main_user}" == "root" ]] && bin_dir="/root/.local/bin"
+        mkdir -p "${bin_dir}"
+
+        cat > "${bin_dir}/anklume" << WRAPPER
+#!/usr/bin/env bash
+exec ${uv_bin} run --directory '${anklume_dir}' anklume "\$@"
+WRAPPER
+        chmod +x "${bin_dir}/anklume"
+        ln -sf "${bin_dir}/anklume" "${bin_dir}/ank"
         if [[ "${main_user}" != "root" ]]; then
-            su - "${main_user}" -c "${uv_bin} tool install anklume" 2>/dev/null || \
-                warn "anklume pas encore sur PyPI."
-        else
-            "${uv_bin}" tool install anklume 2>/dev/null || \
-                warn "anklume pas encore sur PyPI."
+            chown "$(id -u "${main_user}"):$(id -g "${main_user}")" "${bin_dir}/anklume"
+            chown -h "$(id -u "${main_user}"):$(id -g "${main_user}")" "${bin_dir}/ank"
         fi
+
+        # Sync les dépendances
+        if [[ "${main_user}" != "root" ]]; then
+            su - "${main_user}" -c "cd '${anklume_dir}' && ${uv_bin} sync --quiet" 2>/dev/null || true
+        else
+            cd "${anklume_dir}" && "${uv_bin}" sync --quiet 2>/dev/null || true
+        fi
+
+        info "CLI installée : ${bin_dir}/anklume (wrapper vers ${anklume_dir})"
+    else
+        warn "Repo AnKLuMe introuvable dans ${anklume_dir}."
+        warn "  git clone https://github.com/jmchantrein/AnKLuMe.git ${anklume_dir}"
     fi
 
     # Alias ank dans bash
@@ -275,6 +260,7 @@ main() {
     echo "=== AnKLuMe — Post-installation FAI.me ==="
     echo ""
 
+    check_root
     setup_nvidia
     setup_incus
     setup_anklume

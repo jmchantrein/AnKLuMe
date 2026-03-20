@@ -1,0 +1,7 @@
+desktop_packages:
+  - kde-plasma-desktop
+  - sddm
+  - konsole
+  - dolphin
+  - kwin-wayland
+  - plasma-workspace-wayland

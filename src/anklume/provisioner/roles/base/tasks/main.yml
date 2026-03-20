@@ -4,13 +4,10 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
+  tags: [install]
 
 - name: Installer les paquets essentiels
   ansible.builtin.apt:
-    name:
-      - curl
-      - ca-certificates
-      - sudo
-      - locales
-      - apt-transport-https
+    name: "{{ base_packages }}"
     state: present
+  tags: [install]
