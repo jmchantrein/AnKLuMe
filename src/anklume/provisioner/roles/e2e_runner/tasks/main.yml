@@ -8,12 +8,67 @@
     update_cache: true
     cache_valid_time: 3600
 
+- name: Vérifier si Incus est installé
+  ansible.builtin.command:
+    cmd: which incus
+  register: incus_check
+  changed_when: false
+  failed_when: false
+
+- name: Ajouter le repo Zabbly pour Incus (Debian)
+  when: incus_check.rc != 0
+  block:
+    - name: Installer les prérequis du repo
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gpg
+        state: present
+
+    - name: Télécharger la clé Zabbly
+      ansible.builtin.shell:
+        cmd: >
+          curl -fsSL https://pkgs.zabbly.com/key.asc
+          | gpg --dearmor -o /etc/apt/keyrings/zabbly.gpg
+        creates: /etc/apt/keyrings/zabbly.gpg
+
+    - name: Ajouter le repo Zabbly stable
+      ansible.builtin.copy:
+        content: |
+          Types: deb
+          URIs: https://pkgs.zabbly.com/incus/stable
+          Suites: {{ ansible_distribution_release }}
+          Components: main
+          Signed-By: /etc/apt/keyrings/zabbly.gpg
+        dest: /etc/apt/sources.list.d/zabbly-incus-stable.sources
+        mode: "0644"
+
+    - name: Mettre à jour le cache APT après ajout du repo
+      ansible.builtin.apt:
+        update_cache: true
+
 - name: Installer Incus
   ansible.builtin.apt:
     name:
       - incus
       - incus-client
     state: present
+
+- name: Configurer subuid/subgid pour Incus
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    line: "root:1000000:1000000000"
+    create: true
+    mode: "0644"
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+
+- name: Démarrer Incus
+  ansible.builtin.systemd:
+    name: incus
+    state: started
+    enabled: true
 
 - name: Initialiser Incus (minimal)
   ansible.builtin.command:

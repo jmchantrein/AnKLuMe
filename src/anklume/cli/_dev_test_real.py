@@ -65,7 +65,11 @@ def run_dev_test_real(config: E2eRealConfig) -> None:
         prov_result = provision(infra, project_dir)
         os.chdir(original_dir)
         if not prov_result.success and not prov_result.skipped:
-            typer.echo(f"Provisioning échoué : {prov_result.error}", err=True)
+            typer.echo("Provisioning échoué.", err=True)
+            if prov_result.output:
+                typer.echo(prov_result.output, err=True)
+            if prov_result.error:
+                typer.echo(prov_result.error, err=True)
             raise typer.Exit(1)
         typer.echo("Provisioning terminé.")
 
