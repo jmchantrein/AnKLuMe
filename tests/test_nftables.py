@@ -1,5 +1,7 @@
 """Tests du générateur de règles nftables."""
 
+import pytest
+
 from anklume.engine.addressing import assign_addresses
 from anklume.engine.models import Policy
 from anklume.engine.nftables import generate_ruleset
@@ -626,3 +628,64 @@ class TestTorTransparentRouting:
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         assert "chain prerouting" not in ruleset
+
+
+class TestEdgeCharacterNames:
+    """Noms de domaine/machine avec tirets et chiffres dans les règles nftables."""
+
+    @pytest.mark.parametrize(
+        "domain_name",
+        ["ai-tools", "lab-42", "a", "x1", "my-long-name"],
+        ids=["hyphenated", "hyphen-number", "single-char", "letter-number", "multi-hyphen"],
+    )
+    def test_domain_name_in_intra_rule(self, domain_name):
+        """Les noms de domaine avec tirets/chiffres produisent des règles intra-domaine."""
+        infra = make_infra(domains={domain_name: make_domain(domain_name)})
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        expected = f'iifname "net-{domain_name}" oifname "net-{domain_name}" accept'
+        assert expected in ruleset
+
+    def test_policy_with_hyphenated_names(self):
+        """Politique entre domaines aux noms avec tirets et chiffres."""
+        infra = make_infra(
+            domains={
+                "ai-tools": make_domain("ai-tools"),
+                "lab-42": make_domain("lab-42"),
+            }
+        )
+        infra.policies = [
+            Policy(
+                description="AI vers Lab",
+                from_target="ai-tools",
+                to_target="lab-42",
+                ports=[8080],
+            )
+        ]
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert 'iifname "net-ai-tools" oifname "net-lab-42" tcp dport { 8080 } accept' in ruleset
+
+    def test_machine_target_with_hyphens(self):
+        """Machine cible avec tirets dans le nom génère la bonne règle IP."""
+        dev = make_machine("gpu-node", "ai-tools", ip="10.120.0.5")
+        web = make_machine("front-end", "lab-42", ip="10.100.0.3")
+        infra = make_infra(
+            domains={
+                "ai-tools": make_domain("ai-tools", machines={"gpu-node": dev}),
+                "lab-42": make_domain("lab-42", machines={"front-end": web}),
+            }
+        )
+        infra.policies = [
+            Policy(
+                description="GPU vers Frontend",
+                from_target="ai-tools-gpu-node",
+                to_target="lab-42-front-end",
+                ports=[443],
+            )
+        ]
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert "ip saddr 10.120.0.5" in ruleset
+        assert "ip daddr 10.100.0.3" in ruleset
+        assert "tcp dport { 443 }" in ruleset

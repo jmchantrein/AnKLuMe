@@ -362,3 +362,45 @@ class TestParsePolicies:
 
         with pytest.raises(ParseError, match="ports"):
             parse_project(tmp_path)
+
+
+class TestMalformedYaml:
+    """Tests de robustesse pour le parsing YAML malformé."""
+
+    def test_malformed_yaml_anklume(self, tmp_path):
+        """YAML invalide dans anklume.yml doit lever une erreur."""
+        (tmp_path / "anklume.yml").write_text("key: 'unclosed quote\n  invalid: yaml:")
+        with pytest.raises(yaml.YAMLError):
+            parse_project(tmp_path)
+
+    def test_malformed_yaml_domain(self, tmp_path):
+        """YAML invalide dans un fichier domaine doit lever une erreur."""
+        _write_anklume_yml(tmp_path)
+        (tmp_path / "domains").mkdir()
+        (tmp_path / "domains" / "bad.yml").write_text(
+            "description: 'unclosed\n  machines:\n    - invalid: :"
+        )
+        with pytest.raises(yaml.YAMLError):
+            parse_project(tmp_path)
+
+    def test_non_dict_anklume_yml(self, tmp_path):
+        """anklume.yml contenant une liste au lieu d'un dict ne doit pas planter."""
+        # yaml.safe_load d'une liste retourne une liste, `raw.get(...)` échouera
+        (tmp_path / "anklume.yml").write_text("- item1\n- item2\n")
+        with pytest.raises((AttributeError, ParseError, TypeError)):
+            parse_project(tmp_path)
+
+    def test_non_dict_domain_file(self, tmp_path):
+        """Fichier domaine contenant une liste au lieu d'un dict."""
+        _write_anklume_yml(tmp_path)
+        (tmp_path / "domains").mkdir()
+        (tmp_path / "domains" / "bad.yml").write_text("- item1\n- item2\n")
+        with pytest.raises((ParseError, AttributeError, TypeError)):
+            parse_project(tmp_path)
+
+    def test_malformed_yaml_policies(self, tmp_path):
+        """YAML invalide dans policies.yml doit lever une erreur."""
+        _write_anklume_yml(tmp_path)
+        (tmp_path / "policies.yml").write_text("policies:\n  - from: 'unclosed\n    bad: :")
+        with pytest.raises(yaml.YAMLError):
+            parse_project(tmp_path)

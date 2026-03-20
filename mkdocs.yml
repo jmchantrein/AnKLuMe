@@ -60,6 +60,12 @@ markdown_extensions:
 plugins:
   - search:
       lang: fr
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            docstring_style: google
 
 extra:
   social:
@@ -106,3 +112,4 @@ nav:
     - Spécification: SPEC.md
     - Architecture (ADRs): ARCHITECTURE.md
     - Roadmap: ROADMAP.md
+    - API: reference/api.md

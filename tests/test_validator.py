@@ -1,5 +1,7 @@
 """Tests du validateur d'infrastructure anklume."""
 
+import pytest
+
 from anklume.engine.models import (
     Domain,
     GlobalConfig,
@@ -39,16 +41,16 @@ class TestValidInfrastructure:
         result = validate(_minimal_infra(domains={}))
         assert result.valid
 
-    def test_valid_domain_names(self):
-        for name in ["pro", "ai-tools", "a", "test123", "my-domain-2"]:
-            result = validate(
-                _minimal_infra(
-                    domains={
-                        name: Domain(name=name, description="T"),
-                    }
-                )
+    @pytest.mark.parametrize("name", ["pro", "ai-tools", "a", "test123", "my-domain-2"])
+    def test_valid_domain_names(self, name):
+        result = validate(
+            _minimal_infra(
+                domains={
+                    name: Domain(name=name, description="T"),
+                }
             )
-            assert result.valid, f"'{name}' devrait être valide"
+        )
+        assert result.valid, f"'{name}' devrait être valide"
 
     def test_valid_profile_reference(self):
         result = validate(
@@ -169,16 +171,18 @@ class TestTrustLevelValidation:
         assert not result.valid
         assert any("trust_level" in str(e) for e in result.errors)
 
-    def test_all_valid_trust_levels(self):
-        for level in ["admin", "trusted", "semi-trusted", "untrusted", "disposable"]:
-            result = validate(
-                _minimal_infra(
-                    domains={
-                        "pro": Domain(name="pro", description="T", trust_level=level),
-                    }
-                )
+    @pytest.mark.parametrize(
+        "level", ["admin", "trusted", "semi-trusted", "untrusted", "disposable"]
+    )
+    def test_all_valid_trust_levels(self, level):
+        result = validate(
+            _minimal_infra(
+                domains={
+                    "pro": Domain(name="pro", description="T", trust_level=level),
+                }
             )
-            assert result.valid, f"'{level}' devrait être valide"
+        )
+        assert result.valid, f"'{level}' devrait être valide"
 
 
 class TestMachineValidation:

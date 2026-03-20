@@ -83,23 +83,27 @@ class TestHardwareInfo:
 
 
 class TestParseReserve:
-    def test_percentage(self):
-        assert parse_reserve("20%", 100) == 20
-
-    def test_percentage_rounding(self):
-        assert parse_reserve("33%", 10) == 3
-
-    def test_absolute_integer(self):
-        assert parse_reserve("4", 100) == 4
-
-    def test_absolute_zero(self):
-        assert parse_reserve("0", 100) == 0
-
-    def test_percentage_100(self):
-        assert parse_reserve("100%", 80) == 80
-
-    def test_percentage_0(self):
-        assert parse_reserve("0%", 80) == 0
+    @pytest.mark.parametrize(
+        ("spec", "total", "expected"),
+        [
+            ("20%", 100, 20),
+            ("33%", 10, 3),
+            ("4", 100, 4),
+            ("0", 100, 0),
+            ("100%", 80, 80),
+            ("0%", 80, 0),
+        ],
+        ids=[
+            "percentage",
+            "percentage_rounding",
+            "absolute_integer",
+            "absolute_zero",
+            "percentage_100",
+            "percentage_0",
+        ],
+    )
+    def test_parse_reserve(self, spec, total, expected):
+        assert parse_reserve(spec, total) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -108,23 +112,20 @@ class TestParseReserve:
 
 
 class TestParseMemoryValue:
-    def test_gb(self):
-        assert parse_memory_value("4GB") == 4 * 1024**3
-
-    def test_mb(self):
-        assert parse_memory_value("512MB") == 512 * 1024**2
-
-    def test_kb(self):
-        assert parse_memory_value("1024KB") == 1024 * 1024
-
-    def test_tb(self):
-        assert parse_memory_value("1TB") == 1024**4
-
-    def test_bare_number_as_bytes(self):
-        assert parse_memory_value("1048576") == 1048576
-
-    def test_case_insensitive(self):
-        assert parse_memory_value("4gb") == 4 * 1024**3
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("4GB", 4 * 1024**3),
+            ("512MB", 512 * 1024**2),
+            ("1024KB", 1024 * 1024),
+            ("1TB", 1024**4),
+            ("1048576", 1048576),
+            ("4gb", 4 * 1024**3),
+        ],
+        ids=["gb", "mb", "kb", "tb", "bare_number_as_bytes", "case_insensitive"],
+    )
+    def test_parse_memory_value(self, value, expected):
+        assert parse_memory_value(value) == expected
 
     def test_invalid_suffix(self):
         with pytest.raises(ValueError, match="unité mémoire"):
