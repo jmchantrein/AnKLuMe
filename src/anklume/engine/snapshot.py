@@ -14,10 +14,18 @@ logger = logging.getLogger(__name__)
 SnapshotPhase = Literal["pre", "post", "snap"]
 
 
+SNAPSHOT_PREFIX = "anklume-"
+
+
+def snapshot_prefix_for_phase(phase: SnapshotPhase) -> str:
+    """Retourne le préfixe complet pour une phase donnée."""
+    return f"{SNAPSHOT_PREFIX}{phase}-"
+
+
 def generate_name(phase: SnapshotPhase = "snap") -> str:
     """Génère un nom de snapshot : anklume-{phase}-{YYYYMMDD-HHMMSS}."""
     ts = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
-    return f"anklume-{phase}-{ts}"
+    return f"{snapshot_prefix_for_phase(phase)}{ts}"
 
 
 def create_snapshot(
@@ -202,7 +210,8 @@ def rollback_pre_apply(
                 continue
 
             snapshots = driver.snapshot_list(machine.full_name, domain.name)
-            pre_snaps = [s for s in snapshots if s.name.startswith("anklume-pre-")]
+            pre_prefix = snapshot_prefix_for_phase("pre")
+            pre_snaps = [s for s in snapshots if s.name.startswith(pre_prefix)]
 
             if not pre_snaps:
                 continue

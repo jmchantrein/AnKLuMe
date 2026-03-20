@@ -96,6 +96,8 @@ def _check_schema_version(infra: Infrastructure, result: ValidationResult) -> No
 
 def _check_requires_anklume(infra: Infrastructure, result: ValidationResult) -> None:
     """Vérifie que la version anklume installée satisfait requires_anklume."""
+    from packaging.version import InvalidVersion, Version
+
     req = infra.config.requires_anklume
     if req is None:
         return
@@ -105,28 +107,14 @@ def _check_requires_anklume(infra: Infrastructure, result: ValidationResult) -> 
     except PackageNotFoundError:
         current = "0.0.0"
 
-    # Comparaison simplifiée basée sur packaging-style tuple
-    def _version_tuple(v: str) -> tuple[int, ...]:
-        """Extrait les composantes numériques d'une version."""
-        parts = []
-        for p in v.split(".")[:3]:
-            digits = ""
-            for c in p:
-                if c.isdigit():
-                    digits += c
-                else:
-                    break
-            parts.append(int(digits) if digits else 0)
-        return tuple(parts)
-
     try:
-        if _version_tuple(current) < _version_tuple(req):
+        if Version(current) < Version(req):
             result.add(
                 "anklume.yml",
                 f"requires_anklume >= {req} mais version installée = {current}.",
                 "Mettre à jour anklume : uv pip install --upgrade anklume",
             )
-    except (ValueError, IndexError):
+    except InvalidVersion:
         result.add(
             "anklume.yml",
             f"requires_anklume '{req}' : format de version invalide.",
