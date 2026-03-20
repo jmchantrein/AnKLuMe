@@ -956,13 +956,17 @@ class TestRealShowcase:
             1
             for ds in status.domains
             for inst in ds.instances
-            if inst.actual_state == "Running"
+            if inst.state == "Running"
         )
         assert running_count == 4, f"{running_count}/4 instances running"
 
     def test_showcase_snapshot_cycle(self, showcase_project):
         """Create, list, restore un snapshot."""
-        from anklume.engine.snapshot import create_snapshot, list_snapshots, restore_snapshot
+        from anklume.engine.snapshot import (
+            create_snapshot,
+            list_all_snapshots,
+            restore_snapshot,
+        )
 
         run_apply(dry_run=False, no_provision=True)
 
@@ -976,7 +980,7 @@ class TestRealShowcase:
         project_name = first_domain.name
 
         create_snapshot(driver, instance_name, project_name, name="test-snap")
-        snaps = list_snapshots(driver, instance_name, project_name)
+        snaps = list_all_snapshots(driver, instance_name, project_name)
         assert "test-snap" in [s.name for s in snaps]
         restore_snapshot(driver, instance_name, project_name, "test-snap")
 
@@ -992,8 +996,8 @@ class TestRealShowcase:
 
         # Destroy sans force : seules les éphémères (beta) sont supprimées
         result = destroy(infra, driver, force=False)
-        assert result.protected > 0, "Aucune instance protégée ?"
+        assert len(result.skipped) > 0, "Aucune instance protégée ?"
 
         # Destroy avec force : tout est nettoyé
         result = destroy(infra, driver, force=True)
-        assert result.errors == 0
+        assert len(result.errors) == 0
