@@ -384,18 +384,17 @@ class TestMalformedYaml:
             parse_project(tmp_path)
 
     def test_non_dict_anklume_yml(self, tmp_path):
-        """anklume.yml contenant une liste au lieu d'un dict ne doit pas planter."""
-        # yaml.safe_load d'une liste retourne une liste, `raw.get(...)` échouera
+        """anklume.yml contenant une liste au lieu d'un dict lève ParseError."""
         (tmp_path / "anklume.yml").write_text("- item1\n- item2\n")
-        with pytest.raises((AttributeError, ParseError, TypeError)):
+        with pytest.raises(ParseError, match="mapping YAML"):
             parse_project(tmp_path)
 
     def test_non_dict_domain_file(self, tmp_path):
-        """Fichier domaine contenant une liste au lieu d'un dict."""
+        """Fichier domaine contenant une liste au lieu d'un dict lève ParseError."""
         _write_anklume_yml(tmp_path)
         (tmp_path / "domains").mkdir()
         (tmp_path / "domains" / "bad.yml").write_text("- item1\n- item2\n")
-        with pytest.raises((ParseError, AttributeError, TypeError)):
+        with pytest.raises(ParseError, match="mapping YAML"):
             parse_project(tmp_path)
 
     def test_malformed_yaml_policies(self, tmp_path):

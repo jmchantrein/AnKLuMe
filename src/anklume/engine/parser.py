@@ -47,6 +47,8 @@ def _parse_global_config(path: Path) -> GlobalConfig:
         raise ParseError(path, "fichier introuvable. Lancer 'anklume init' d'abord.")
 
     raw = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(raw, dict):
+        raise ParseError(path, "le fichier doit contenir un mapping YAML (clé: valeur).")
 
     defaults_raw = raw.get("defaults", {})
     defaults = Defaults(
@@ -117,6 +119,8 @@ def _parse_domain(path: Path, defaults: Defaults) -> Domain:
     raw = yaml.safe_load(path.read_text())
     if not raw:
         raise ParseError(path, "fichier domaine vide.")
+    if not isinstance(raw, dict):
+        raise ParseError(path, "le fichier domaine doit contenir un mapping YAML.")
 
     domain_name = path.stem
 
