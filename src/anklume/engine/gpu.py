@@ -104,6 +104,14 @@ def validate_gpu_machines(
                 f"détectées ({names}). Utiliser gpu_policy: shared "
                 f"ou retirer gpu: true"
             )
+        elif policy == "shared":
+            log.warning(
+                "Politique GPU shared : %d machines partagent le GPU (%s). "
+                "Pas d'isolation VRAM entre les instances. "
+                "Un conteneur peut consommer toute la VRAM disponible.",
+                len(gpu_machines),
+                ", ".join(gpu_machines),
+            )
 
     return errors
 

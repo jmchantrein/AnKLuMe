@@ -309,10 +309,7 @@ def build_console_config(
     nesting_cfg = infra.config.nesting
     zone_step = infra.config.addressing.zone_step
 
-    if domain:
-        session_name = f"{SESSION_NAME}-{domain}"
-    else:
-        session_name = SESSION_NAME
+    session_name = f"{SESSION_NAME}-{domain}" if domain else SESSION_NAME
 
     existing_projects = {p.name for p in driver.project_list()}
     windows: dict[str, list[ConsolePane]] = {}

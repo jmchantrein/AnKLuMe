@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -119,7 +120,5 @@ def get_stats() -> TelemetryStats:
 
 def clear_events() -> None:
     """Supprime le fichier d'événements."""
-    try:
+    with contextlib.suppress(OSError):
         EVENTS_PATH.unlink(missing_ok=True)
-    except OSError:
-        pass

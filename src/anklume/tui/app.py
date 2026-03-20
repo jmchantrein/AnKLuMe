@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import ClassVar
 
@@ -42,14 +43,13 @@ class AnklumeTUI(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with TabbedContent():
-            with TabPane("Domaines", id="tab-domains"):
-                with Horizontal(id="main-container"):
-                    yield DomainTree(id="tree-pane")
-                    with Vertical(id="detail-pane"):
-                        with Vertical(id="form-pane"):
-                            yield DomainForm()
-                            yield MachineForm()
-                        yield YamlPreview()
+            with TabPane("Domaines", id="tab-domains"), Horizontal(id="main-container"):
+                yield DomainTree(id="tree-pane")
+                with Vertical(id="detail-pane"):
+                    with Vertical(id="form-pane"):
+                        yield DomainForm()
+                        yield MachineForm()
+                    yield YamlPreview()
             with TabPane("Politiques", id="tab-policies"):
                 yield PolicyTable()
         yield Footer()
@@ -242,10 +242,8 @@ class AnklumeTUI(App):
                 del self._infra.domains[name]
                 # Supprimer le fichier
                 path = self._project_dir / "domains" / f"{name}.yml"
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     path.unlink()
-                except FileNotFoundError:
-                    pass
                 self._current_node = None
                 self.query_one(DomainTree).load_infra(self._infra)
                 self.query_one(DomainForm).display = False

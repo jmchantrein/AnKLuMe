@@ -459,7 +459,7 @@ create_zfs_pool() {
 
     openssl enc -aes-256-cbc -pbkdf2 -iter 600000 \
         -salt -in "${ZFS_KEY_FILE}" -out "${ZFS_KEY_ENC}" \
-        -pass "pass:${passphrase}"
+        -pass "fd:3" 3<<< "${passphrase}"
     chmod 400 "${ZFS_KEY_ENC}"
     chown root:root "${ZFS_KEY_ENC}"
     info "Backup chiffré : ${ZFS_KEY_ENC} (déchiffrable avec la passphrase)"
@@ -525,7 +525,7 @@ unlock_zfs_pool() {
             echo ""
             if openssl enc -aes-256-cbc -pbkdf2 -iter 600000 \
                     -d -in "${ZFS_KEY_ENC}" -out "${tmp_key}" \
-                    -pass "pass:${pass}" 2>/dev/null; then
+                    -pass "fd:3" 3<<< "${pass}" 2>/dev/null; then
                 if zfs load-key -L "file://${tmp_key}" "${POOL}" 2>/dev/null; then
                     # Restaurer le keyfile pour les prochains boots
                     cp "${tmp_key}" "${ZFS_KEY_FILE}"
@@ -683,7 +683,7 @@ if [[ -f "$KEY_ENC" ]]; then
         echo ""
         if openssl enc -aes-256-cbc -pbkdf2 -iter 600000 \
                 -d -in "$KEY_ENC" -out "$tmp_key" \
-                -pass "pass:${pass}" 2>/dev/null; then
+                -pass "fd:3" 3<<< "${pass}" 2>/dev/null; then
             if zfs load-key -L "file://${tmp_key}" "$POOL" 2>/dev/null; then
                 # Restaurer le keyfile pour les prochains boots
                 cp "$tmp_key" "$KEY_FILE"

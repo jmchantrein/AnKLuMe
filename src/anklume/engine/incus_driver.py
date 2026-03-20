@@ -7,8 +7,19 @@ utilise ce driver, jamais subprocess directement.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
+
+_SAFE_NAME = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
+_SAFE_IMAGE_REF = re.compile(r"^[a-z0-9][a-z0-9./:_-]*$")
+
+
+def _validate_name(value: str) -> None:
+    """Rejette les noms contenant des caractères dangereux."""
+    if not _SAFE_NAME.match(value):
+        msg = f"Nom Incus invalide : {value!r}"
+        raise ValueError(msg)
 
 
 class IncusError(Exception):
@@ -115,6 +126,7 @@ class IncusDriver:
         return [IncusProject(name=p["name"], description=p.get("description", "")) for p in data]
 
     def project_create(self, name: str, description: str = "") -> None:
+        _validate_name(name)
         args = [
             "project",
             "create",
@@ -145,6 +157,8 @@ class IncusDriver:
         ]
 
     def network_create(self, name: str, project: str, config: dict | None = None) -> None:
+        _validate_name(name)
+        _validate_name(project)
         args = ["network", "create", name, "--project", project, "--type", "bridge"]
         for key, value in (config or {}).items():
             args.extend([f"{key}={value}"])
@@ -180,6 +194,11 @@ class IncusDriver:
         config: dict | None = None,
         network: str | None = None,
     ) -> None:
+        _validate_name(name)
+        _validate_name(project)
+        if not _SAFE_IMAGE_REF.match(image):
+            msg = f"Référence image invalide : {image!r}"
+            raise ValueError(msg)
         args = ["init", image, name, "--project", project]
         if instance_type == "virtual-machine":
             args.append("--vm")
@@ -198,11 +217,13 @@ class IncusDriver:
         self._run(["stop", name, "--project", project])
 
     def instance_delete(self, name: str, project: str) -> None:
+        _validate_name(name)
         self._run(["delete", name, "--project", project])
 
     # --- Snapshots ---
 
     def snapshot_create(self, instance: str, project: str, name: str) -> None:
+        _validate_name(name)
         self._run(["snapshot", "create", instance, name, "--project", project])
 
     def snapshot_restore(self, instance: str, project: str, name: str) -> None:
@@ -235,6 +256,7 @@ class IncusDriver:
         return name in self.profile_list(project)
 
     def profile_create(self, name: str, project: str) -> None:
+        _validate_name(name)
         self._run(["profile", "create", name, "--project", project])
 
     def profile_device_add(
@@ -285,6 +307,8 @@ class IncusDriver:
 
     def profile_show(self, name: str, project: str = "default") -> dict:
         """Retourne la config complète d'un profil (JSON via API)."""
+        _validate_name(name)
+        _validate_name(project)
         result = self._run(
             ["query", f"/1.0/profiles/{name}?project={project}"]
         )

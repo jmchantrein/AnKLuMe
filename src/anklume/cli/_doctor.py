@@ -23,7 +23,7 @@ def run_doctor_cmd(fix: bool = False, json_output: bool = False) -> None:
 
     # Driver optionnel
     driver = None
-    try:
+    try:  # noqa: SIM105
         driver = IncusDriver()
     except Exception:  # noqa: S110
         pass  # Driver optionnel — checks système uniquement

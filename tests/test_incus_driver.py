@@ -151,9 +151,8 @@ class TestNetworkCreate:
         assert "--project" in cmd
 
     def test_error_raises(self, driver: IncusDriver) -> None:
-        with patch("subprocess.run", return_value=_fail()):
-            with pytest.raises(IncusError):
-                driver.network_create("net-pro", "pro")
+        with patch("subprocess.run", return_value=_fail()), pytest.raises(IncusError):
+            driver.network_create("net-pro", "pro")
 
 
 class TestNetworkExists:
@@ -277,9 +276,8 @@ class TestInstanceStart:
         assert "pro-dev" in cmd
 
     def test_error_raises(self, driver: IncusDriver) -> None:
-        with patch("subprocess.run", return_value=_fail()):
-            with pytest.raises(IncusError):
-                driver.instance_start("pro-dev", "pro")
+        with patch("subprocess.run", return_value=_fail()), pytest.raises(IncusError):
+            driver.instance_start("pro-dev", "pro")
 
 
 class TestInstanceStop:

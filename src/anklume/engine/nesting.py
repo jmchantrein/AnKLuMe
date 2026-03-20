@@ -9,10 +9,13 @@ Gère les environnements multi-niveaux (conteneurs dans conteneurs) :
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from anklume.engine.models import NestingConfig
+
+log = logging.getLogger(__name__)
 
 CONTEXT_DIR = Path("/etc/anklume")
 
@@ -66,6 +69,12 @@ def nesting_security_config(level: int) -> dict[str, str]:
             "security.syscalls.intercept.mknod": "true",
             "security.syscalls.intercept.setxattr": "true",
         }
+    log.warning(
+        "Nesting level %d : mode privilegié activé (security.privileged=true). "
+        "Les conteneurs créés à ce niveau ont un accès étendu au kernel hôte. "
+        "Préférer le nesting VM pour la frontière de sécurité.",
+        level,
+    )
     return {
         "security.nesting": "true",
         "security.privileged": "true",

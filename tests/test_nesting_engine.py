@@ -222,6 +222,22 @@ class TestNestingSecurityConfig:
         config = nesting_security_config(5)
         assert config == nesting_security_config(1)
 
+    def test_level_1_logs_privileged_warning(self, caplog):
+        """L1+ émet un warning sur le mode privilégié."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.nesting"):
+            nesting_security_config(1)
+        assert "privilegié" in caplog.text or "privileged" in caplog.text
+
+    def test_level_0_no_warning(self, caplog):
+        """L0 n'émet aucun warning."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.nesting"):
+            nesting_security_config(0)
+        assert caplog.text == ""
+
 
 # ================================================================
 # context_files_for_instance

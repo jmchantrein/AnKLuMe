@@ -183,10 +183,7 @@ def _plan_domain(
             )
 
     # 2. Réseau
-    if project_is_new:
-        net_exists = False
-    else:
-        net_exists = driver.network_exists(network_name, project_name)
+    net_exists = False if project_is_new else driver.network_exists(network_name, project_name)
 
     if not net_exists:
         gateway = domain.gateway or "auto"
@@ -408,7 +405,7 @@ def _execute_action(
     elif action.verb == "start" and action.resource == "instance":
         # Préparer les répertoires GUI avant le start si profil GUI présent
         machine = _find_machine(action.target, domain, infra.config.nesting, ctx)
-        if gui_info and gui_info.detected and GUI_PROFILE_NAME in machine.profiles:
+        if gui_info and gui_info.detected and GUI_PROFILE_NAME in machine.profiles:  # noqa: SIM102
             if machine.incus_type == "container":
                 _push_gui_tmpfiles(driver, action.target, action.project, gui_info)
         driver.instance_start(action.target, action.project)

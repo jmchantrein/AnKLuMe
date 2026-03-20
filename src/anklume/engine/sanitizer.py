@@ -65,6 +65,12 @@ _IP_10 = re.compile(r"\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3})\b")
 _IP_172 = re.compile(r"\b(172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b")
 _IP_192 = re.compile(r"\b(192\.168\.\d{1,3}\.\d{1,3})\b")
 
+# IPv6 privées (ULA fd00::/8, link-local fe80::/10)
+_IPV6_ULA = re.compile(r"\b(fd[0-9a-f]{2}(?::[0-9a-f]{1,4}){1,7})\b", re.IGNORECASE)
+_IPV6_LINK_LOCAL = re.compile(
+    r"\b(fe80(?::[0-9a-f]{1,4}){0,7}(?:%\w+)?)\b", re.IGNORECASE
+)
+
 # FQDNs internes
 _FQDN_INTERNAL = re.compile(r"\b([\w][\w.-]*\.(internal|local|corp))\b")
 
@@ -74,6 +80,12 @@ _KEY_VALUE = re.compile(
     r"(?:api_key|token|secret|password|key)\s*[=:]\s*(\S+)",
     re.IGNORECASE,
 )
+_JSON_CRED = re.compile(
+    r'"(?:password|token|secret|api_key|access_key)"\s*:\s*"([^"]+)"',
+    re.IGNORECASE,
+)
+_SSH_KEY = re.compile(r"(-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----)")
+_AWS_KEY_ID = re.compile(r"\b(AKIA[0-9A-Z]{16})\b")
 
 # MAC addresses
 _MAC = re.compile(r"\b([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\b")
@@ -91,9 +103,9 @@ _INCUS_CMD = re.compile(
 
 # Registre : catégorie → liste de patterns compilés
 _PATTERN_REGISTRY: list[tuple[str, list[re.Pattern[str]]]] = [
-    ("ip", [_IP_10, _IP_172, _IP_192]),
+    ("ip", [_IP_10, _IP_172, _IP_192, _IPV6_ULA, _IPV6_LINK_LOCAL]),
     ("fqdn", [_FQDN_INTERNAL]),
-    ("credential", [_BEARER, _KEY_VALUE]),
+    ("credential", [_BEARER, _KEY_VALUE, _JSON_CRED, _SSH_KEY, _AWS_KEY_ID]),
     ("mac", [_MAC]),
     ("socket", [_SOCKET]),
     ("incus_cmd", [_INCUS_CMD]),

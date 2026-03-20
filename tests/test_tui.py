@@ -305,7 +305,7 @@ class TestBuiltinRoles:
     def test_roles_sorted(self) -> None:
         from anklume.tui.widgets.machine_form import BUILTIN_ROLES
 
-        assert BUILTIN_ROLES == sorted(BUILTIN_ROLES)
+        assert sorted(BUILTIN_ROLES) == BUILTIN_ROLES
 
 
 # --- CLI registration ---

@@ -40,7 +40,7 @@ class TestLlmRoutingConstants:
     def test_ai_sanitize_values(self):
         from anklume.engine.llm_routing import AI_SANITIZE_VALUES
 
-        assert AI_SANITIZE_VALUES == {"false", "true", "always"}
+        assert {"false", "true", "always"} == AI_SANITIZE_VALUES
 
     def test_llm_consumer_roles(self):
         from anklume.engine.llm_routing import LLM_CONSUMER_ROLES

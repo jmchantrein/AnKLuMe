@@ -100,10 +100,7 @@ def compute_status(
             incus_name = prefix_name(machine.full_name, ctx, nesting_cfg)
             incus_inst = existing.get(incus_name)
 
-            if incus_inst is None:
-                state = "Absent"
-            else:
-                state = incus_inst.status
+            state = "Absent" if incus_inst is None else incus_inst.status
 
             instances.append(
                 InstanceStatus(

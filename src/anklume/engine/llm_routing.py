@@ -135,10 +135,7 @@ def resolve_llm_endpoint(
     needs_sanitize = _needs_sanitization(backend, ai_sanitize)
 
     # Résoudre l'URL du backend réel
-    if backend == BACKEND_LOCAL:
-        real_url = find_ollama_url(domain, infra)
-    else:
-        real_url = api_url
+    real_url = find_ollama_url(domain, infra) if backend == BACKEND_LOCAL else api_url
 
     # Routage via sanitizer si requis
     if needs_sanitize:
@@ -312,9 +309,7 @@ def _needs_sanitization(backend: str, ai_sanitize: str) -> bool:
     """Détermine si la sanitisation est requise."""
     if ai_sanitize == SANITIZE_ALWAYS:
         return True
-    if ai_sanitize == SANITIZE_TRUE and backend in _EXTERNAL_BACKENDS:
-        return True
-    return False
+    return bool(ai_sanitize == SANITIZE_TRUE and backend in _EXTERNAL_BACKENDS)
 
 
 def _is_llm_consumer(machine: Machine) -> bool:

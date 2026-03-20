@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import configparser
+import contextlib
 import json
 import logging
 import os
@@ -121,10 +122,8 @@ def run_setup_gui_fix() -> None:
                     pass
 
         if profile_exists:
-            try:
+            with contextlib.suppress(IncusError):
                 driver.profile_delete(GUI_PROFILE_NAME, project_name)
-            except IncusError:
-                pass
         create_gui_profile(driver, project_name, gui)
         typer.echo(f"  Profil {GUI_PROFILE_NAME} recréé.")
 
@@ -433,10 +432,7 @@ def _ensure_color_scheme(trust_level: str, user_home: Path, gui_uid: int = 0) ->
     base = Path("/usr/share/color-schemes/BreezeLight.colors")
     if not base.exists():
         base = Path("/usr/share/color-schemes/BreezeDark.colors")
-    if base.exists():
-        lines = base.read_text().splitlines()
-    else:
-        lines = ["[General]", f"Name={scheme_name}"]
+    lines = base.read_text().splitlines() if base.exists() else ["[General]", f"Name={scheme_name}"]
 
     # Remplacements par section
     section_replacements: dict[str, dict[str, str]] = {
@@ -746,10 +742,7 @@ def run_instance_gui(instance: str, app: str) -> None:
         app = "dbus-run-session kwin_wayland --xwayland plasmashell konsole dolphin"
 
     # Commandes composées (avec espaces) → passer via sh -c
-    if " " in app:
-        app_args = ["sh", "-c", app]
-    else:
-        app_args = [app]
+    app_args = ["sh", "-c", app] if " " in app else [app]
 
     cmd = [
         "incus",

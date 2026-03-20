@@ -62,10 +62,8 @@ def push_file(
         msg = f"Instance inconnue : {instance}"
         raise ValueError(msg)
 
-    if ".." in local_path.split(os.sep):
-        raise ValueError(_PATH_TRAVERSAL_MSG)
-    if ".." in remote_path.split("/"):
-        raise ValueError(_PATH_TRAVERSAL_MSG)
+    _validate_local_path(local_path)
+    _validate_remote_path(remote_path)
 
     if not os.path.exists(local_path):
         msg = f"Fichier introuvable : {local_path}"
@@ -109,10 +107,8 @@ def pull_file(
         msg = f"Instance inconnue : {instance}"
         raise ValueError(msg)
 
-    if ".." in remote_path.split("/"):
-        raise ValueError(_PATH_TRAVERSAL_MSG)
-    if ".." in local_path.split(os.sep):
-        raise ValueError(_PATH_TRAVERSAL_MSG)
+    _validate_remote_path(remote_path)
+    _validate_local_path(local_path)
 
     # Si local_path est un répertoire, ajouter le nom du fichier distant
     if os.path.isdir(local_path):
@@ -192,3 +188,15 @@ def _parse_ls_output(output: str) -> list[PortalEntry]:
         )
 
     return entries
+
+
+def _validate_local_path(path_str: str) -> None:
+    """Valide un chemin local contre les attaques par traversée."""
+    if ".." in path_str.split(os.sep):
+        raise ValueError(_PATH_TRAVERSAL_MSG)
+
+
+def _validate_remote_path(path_str: str) -> None:
+    """Valide un chemin distant contre les traversées (vérification syntaxique)."""
+    if ".." in path_str.split("/"):
+        raise ValueError(_PATH_TRAVERSAL_MSG)

@@ -166,9 +166,34 @@ class TestDomainToDomainPolicy:
         ]
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
-        # Règle sans restriction de port
         rule_lines = _effective_lines(ruleset, "net-pro", "net-perso")
         assert len(rule_lines) == 1
+        assert "dport" not in rule_lines[0]
+        # ports="all" avec protocole par défaut → filtre protocole
+        assert "meta l4proto tcp" in rule_lines[0]
+
+    def test_ports_all_with_udp(self):
+        """ports='all' avec protocol='udp' → meta l4proto udp."""
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
+        infra.policies = [
+            Policy(
+                description="Tout UDP",
+                from_target="pro",
+                to_target="perso",
+                ports="all",
+                protocol="udp",
+            )
+        ]
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        rule_lines = _effective_lines(ruleset, "net-pro", "net-perso")
+        assert len(rule_lines) == 1
+        assert "meta l4proto udp" in rule_lines[0]
         assert "dport" not in rule_lines[0]
 
     def test_ports_empty_list(self):
@@ -520,3 +545,84 @@ class TestNetworkPassthrough:
         assert 'iifname "net-pro" oifname "net-pro" accept' in ruleset
         assert "tcp dport { 22 }" in ruleset
         assert "policy drop" in ruleset
+
+
+class TestTorTransparentRouting:
+    """Règles DNAT prerouting pour le routage transparent Tor."""
+
+    def _make_tor_infra(self):
+        """Infra avec un domaine sandbox contenant un tor_gateway."""
+        gw = make_machine("tor-gw", "sandbox", roles=["tor_gateway"])
+        gw.vars = {"tor_trans_port": 9040, "tor_dns_port": 5353}
+        gw.type = "vm"
+        browser = make_machine("browse", "sandbox")
+        infra = make_infra(
+            domains={
+                "sandbox": make_domain(
+                    "sandbox",
+                    machines={"tor-gw": gw, "browse": browser},
+                )
+            }
+        )
+        assign_addresses(infra)
+        return infra
+
+    def test_tor_generates_prerouting_chain(self):
+        infra = self._make_tor_infra()
+        ruleset = generate_ruleset(infra)
+        assert "chain prerouting" in ruleset
+        assert "priority dstnat" in ruleset
+
+    def test_tor_dnat_tcp_rule(self):
+        infra = self._make_tor_infra()
+        ruleset = generate_ruleset(infra)
+        assert "tcp dport 1-65535 dnat to" in ruleset
+
+    def test_tor_dnat_dns_rule(self):
+        infra = self._make_tor_infra()
+        ruleset = generate_ruleset(infra)
+        assert "udp dport 53 dnat to" in ruleset
+
+    def test_tor_excludes_gateway_ip(self):
+        """La gateway elle-même est exclue des règles DNAT."""
+        infra = self._make_tor_infra()
+        ruleset = generate_ruleset(infra)
+        # Trouver l'IP du gateway
+        gw = infra.domains["sandbox"].machines["tor-gw"]
+        assert f"ip saddr != {gw.ip}" in ruleset
+
+    def test_no_tor_no_prerouting(self):
+        """Sans tor_gateway, pas de chain prerouting."""
+        infra = make_infra(domains={"pro": make_domain("pro")})
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert "chain prerouting" not in ruleset
+
+    def test_tor_custom_ports(self):
+        """Les ports custom sont utilisés dans les règles DNAT."""
+        gw = make_machine("tor-gw", "sandbox", roles=["tor_gateway"])
+        gw.vars = {"tor_trans_port": 9999, "tor_dns_port": 5454}
+        gw.type = "vm"
+        infra = make_infra(
+            domains={
+                "sandbox": make_domain("sandbox", machines={"tor-gw": gw})
+            }
+        )
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert "dnat to" in ruleset
+        assert ":9999" in ruleset
+        assert ":5454" in ruleset
+
+    def test_tor_disabled_domain_ignored(self):
+        """Domaine désactivé avec tor_gateway → pas de règles."""
+        gw = make_machine("tor-gw", "sandbox", roles=["tor_gateway"])
+        gw.vars = {"tor_trans_port": 9040, "tor_dns_port": 5353}
+        infra = make_infra(
+            domains={
+                "sandbox": make_domain("sandbox", machines={"tor-gw": gw}, enabled=False)
+            }
+        )
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert "chain prerouting" not in ruleset

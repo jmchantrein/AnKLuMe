@@ -12,6 +12,7 @@ import logging
 from dataclasses import dataclass
 
 from anklume.engine.models import Infrastructure, Policy
+from anklume.engine.tor import find_tor_gateways
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +75,10 @@ def generate_ruleset(infra: Infrastructure) -> str:
             _append_policy_rules(policy, infra, lines, machine_index)
 
     lines.append("    }")
+
+    # Routage transparent Tor (DNAT prerouting)
+    _append_tor_rules(infra, lines, machine_index)
+
     lines.append("}")
     lines.append("")
 
@@ -178,6 +183,51 @@ def _build_forward_rule(src: _ResolvedTarget, dst: _ResolvedTarget, policy: Poli
     if isinstance(policy.ports, list) and policy.ports:
         port_list = ", ".join(str(p) for p in sorted(policy.ports))
         parts.append(f"{policy.protocol} dport {{ {port_list} }}")
+    elif policy.ports == "all":
+        parts.append(f"meta l4proto {policy.protocol}")
 
     parts.append("accept")
     return " ".join(parts)
+
+
+def _append_tor_rules(
+    infra: Infrastructure,
+    lines: list[str],
+    machine_index: dict[str, _ResolvedTarget],
+) -> None:
+    """Ajoute les règles DNAT prerouting pour le routage transparent Tor."""
+    gateways = find_tor_gateways(infra)
+    if not gateways:
+        return
+
+    lines.append("")
+    lines.append("    chain prerouting {")
+    lines.append("        type nat hook prerouting priority dstnat; policy accept;")
+
+    for gw in gateways:
+        resolved = machine_index.get(gw.instance)
+        gw_ip = resolved.ip if resolved else None
+        if not gw_ip:
+            log.warning(
+                "Tor gateway '%s' : pas d'IP assignée, règles DNAT ignorées",
+                gw.instance,
+            )
+            lines.append(f"        # [erreur] Tor gateway '{gw.instance}' sans IP")
+            continue
+
+        domain = infra.domains.get(gw.domain)
+        if not domain:
+            continue
+
+        net = domain.network_name
+        lines.append(f"        # Tor transparent : {gw.domain} -> {gw.instance}")
+        lines.append(
+            f'        iifname "{net}" ip saddr != {gw_ip} '
+            f"tcp dport 1-65535 dnat to {gw_ip}:{gw.trans_port}"
+        )
+        lines.append(
+            f'        iifname "{net}" ip saddr != {gw_ip} '
+            f"udp dport 53 dnat to {gw_ip}:{gw.dns_port}"
+        )
+
+    lines.append("    }")

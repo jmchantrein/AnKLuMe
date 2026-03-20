@@ -592,6 +592,76 @@ class TestAuditLog:
 
 
 # ---------------------------------------------------------------------------
+# Nouveaux patterns (audit 26g-sec)
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeSSHKeys:
+    def test_detects_rsa_private_key(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "Key: -----BEGIN RSA PRIVATE KEY----- dans le texte"
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "credential" for r in result.replacements)
+
+    def test_detects_openssh_private_key(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "Clé: -----BEGIN OPENSSH PRIVATE KEY-----"
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "credential" for r in result.replacements)
+
+
+class TestSanitizeAWSCredentials:
+    def test_detects_aws_access_key_id(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "AWS key: AKIAIOSFODNN7EXAMPLE"
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "credential" for r in result.replacements)
+        assert "AKIAIOSFODNN7EXAMPLE" not in result.text
+
+    def test_preserves_non_aws_key(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "AKIASHORT"  # trop court, pas un AWS key
+        result = sanitize(text, mode="mask")
+        assert result.text == text
+
+
+class TestSanitizeIPv6:
+    def test_detects_ula_address(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "Adresse: fd00:1234:5678::1"
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "ip" for r in result.replacements)
+
+    def test_detects_link_local(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = "Link-local: fe80::1"
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "ip" for r in result.replacements)
+
+
+class TestSanitizeJSONCredentials:
+    def test_detects_json_password(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = '{"password": "s3cret_value"}'
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "credential" for r in result.replacements)
+
+    def test_detects_json_token(self):
+        from anklume.engine.sanitizer import sanitize
+
+        text = '{"token": "ghp_abc123XYZ"}'
+        result = sanitize(text, mode="mask")
+        assert any(r.category == "credential" for r in result.replacements)
+
+
+# ---------------------------------------------------------------------------
 # Phase 15 — CLI `anklume llm sanitize`
 # ---------------------------------------------------------------------------
 
