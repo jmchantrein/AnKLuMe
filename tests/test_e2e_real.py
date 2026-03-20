@@ -962,11 +962,7 @@ class TestRealShowcase:
 
     def test_showcase_snapshot_cycle(self, showcase_project):
         """Create, list, restore un snapshot."""
-        from anklume.engine.snapshot import (
-            create_snapshot,
-            list_all_snapshots,
-            restore_snapshot,
-        )
+        from anklume.engine.snapshot import create_snapshot, restore_snapshot
 
         run_apply(dry_run=False, no_provision=True)
 
@@ -980,7 +976,7 @@ class TestRealShowcase:
         project_name = first_domain.name
 
         create_snapshot(driver, instance_name, project_name, name="test-snap")
-        snaps = list_all_snapshots(driver, instance_name, project_name)
+        snaps = driver.snapshot_list(instance_name, project_name)
         assert "test-snap" in [s.name for s in snaps]
         restore_snapshot(driver, instance_name, project_name, "test-snap")
 
