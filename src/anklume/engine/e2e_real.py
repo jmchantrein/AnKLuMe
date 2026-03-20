@@ -12,6 +12,7 @@ Orchestre le cycle de vie d'une VM sandbox isolée :
 from __future__ import annotations
 
 import logging
+import os
 import re
 import subprocess
 import tempfile
@@ -142,7 +143,7 @@ def push_source_to_vm(
     Crée une archive tar du source (sans .git, __pycache__, .venv),
     la pousse dans la VM, et l'extrait.
     """
-    source_dir = _find_anklume_root()
+    source_dir = find_anklume_root()
     log.info("Packing source depuis %s", source_dir)
 
     with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
@@ -305,7 +306,7 @@ def cleanup_sandbox(project: str = SANDBOX_PROJECT) -> None:
         log.debug("Cleanup projet %s ignorée", project)
 
 
-def _find_anklume_root() -> Path:
+def find_anklume_root() -> Path:
     """Trouve la racine du repo anklume.
 
     Cherche dans l'ordre :
@@ -313,8 +314,6 @@ def _find_anklume_root() -> Path:
     2. CWD et ses parents (pyproject.toml contenant 'anklume')
     3. Remontée depuis __file__ (fonctionne en mode dev)
     """
-    import os
-
     env_root = os.environ.get("ANKLUME_ROOT")
     if env_root:
         candidate = Path(env_root).resolve()

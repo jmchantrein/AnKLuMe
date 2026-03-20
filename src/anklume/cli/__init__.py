@@ -188,10 +188,10 @@ def dev_test() -> None:
     """Lancer pytest."""
     import subprocess
 
-    from anklume.engine.e2e_real import _find_anklume_root
+    from anklume.engine.e2e_real import find_anklume_root
 
     try:
-        root = _find_anklume_root()
+        root = find_anklume_root()
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from None

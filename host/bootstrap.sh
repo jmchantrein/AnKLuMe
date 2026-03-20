@@ -1421,7 +1421,7 @@ install_anklume() {
         # Wrapper anklume : exécute depuis le repo via uv run
         cat > "${bin_dir}/anklume" << WRAPPER
 #!/usr/bin/env bash
-exec ${user_home}/.local/bin/uv run --directory '${anklume_dir}' anklume "\$@"
+exec ${uv_bin} run --directory '${anklume_dir}' anklume "\$@"
 WRAPPER
         chmod +x "${bin_dir}/anklume"
         chown "${user_uid}:${user_gid}" "${bin_dir}/anklume"
