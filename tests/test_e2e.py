@@ -440,26 +440,20 @@ class TestShowcaseDryRun:
 
     def test_dry_run_produces_plan(self):
         """apply --dry-run réussit et produit un plan non-vide."""
-        from unittest.mock import patch
-
+        from anklume.engine.addressing import assign_addresses
         from anklume.engine.reconciler import reconcile
+        from anklume.engine.validator import validate
+        from tests.conftest import mock_driver
 
         infra = parse_project(self.path)
-        from anklume.engine.validator import validate
-
         result = validate(infra)
         assert result.valid
 
-        from anklume.engine.addressing import assign_addresses
-
         assign_addresses(infra)
-
-        # Mock le driver pour ne pas toucher Incus
-        from tests.conftest import mock_driver
 
         driver = mock_driver()
         result = reconcile(infra, driver=driver, dry_run=True)
-        assert len(result.actions) > 0  # au moins des créations planifiées
+        assert len(result.actions) > 0
 
     def test_all_trust_levels_present(self):
         infra = parse_project(self.path)

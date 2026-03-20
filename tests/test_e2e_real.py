@@ -921,7 +921,7 @@ class TestRealShowcase:
 
             monkeypatch.chdir(project_dir)
             run_destroy(force=True)
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
     def test_showcase_apply_and_status(self, showcase_project):

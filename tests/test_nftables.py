@@ -493,8 +493,8 @@ class TestNetworkPassthrough:
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         lines = ruleset.splitlines()
-        passthrough_idx = next(i for i, l in enumerate(lines) if 'iifname != "net-*"' in l)
-        intra_idx = next(i for i, l in enumerate(lines) if "intra-domaine" in l)
+        passthrough_idx = next(i for i, line in enumerate(lines) if 'iifname != "net-*"' in line)
+        intra_idx = next(i for i, line in enumerate(lines) if "intra-domaine" in line)
         assert passthrough_idx < intra_idx
 
     def test_passthrough_does_not_affect_anklume_rules(self):
