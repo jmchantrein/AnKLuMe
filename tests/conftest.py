@@ -151,6 +151,7 @@ def write_test_project(path, domains: dict, *, policies: list | None = None):
     from pathlib import Path
 
     path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
     (path / "anklume.yml").write_text(
         yaml.dump(
             {
