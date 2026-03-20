@@ -250,3 +250,37 @@ pour un YAML compact conforme au modèle PSOT.
 **Réutilisation** : `BUILTIN_ROLES_DIR` importé de `provisioner/`,
 `TRUST_LEVELS` et `TRUST_COLORS` importés de `engine/models.py`.
 Aucune duplication avec le reste du codebase.
+
+## ADR-027 : Cohabitation nftables avec les bridges non-anklume
+
+La table `inet anklume` utilise `policy drop` sur la chaîne `forward`
+(ADR-007). Ce drop-all attrape tout le trafic forwarded du kernel,
+y compris celui transitant par des bridges non-anklume (incusbr0
+créé manuellement, bridges Docker, libvirt).
+
+**Conséquence** : toute VM ou conteneur non-anklume perd sa
+connectivité dès que `anklume network deploy` est exécuté.
+
+**Solution** : champ `network_passthrough` dans `anklume.yml`
+(défaut `false`, conformément à ADR-007). Quand activé, une règle
+est ajoutée en tête de chaîne :
+
+```nft
+iifname != "net-*" oifname != "net-*" accept
+```
+
+**Matrice de sécurité** :
+| Source | Destination | Résultat |
+|--------|-------------|----------|
+| non-anklume | non-anklume | accept (passthrough) |
+| anklume | anklume | contrôlé par policies |
+| non-anklume | anklume | drop (sécurisé) |
+| anklume | non-anklume | drop (sécurisé) |
+
+**CLI** : `anklume network passthrough enable/disable` modifie
+`anklume.yml`. Le changement prend effet au prochain
+`anklume network deploy`.
+
+**Défaut `false`** : l'utilisateur doit passer par anklume pour
+gérer son infrastructure. Activer le passthrough est une décision
+explicite de cohabitation.

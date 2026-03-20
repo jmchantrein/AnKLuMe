@@ -1,4 +1,4 @@
-"""Implémentation de `anklume network rules` et `anklume network deploy`."""
+"""Implémentation des commandes `anklume network`."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 import typer
+import yaml
 
 from anklume.cli._common import load_infra
 from anklume.engine.nftables import generate_ruleset
@@ -80,3 +81,24 @@ def run_network_status() -> None:
         )
     else:
         typer.echo("\nnftables : table inet anklume absente")
+
+    # Afficher l'état du passthrough
+    passthrough = infra.config.network_passthrough
+    label = "activé" if passthrough else "désactivé"
+    typer.echo(f"passthrough bridges externes : {label}")
+
+
+def run_network_passthrough(enable: bool) -> None:
+    """Active ou désactive le passthrough des bridges non-anklume."""
+    config_path = Path.cwd() / "anklume.yml"
+    if not config_path.exists():
+        typer.echo("Erreur : anklume.yml introuvable.", err=True)
+        raise typer.Exit(1)
+
+    raw = yaml.safe_load(config_path.read_text()) or {}
+    raw["network_passthrough"] = enable
+    config_path.write_text(yaml.dump(raw, default_flow_style=False, sort_keys=False))
+
+    label = "activé" if enable else "désactivé"
+    typer.echo(f"Passthrough bridges externes {label}.")
+    typer.echo("Appliquer avec : anklume network deploy")

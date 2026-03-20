@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from anklume.cli._apply import run_apply
-from anklume.cli._init import run_init
+from anklume.cli._init import run_init, run_init_showcase
 from anklume.engine.addressing import assign_addresses
 from anklume.engine.incus_driver import IncusDriver
 from anklume.engine.parser import parse_project
@@ -379,3 +379,96 @@ class TestE2EImportRoundtrip:
         assert set(content["machines"].keys()) == {"web", "db"}
         for m in content["machines"].values():
             assert m["type"] == "lxc"
+
+
+# ===========================================================================
+# Tests showcase — pipeline dry-run complet (pas de vrai Incus)
+# ===========================================================================
+
+
+class TestShowcaseDryRun:
+    """Valide le template showcase à travers tout le pipeline sans Incus."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_showcase(self, tmp_path, monkeypatch):
+        """Initialise un projet showcase dans un répertoire temporaire."""
+        monkeypatch.chdir(tmp_path)
+        run_init_showcase(str(tmp_path / "showcase"))
+        monkeypatch.chdir(tmp_path / "showcase")
+        self.path = tmp_path / "showcase"
+
+    def test_init_creates_files(self):
+        assert (self.path / "anklume.yml").is_file()
+        assert (self.path / "policies.yml").is_file()
+        domain_files = list((self.path / "domains").glob("*.yml"))
+        assert len(domain_files) >= 5  # vault, pro, perso, ai-tools, sandbox, gaming
+
+    def test_parse_succeeds(self):
+        infra = parse_project(self.path)
+        assert len(infra.domains) >= 5
+        assert "vault" in infra.domains
+        assert "pro" in infra.domains
+
+    def test_validate_succeeds(self):
+        from anklume.engine.validator import validate
+
+        infra = parse_project(self.path)
+        result = validate(infra)
+        assert result.valid, f"Validation échouée : {result}"
+
+    def test_addressing_assigns_ips(self):
+        from anklume.engine.addressing import assign_addresses
+
+        infra = parse_project(self.path)
+        assign_addresses(infra)
+        for domain in infra.enabled_domains:
+            assert domain.subnet is not None
+            assert domain.gateway is not None
+            for machine in domain.machines.values():
+                assert machine.ip is not None
+
+    def test_nftables_generates_ruleset(self):
+        from anklume.engine.addressing import assign_addresses
+        from anklume.engine.nftables import generate_ruleset
+
+        infra = parse_project(self.path)
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert "policy drop" in ruleset
+        assert "intra-domaine" in ruleset
+        assert "inter-domaines" in ruleset
+
+    def test_dry_run_produces_plan(self):
+        """apply --dry-run réussit et produit un plan non-vide."""
+        from unittest.mock import patch
+
+        from anklume.engine.reconciler import reconcile
+
+        infra = parse_project(self.path)
+        from anklume.engine.validator import validate
+
+        result = validate(infra)
+        assert result.valid
+
+        from anklume.engine.addressing import assign_addresses
+
+        assign_addresses(infra)
+
+        # Mock le driver pour ne pas toucher Incus
+        from tests.conftest import mock_driver
+
+        driver = mock_driver()
+        result = reconcile(infra, driver=driver, dry_run=True)
+        assert len(result.actions) > 0  # au moins des créations planifiées
+
+    def test_all_trust_levels_present(self):
+        infra = parse_project(self.path)
+        trust_levels = {d.trust_level for d in infra.domains.values()}
+        assert "admin" in trust_levels
+        assert "trusted" in trust_levels
+        assert "semi-trusted" in trust_levels
+        assert "disposable" in trust_levels
+
+    def test_policies_parsed(self):
+        infra = parse_project(self.path)
+        assert len(infra.policies) >= 5  # showcase a ~10 policies

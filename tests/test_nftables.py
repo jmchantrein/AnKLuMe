@@ -468,3 +468,55 @@ class TestUnresolvedTarget:
         ruleset = generate_ruleset(infra)
         assert "non résolue" in ruleset
         assert _effective_lines(ruleset, "inexistant") == []
+
+
+class TestNetworkPassthrough:
+    """Passthrough pour les bridges non-anklume (ADR-027)."""
+
+    def test_passthrough_disabled_by_default(self):
+        infra = make_infra(domains={"pro": make_domain("pro")})
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert 'iifname != "net-*"' not in ruleset
+
+    def test_passthrough_enabled(self):
+        infra = make_infra(domains={"pro": make_domain("pro")})
+        infra.config.network_passthrough = True
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert 'iifname != "net-*" oifname != "net-*" accept' in ruleset
+
+    def test_passthrough_before_intra_domain(self):
+        """Le passthrough est avant les règles intra-domaine."""
+        infra = make_infra(domains={"pro": make_domain("pro")})
+        infra.config.network_passthrough = True
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        lines = ruleset.splitlines()
+        passthrough_idx = next(i for i, l in enumerate(lines) if 'iifname != "net-*"' in l)
+        intra_idx = next(i for i, l in enumerate(lines) if "intra-domaine" in l)
+        assert passthrough_idx < intra_idx
+
+    def test_passthrough_does_not_affect_anklume_rules(self):
+        """Les règles anklume (intra + policies) sont toujours présentes."""
+        infra = make_infra(
+            domains={
+                "pro": make_domain("pro"),
+                "perso": make_domain("perso"),
+            }
+        )
+        infra.config.network_passthrough = True
+        infra.policies = [
+            Policy(
+                description="Pro → Perso SSH",
+                from_target="pro",
+                to_target="perso",
+                ports=[22],
+            ),
+        ]
+        assign_addresses(infra)
+        ruleset = generate_ruleset(infra)
+        assert 'iifname != "net-*"' in ruleset
+        assert 'iifname "net-pro" oifname "net-pro" accept' in ruleset
+        assert "tcp dport { 22 }" in ruleset
+        assert "policy drop" in ruleset

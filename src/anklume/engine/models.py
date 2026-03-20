@@ -204,6 +204,7 @@ class GlobalConfig:
     resource_policy: ResourcePolicyConfig | None = None
     gpu_policy: GpuPolicyConfig | None = None
     ai_access_policy: str = "exclusive"  # "exclusive" | "open"
+    network_passthrough: bool = False  # laisser passer le trafic non-anklume
 
 
 @dataclass

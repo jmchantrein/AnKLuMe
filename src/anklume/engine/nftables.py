@@ -48,6 +48,12 @@ def generate_ruleset(infra: Infrastructure) -> str:
     lines.append("        # Connexions établies/reliées")
     lines.append("        ct state established,related accept")
 
+    # Passthrough pour le trafic non-anklume (Docker, libvirt, bridges manuels)
+    if infra.config.network_passthrough:
+        lines.append("")
+        lines.append("        # Trafic hors anklume : ne pas interférer")
+        lines.append('        iifname != "net-*" oifname != "net-*" accept')
+
     # Index full_name -> resolved target (O(1) au lieu de O(M*K) par policy)
     machine_index = _build_machine_index(infra)
 

@@ -85,6 +85,7 @@ def _parse_global_config(path: Path) -> GlobalConfig:
         gpu_policy = GpuPolicyConfig(policy=policy_str)
 
     ai_access_policy = raw.get("ai_access_policy", "exclusive")
+    network_passthrough = raw.get("network_passthrough", False)
 
     return GlobalConfig(
         schema_version=raw.get("schema_version", SCHEMA_VERSION),
@@ -94,6 +95,7 @@ def _parse_global_config(path: Path) -> GlobalConfig:
         resource_policy=resource_policy,
         gpu_policy=gpu_policy,
         ai_access_policy=ai_access_policy,
+        network_passthrough=network_passthrough,
     )
 
 

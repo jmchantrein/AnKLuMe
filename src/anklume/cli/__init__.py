@@ -548,6 +548,19 @@ def network_status() -> None:
     run_network_status()
 
 
+@network_app.command("passthrough")
+def network_passthrough(
+    action: str = typer.Argument(help="enable ou disable"),
+) -> None:
+    """Activer/désactiver le passthrough des bridges non-anklume."""
+    from anklume.cli._network import run_network_passthrough
+
+    if action not in ("enable", "disable"):
+        typer.echo("Usage : anklume network passthrough <enable|disable>", err=True)
+        raise typer.Exit(1)
+    run_network_passthrough(enable=(action == "enable"))
+
+
 # --- anklume llm <status|bench> ---
 
 
