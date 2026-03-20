@@ -1,16 +1,52 @@
 # anklume
 
-Framework déclaratif de compartimentalisation d'infrastructure.
-Isolation avec Incus (LXC/KVM) + nftables, sur n'importe quel Linux.
-Provisioning intégré via Ansible.
+Cloisonnez votre poste de travail Linux. Utilisez l'IA en sécurité.
+
+Décrivez vos environnements en YAML, lancez `anklume apply all`,
+obtenez des conteneurs et VMs isolés avec réseau cloisonné (nftables),
+provisionnés par Ansible et prêts à l'emploi.
 
 [![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml)
 [![Documentation](https://github.com/jmchantrein/AnKLuMe/actions/workflows/docs.yml/badge.svg)](https://jmchantrein.github.io/AnKLuMe/)
 
-## Principe
+## Pourquoi anklume ?
 
-Décrivez vos domaines en YAML. Lancez `anklume apply all`. Obtenez des
-environnements isolés et reproductibles.
+### Tester et utiliser l'IA sans compromettre ses données
+
+Les agents IA et LLM ont besoin d'un accès système (shell, fichiers,
+réseau) pour être utiles. Sur un poste bare-metal, c'est un risque
+majeur : fuites de données personnelles, credentials exposées,
+exécution de code non audité.
+
+**IA locale isolée** — faire tourner des LLM (Ollama) avec GPU
+passthrough dans un domaine dédié, cloisonné par nftables. L'IA a
+accès au GPU mais pas au reste du poste.
+
+**IA cloud sanitisée** — proxy de sanitisation qui tokenise les IPs,
+credentials, noms de machines avant envoi aux LLM cloud. Le
+cloisonnement réseau garantit que le flux passe obligatoirement
+par le proxy.
+
+**Tester les nouveautés IA en sécurité** — chaque nouvel agent ou
+outil IA tourne dans un conteneur/VM jetable. On teste, on évalue,
+on détruit. Pas d'accès aux données personnelles, pas de persistance
+non contrôlée.
+
+### Enseigner l'administration système et le réseau
+
+L'enseignant prépare une infrastructure (domaines, rôles, politiques
+réseau) et la distribue via git. Les étudiants déploient avec
+`anklume apply all` et apprennent en manipulant une vraie infra :
+réseau, pare-feu, conteneurs, provisioning. Idempotent, reproductible,
+jetable — l'étudiant casse, détruit, recommence.
+
+### Compartimentaliser son poste de travail
+
+Séparer pro/perso/dev/sandbox/IA sur une seule machine. Un domaine =
+un sous-réseau + un projet Incus + des instances. Drop-all par défaut
+entre domaines, politiques déclaratives.
+
+## Principe
 
 ```yaml
 # domains/pro.yml
@@ -54,6 +90,31 @@ anklume apply all           # Déployer
 anklume status              # Vérifier
 ```
 
+## Isolation : LXC vs VM
+
+| | LXC | VM (KVM) |
+|---|---|---|
+| Noyau | Partagé (hôte) | Séparé (hyperviseur type 1) |
+| Performance | Native | Overhead virtualisation |
+| Usage recommandé | Charges de confiance | Charges non fiables, jetables |
+
+anklume n'est pas un OS sécurisé. Les conteneurs LXC partagent le
+noyau hôte. Pour les domaines untrusted et disposable, utiliser
+`type: vm` (KVM, noyau séparé).
+
+## Niveaux de confiance
+
+Chaque domaine déclare un trust-level qui détermine son sous-réseau,
+ses règles nftables, et sa couleur dans l'interface :
+
+| Niveau | Réseau | Usage | Recommandation |
+|---|---|---|---|
+| `admin` | 10.100.x.x | Administration système | LXC ou VM |
+| `trusted` | 10.110.x.x | Services de confiance | LXC |
+| `semi-trusted` | 10.120.x.x | Travail quotidien (défaut) | LXC |
+| `untrusted` | 10.130.x.x | Navigation, tests | VM recommandée |
+| `disposable` | 10.140.x.x | Usage unique, éphémère | VM recommandée |
+
 ## Fonctionnalités
 
 | Fonctionnalité | Description |
@@ -65,7 +126,7 @@ anklume status              # Vérifier
 | **Provisioning Ansible** | 15 rôles embarqués + rôles custom + Galaxy |
 | **Routage LLM** | Backend local/cloud, proxy de sanitisation automatique |
 | **Snapshots** | Automatiques pré/post-apply, rollback destructif |
-| **Nesting Incus** | Conteneurs dans conteneurs (5 niveaux validés) |
+| **Nesting Incus** | 2 niveaux en usage réel, 5 niveaux validés en benchmark |
 | **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
 | **Resource policy** | Allocation CPU/RAM proportionnelle par poids |
 | **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
@@ -113,18 +174,17 @@ anklume doctor                          # Diagnostic automatique
 anklume console                         # Console tmux colorée
 ```
 
-## Niveaux de confiance
+## Ce que anklume n'est PAS
 
-Chaque domaine déclare un trust-level qui détermine son sous-réseau,
-ses règles nftables, et sa couleur dans l'interface :
-
-| Niveau | Réseau | Usage |
-|---|---|---|
-| `admin` | 10.100.x.x | Administration système |
-| `trusted` | 10.110.x.x | Services de confiance |
-| `semi-trusted` | 10.120.x.x | Travail quotidien (défaut) |
-| `untrusted` | 10.130.x.x | Navigation, tests |
-| `disposable` | 10.140.x.x | Usage unique, éphémère |
+- **Pas un OS sécurisé.** QubesOS (Xen) offre une isolation hardware
+  supérieure, mais ne supporte pas l'inférence LLM locale avec GPU
+  passthrough (Ollama freeze à l'initialisation du modèle). anklume
+  utilise KVM (hyperviseur type 1, noyau séparé) pour les VM et des
+  conteneurs LXC (noyau partagé) pour les charges légères.
+- **Pas une web app ni une API**
+- **Pas un remplacement d'Ansible, d'Incus ou de nftables**
+- **Pas un orchestrateur multi-machines**
+- **Pas lié à une distribution Linux spécifique**
 
 ## Rôles Ansible embarqués
 

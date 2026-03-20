@@ -59,7 +59,6 @@ EXPECTED_TOP_LEVEL = {
     "golden",
     "tor",
     "resource",
-    "telemetry",
     "workspace",
     "console",
 }
@@ -132,7 +131,6 @@ EXPECTED_SUBCOMMANDS = {
     "golden": {"create", "list", "delete"},
     "tor": {"status"},
     "resource": {"show"},
-    "telemetry": {"on", "off", "status"},
     "workspace": {"load", "status", "grid"},
     "console": {"kill"},
 }
@@ -143,9 +141,7 @@ class TestSubcommandCompletion:
         for group, expected in EXPECTED_SUBCOMMANDS.items():
             completions = set(_get_completions([group]))
             missing = expected - completions
-            assert not missing, (
-                f"Sous-commandes manquantes pour '{group}' : {missing}"
-            )
+            assert not missing, f"Sous-commandes manquantes pour '{group}' : {missing}"
 
     def test_apply_partial(self) -> None:
         completions = _get_completions(["apply"], "a")
@@ -182,6 +178,5 @@ class TestBashCompletionScript:
         content = _COMPLETION_SCRIPT.read_text()
         assert "_ANKLUME_COMPLETE=complete_bash anklume" in content
         assert "$1" not in content, (
-            "La fonction de completion ne doit pas utiliser $1 "
-            "(ne fonctionne pas avec l'alias ank)"
+            "La fonction de completion ne doit pas utiliser $1 (ne fonctionne pas avec l'alias ank)"
         )

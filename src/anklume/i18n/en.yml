@@ -10,14 +10,6 @@ cli:
     ok: "Infrastructure synchronized"
   destroy:
     done: "Infrastructure destroyed"
-  telemetry:
-    enabled: "Telemetry enabled"
-    disabled: "Telemetry disabled"
-    status_on: "Telemetry: enabled ({count} events)"
-    status_off: "Telemetry: disabled"
-    top_commands: "Most used commands:"
-    success_rate: "Success rate: {rate}"
-    last_event: "Last event: {timestamp}"
 errors:
   file_not_found: "File not found: {path}"
   domain_not_found: "Unknown domain: {name}"

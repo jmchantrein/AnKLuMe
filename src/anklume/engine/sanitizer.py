@@ -3,19 +3,15 @@
 Détecte et remplace les IPs privées, FQDNs internes, credentials,
 MAC addresses, sockets Unix, commandes Incus et ressources Incus.
 Deux modes : mask (placeholders indexés) et pseudonymize (cohérent).
-Détection NER optionnelle (GLiNER/spaCy). Audit logging.
+Détection NER optionnelle (GLiNER/spaCy).
 """
 
 from __future__ import annotations
 
 import functools
-import json
 import re
-from collections import Counter
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -46,16 +42,6 @@ class SanitizeResult:
     replacements: list[Replacement] = field(default_factory=list)
 
 
-@dataclass
-class AuditEntry:
-    """Une entrée d'audit de sanitisation."""
-
-    timestamp: str  # ISO 8601
-    mode: str  # mask | pseudonymize
-    categories: dict[str, int]  # {"ip": 2, "credential": 1}
-    total_redactions: int
-
-
 # ---------------------------------------------------------------------------
 # Patterns de détection — registre data-driven
 # ---------------------------------------------------------------------------
@@ -67,9 +53,7 @@ _IP_192 = re.compile(r"\b(192\.168\.\d{1,3}\.\d{1,3})\b")
 
 # IPv6 privées (ULA fd00::/8, link-local fe80::/10)
 _IPV6_ULA = re.compile(r"\b(fd[0-9a-f]{2}(?::[0-9a-f]{1,4}){1,7})\b", re.IGNORECASE)
-_IPV6_LINK_LOCAL = re.compile(
-    r"\b(fe80(?::[0-9a-f]{1,4}){0,7}(?:%\w+)?)\b", re.IGNORECASE
-)
+_IPV6_LINK_LOCAL = re.compile(r"\b(fe80(?::[0-9a-f]{1,4}){0,7}(?:%\w+)?)\b", re.IGNORECASE)
 
 # FQDNs internes
 _FQDN_INTERNAL = re.compile(r"\b([\w][\w.-]*\.(internal|local|corp))\b")
@@ -314,40 +298,6 @@ def _ner_spacy(text: str) -> list[tuple[int, int, str]]:
         ]
     except Exception:
         return []
-
-
-# ---------------------------------------------------------------------------
-# Audit logging
-# ---------------------------------------------------------------------------
-
-
-def audit_log(
-    result: SanitizeResult,
-    *,
-    mode: str,
-    log_path: Path | None = None,
-) -> AuditEntry:
-    """Écrit une entrée d'audit et la retourne.
-
-    log_path: chemin du fichier d'audit
-    (défaut: /var/log/anklume/sanitizer/audit.jsonl).
-    """
-    if log_path is None:
-        log_path = Path("/var/log/anklume/sanitizer/audit.jsonl")
-
-    entry = AuditEntry(
-        timestamp=datetime.now(tz=UTC).isoformat(),
-        mode=mode,
-        categories=dict(Counter(r.category for r in result.replacements)),
-        total_redactions=len(result.replacements),
-    )
-
-    log_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with log_path.open("a") as f:
-        f.write(json.dumps(asdict(entry)) + "\n")
-    log_path.chmod(0o600)
-
-    return entry
 
 
 # ---------------------------------------------------------------------------

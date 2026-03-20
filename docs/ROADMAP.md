@@ -71,7 +71,7 @@
 
 ## Phase 7 — Nesting Incus ✅
 
-- [x] Tests de nesting (LXC dans LXC, 5 niveaux validés)
+- [x] Tests de nesting (LXC dans LXC, 2 niveaux = cas d'usage réel, 5 niveaux = benchmark de robustesse)
 - [x] SPEC §8 détaillé (détection, préfixes, contexte, sécurité, module)
 - [x] `engine/nesting.py` — NestingContext, préfixes, sécurité, fichiers de contexte
 - [x] Détection du contexte via `/etc/anklume/` (absolute_level, relative_level, vm_nested, yolo)
@@ -488,13 +488,7 @@ Communication hôte ↔ conteneur sans compromettre l'isolation.
   - Catalogues YAML : `fr.yml`, `en.yml` (mêmes clés)
   - Détection locale : `ANKLUME_LANG` > `LANG` > `fr`
   - Interpolation `{variable}`, fallback clé brute
-- [x] Telemetry — métriques d'usage opt-in (§33)
-  - `engine/telemetry.py` — `TelemetryEvent`, `TelemetryStats`
-  - `enable()`, `disable()`, `is_enabled()`, `record_event()`, `get_stats()`, `clear_events()`
-  - Stockage local `~/.config/anklume/` (JSON + JSON-lines)
-  - Échec silencieux, garde si désactivé
-  - `cli/_telemetry.py` — `run_telemetry_on/off/status`
-  - CLI : `anklume telemetry on/off/status`
+- ~~Telemetry — métriques d'usage opt-in (§33)~~ — supprimée (YAGNI, code mort jamais câblé)
 - [x] Documentation — MkDocs (§34)
   - `mkdocs.yml` — Material theme, navigation manuelle
   - `docs/index.md` — page d'accueil avec démarrage rapide
@@ -721,17 +715,10 @@ avec Incus nested. Validation du cycle complet.
 Corrections de fond issues de l'audit de cohérence. Aucun n'est
 bloquant, mais chaque point améliore la maintenabilité.
 
-### 26a — Câbler la télémétrie
+### ~~26a — Câbler la télémétrie~~ — Supprimée (YAGNI)
 
-`record_event()` et `clear_events()` dans `engine/telemetry.py` sont
-définis mais jamais appelés. `audit_log()` dans `engine/sanitizer.py`
-idem. La CLI `telemetry on/off/status` existe mais aucune commande
-n'enregistre d'événements.
-
-- [ ] Appeler `record_event()` dans le pipeline CLI (apply, destroy, etc.)
-- [ ] Exposer `clear_events` dans la CLI (`anklume telemetry clear`)
-- [ ] Câbler `audit_log()` dans le proxy sanitizer (appel après chaque sanitisation)
-- [ ] Tests unitaires pour le flux complet (record → stats → clear)
+Code mort supprimé : `engine/telemetry.py`, `cli/_telemetry.py`,
+`AuditEntry`/`audit_log()` dans sanitizer.py, feature flags `experimental`.
 
 ### 26b — Factoriser les scripts shell (bootstrap / quickstart) ✅
 
@@ -815,7 +802,7 @@ pour l'auto-évolution LLM du projet.
 - [x] `anklume doctor --drift` — détecte les écarts YAML vs état Incus réel
 - [x] `anklume migrate` — placeholder pour migrations de `schema_version`
 - [x] `requires_anklume` dans anklume.yml — vérifie la version minimum du tool
-- [x] Feature flags `experimental:` dans anklume.yml (data model)
+- ~~Feature flags `experimental:` dans anklume.yml~~ — supprimés (YAGNI, jamais utilisés)
 - [x] Hook PreToolUse commit-bloquant (pytest doit passer avant `git commit`)
 - [x] Hook PreToolUse protection fichiers critiques (CLAUDE.md, SPEC, pyproject)
 - [x] Hook PostToolUse `ruff format` ajouté

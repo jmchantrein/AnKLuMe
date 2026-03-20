@@ -126,14 +126,6 @@ Makefile, pas d'API web.
 | `anklume dev env <name>` | Générer un domaine de développement |
 | `anklume dev test-real` | Tests E2E dans une VM KVM |
 
-## Télémétrie
-
-| Commande | Description |
-|---|---|
-| `anklume telemetry on` | Activer la télémétrie (opt-in) |
-| `anklume telemetry off` | Désactiver la télémétrie |
-| `anklume telemetry status` | État de la télémétrie |
-
 ## Arbre des commandes
 
 ```mermaid
@@ -159,7 +151,6 @@ graph TD
     CLI --> setup
     CLI --> resource
     CLI --> tui
-    CLI --> telemetry
 
     apply --> apply_all[all]
     apply --> apply_domain[domain]

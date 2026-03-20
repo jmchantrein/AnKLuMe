@@ -1,7 +1,7 @@
 # anklume
 
-Framework de compartimentalisation d'infrastructure déclaratif.
-Isolation avec Incus (LXC/KVM) + nftables, sur n'importe quel Linux.
+Outil IaC déclaratif pour cloisonner un poste Linux — IA sécurisée
++ enseignement sys/réseaux. Isolation avec Incus (LXC/KVM) + nftables.
 Provisioning des instances via Ansible (intégré, optionnel pour l'utilisateur).
 
 ## Règles non-négociables

@@ -206,7 +206,6 @@ class GlobalConfig:
     ai_access_policy: str = "exclusive"  # "exclusive" | "open"
     network_passthrough: bool = False  # laisser passer le trafic non-anklume
     requires_anklume: str | None = None  # version minimale requise (ex: "0.2.0")
-    experimental: dict[str, bool] = field(default_factory=dict)  # feature flags
 
 
 @dataclass

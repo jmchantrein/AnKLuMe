@@ -1,7 +1,8 @@
 # Nesting Incus
 
 Support du nesting LXC pour les architectures multi-niveaux :
-conteneurs dans conteneurs, jusqu'à 5 niveaux validés.
+conteneurs dans conteneurs — 2 niveaux en usage réel (TP en VM, VPS),
+5 niveaux validés en benchmark de robustesse.
 
 ## Principe
 

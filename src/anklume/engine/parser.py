@@ -92,9 +92,6 @@ def _parse_global_config(path: Path) -> GlobalConfig:
     if requires_anklume is not None:
         requires_anklume = str(requires_anklume)
 
-    experimental_raw = raw.get("experimental", {})
-    experimental = {str(k): bool(v) for k, v in (experimental_raw or {}).items()}
-
     return GlobalConfig(
         schema_version=raw.get("schema_version", SCHEMA_VERSION),
         defaults=defaults,
@@ -105,7 +102,6 @@ def _parse_global_config(path: Path) -> GlobalConfig:
         ai_access_policy=ai_access_policy,
         network_passthrough=network_passthrough,
         requires_anklume=requires_anklume,
-        experimental=experimental,
     )
 
 

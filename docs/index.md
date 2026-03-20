@@ -1,9 +1,10 @@
 # anklume
 
-**Framework déclaratif de compartimentalisation d'infrastructure.**
+**Cloisonnez votre poste de travail Linux. Utilisez l'IA en sécurité.**
 
-Isolation avec Incus (LXC/KVM) + nftables, sur n'importe quel Linux.
-Provisioning des instances via Ansible (intégré, optionnel pour l'utilisateur).
+Décrivez vos environnements en YAML, lancez `anklume apply all`,
+obtenez des conteneurs et VMs isolés avec réseau cloisonné (nftables),
+provisionnés par Ansible et prêts à l'emploi.
 
 ```mermaid
 graph LR
@@ -19,10 +20,34 @@ graph LR
     style C fill:#8b5cf6,color:#fff
 ```
 
-## Principe
+## Pourquoi anklume ?
 
-Décrivez vos domaines en YAML. Lancez `anklume apply all`. Obtenez des
-environnements isolés et reproductibles.
+### Tester et utiliser l'IA sans compromettre ses données
+
+Les agents IA et LLM ont besoin d'un accès système (shell, fichiers,
+réseau) pour être utiles. Sur un poste bare-metal, c'est un risque
+majeur : fuites de données personnelles, credentials exposées,
+exécution de code non audité.
+
+- **IA locale isolée** — LLM (Ollama) avec GPU passthrough dans un
+  domaine dédié, cloisonné par nftables
+- **IA cloud sanitisée** — proxy de sanitisation qui tokenise les
+  données sensibles avant envoi aux LLM cloud
+- **Tester en sécurité** — chaque agent/outil IA tourne dans un
+  conteneur/VM jetable
+
+### Enseigner l'administration système et le réseau
+
+L'enseignant prépare une infrastructure et la distribue via git.
+Les étudiants déploient avec `anklume apply all` et manipulent une
+vraie infra. Idempotent, reproductible, jetable.
+
+### Compartimentaliser son poste de travail
+
+Séparer pro/perso/dev/sandbox/IA sur une seule machine. Un domaine =
+un sous-réseau + un projet Incus. Drop-all par défaut entre domaines.
+
+## Principe
 
 ```yaml
 # domains/pro.yml
@@ -41,6 +66,18 @@ machines:
     gpu: true
     roles: [base, desktop]
 ```
+
+## Isolation : LXC vs VM
+
+| | LXC | VM (KVM) |
+|---|---|---|
+| Noyau | Partagé (hôte) | Séparé (hyperviseur type 1) |
+| Performance | Native | Overhead virtualisation |
+| Usage recommandé | Charges de confiance | Charges non fiables, jetables |
+
+anklume n'est pas un OS sécurisé. Les conteneurs LXC partagent le
+noyau hôte. Pour les domaines untrusted et disposable, utiliser
+`type: vm` (KVM, noyau séparé).
 
 ## Démarrage rapide
 
@@ -62,7 +99,7 @@ anklume apply all
 anklume status
 ```
 
-→ [Guide d'installation détaillé](guide/installation.md)
+> [Guide d'installation détaillé](guide/installation.md)
 
 ## Fonctionnalités
 
@@ -73,11 +110,23 @@ anklume status
 | **GPU passthrough** | Accès exclusif ou partagé au GPU (Ollama, STT, LLM) |
 | **Provisioning Ansible** | Rôles embarqués + rôles custom utilisateur |
 | **Snapshots automatiques** | Pré/post-apply, rollback destructif |
-| **Nesting Incus** | Conteneurs dans conteneurs (5 niveaux validés) |
+| **Nesting Incus** | 2 niveaux en usage réel, 5 niveaux validés en benchmark |
 | **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
 | **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
 | **Portails fichiers** | Transfert hôte ↔ conteneur sans compromettre l'isolation |
 | **Golden images** | Publier des instances comme images réutilisables |
+
+## Ce que anklume n'est PAS
+
+- **Pas un OS sécurisé.** QubesOS (Xen) offre une isolation hardware
+  supérieure, mais ne supporte pas l'inférence LLM locale avec GPU
+  passthrough (Ollama freeze à l'initialisation du modèle). anklume
+  utilise KVM (hyperviseur type 1, noyau séparé) pour les VM et des
+  conteneurs LXC (noyau partagé) pour les charges légères.
+- Pas une web app ni une API
+- Pas un remplacement d'Ansible, d'Incus ou de nftables
+- Pas un orchestrateur multi-machines
+- Pas lié à une distribution Linux spécifique
 
 ## Architecture
 
@@ -98,7 +147,7 @@ graph TB
             P2[pro-desktop]
         end
         subgraph "Domaine ai-tools"
-            AI1["gpu-server 🎮"]
+            AI1["gpu-server"]
         end
     end
 

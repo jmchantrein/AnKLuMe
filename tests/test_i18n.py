@@ -166,10 +166,10 @@ class TestTranslate:
         from anklume.i18n import set_locale, t
 
         set_locale("fr")
-        result = t("cli.telemetry.enabled")
+        result = t("cli.apply.deploying", domain="test")
         assert isinstance(result, str)
         assert len(result) > 0
-        assert result != "cli.telemetry.enabled"  # résolu
+        assert result != "cli.apply.deploying"  # résolu
 
     def test_version_key(self) -> None:
         from anklume.i18n import set_locale, t

@@ -4,6 +4,18 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ## [Non publié]
 
+### Supprimé
+- refactor: télémétrie supprimée (YAGNI) — code mort jamais câblé
+- refactor: feature flags `experimental` supprimés — jamais utilisés
+- refactor: AuditEntry/audit_log supprimés du sanitizer — jamais appelés
+
+### Modifié
+- docs: repositionnement — outil IaC pour IA sécurisée + enseignement
+- docs: suppression des références QubesOS — anklume n'est pas un OS sécurisé
+- docs: clarification isolation LXC vs VM (KVM = hyperviseur type 1)
+- docs: nesting 2 niveaux = usage réel, 5 niveaux = benchmark
+- docs: cas d'usage IA : agents isolés, sanitisation, GPU local
+
 ### Sécurité
 - fix: passphrase ZFS masquée via openssl fd:3 (plus visible dans /proc)
 - fix: actions GitHub épinglées par SHA + permissions contents:read

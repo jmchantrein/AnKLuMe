@@ -8,7 +8,7 @@ from anklume import __version__
 
 app = typer.Typer(
     name="anklume",
-    help="Framework déclaratif de compartimentalisation d'infrastructure.",
+    help="Cloisonnez votre poste Linux — IA sécurisée + enseignement.",
     no_args_is_help=True,
 )
 
@@ -29,7 +29,6 @@ setup_app = typer.Typer(help="Configuration et import.")
 golden_app = typer.Typer(help="Golden images — images réutilisables.")
 tor_app = typer.Typer(help="Passerelle Tor.")
 resource_app = typer.Typer(help="Allocation des ressources.")
-telemetry_app = typer.Typer(help="Métriques d'usage.")
 workspace_app = typer.Typer(help="Workspace layout déclaratif (GUI tmuxp).")
 
 app.add_typer(init_app, name="init")
@@ -47,7 +46,6 @@ app.add_typer(setup_app, name="setup")
 app.add_typer(golden_app, name="golden")
 app.add_typer(tor_app, name="tor")
 app.add_typer(resource_app, name="resource")
-app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(workspace_app, name="workspace")
 
 
@@ -1017,33 +1015,6 @@ def doctor(
     from anklume.cli._doctor import run_doctor_cmd
 
     run_doctor_cmd(fix=fix, json_output=json_output, drift=drift)
-
-
-# --- anklume telemetry <on|off|status> ---
-
-
-@telemetry_app.command("on")
-def telemetry_on() -> None:
-    """Activer la collecte de métriques."""
-    from anklume.cli._telemetry import run_telemetry_on
-
-    run_telemetry_on()
-
-
-@telemetry_app.command("off")
-def telemetry_off() -> None:
-    """Désactiver la collecte de métriques."""
-    from anklume.cli._telemetry import run_telemetry_off
-
-    run_telemetry_off()
-
-
-@telemetry_app.command("status")
-def telemetry_status() -> None:
-    """Afficher l'état et le résumé des métriques."""
-    from anklume.cli._telemetry import run_telemetry_status
-
-    run_telemetry_status()
 
 
 # --- anklume workspace <load|status|grid> ---

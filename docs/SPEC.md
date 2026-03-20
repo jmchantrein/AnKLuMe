@@ -2,33 +2,60 @@
 
 ## 1. Vision
 
-anklume est un framework déclaratif de compartimentalisation
-d'infrastructure. Il fournit une isolation de type QubesOS en
-utilisant les mécanismes natifs du noyau Linux (KVM/LXC),
-orchestrés par Incus et nftables.
-
-L'utilisateur décrit ses domaines dans des fichiers YAML (un par
-domaine, style docker-compose), lance `anklume apply all`, et
-obtient des environnements isolés et reproductibles.
+anklume est un outil IaC déclaratif pour cloisonner un poste de
+travail Linux. L'utilisateur décrit ses domaines dans des fichiers
+YAML (un par domaine, style docker-compose), lance `anklume apply all`,
+et obtient des conteneurs et VMs isolés avec réseau cloisonné
+(nftables), provisionnés par Ansible et prêts à l'emploi.
 
 **Principe de design : minimiser la friction.** Des défauts sensés
 éliminent la configuration quand l'utilisateur n'a pas d'opinion.
 Les messages d'erreur expliquent quoi faire, pas juste ce qui a
 échoué.
 
+### Cas d'usage
+
+1. **IA sécurisée** — faire tourner des LLM locaux (Ollama) avec
+   GPU passthrough dans un domaine dédié, cloisonné par nftables.
+   Proxy de sanitisation pour les LLM cloud. Chaque agent/outil IA
+   tourne dans un conteneur/VM jetable.
+2. **Enseignement sys/réseaux** — l'enseignant prépare une
+   infrastructure et la distribue via git. Les étudiants déploient
+   avec `anklume apply all` et manipulent une vraie infra.
+   Idempotent, reproductible, jetable.
+3. **Compartimentalisation de poste** — séparer pro/perso/dev/sandbox/IA
+   sur une seule machine. Un domaine = un sous-réseau + un projet Incus.
+   Drop-all par défaut entre domaines, politiques déclaratives.
+
 ### Utilisateurs cibles
 
-- **Sysadmins** — compartimentalisation de poste de travail
-- **Étudiants** — apprentissage de l'administration système
-- **Power users** — isolation type QubesOS sans les contraintes
-- **Utilisateurs soucieux de leur vie privée** — routage via
-  des passerelles isolées (Tor, VPN)
+- **Admin sys / enseignant** (Univ. Angers, sys/réseaux) —
+  compartimentalisation de poste et IA sécurisée
+- **Étudiants** — apprentissage de l'administration système,
+  du réseau et de la virtualisation
+
+### Isolation : LXC vs VM
+
+| | LXC | VM (KVM) |
+|---|---|---|
+| Noyau | Partagé (hôte) | Séparé (hyperviseur type 1) |
+| Performance | Native | Overhead virtualisation |
+| Usage recommandé | Charges de confiance | Charges non fiables, jetables |
+
+anklume n'est pas un OS sécurisé. Les conteneurs LXC partagent le
+noyau hôte. Pour les domaines untrusted et disposable, utiliser
+`type: vm` (KVM, noyau séparé).
 
 ### Ce que anklume n'est PAS
 
+- **Pas un OS sécurisé.** QubesOS (Xen) offre une isolation hardware
+  supérieure, mais ne supporte pas l'inférence LLM locale avec GPU
+  passthrough (Ollama freeze à l'initialisation du modèle). anklume
+  utilise KVM (hyperviseur type 1, noyau séparé) pour les VM et des
+  conteneurs LXC (noyau partagé) pour les charges légères.
 - Pas une web app ni une API — c'est un outil IaC
-- Pas un remplacement d'Ansible — il l'utilise pour le provisioning
-- Pas un orchestrateur de conteneurs — il utilise Incus pour ça
+- Pas un remplacement d'Ansible, d'Incus ou de nftables
+- Pas un orchestrateur multi-machines
 - Pas lié à une distribution Linux spécifique
 
 ## 2. Installation et utilisation
@@ -416,14 +443,6 @@ policies:
 | `anklume setup import [--dir]` | Importer une infrastructure Incus existante |
 | `anklume setup aliases [--remove] [--shell]` | Installer les aliases shell |
 | `anklume setup gui [--fix] [--recover]` | Diagnostic/réparation GUI |
-
-### Télémétrie
-
-| Commande | Description |
-|----------|-------------|
-| `anklume telemetry on` | Activer les métriques d'usage |
-| `anklume telemetry off` | Désactiver les métriques |
-| `anklume telemetry status` | État des métriques |
 
 ### Développement
 
@@ -3114,31 +3133,6 @@ Remplacements (2) :
 }
 ```
 
-### 27.4 Audit logging
-
-Trace des redactions dans un fichier de log (JSON-lines).
-
-```python
-@dataclass
-class AuditEntry:
-    """Une entrée d'audit de sanitisation."""
-    timestamp: str          # ISO 8601
-    mode: str               # mask | pseudonymize
-    categories: dict[str, int]  # {"ip": 2, "credential": 1}
-    total_redactions: int
-
-def audit_log(
-    result: SanitizeResult,
-    *,
-    mode: str,
-    log_path: Path | None = None,
-) -> AuditEntry:
-    """Écrit une entrée d'audit et la retourne.
-
-    log_path: chemin du fichier d'audit (défaut: /var/log/anklume/sanitizer/audit.jsonl).
-    """
-```
-
 Variables du rôle `llm_sanitizer` :
 
 | Variable | Défaut | Description |
@@ -3185,14 +3179,6 @@ def sanitize(
     ner: bool = False,
     categories: set[str] | None = None,  # None = toutes
 ) -> SanitizeResult:
-    """..."""
-
-def audit_log(
-    result: SanitizeResult,
-    *,
-    mode: str,
-    log_path: Path | None = None,
-) -> AuditEntry:
     """..."""
 
 def detect_ner_backend() -> str | None:
@@ -4549,11 +4535,6 @@ cli:
     ok: "Infrastructure synchronisée"
   destroy:
     done: "Infrastructure détruite"
-  telemetry:
-    enabled: "Télémétrie activée"
-    disabled: "Télémétrie désactivée"
-    status_on: "Télémétrie : activée ({count} événements)"
-    status_off: "Télémétrie : désactivée"
 errors:
   file_not_found: "Fichier introuvable : {path}"
   domain_not_found: "Domaine inconnu : {name}"
@@ -4574,11 +4555,6 @@ cli:
     ok: "Infrastructure synchronized"
   destroy:
     done: "Infrastructure destroyed"
-  telemetry:
-    enabled: "Telemetry enabled"
-    disabled: "Telemetry disabled"
-    status_on: "Telemetry: enabled ({count} events)"
-    status_off: "Telemetry: disabled"
 errors:
   file_not_found: "File not found: {path}"
   domain_not_found: "Unknown domain: {name}"
@@ -4611,136 +4587,9 @@ Locale inconnue → fallback `fr` avec warning stderr.
 | Catalogues fr et en ont les mêmes clés | Cohérence |
 | Locale inconnue → fallback fr | Robustesse |
 
-## 33. Telemetry — Métriques d'usage opt-in
+## §33 — Supprimée (YAGNI)
 
-Métriques locales uniquement. Opt-in explicite. Échec silencieux.
-
-### 33.1 Philosophie
-
-Collecter des métriques d'usage pour comprendre quelles commandes
-sont utilisées. Stockage local uniquement : aucune donnée envoyée
-nulle part. L'utilisateur active avec `anklume telemetry on` et
-peut consulter/effacer à tout moment.
-
-### 33.2 Module `engine/telemetry.py`
-
-```python
-from dataclasses import dataclass, field
-from pathlib import Path
-
-CONFIG_DIR = Path.home() / ".config" / "anklume"
-CONFIG_PATH = CONFIG_DIR / "telemetry.json"
-EVENTS_PATH = CONFIG_DIR / "telemetry-events.jsonl"
-
-@dataclass
-class TelemetryEvent:
-    command: str
-    timestamp: str      # ISO 8601
-    duration_ms: int
-    success: bool
-    error: str | None = None
-
-@dataclass
-class TelemetryStats:
-    total_events: int
-    commands: dict[str, int]     # commande → nombre d'appels
-    success_rate: float          # 0.0 - 1.0
-    last_event: str | None       # timestamp du dernier événement
-
-def is_enabled() -> bool:
-    """Lit CONFIG_PATH → {"enabled": true/false}."""
-
-def enable() -> None:
-    """Écrit {"enabled": true} dans CONFIG_PATH."""
-
-def disable() -> None:
-    """Écrit {"enabled": false} dans CONFIG_PATH."""
-
-def record_event(event: TelemetryEvent) -> None:
-    """Ajoute l'événement en JSON-line dans EVENTS_PATH.
-
-    Silencieux si désactivé ou en cas d'erreur I/O.
-    """
-
-def get_stats() -> TelemetryStats:
-    """Agrège les événements : total, commandes, taux de succès."""
-
-def clear_events() -> None:
-    """Supprime EVENTS_PATH."""
-```
-
-### 33.3 Stockage
-
-| Fichier | Format | Contenu |
-|---------|--------|---------|
-| `~/.config/anklume/telemetry.json` | JSON | `{"enabled": true}` |
-| `~/.config/anklume/telemetry-events.jsonl` | JSON-lines | Un TelemetryEvent par ligne |
-
-Création automatique des répertoires parents.
-Toutes les erreurs I/O sont silencieuses (catch + ignore).
-
-### 33.4 CLI
-
-```python
-telemetry_app = typer.Typer(help="Métriques d'usage.")
-app.add_typer(telemetry_app, name="telemetry")
-
-@telemetry_app.command("on")
-def telemetry_on() -> None:
-    """Activer la collecte de métriques."""
-
-@telemetry_app.command("off")
-def telemetry_off() -> None:
-    """Désactiver la collecte de métriques."""
-
-@telemetry_app.command("status")
-def telemetry_status() -> None:
-    """Afficher l'état et le résumé des métriques."""
-```
-
-#### Sorties
-
-```
-# anklume telemetry on
-Télémétrie activée.
-
-# anklume telemetry off
-Télémétrie désactivée.
-
-# anklume telemetry status (activée)
-Télémétrie : activée (42 événements)
-Commandes les plus utilisées :
-  apply all        15
-  status            8
-  instance list     7
-Taux de succès : 95.2%
-Dernier événement : 2026-03-09T14:32:00
-
-# anklume telemetry status (désactivée)
-Télémétrie : désactivée.
-```
-
-### 33.5 Fichiers CLI
-
-| Fichier | Fonctions |
-|---------|-----------|
-| `cli/_telemetry.py` | `run_telemetry_on`, `run_telemetry_off`, `run_telemetry_status` |
-
-### 33.6 Tests
-
-| Test | Vérification |
-|------|-------------|
-| `enable()` crée le fichier config | Écriture |
-| `disable()` met `enabled: false` | Écriture |
-| `is_enabled()` lit correctement | Lecture |
-| `is_enabled()` → `False` si fichier absent | Défaut |
-| `record_event()` écrit une ligne JSON | Append |
-| `record_event()` silencieux si désactivé | Garde |
-| `record_event()` silencieux si erreur I/O | Robustesse |
-| `get_stats()` agrège correctement | Calcul |
-| `get_stats()` → zéros si fichier vide | Défaut |
-| `clear_events()` supprime le fichier | Nettoyage |
-| `TelemetryEvent` sérialisation JSON | Dataclass |
+Télémétrie supprimée : code mort jamais câblé. Voir CHANGELOG.md.
 
 ## 34. Documentation — MkDocs
 
