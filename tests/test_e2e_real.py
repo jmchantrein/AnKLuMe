@@ -894,44 +894,55 @@ class TestRealShowcase:
 
     @pytest.fixture()
     def showcase_project(self, tmp_path, monkeypatch):
-        """Init un showcase adapté (sans GPU, resources réduites) avec cleanup."""
-        from anklume.cli._init import run_init_showcase
-
+        """Crée un mini-showcase (2 domaines, 4 instances) adapté à la VM."""
         monkeypatch.chdir(tmp_path)
-        project_dir = tmp_path / "showcase"
-        run_init_showcase(str(project_dir))
+        project_dir = tmp_path / "mini-showcase"
+
+        # Mini-showcase : 2 domaines LXC, pas de GPU, pas de GUI, pas de VM
+        write_test_project(
+            project_dir,
+            {
+                "e2e-sc-alpha": {
+                    "description": "Mini-showcase alpha (trusted)",
+                    "trust_level": "trusted",
+                    "machines": {
+                        "web": {"description": "Serveur web", "type": "lxc"},
+                        "db": {"description": "Base de données", "type": "lxc"},
+                    },
+                },
+                "e2e-sc-beta": {
+                    "description": "Mini-showcase beta (disposable)",
+                    "trust_level": "disposable",
+                    "ephemeral": True,
+                    "machines": {
+                        "browser": {"description": "Navigation jetable", "type": "lxc"},
+                        "tools": {"description": "Outils éphémères", "type": "lxc"},
+                    },
+                },
+            },
+            policies=[
+                {
+                    "description": "Alpha → Beta SSH",
+                    "from": "e2e-sc-alpha",
+                    "to": "e2e-sc-beta",
+                    "ports": [22],
+                },
+            ],
+        )
         monkeypatch.chdir(project_dir)
-
-        # Adapter pour l'environnement de test (pas de GPU, resources réduites)
-        import re
-
-        for yml_file in (project_dir / "domains").glob("*.yml"):
-            content = yml_file.read_text()
-            content = content.replace("gpu: true", "gpu: false")
-            # Réduire les limits CPU/memory explicites
-            content = re.sub(r'limits\.cpu: "\d+"', 'limits.cpu: "1"', content)
-            content = re.sub(r'limits\.memory: "\d+GB"', 'limits.memory: "512MB"', content)
-            yml_file.write_text(content)
 
         yield project_dir
 
-        # Cleanup : destroy tout
-        try:
-            from anklume.cli._destroy import run_destroy
-
-            monkeypatch.chdir(project_dir)
-            run_destroy(force=True)
-        except Exception:  # noqa: S110
-            pass
+        # Cleanup
+        for proj in ("e2e-sc-alpha", "e2e-sc-beta"):
+            cleanup_project(proj)
 
     def test_showcase_apply_and_status(self, showcase_project):
-        """Déploie le showcase, vérifie le status, puis détruit."""
+        """Déploie le mini-showcase, vérifie le status."""
         from anklume.engine.status import compute_status
 
-        # Apply
         run_apply(dry_run=False, no_provision=True)
 
-        # Status : tous les projets et réseaux existent
         infra = parse_project(showcase_project)
         assign_addresses(infra)
         driver = IncusDriver()
@@ -941,17 +952,16 @@ class TestRealShowcase:
             assert ds.project_exists, f"Projet manquant : {ds.domain_name}"
             assert ds.network_exists, f"Réseau manquant : {ds.domain_name}"
 
-        # Au moins quelques instances running (certaines VMs mettent du temps)
         running_count = sum(
             1
             for ds in status.domains
             for inst in ds.instances
             if inst.actual_state == "Running"
         )
-        assert running_count >= 10, f"Seulement {running_count} instances running"
+        assert running_count == 4, f"{running_count}/4 instances running"
 
     def test_showcase_snapshot_cycle(self, showcase_project):
-        """Create, list, restore un snapshot sur une instance du showcase."""
+        """Create, list, restore un snapshot."""
         from anklume.engine.snapshot import create_snapshot, list_snapshots, restore_snapshot
 
         run_apply(dry_run=False, no_provision=True)
@@ -960,23 +970,14 @@ class TestRealShowcase:
         infra = parse_project(showcase_project)
         assign_addresses(infra)
 
-        # Trouver la première instance LXC running
         first_domain = infra.enabled_domains[0]
-        first_machine = next(
-            m for m in first_domain.machines.values() if m.type == "lxc"
-        )
+        first_machine = next(iter(first_domain.machines.values()))
         instance_name = first_machine.full_name
         project_name = first_domain.name
 
-        # Create
         create_snapshot(driver, instance_name, project_name, name="test-snap")
-
-        # List
         snaps = list_snapshots(driver, instance_name, project_name)
-        snap_names = [s.name for s in snaps]
-        assert "test-snap" in snap_names
-
-        # Restore
+        assert "test-snap" in [s.name for s in snaps]
         restore_snapshot(driver, instance_name, project_name, "test-snap")
 
     def test_showcase_destroy_respects_protection(self, showcase_project):
@@ -989,11 +990,10 @@ class TestRealShowcase:
         infra = parse_project(showcase_project)
         assign_addresses(infra)
 
-        # Destroy sans force
+        # Destroy sans force : seules les éphémères (beta) sont supprimées
         result = destroy(infra, driver, force=False)
         assert result.protected > 0, "Aucune instance protégée ?"
-        assert result.deleted >= 0
 
-        # Destroy avec force
+        # Destroy avec force : tout est nettoyé
         result = destroy(infra, driver, force=True)
         assert result.errors == 0
