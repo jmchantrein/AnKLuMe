@@ -733,17 +733,16 @@ n'enregistre d'événements.
 - [ ] Câbler `audit_log()` dans le proxy sanitizer (appel après chaque sanitisation)
 - [ ] Tests unitaires pour le flux complet (record → stats → clear)
 
-### 26b — Factoriser les scripts shell (bootstrap / quickstart)
+### 26b — Factoriser les scripts shell (bootstrap / quickstart) ✅
 
-~400 lignes dupliquées entre `bootstrap.sh` et `quickstart.sh` :
-`detect_distro()`, détection/installation GPU NVIDIA (standard +
-Blackwell), `setup_incus()`, intégration shell (aliases, completion).
-
-- [ ] Extraire `host/lib/common.sh` (couleurs, check_root, detect_distro)
-- [ ] Extraire `host/lib/nvidia.sh` (detect_gpu, install_standard, install_blackwell)
-- [ ] Extraire `host/lib/shell-setup.sh` (add_shell_alias, completion)
-- [ ] Sourcer ces libs depuis bootstrap.sh et quickstart.sh
-- [ ] Consolider `_find_anklume_root()` (e2e_real.py) et `_find_project_root()` (_dev_setup.py) en un utilitaire partagé
+- [x] Extraire `host/lib/common.sh` (couleurs, check_root, info/warn/error/step)
+- [x] Extraire `host/lib/nvidia.sh` (BLACKWELL_IDS, detect_gpu, install_standard, install_blackwell)
+- [x] Sourcer ces libs depuis bootstrap.sh, quickstart.sh et faime/postinst.sh
+- [x] PKG_INSTALL converti en array bash (plus de word-splitting)
+- [x] Fonctions imbriquées extraites en top-level (_resolve_disk_path, _ensure_dataset)
+- [x] postinst.sh : `uv tool install` → wrapper `uv run` + ajout check_root
+- [ ] Extraire `host/lib/shell-setup.sh` (aliases, completion) — reporté
+- [ ] Consolider `_find_anklume_root()` et `_find_project_root()` — reporté
 
 ### 26c — Étendre la couverture i18n
 
@@ -756,19 +755,19 @@ Les catalogues `fr.yml` / `en.yml` sont synchronisés (25 clés) mais
 - [ ] Ajouter les messages d'erreur courants au catalogue
 - [ ] Test de couverture : vérifier que toutes les clés fr existent en en
 
-### 26d — Consolider les rôles Ansible
+### 26d — Consolider les rôles Ansible ✅
 
-Audit des 15 rôles embarqués — incohérences et manques.
-
-- [ ] Ajouter `defaults/main.yml` aux rôles `base`, `desktop`, `dev-tools`
-      (actuellement toutes les valeurs sont hardcodées dans tasks)
-- [ ] Renommer les handlers en anglais (violation CLAUDE.md) :
-      `ollama_server`, `stt_server`, `tor_gateway` ont des noms français
-- [ ] Documenter les variables externes `llm_effective_*` référencées
-      par `lobechat` et `openclaw_server` mais jamais définies dans les defaults
-- [ ] Harmoniser `changed_when`/`failed_when` sur les tasks shell
-      (`lobechat` : `changed_when: false` incorrect, `open_webui` : pas de `failed_when`)
-- [ ] Standardiser templates .j2 vs config inline (5 rôles inlinent, 3 templalisent)
+- [x] `meta/main.yml` créé pour les 16 rôles (galaxy_info, platforms, dependencies)
+- [x] Tags ajoutés à toutes les tâches (install/configure/service)
+- [x] Handlers renommés en anglais (ollama, stt, tor_gateway)
+- [x] `defaults/main.yml` pour base, desktop, dev-tools (packages paramétrisables)
+- [x] `changed_when` conditionnel (stt, e2e_runner, ollama — register + check output)
+- [x] `failed_when` amélioré (GPU rc check, `ignore_errors` pip, health check warnings)
+- [x] git config → `community.general.git_config` (dev_env)
+- [x] Rôle `nodejs/` partagé, référencé via meta dependencies (lobechat, openclaw, dev_env)
+- [x] open_webui pip dans virtualenv `/opt/open-webui/venv`
+- [ ] Documenter les variables externes `llm_effective_*` — reporté
+- [ ] Standardiser templates .j2 vs config inline — reporté
 
 ### 26e — Robustifier le TUI
 
@@ -783,9 +782,51 @@ Gestion d'erreurs insuffisante dans les widgets Textual.
 
 La table des commandes CLI (§6) est incomplète : il manque
 `domain check`, `domain exec`, `resource show`, `setup import`,
-`workspace grid`, `snapshot rollback`, `doctor --fix`.
+`workspace grid`, `snapshot rollback`, `doctor --fix`, `rollback`,
+`migrate`.
 
 - [ ] Mettre à jour §6 pour refléter toutes les commandes implémentées
+
+### 26g — Audit global + sécurité + CI hardening ✅
+
+Audit approfondi par technologie (Python, Ansible, Bash, GitHub Actions,
+nftables/sécurité, tests/docs) — 5 critiques, 27 importants, 29 suggestions.
+
+- [x] Passphrase ZFS masquée (`openssl -pass fd:3`)
+- [x] Actions GitHub épinglées par SHA + permissions `contents: read`
+- [x] Règles nftables DNAT prerouting pour routage transparent Tor
+- [x] `ports: "all"` respecte le champ `protocol` (meta l4proto)
+- [x] Validation `_validate_name()` dans IncusDriver
+- [x] Sanitizer enrichi (SSH keys, AWS creds, IPv6, JSON credentials)
+- [x] Path traversal renforcé dans portal.py
+- [x] Warnings log : nesting privilégié (L2+), GPU shared mode
+- [x] Validation dict dans parser (non-dict YAML → ParseError propre)
+- [x] CI : matrice Python 3.11+3.12, cache uv, timeouts, persist-credentials
+- [x] Workflow `security.yml` (ruff S + pip-audit hebdomadaire)
+- [x] `dependabot.yml` (github-actions + pip)
+- [x] Ruff étendu C4/SIM/PIE, pyright basic, pytest-cov
+- [x] Tests parametrize, edge cases YAML/nftables, coverage dans CI
+- [x] mkdocstrings + référence API (`docs/reference/api.md`)
+
+### 26h — Infrastructure safety + DX Claude Code ✅
+
+Protections contre les régressions après `git pull` et optimisations
+pour l'auto-évolution LLM du projet.
+
+- [x] nftables intégré dans le pipeline `apply` (plus de `network deploy` séparé)
+- [x] `anklume rollback` — restaure les snapshots pre-apply de toutes les instances
+- [x] `anklume doctor --drift` — détecte les écarts YAML vs état Incus réel
+- [x] `anklume migrate` — placeholder pour migrations de `schema_version`
+- [x] `requires_anklume` dans anklume.yml — vérifie la version minimum du tool
+- [x] Feature flags `experimental:` dans anklume.yml (data model)
+- [x] Hook PreToolUse commit-bloquant (pytest doit passer avant `git commit`)
+- [x] Hook PreToolUse protection fichiers critiques (CLAUDE.md, SPEC, pyproject)
+- [x] Hook PostToolUse `ruff format` ajouté
+- [x] CLAUDE.md : trigger table (14 mappings source→test), gotchas (6 pièges),
+      règle de régression obligatoire
+- [x] Skill `/catchup` pour rattraper le contexte après `/clear`
+- [x] Coverage ratcheting (`scripts/coverage-ratchet.sh` + `.coverage-threshold`)
+- [x] CHANGELOG.md (Keep a Changelog format)
 
 ### En réflexion
 
