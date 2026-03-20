@@ -707,9 +707,12 @@ avec Incus nested. Validation du cycle complet.
   - `ank apply all --no-provision` : 50/51 actions OK
   - 19/20 instances running (1 arrêtée = profil audio sans PipeWire)
   - `ank status`, `ank destroy --force` : 20 instances supprimées, 0 erreur
-- [x] Finding important : les nftables `anklume` (policy drop) bloquent
-  le trafic des bridges non-anklume (incusbr0). À traiter en phase 26.
-- [ ] Tests E2E automatisés dans la VM (pytest marqués @real) — reporté
+- [x] Finding nftables : `policy drop` bloquait les bridges non-anklume
+  → ADR-027, `network_passthrough` (défaut false), CLI enable/disable
+- [x] Tests showcase dry-run ajoutés (test_e2e.py, 8 tests)
+  - init, parse, validate, addressing, nftables, dry-run, trust-levels, policies
+- [x] Tests showcase réels ajoutés (test_e2e_real.py, 3 tests @real)
+  - apply + status, snapshot cycle, destroy avec protection
 - [ ] Validation complète bootstrap.sh avec ZFS — reporté (nécessite
   disques dédiés)
 
