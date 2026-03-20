@@ -1426,10 +1426,14 @@ WRAPPER
         chmod +x "${bin_dir}/anklume"
         chown "${user_uid}:${user_gid}" "${bin_dir}/anklume"
 
+        # Symlink ank → anklume (fonctionne partout, pas juste en shell interactif)
+        ln -sf "${bin_dir}/anklume" "${bin_dir}/ank"
+        chown -h "${user_uid}:${user_gid}" "${bin_dir}/ank"
+
         # Sync les dépendances du projet (premier lancement rapide)
         su - "${main_user}" -c "cd '${anklume_dir}' && ${uv_bin} sync --quiet" 2>/dev/null || true
 
-        info "CLI installée : ${bin_dir}/anklume (wrapper vers ${anklume_dir})"
+        info "CLI installée : ${bin_dir}/anklume + ank (wrapper vers ${anklume_dir})"
     else
         warn "uv ou repo local absent. Installation CLI ignorée."
     fi

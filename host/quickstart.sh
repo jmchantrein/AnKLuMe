@@ -371,8 +371,11 @@ install_anklume() {
 exec ${uv_bin} run --directory '${anklume_dir}' anklume "\$@"
 WRAPPER
         chmod +x "${bin_dir}/anklume"
-        [[ -n "${main_user}" && "${main_user}" != "root" ]] && \
+        ln -sf "${bin_dir}/anklume" "${bin_dir}/ank"
+        if [[ -n "${main_user}" && "${main_user}" != "root" ]]; then
             chown "$(id -u "${main_user}"):$(id -g "${main_user}")" "${bin_dir}/anklume"
+            chown -h "$(id -u "${main_user}"):$(id -g "${main_user}")" "${bin_dir}/ank"
+        fi
 
         # Sync les dépendances
         if [[ "${main_user}" != "root" ]]; then
