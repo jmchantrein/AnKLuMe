@@ -298,7 +298,7 @@ policies:
 
 | Commande | Description |
 |----------|-------------|
-| `anklume init [dir]` | Créer un nouveau projet |
+| `anklume init [dir]` | Créer un nouveau projet (showcase ou simple) |
 | `anklume apply all` | Déployer toute l'infrastructure |
 | `anklume apply all --dry-run` | Afficher les changements sans appliquer |
 | `anklume apply all --no-provision` | Déployer sans provisioning Ansible |
@@ -306,6 +306,11 @@ policies:
 | `anklume status` | Afficher l'état des instances |
 | `anklume destroy` | Détruire (respecte ephemeral) |
 | `anklume destroy --force` | Tout détruire |
+| `anklume rollback [--dry-run]` | Restaurer les snapshots pré-apply les plus récents |
+| `anklume migrate [--project]` | Migrer le schema_version du projet |
+| `anklume doctor [--fix] [--json] [--drift]` | Diagnostic automatique + réparation |
+| `anklume tui [--project]` | Éditeur interactif TUI (Textual) |
+| `anklume console [--domain] [--detach]` | Console tmux colorée par domaine |
 
 ### Gestion des instances
 
@@ -314,6 +319,8 @@ policies:
 | `anklume instance list` | Tableau des instances (nom, domaine, état, IP, type) |
 | `anklume instance exec <inst> -- <cmd>` | Exécuter dans une instance |
 | `anklume instance info <inst>` | Détails d'une instance |
+| `anklume instance gui <inst> [app]` | Lancer une application graphique |
+| `anklume instance clipboard <inst> [--pull]` | Partager le presse-papiers hôte ↔ conteneur |
 
 ### Gestion des domaines
 
@@ -333,7 +340,7 @@ policies:
 | `anklume snapshot list [instance]` | Lister les snapshots |
 | `anklume snapshot restore <inst> <snap>` | Restaurer un snapshot |
 | `anklume snapshot delete <inst> <snap>` | Supprimer un snapshot |
-| `anklume snapshot rollback <inst> <snap>` | Rollback destructif |
+| `anklume snapshot rollback <inst> <snap>` | Rollback destructif (restaure + supprime postérieurs) |
 
 ### Réseau
 
@@ -342,19 +349,81 @@ policies:
 | `anklume network rules` | Générer les règles nftables |
 | `anklume network deploy` | Appliquer les règles sur l'hôte |
 | `anklume network status` | État réseau (bridges, IPs, nftables) |
+| `anklume network passthrough <enable\|disable>` | Activer/désactiver le passthrough des bridges non-anklume |
+
+### Portails et transferts
+
+| Commande | Description |
+|----------|-------------|
+| `anklume portal push <inst> <local> [remote]` | Envoyer un fichier vers une instance |
+| `anklume portal pull <inst> <remote> [local]` | Récupérer un fichier depuis une instance |
+| `anklume portal list <inst> [path]` | Lister un répertoire distant |
+| `anklume disp [image] [cmd] [--list] [--cleanup]` | Lancer un conteneur jetable |
 
 ### Ressources
 
 | Commande | Description |
 |----------|-------------|
-| `anklume resource show` | Afficher l'allocation de ressources calculée |
+| `anklume resource show [--project]` | Afficher l'allocation de ressources calculée |
 
-### LLM
+### Golden images
 
 | Commande | Description |
 |----------|-------------|
+| `anklume golden create <inst> [--alias]` | Publier une golden image |
+| `anklume golden list` | Lister les golden images |
+| `anklume golden delete <alias>` | Supprimer une golden image |
+
+### IA et LLM
+
+| Commande | Description |
+|----------|-------------|
+| `anklume ai status` | État des services IA (GPU, Ollama, STT) |
+| `anklume ai flush` | Libérer la VRAM GPU |
+| `anklume ai switch <domaine>` | Basculer l'accès exclusif GPU |
+| `anklume ai test [--backend] [--mode]` | Boucle test + analyse LLM |
 | `anklume llm status` | Vue dédiée backends LLM |
-| `anklume llm bench` | Benchmark inférence |
+| `anklume llm bench [--model] [--prompt]` | Benchmark inférence (tokens/s, latence) |
+| `anklume llm sanitize [texte] [--mode] [--ner] [--json]` | Dry-run sanitisation |
+
+### STT (Speech-to-Text)
+
+| Commande | Description |
+|----------|-------------|
+| `anklume stt setup` | Configurer le STT (dépendances, raccourci KDE) |
+| `anklume stt start` | Démarrer le push-to-talk |
+| `anklume stt stop` | Arrêter le push-to-talk |
+| `anklume stt status` | État du service STT |
+
+### Tor
+
+| Commande | Description |
+|----------|-------------|
+| `anklume tor status` | État des passerelles Tor |
+
+### Workspace (layout bureau)
+
+| Commande | Description |
+|----------|-------------|
+| `anklume workspace load [domaine]` | Restaurer le layout complet |
+| `anklume workspace status` | Afficher layout déclaré vs réel |
+| `anklume workspace grid [--add-cols N] [--add-rows N] [--set CxR]` | Gérer la grille de bureaux virtuels |
+
+### Setup et import
+
+| Commande | Description |
+|----------|-------------|
+| `anklume setup import [--dir]` | Importer une infrastructure Incus existante |
+| `anklume setup aliases [--remove] [--shell]` | Installer les aliases shell |
+| `anklume setup gui [--fix] [--recover]` | Diagnostic/réparation GUI |
+
+### Télémétrie
+
+| Commande | Description |
+|----------|-------------|
+| `anklume telemetry on` | Activer les métriques d'usage |
+| `anklume telemetry off` | Désactiver les métriques |
+| `anklume telemetry status` | État des métriques |
 
 ### Développement
 
@@ -363,6 +432,9 @@ policies:
 | `anklume dev setup` | Préparer l'environnement de dev |
 | `anklume dev lint` | Tous les validateurs |
 | `anklume dev test` | pytest + behave |
+| `anklume dev env <nom> [--type] [--gpu] [--llm] [--preset]` | Générer un environnement de développement |
+| `anklume dev test-real [--keep] [--filter]` | Tests E2E réels en VM KVM |
+| `anklume dev molecule [role] [--scenario]` | Tests Molecule rôles Ansible |
 
 ## 7. Modèle d'exécution
 

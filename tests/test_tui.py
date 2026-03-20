@@ -359,3 +359,98 @@ class TestPolicyParsing:
 
         table = PolicyTable()
         assert table._parse_ports("") == []
+
+
+# --- Weight validation ---
+
+
+class TestWeightClamping:
+    def test_valid_weight(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("5") == 5
+
+    def test_weight_one(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("1") == 1
+
+    def test_zero_weight_clamped(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("0") == 1
+
+    def test_negative_weight_clamped(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("-1") == 1
+
+    def test_overflow_weight_clamped(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("99999") == 1000
+
+    def test_max_weight(self) -> None:
+        from anklume.tui.widgets.machine_form import MAX_WEIGHT, _clamp_weight
+
+        assert _clamp_weight("1000") == MAX_WEIGHT
+
+    def test_empty_string_defaults(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("") == 1
+
+    def test_non_numeric_defaults(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("abc") == 1
+
+    def test_whitespace_stripped(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("  42  ") == 42
+
+    def test_float_string_defaults(self) -> None:
+        from anklume.tui.widgets.machine_form import _clamp_weight
+
+        assert _clamp_weight("3.5") == 1
+
+
+# --- Form mounted guard ---
+
+
+class TestFormMountedGuard:
+    """Vérifie que les forms ne crashent pas si appelés avant mount."""
+
+    def test_domain_form_load_before_mount(self) -> None:
+        from anklume.tui.widgets.domain_form import DomainForm
+
+        form = DomainForm()
+        domain = Domain(name="test", description="Test")
+        # Ne doit pas lever d'exception (guard is_mounted)
+        form.load_domain(domain)
+
+    def test_domain_form_apply_before_mount(self) -> None:
+        from anklume.tui.widgets.domain_form import DomainForm
+
+        form = DomainForm()
+        domain = Domain(name="test", description="Test")
+        form.apply_to_domain(domain)
+        # Le domaine ne doit pas être modifié
+        assert domain.description == "Test"
+
+    def test_machine_form_load_before_mount(self) -> None:
+        from anklume.tui.widgets.machine_form import MachineForm
+
+        form = MachineForm()
+        machine = Machine(name="m1", full_name="test-m1", description="Machine")
+        form.load_machine(machine, "test")
+
+    def test_machine_form_apply_before_mount(self) -> None:
+        from anklume.tui.widgets.machine_form import MachineForm
+
+        form = MachineForm()
+        machine = Machine(name="m1", full_name="test-m1", description="Machine", weight=5)
+        form.apply_to_machine(machine)
+        # Le poids ne doit pas être modifié
+        assert machine.weight == 5

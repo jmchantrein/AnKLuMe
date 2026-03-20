@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from pathlib import Path
 from typing import ClassVar
 
@@ -152,15 +151,26 @@ class AnklumeTUI(App):
         # Appliquer les formulaires avant de sauver
         self._update_preview()
 
-        domains_dir = self._project_dir / "domains"
-        domains_dir.mkdir(exist_ok=True)
+        errors: list[str] = []
 
-        # Sauver chaque domaine
+        try:
+            domains_dir = self._project_dir / "domains"
+            domains_dir.mkdir(exist_ok=True)
+        except OSError as e:
+            self.notify(f"Erreur de sauvegarde : {e}", severity="error")
+            return
+
+        # Sauver chaque domaine (continue si un fichier échoue)
         for domain in self._infra.domains.values():
             path = domains_dir / f"{domain.name}.yml"
             data = domain_to_dict(domain)
-            with open(path, "w") as f:
-                yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            try:
+                with open(path, "w") as f:
+                    yaml.dump(
+                        data, f, default_flow_style=False, allow_unicode=True, sort_keys=False
+                    )
+            except OSError as e:
+                errors.append(f"{domain.name}: {e}")
 
         # Sauver les politiques
         policy_table = self.query_one(PolicyTable)
@@ -180,12 +190,24 @@ class AnklumeTUI(App):
                     for p in policies
                 ]
             }
-            with open(policies_path, "w") as f:
-                yaml.dump(
-                    policies_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False
-                )
+            try:
+                with open(policies_path, "w") as f:
+                    yaml.dump(
+                        policies_data,
+                        f,
+                        default_flow_style=False,
+                        allow_unicode=True,
+                        sort_keys=False,
+                    )
+            except OSError as e:
+                errors.append(f"policies: {e}")
 
-        self.notify(f"Sauvegardé : {len(self._infra.domains)} domaines, {len(policies)} politiques")
+        if errors:
+            self.notify(f"Erreurs : {', '.join(errors)}", severity="error")
+        else:
+            self.notify(
+                f"Sauvegardé : {len(self._infra.domains)} domaines, {len(policies)} politiques"
+            )
 
     def action_add_node(self) -> None:
         """Ajouter un domaine ou une machine."""
@@ -242,8 +264,12 @@ class AnklumeTUI(App):
                 del self._infra.domains[name]
                 # Supprimer le fichier
                 path = self._project_dir / "domains" / f"{name}.yml"
-                with contextlib.suppress(FileNotFoundError):
+                try:
                     path.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as e:
+                    self.notify(f"Fichier non supprimé : {e}", severity="warning")
                 self._current_node = None
                 self.query_one(DomainTree).load_infra(self._infra)
                 self.query_one(DomainForm).display = False

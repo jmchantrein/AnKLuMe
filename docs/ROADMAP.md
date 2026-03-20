@@ -769,23 +769,20 @@ Les catalogues `fr.yml` / `en.yml` sont synchronisés (25 clés) mais
 - [ ] Documenter les variables externes `llm_effective_*` — reporté
 - [ ] Standardiser templates .j2 vs config inline — reporté
 
-### 26e — Robustifier le TUI
+### 26e — Robustifier le TUI ✅
 
-Gestion d'erreurs insuffisante dans les widgets Textual.
+- [x] try-except OSError sur les I/O fichier dans `tui/app.py` `action_save()`
+- [x] Guard `is_mounted` dans `DomainForm` et `MachineForm` (load/apply)
+- [x] `_clamp_weight()` avec bornes [1, 1000] dans `machine_form.py`
+- [x] `contextlib.suppress(OSError)` dans `action_delete_node()` (était FileNotFoundError)
+- [x] Tests unitaires : 14 nouveaux tests (weight clamping, form mounted guard)
 
-- [ ] Ajouter try-except sur les I/O fichier dans `tui/app.py` `action_save()`
-- [ ] Protéger `query_one()` dans les forms (crash si widget non rendu)
-- [ ] Valider les bornes de `weight` dans `machine_form.py` (overflow possible)
-- [ ] Élargir le catch dans `action_delete_domain()` (seul FileNotFoundError attrapé)
+### 26f — Mettre à jour SPEC §6 ✅
 
-### 26f — Mettre à jour SPEC §6
-
-La table des commandes CLI (§6) est incomplète : il manque
-`domain check`, `domain exec`, `resource show`, `setup import`,
-`workspace grid`, `snapshot rollback`, `doctor --fix`, `rollback`,
-`migrate`.
-
-- [ ] Mettre à jour §6 pour refléter toutes les commandes implémentées
+- [x] §6 mis à jour : 76 commandes dans 17 catégories
+  (ajout : portails, golden, IA, STT, Tor, workspace, setup, télémétrie,
+  rollback, migrate, doctor, disp, console, instance gui/clipboard,
+  network passthrough, llm sanitize, dev env/test-real/molecule)
 
 ### 26g — Audit global + sécurité + CI hardening ✅
 

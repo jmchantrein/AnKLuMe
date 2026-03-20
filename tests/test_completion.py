@@ -41,6 +41,8 @@ EXPECTED_TOP_LEVEL = {
     "disp",
     "doctor",
     "tui",
+    "rollback",
+    "migrate",
     # Groupes de sous-commandes
     "init",
     "apply",

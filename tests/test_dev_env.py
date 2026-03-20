@@ -471,10 +471,13 @@ class TestDevEnvRole:
     def test_tasks_contains_key_steps(self) -> None:
         content = (_ROLE_DIR / "tasks" / "main.yml").read_text()
         assert "uv" in content
-        assert "Node.js" in content
         assert "Claude Code" in content
         assert "lazygit" in content
         assert "ripgrep" in content
+
+    def test_nodejs_via_dependency(self) -> None:
+        meta = (_ROLE_DIR / "meta" / "main.yml").read_text()
+        assert "nodejs" in meta
 
     def test_defaults_aider_off(self, role_defaults: dict) -> None:
         assert role_defaults["dev_env_install_aider"] is False

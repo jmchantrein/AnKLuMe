@@ -17,6 +17,16 @@ BUILTIN_ROLES = (
     else []
 )
 
+MAX_WEIGHT = 1000
+
+
+def _clamp_weight(value: str) -> int:
+    """Parse et clamp le poids dans [1, MAX_WEIGHT]."""
+    value = value.strip()
+    if value.isdigit() and value != "0":
+        return min(int(value), MAX_WEIGHT)
+    return 1
+
 
 class MachineForm(Vertical):
     """Formulaire pour éditer les champs d'une machine."""
@@ -78,6 +88,8 @@ class MachineForm(Vertical):
 
     def load_machine(self, machine: Machine, domain_name: str) -> None:
         """Charge une machine dans le formulaire."""
+        if not self.is_mounted:
+            return
         self._machine = machine
         self._domain_name = domain_name
 
@@ -98,6 +110,8 @@ class MachineForm(Vertical):
 
     def apply_to_machine(self, machine: Machine) -> None:
         """Applique les valeurs du formulaire sur la machine."""
+        if not self.is_mounted:
+            return
         machine.description = self.query_one("#machine-description", Input).value
         mtype = self.query_one("#machine-type", Select).value
         if isinstance(mtype, str):
@@ -107,8 +121,8 @@ class MachineForm(Vertical):
         machine.gpu = self.query_one("#machine-gpu", Switch).value
         machine.gui = self.query_one("#machine-gui", Switch).value
 
-        weight_str = self.query_one("#machine-weight", Input).value.strip()
-        machine.weight = int(weight_str) if weight_str.isdigit() and int(weight_str) >= 1 else 1
+        weight_str = self.query_one("#machine-weight", Input).value
+        machine.weight = _clamp_weight(weight_str)
 
         roles_list = self.query_one("#roles-list", SelectionList)
         machine.roles = list(roles_list.selected)

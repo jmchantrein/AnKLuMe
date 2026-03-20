@@ -54,6 +54,8 @@ class DomainForm(Vertical):
 
     def load_domain(self, domain: Domain) -> None:
         """Charge un domaine dans le formulaire."""
+        if not self.is_mounted:
+            return
         self._domain = domain
         self.query_one("#domain-description", Input).value = domain.description
         self.query_one("#domain-trust-level", Select).value = domain.trust_level
@@ -62,6 +64,8 @@ class DomainForm(Vertical):
 
     def apply_to_domain(self, domain: Domain) -> None:
         """Applique les valeurs du formulaire sur le domaine."""
+        if not self.is_mounted:
+            return
         domain.description = self.query_one("#domain-description", Input).value
         trust = self.query_one("#domain-trust-level", Select).value
         if isinstance(trust, str):
