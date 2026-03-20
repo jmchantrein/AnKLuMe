@@ -17,6 +17,7 @@ from anklume.engine.snapshot import (
     list_all_snapshots,
     resolve_instance_project,
     restore_snapshot,
+    rollback_pre_apply,
 )
 
 from .conftest import (
@@ -417,3 +418,202 @@ class TestResolveInstanceProject:
         assert resolve_instance_project(infra, "pro-dev") == "pro"
         assert resolve_instance_project(infra, "perso-web") == "perso"
         assert resolve_instance_project(infra, "unknown-vm") is None
+
+
+# ============================================================
+# rollback_pre_apply
+# ============================================================
+
+
+class TestRollbackPreApply:
+    def test_restores_most_recent_pre_snapshot(self) -> None:
+        """Restaure le snapshot anklume-pre-* le plus récent par instance."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro")],
+            instances={"pro": [running_instance("pro-dev", "pro")]},
+            snapshots={
+                "pro-dev": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260301-100000",
+                        created_at="2026-03-01T10:00Z",
+                    ),
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                    IncusSnapshot(
+                        name="anklume-post-20260310-120001",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+            },
+        )
+
+        restored = rollback_pre_apply(driver, infra)
+
+        assert len(restored) == 1
+        inst, proj, snap = restored[0]
+        assert inst == "pro-dev"
+        assert proj == "pro"
+        assert snap == "anklume-pre-20260310-120000"
+        driver.snapshot_restore.assert_called_once()
+
+    def test_no_pre_snapshots_returns_empty(self) -> None:
+        """Aucun snapshot anklume-pre-* → liste vide."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro")],
+            instances={"pro": [running_instance("pro-dev", "pro")]},
+            snapshots={
+                "pro-dev": [
+                    IncusSnapshot(
+                        name="anklume-post-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+            },
+        )
+
+        restored = rollback_pre_apply(driver, infra)
+
+        assert len(restored) == 0
+
+    def test_dry_run_does_not_restore(self) -> None:
+        """En dry-run, liste les snapshots mais ne restaure pas."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro")],
+            instances={"pro": [running_instance("pro-dev", "pro")]},
+            snapshots={
+                "pro-dev": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+            },
+        )
+
+        restored = rollback_pre_apply(driver, infra, dry_run=True)
+
+        assert len(restored) == 1
+        driver.snapshot_restore.assert_not_called()
+        driver.instance_stop.assert_not_called()
+
+    def test_multiple_domains(self) -> None:
+        """Rollback sur plusieurs domaines."""
+        d1 = make_domain("pro", machines={"dev": make_machine("dev", "pro")})
+        d2 = make_domain("perso", machines={"web": make_machine("web", "perso")})
+        infra = make_infra(domains={"pro": d1, "perso": d2})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro"), IncusProject(name="perso")],
+            instances={
+                "pro": [running_instance("pro-dev", "pro")],
+                "perso": [running_instance("perso-web", "perso")],
+            },
+            snapshots={
+                "pro-dev": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+                "perso-web": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+            },
+        )
+
+        restored = rollback_pre_apply(driver, infra)
+
+        assert len(restored) == 2
+
+    def test_skips_absent_instances(self) -> None:
+        """Ne tente pas de restaurer les instances absentes."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro")],
+            instances={"pro": []},
+        )
+
+        restored = rollback_pre_apply(driver, infra)
+
+        assert len(restored) == 0
+
+    def test_skips_absent_project(self) -> None:
+        """Ne tente pas de restaurer si le projet n'existe pas."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver()
+
+        restored = rollback_pre_apply(driver, infra)
+
+        assert len(restored) == 0
+
+    def test_restore_failure_continues(self) -> None:
+        """Si la restauration échoue sur une instance, les autres continuent."""
+        domain = make_domain(
+            "pro",
+            machines={
+                "dev": make_machine("dev", "pro"),
+                "desktop": make_machine("desktop", "pro"),
+            },
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver(
+            projects=[IncusProject(name="pro")],
+            instances={
+                "pro": [
+                    running_instance("pro-desktop", "pro"),
+                    running_instance("pro-dev", "pro"),
+                ]
+            },
+            snapshots={
+                "pro-desktop": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+                "pro-dev": [
+                    IncusSnapshot(
+                        name="anklume-pre-20260310-120000",
+                        created_at="2026-03-10T12:00Z",
+                    ),
+                ],
+            },
+        )
+        # snapshot_restore échoue sur le premier appel (pro-desktop), réussit sur pro-dev
+        driver.snapshot_restore.side_effect = [
+            IncusError(["incus", "snapshot", "restore"], 1, "failed"),
+            None,
+        ]
+
+        restored = rollback_pre_apply(driver, infra)
+
+        # pro-desktop échoue (restore_snapshot raises), pro-dev réussit
+        assert len(restored) == 1
+        assert restored[0][0] == "pro-dev"

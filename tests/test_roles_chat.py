@@ -103,9 +103,9 @@ class TestOpenWebuiContent:
 
 class TestLobechatContent:
     def test_installs_nodejs(self):
-        tasks = yaml.safe_load((BUILTIN_ROLES_DIR / "lobechat" / "tasks" / "main.yml").read_text())
-        task_names = [t.get("name", "") for t in tasks]
-        assert any("node" in n.lower() for n in task_names)
+        meta = yaml.safe_load((BUILTIN_ROLES_DIR / "lobechat" / "meta" / "main.yml").read_text())
+        deps = meta.get("dependencies", [])
+        assert any(d.get("role") == "nodejs" for d in deps), "nodejs dependency not found in meta"
 
     def test_clones_lobechat(self):
         tasks = yaml.safe_load((BUILTIN_ROLES_DIR / "lobechat" / "tasks" / "main.yml").read_text())

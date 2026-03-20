@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import yaml
+
 from anklume.provisioner import BUILTIN_ROLES_DIR, has_provisionable_machines
 from anklume.provisioner.playbook import generate_host_vars, generate_playbook
 
@@ -56,8 +58,12 @@ class TestOpenclawTasks:
         assert any("utilisateur" in n.lower() or "user" in n.lower() for n in names)
 
     def test_installs_nodejs(self):
-        names = role_task_names("openclaw_server")
-        assert any("node" in n.lower() for n in names)
+        meta_path = BUILTIN_ROLES_DIR / "openclaw_server" / "meta" / "main.yml"
+        meta = yaml.safe_load(meta_path.read_text())
+        deps = meta.get("dependencies", [])
+        assert any(
+            d.get("role") == "nodejs" for d in deps
+        ), "nodejs dependency not found in meta"
 
     def test_installs_openclaw_npm(self):
         tasks = role_tasks("openclaw_server")

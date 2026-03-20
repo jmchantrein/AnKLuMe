@@ -21,16 +21,6 @@
   when: dev_env_install_uv
   tags: [install]
 
-# --- Node.js via NodeSource ---
-- name: Installer Node.js {{ dev_env_node_version }}
-  ansible.builtin.shell:
-    cmd: >
-      curl -fsSL https://deb.nodesource.com/setup_{{ dev_env_node_version }}.x
-      | bash - && apt-get install -y nodejs
-    creates: /usr/bin/node
-  when: dev_env_install_node
-  tags: [install]
-
 # --- Outils CLI modernes ---
 - name: Installer ripgrep
   ansible.builtin.apt:
@@ -90,17 +80,21 @@
 
 # --- Git configuration ---
 - name: Configurer git user.name
-  ansible.builtin.command:
-    cmd: git config --global user.name "{{ dev_env_git_name }}"
+  community.general.git_config:
+    name: user.name
+    value: "{{ dev_env_git_name }}"
+    scope: global
+  become_user: "{{ dev_env_user }}"
   when: dev_env_git_name | length > 0
-  changed_when: true
   tags: [configure]
 
 - name: Configurer git user.email
-  ansible.builtin.command:
-    cmd: git config --global user.email "{{ dev_env_git_email }}"
+  community.general.git_config:
+    name: user.email
+    value: "{{ dev_env_git_email }}"
+    scope: global
+  become_user: "{{ dev_env_user }}"
   when: dev_env_git_email | length > 0
-  changed_when: true
   tags: [configure]
 
 # --- Paquets supplémentaires ---

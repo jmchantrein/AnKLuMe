@@ -1,6 +1,7 @@
+---
 galaxy_info:
   author: Jean-Michel Chantrein
-  description: "Environnement de développement (uv, Node.js, outils CLI)"
+  description: "Installation Node.js via NodeSource"
   min_ansible_version: "2.16"
   license: AGPL-3.0-only
   platforms:
@@ -8,5 +9,4 @@ galaxy_info:
       versions:
         - bookworm
         - trixie
-dependencies:
-  - {role: nodejs, nodejs_version: "{{ dev_env_node_version }}"}
+dependencies: []

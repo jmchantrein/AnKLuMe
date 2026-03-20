@@ -7,8 +7,10 @@ from unittest.mock import MagicMock, patch
 from anklume.engine.doctor import (
     CheckResult,
     DoctorReport,
+    DriftItem,
     check_ansible,
     check_domains,
+    check_drift,
     check_golden,
     check_gpu,
     check_incus,
@@ -17,6 +19,7 @@ from anklume.engine.doctor import (
     run_doctor,
 )
 from anklume.engine.incus_driver import IncusImage, IncusProject
+from anklume.engine.reconciler import Action, ReconcileResult
 from tests.conftest import make_domain, make_infra, make_machine, mock_driver
 
 
@@ -249,3 +252,134 @@ class TestRunDoctor:
         assert isinstance(report, DoctorReport)
         # Au minimum les checks système (incus, nft, ansible, gpu)
         assert len(report.checks) >= 4
+
+    def test_run_with_drift_no_actions(self):
+        """run_doctor avec drift=True et aucune action planifiée → ok."""
+        driver = mock_driver()
+        driver.image_list.return_value = []
+        infra = make_infra(domains={})
+
+        with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):
+            with patch("anklume.engine.doctor.subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="GPU OK")
+                report = run_doctor(driver=driver, infra=infra, drift=True)
+
+        # Doit contenir un check "Drift" avec status ok
+        drift_checks = [c for c in report.checks if c.name == "Drift"]
+        assert len(drift_checks) == 1
+        assert drift_checks[0].status == "ok"
+
+    def test_run_with_drift_has_actions(self):
+        """run_doctor avec drift=True et des actions planifiées → warnings."""
+        driver = mock_driver()
+        driver.image_list.return_value = []
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+
+        # Mock reconcile pour retourner des actions
+        mock_result = ReconcileResult(
+            actions=[
+                Action(
+                    verb="create",
+                    resource="project",
+                    target="pro",
+                    project="pro",
+                    detail="Créer projet pro",
+                ),
+                Action(
+                    verb="create",
+                    resource="instance",
+                    target="pro-dev",
+                    project="pro",
+                    detail="Créer instance pro-dev",
+                ),
+            ]
+        )
+
+        with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):
+            with patch("anklume.engine.doctor.subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="GPU OK")
+                with patch("anklume.engine.reconciler.reconcile", return_value=mock_result):
+                    report = run_doctor(driver=driver, infra=infra, drift=True)
+
+        drift_checks = [c for c in report.checks if c.name.startswith("Drift")]
+        assert len(drift_checks) == 2
+        assert all(c.status == "warning" for c in drift_checks)
+        assert all(c.fix_command == "anklume apply all" for c in drift_checks)
+
+    def test_drift_not_run_without_flag(self):
+        """run_doctor sans drift=True ne lance pas la détection de drift."""
+        driver = mock_driver()
+        driver.image_list.return_value = []
+        infra = make_infra(domains={})
+
+        with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):
+            with patch("anklume.engine.doctor.subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="GPU OK")
+                report = run_doctor(driver=driver, infra=infra, drift=False)
+
+        drift_checks = [c for c in report.checks if c.name.startswith("Drift")]
+        assert len(drift_checks) == 0
+
+
+class TestCheckDrift:
+    """Tests pour check_drift."""
+
+    def test_no_drift(self):
+        """Pas d'actions planifiées → liste vide."""
+        infra = make_infra(domains={})
+        driver = mock_driver()
+
+        with patch(
+            "anklume.engine.reconciler.reconcile",
+            return_value=ReconcileResult(),
+        ):
+            items = check_drift(infra, driver)
+
+        assert items == []
+
+    def test_drift_detected(self):
+        """Actions planifiées → items de drift retournés."""
+        domain = make_domain(
+            "pro",
+            machines={"dev": make_machine("dev", "pro")},
+        )
+        infra = make_infra(domains={"pro": domain})
+        driver = mock_driver()
+
+        mock_result = ReconcileResult(
+            actions=[
+                Action(
+                    verb="create",
+                    resource="instance",
+                    target="pro-dev",
+                    project="pro",
+                    detail="Créer instance pro-dev (lxc)",
+                ),
+            ]
+        )
+
+        with patch("anklume.engine.reconciler.reconcile", return_value=mock_result):
+            items = check_drift(infra, driver)
+
+        assert len(items) == 1
+        assert isinstance(items[0], DriftItem)
+        assert items[0].verb == "create"
+        assert items[0].resource == "instance"
+        assert items[0].target == "pro-dev"
+
+    def test_drift_uses_dry_run(self):
+        """check_drift appelle reconcile avec dry_run=True."""
+        infra = make_infra(domains={})
+        driver = mock_driver()
+
+        with patch(
+            "anklume.engine.reconciler.reconcile",
+            return_value=ReconcileResult(),
+        ) as mock_rec:
+            check_drift(infra, driver)
+
+        mock_rec.assert_called_once_with(infra, driver, dry_run=True)

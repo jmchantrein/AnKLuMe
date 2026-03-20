@@ -79,7 +79,8 @@
 - name: Initialiser Incus (minimal)
   ansible.builtin.command:
     cmd: incus admin init --minimal
-  changed_when: true
+  register: incus_init_result
+  changed_when: "'already' not in incus_init_result.stderr"
   when: e2e_runner_incus_init
   tags: [configure]
 

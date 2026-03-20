@@ -1,15 +1,6 @@
 ---
 # Installation et configuration de LobeChat
 
-- name: Installer Node.js (dépendance LobeChat)
-  ansible.builtin.shell: |
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-  args:
-    creates: /usr/bin/node
-  changed_when: false
-  tags: [install]
-
 - name: Créer le répertoire de données LobeChat
   ansible.builtin.file:
     path: "{{ lobechat_data_dir }}"
@@ -76,9 +67,15 @@
     url: "http://localhost:{{ lobechat_port }}"
     status_code: 200
   register: lobechat_health
-  until: lobechat_health.status == 200
+  until: lobechat_health.status is defined and lobechat_health.status == 200
   retries: 30
   delay: 5
   changed_when: false
   failed_when: false
+  tags: [service]
+
+- name: Avertir si LobeChat n'est pas prêt
+  ansible.builtin.debug:
+    msg: "ATTENTION : LobeChat ne répond pas sur le port {{ lobechat_port }}"
+  when: lobechat_health.status is not defined or lobechat_health.status != 200
   tags: [service]

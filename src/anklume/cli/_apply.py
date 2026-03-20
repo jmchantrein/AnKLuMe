@@ -102,6 +102,16 @@ def run_apply(
         if post:
             typer.echo(f"Snapshots post-apply : {len(post)} créé(s)")
 
+    # Déploiement nftables (après les snapshots, avant le provisioning)
+    if not dry_run:
+        try:
+            from anklume.cli._network import deploy_nftables
+
+            deploy_nftables(infra)
+            typer.echo("Règles nftables appliquées.")
+        except RuntimeError as e:
+            typer.echo(f"nftables : {e}", err=True)
+
     # Afficher le résultat de la réconciliation
     _print_result(reconcile_result, dry_run=dry_run)
 

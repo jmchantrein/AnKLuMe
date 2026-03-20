@@ -106,6 +106,19 @@ def status() -> None:
 
 
 @app.command()
+def rollback(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Afficher le plan sans appliquer"),
+    ] = False,
+) -> None:
+    """Restaurer les snapshots pré-apply les plus récents (rollback global)."""
+    from anklume.cli._snapshot import run_rollback
+
+    run_rollback(dry_run=dry_run)
+
+
+@app.command()
 def destroy(
     force: Annotated[
         bool,
@@ -979,11 +992,15 @@ def doctor(
         bool,
         typer.Option("--json", help="Sortie JSON"),
     ] = False,
+    drift: Annotated[
+        bool,
+        typer.Option("--drift", help="Détecter le drift infra (dry-run reconcile)"),
+    ] = False,
 ) -> None:
     """Diagnostic automatique de l'infrastructure."""
     from anklume.cli._doctor import run_doctor_cmd
 
-    run_doctor_cmd(fix=fix, json_output=json_output)
+    run_doctor_cmd(fix=fix, json_output=json_output, drift=drift)
 
 
 # --- anklume telemetry <on|off|status> ---

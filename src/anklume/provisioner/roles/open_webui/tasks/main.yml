@@ -14,6 +14,7 @@
 - name: Installer Open WebUI via pip
   ansible.builtin.pip:
     name: open-webui
+    virtualenv: /opt/open-webui/venv
     state: present
   changed_when: false
   tags: [install]
@@ -38,7 +39,7 @@
       Type=simple
       Environment=OLLAMA_BASE_URL={{ open_webui_ollama_url }}
       Environment=DATA_DIR={{ open_webui_data_dir }}
-      ExecStart=/usr/local/bin/open-webui serve --host 0.0.0.0 --port {{ open_webui_port }}
+      ExecStart=/opt/open-webui/venv/bin/open-webui serve --host 0.0.0.0 --port {{ open_webui_port }}
       Restart=on-failure
       RestartSec=5
 
@@ -60,9 +61,15 @@
     url: "http://localhost:{{ open_webui_port }}"
     status_code: 200
   register: webui_health
-  until: webui_health.status == 200
+  until: webui_health.status is defined and webui_health.status == 200
   retries: 30
   delay: 5
   changed_when: false
   failed_when: false
+  tags: [service]
+
+- name: Avertir si Open WebUI n'est pas prêt
+  ansible.builtin.debug:
+    msg: "ATTENTION : Open WebUI ne répond pas sur le port {{ open_webui_port }}"
+  when: webui_health.status is not defined or webui_health.status != 200
   tags: [service]

@@ -10,6 +10,7 @@ from anklume.engine.snapshot import (
     create_auto_snapshots,
     list_all_snapshots,
     resolve_instance_project,
+    rollback_pre_apply,
     rollback_snapshot,
 )
 from anklume.engine.snapshot import (
@@ -124,3 +125,22 @@ def run_snapshot_rollback(instance: str, snapshot: str) -> None:
     except IncusError as e:
         typer.echo(f"Erreur de rollback : {e}", err=True)
         raise typer.Exit(1) from None
+
+
+def run_rollback(dry_run: bool = False) -> None:
+    """Rollback global : restaure les snapshots anklume-pre-* les plus récents."""
+    infra = load_infra()
+    driver = IncusDriver()
+
+    prefix = "[dry-run] " if dry_run else ""
+
+    restored = rollback_pre_apply(driver, infra, dry_run=dry_run)
+
+    if not restored:
+        typer.echo(f"{prefix}Aucun snapshot anklume-pre-* trouvé.")
+        return
+
+    for inst_name, project, snap_name in restored:
+        typer.echo(f"{prefix}  {inst_name} ({project}) → {snap_name}")
+
+    typer.echo(f"\n{prefix}{len(restored)} instance(s) restaurée(s).")

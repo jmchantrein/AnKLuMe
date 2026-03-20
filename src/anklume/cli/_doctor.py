@@ -10,7 +10,11 @@ from anklume.engine.doctor import run_doctor
 from anklume.engine.incus_driver import IncusDriver
 
 
-def run_doctor_cmd(fix: bool = False, json_output: bool = False) -> None:
+def run_doctor_cmd(
+    fix: bool = False,
+    json_output: bool = False,
+    drift: bool = False,
+) -> None:
     """Diagnostic automatique de l'infrastructure."""
     # Charger l'infra si possible (optionnel)
     infra = None
@@ -28,7 +32,7 @@ def run_doctor_cmd(fix: bool = False, json_output: bool = False) -> None:
     except Exception:  # noqa: S110
         pass  # Driver optionnel — checks système uniquement
 
-    report = run_doctor(driver=driver, infra=infra, fix=fix)
+    report = run_doctor(driver=driver, infra=infra, fix=fix, drift=drift)
 
     if json_output:
         data = [

@@ -194,11 +194,46 @@ def check_golden(driver: IncusDriver) -> CheckResult:
         )
 
 
+@dataclass
+class DriftItem:
+    """Un écart entre l'état désiré et l'état réel."""
+
+    verb: str  # "create" | "start" | "stop" | "delete"
+    resource: str  # "project" | "network" | "instance" | "profile"
+    target: str  # nom de la ressource
+    detail: str  # description lisible
+
+
+def check_drift(
+    infra: Infrastructure,
+    driver: IncusDriver,
+) -> list[DriftItem]:
+    """Détecte le drift entre l'infrastructure déclarée et l'état réel.
+
+    Exécute la réconciliation en dry_run et convertit les actions planifiées
+    en items de drift.
+    """
+    from anklume.engine.reconciler import reconcile
+
+    result = reconcile(infra, driver, dry_run=True)
+
+    return [
+        DriftItem(
+            verb=action.verb,
+            resource=action.resource,
+            target=action.target,
+            detail=action.detail,
+        )
+        for action in result.actions
+    ]
+
+
 def run_doctor(
     driver: IncusDriver | None = None,
     infra: Infrastructure | None = None,
     *,
     fix: bool = False,
+    drift: bool = False,
 ) -> DoctorReport:
     """Exécute toutes les vérifications."""
     checks: list[CheckResult] = []
@@ -219,5 +254,27 @@ def run_doctor(
     # Checks golden (si driver disponible)
     if driver is not None:
         checks.append(check_golden(driver))
+
+    # Drift detection (si demandé + infra + driver disponibles)
+    if drift and infra is not None and driver is not None:
+        drift_items = check_drift(infra, driver)
+        if drift_items:
+            for item in drift_items:
+                checks.append(
+                    CheckResult(
+                        name=f"Drift {item.resource}",
+                        status="warning",
+                        message=item.detail,
+                        fix_command="anklume apply all",
+                    )
+                )
+        else:
+            checks.append(
+                CheckResult(
+                    name="Drift",
+                    status="ok",
+                    message="infrastructure synchronisée, aucun drift détecté",
+                )
+            )
 
     return DoctorReport(checks=checks)

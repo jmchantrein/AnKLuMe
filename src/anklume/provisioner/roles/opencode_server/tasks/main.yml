@@ -23,7 +23,7 @@
     name: opencode-server
     virtualenv: /opt/opencode/venv
     state: present
-  failed_when: false
+  ignore_errors: true
   tags: [install]
 
 - name: Créer le répertoire de données OpenCode
@@ -69,9 +69,15 @@
     url: "http://localhost:{{ opencode_port }}/health"
     status_code: 200
   register: opencode_health
-  until: opencode_health.status == 200
+  until: opencode_health.status is defined and opencode_health.status == 200
   retries: 15
   delay: 3
   changed_when: false
   failed_when: false
+  tags: [service]
+
+- name: Avertir si OpenCode n'est pas prêt
+  ansible.builtin.debug:
+    msg: "ATTENTION : OpenCode ne répond pas sur le port {{ opencode_port }}"
+  when: opencode_health.status is not defined or opencode_health.status != 200
   tags: [service]

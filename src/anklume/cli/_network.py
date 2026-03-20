@@ -6,12 +6,16 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 import yaml
 
 from anklume.cli._common import load_infra
 from anklume.engine.nftables import generate_ruleset
+
+if TYPE_CHECKING:
+    from anklume.engine.models import Infrastructure
 
 
 def run_network_rules() -> None:
@@ -21,16 +25,16 @@ def run_network_rules() -> None:
     typer.echo(ruleset)
 
 
-def run_network_deploy() -> None:
-    """Applique les règles nftables sur l'hôte via nft -f."""
-    if not shutil.which("nft"):
-        typer.echo(
-            "Erreur : nft introuvable. Installer nftables sur l'hôte.",
-            err=True,
-        )
-        raise typer.Exit(1)
+def deploy_nftables(infra: Infrastructure) -> None:
+    """Applique les règles nftables sur l'hôte via nft -f.
 
-    infra = load_infra()
+    Raises:
+        RuntimeError: si nft est introuvable ou si l'application échoue.
+    """
+    if not shutil.which("nft"):
+        msg = "nft introuvable. Installer nftables sur l'hôte."
+        raise RuntimeError(msg)
+
     ruleset = generate_ruleset(infra)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".nft", delete=False) as tmp:
@@ -44,12 +48,22 @@ def run_network_deploy() -> None:
             text=True,
         )
         if result.returncode != 0:
-            typer.echo(f"Erreur nftables : {result.stderr.strip()}", err=True)
-            raise typer.Exit(1)
-
-        typer.echo("Règles nftables appliquées.")
+            msg = f"Erreur nftables : {result.stderr.strip()}"
+            raise RuntimeError(msg)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
+def run_network_deploy() -> None:
+    """Applique les règles nftables sur l'hôte via nft -f."""
+    infra = load_infra()
+
+    try:
+        deploy_nftables(infra)
+        typer.echo("Règles nftables appliquées.")
+    except RuntimeError as e:
+        typer.echo(f"Erreur : {e}", err=True)
+        raise typer.Exit(1) from None
 
 
 def run_network_status() -> None:

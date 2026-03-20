@@ -8,4 +8,5 @@ galaxy_info:
       versions:
         - bookworm
         - trixie
-dependencies: []
+dependencies:
+  - {role: nodejs}

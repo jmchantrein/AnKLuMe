@@ -22,7 +22,7 @@
     name: anklume
     virtualenv: /opt/sanitizer/venv
     state: present
-  failed_when: false
+  ignore_errors: true
   tags: [install]
 
 - name: Créer le répertoire de logs du sanitizer
@@ -94,9 +94,15 @@
     url: "http://localhost:{{ sanitizer_port }}/health"
     status_code: 200
   register: sanitizer_health
-  until: sanitizer_health.status == 200
+  until: sanitizer_health.status is defined and sanitizer_health.status == 200
   retries: 10
   delay: 3
   changed_when: false
   failed_when: false
+  tags: [service]
+
+- name: Avertir si le sanitizer n'est pas prêt
+  ansible.builtin.debug:
+    msg: "ATTENTION : le sanitizer ne répond pas sur le port {{ sanitizer_port }}"
+  when: sanitizer_health.status is not defined or sanitizer_health.status != 200
   tags: [service]

@@ -9,14 +9,6 @@
     shell: /bin/bash
   tags: [configure]
 
-- name: Installer Node.js 20.x
-  ansible.builtin.shell: |
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-  args:
-    creates: /usr/bin/node
-  tags: [install]
-
 - name: Installer OpenClaw via npm global
   ansible.builtin.shell: |
     npm install -g openclaw@{{ openclaw_version }}
@@ -62,9 +54,15 @@
     url: "http://localhost:{{ openclaw_port }}/health"
     status_code: 200
   register: openclaw_health
-  until: openclaw_health.status == 200
+  until: openclaw_health.status is defined and openclaw_health.status == 200
   retries: 15
   delay: 3
   changed_when: false
   failed_when: false
+  tags: [service]
+
+- name: Avertir si OpenClaw n'est pas prêt
+  ansible.builtin.debug:
+    msg: "ATTENTION : OpenClaw ne répond pas sur le port {{ openclaw_port }}"
+  when: openclaw_health.status is not defined or openclaw_health.status != 200
   tags: [service]

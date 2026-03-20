@@ -1,0 +1,6 @@
+---
+- name: Installer Node.js via NodeSource
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | bash - && apt-get install -y nodejs
+    creates: /usr/bin/node
+  tags: [install]

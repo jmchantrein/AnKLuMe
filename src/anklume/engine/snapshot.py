@@ -177,6 +177,57 @@ def rollback_snapshot(
     return deleted_count
 
 
+def rollback_pre_apply(
+    driver: IncusDriver,
+    infra: Infrastructure,
+    *,
+    dry_run: bool = False,
+) -> list[tuple[str, str, str]]:
+    """Restaure les snapshots anklume-pre-* les plus récents de toutes les instances.
+
+    Returns:
+        list of (instance, project, snapshot_name) restored.
+    """
+    existing_projects = {p.name for p in driver.project_list()}
+    restored: list[tuple[str, str, str]] = []
+
+    for domain in infra.enabled_domains:
+        if domain.name not in existing_projects:
+            continue
+
+        instances = {i.name for i in driver.instance_list(domain.name)}
+
+        for machine in domain.sorted_machines:
+            if machine.full_name not in instances:
+                continue
+
+            snapshots = driver.snapshot_list(machine.full_name, domain.name)
+            pre_snaps = [s for s in snapshots if s.name.startswith("anklume-pre-")]
+
+            if not pre_snaps:
+                continue
+
+            # Le plus récent par nom (format anklume-pre-YYYYMMDD-HHMMSS, tri lexicographique)
+            latest = max(pre_snaps, key=lambda s: s.name)
+
+            if dry_run:
+                restored.append((machine.full_name, domain.name, latest.name))
+                continue
+
+            try:
+                restore_snapshot(driver, machine.full_name, domain.name, latest.name)
+                restored.append((machine.full_name, domain.name, latest.name))
+            except IncusError as e:
+                logger.warning(
+                    "Rollback %s/%s échoué : %s",
+                    domain.name,
+                    machine.full_name,
+                    e,
+                )
+
+    return restored
+
+
 def resolve_instance_project(
     infra: Infrastructure,
     instance_name: str,
