@@ -37,7 +37,17 @@
 - name: Installer uv
   ansible.builtin.shell:
     cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
+  args:
     creates: /root/.local/bin/uv
+  retries: 3
+  delay: 5
+  register: uv_install
+  until: uv_install.rc == 0
+
+- name: Vérifier uv installé
+  ansible.builtin.command:
+    cmd: /root/.local/bin/uv --version
+  changed_when: false
 
 - name: Ajouter uv au PATH
   ansible.builtin.copy:

@@ -306,11 +306,35 @@ def cleanup_sandbox(project: str = SANDBOX_PROJECT) -> None:
 
 
 def _find_anklume_root() -> Path:
-    """Trouve la racine du repo anklume."""
+    """Trouve la racine du repo anklume.
+
+    Cherche dans l'ordre :
+    1. Variable d'environnement ANKLUME_ROOT
+    2. CWD et ses parents (pyproject.toml contenant 'anklume')
+    3. Remontée depuis __file__ (fonctionne en mode dev)
+    """
+    import os
+
+    env_root = os.environ.get("ANKLUME_ROOT")
+    if env_root:
+        candidate = Path(env_root).resolve()
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+
+    cwd = Path.cwd().resolve()
+    for parent in [cwd, *cwd.parents]:
+        pyproject = parent / "pyproject.toml"
+        if pyproject.exists() and "anklume" in pyproject.read_text()[:200]:
+            return parent
+
     candidate = Path(__file__).resolve().parent.parent.parent.parent
     if (candidate / "pyproject.toml").exists():
         return candidate
-    msg = f"Racine anklume introuvable depuis {__file__}"
+
+    msg = (
+        "Racine anklume introuvable. "
+        "Lancez depuis le repo AnKLuMe ou définissez ANKLUME_ROOT."
+    )
     raise FileNotFoundError(msg)
 
 

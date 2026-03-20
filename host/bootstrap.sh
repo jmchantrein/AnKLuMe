@@ -1413,22 +1413,23 @@ install_anklume() {
         chown -R "${user_uid}:${user_gid}" "${anklume_dir}"
     fi
 
-    # --- 3. Installer la CLI via uv depuis le repo local ---
-    if [[ -n "${uv_bin}" && -d "${anklume_dir}" && ! -f "${anklume_dir}/pyproject.toml" ]]; then
-        warn "pyproject.toml introuvable dans ${anklume_dir}. Installation CLI ignorée."
-    elif [[ -n "${uv_bin}" && -d "${anklume_dir}" ]]; then
-        info "Installation de la CLI anklume depuis ${anklume_dir}..."
-        if [[ "${main_user}" != "root" ]]; then
-            su - "${main_user}" -c \
-                "${uv_bin} tool install --force --with textual '${anklume_dir}'" || {
-                warn "Installation CLI échouée. Installer manuellement :"
-                warn "  cd ${anklume_dir} && uv tool install --with textual ."
-            }
-        else
-            "${uv_bin}" tool install --force --with textual "${anklume_dir}" || {
-                warn "Installation CLI échouée."
-            }
-        fi
+    # --- 3. Créer le wrapper CLI (uv run depuis le repo, pas de copie) ---
+    if [[ -n "${uv_bin}" && -d "${anklume_dir}" && -f "${anklume_dir}/pyproject.toml" ]]; then
+        local bin_dir="${user_home}/.local/bin"
+        mkdir -p "${bin_dir}"
+
+        # Wrapper anklume : exécute depuis le repo via uv run
+        cat > "${bin_dir}/anklume" << WRAPPER
+#!/usr/bin/env bash
+exec ${user_home}/.local/bin/uv run --directory '${anklume_dir}' anklume "\$@"
+WRAPPER
+        chmod +x "${bin_dir}/anklume"
+        chown "${user_uid}:${user_gid}" "${bin_dir}/anklume"
+
+        # Sync les dépendances du projet (premier lancement rapide)
+        su - "${main_user}" -c "cd '${anklume_dir}' && ${uv_bin} sync --quiet" 2>/dev/null || true
+
+        info "CLI installée : ${bin_dir}/anklume (wrapper vers ${anklume_dir})"
     else
         warn "uv ou repo local absent. Installation CLI ignorée."
     fi

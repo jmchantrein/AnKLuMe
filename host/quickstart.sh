@@ -349,27 +349,42 @@ install_anklume() {
             su - "${main_user}" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' 2>/dev/null || true
             info "uv installé pour ${main_user}."
         fi
-
-        local uv_bin="${user_home}/.local/bin/uv"
-        if [[ -x "${uv_bin}" ]]; then
-            if su - "${main_user}" -c "${uv_bin} tool install anklume" 2>/dev/null; then
-                info "anklume installé via uv."
-            else
-                warn "anklume pas encore publié sur PyPI."
-                warn "  Installation manuelle : uv tool install anklume"
-            fi
-        fi
     else
-        # Root direct
         if ! command -v uv &> /dev/null; then
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="/root/.local/bin:${PATH}"
         fi
-        if uv tool install anklume 2>/dev/null; then
-            info "anklume installé via uv."
+    fi
+
+    # Créer le wrapper CLI si le repo existe
+    local anklume_dir="${user_home}/AnKLuMe"
+    local uv_bin="${user_home}/.local/bin/uv"
+    [[ "${main_user}" == "root" ]] && anklume_dir="/root/AnKLuMe" && uv_bin="/root/.local/bin/uv"
+
+    if [[ -x "${uv_bin}" && -d "${anklume_dir}" && -f "${anklume_dir}/pyproject.toml" ]]; then
+        local bin_dir="${user_home}/.local/bin"
+        [[ "${main_user}" == "root" ]] && bin_dir="/root/.local/bin"
+        mkdir -p "${bin_dir}"
+
+        cat > "${bin_dir}/anklume" << WRAPPER
+#!/usr/bin/env bash
+exec ${uv_bin} run --directory '${anklume_dir}' anklume "\$@"
+WRAPPER
+        chmod +x "${bin_dir}/anklume"
+        [[ -n "${main_user}" && "${main_user}" != "root" ]] && \
+            chown "$(id -u "${main_user}"):$(id -g "${main_user}")" "${bin_dir}/anklume"
+
+        # Sync les dépendances
+        if [[ "${main_user}" != "root" ]]; then
+            su - "${main_user}" -c "cd '${anklume_dir}' && ${uv_bin} sync --quiet" 2>/dev/null || true
         else
-            warn "anklume pas encore publié sur PyPI."
+            cd "${anklume_dir}" && "${uv_bin}" sync --quiet 2>/dev/null || true
         fi
+
+        info "CLI installée : ${bin_dir}/anklume (wrapper vers ${anklume_dir})"
+    else
+        warn "Repo AnKLuMe introuvable dans ${anklume_dir}."
+        warn "  git clone https://github.com/jmchantrein/AnKLuMe.git ${anklume_dir}"
     fi
 
     # Alias ank dans les shells

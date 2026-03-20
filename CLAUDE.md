@@ -104,11 +104,14 @@ Incus et Ansible sont appelés via `subprocess`.
 
 ### Réinstallation CLI après modification du code
 
-**IMPORTANT** : `uv tool install --force` utilise un cache et ne
-réinstalle PAS les changements locaux. Toujours utiliser :
+La CLI `ank` est un wrapper script qui exécute `uv run` depuis le
+repo `~/AnKLuMe`. Les modifications du code sont donc immédiates,
+pas de réinstallation nécessaire.
+
+Si les dépendances changent (pyproject.toml), relancer :
 
 ```bash
-uv tool install --force --reinstall --with textual ~/AnKLuMe
+cd ~/AnKLuMe && uv sync
 ```
 
 ## Démarrage de session (après chaque /clear)

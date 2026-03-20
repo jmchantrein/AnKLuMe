@@ -187,10 +187,18 @@ def dev_lint() -> None:
 def dev_test() -> None:
     """Lancer pytest."""
     import subprocess
-    import sys
+
+    from anklume.engine.e2e_real import _find_anklume_root
+
+    try:
+        root = _find_anklume_root()
+    except FileNotFoundError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from None
 
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/", "-v"],
+        ["uv", "run", "pytest", "tests/", "-v"],
+        cwd=root,
     )
     raise typer.Exit(result.returncode)
 
