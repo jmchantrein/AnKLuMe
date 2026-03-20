@@ -63,7 +63,8 @@ omit = ["src/anklume/_version.py"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 70
+# fail_under géré par scripts/coverage-ratchet.sh (ratcheting progressif)
+# Le seuil courant est dans .coverage-threshold
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

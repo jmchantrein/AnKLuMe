@@ -47,6 +47,15 @@
             "command": "bash -c 'CMD=$(cat /dev/stdin | python3 -c \"import sys,json; print(json.load(sys.stdin).get(\\\"command\\\",\\\"\\\"))\" 2>/dev/null); case \"$CMD\" in *git\\ commit*) cd /home/jmc/AnKLuMe && python -m pytest tests/ -x -q --tb=line --ignore=tests/e2e --ignore=tests/test_e2e_real.py -m \"not real and not slow\" 2>&1 | tail -3; test ${PIPESTATUS[0]} -eq 0 || { echo \"BLOCKED: les tests doivent passer avant le commit\"; exit 2; } ;; esac'"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=$(cat /dev/stdin | python3 -c \"import sys,json; print(json.load(sys.stdin).get(\\\"file_path\\\",\\\"\\\"))\" 2>/dev/null); case \"$FILE\" in */CLAUDE.md|*/SPEC.md|*/ARCHITECTURE.md|*/pyproject.toml) echo \"BLOCKED: fichier critique — modification manuelle requise ou confirmation explicite\"; exit 2;; esac'"
+          }
+        ]
       }
     ]
   }

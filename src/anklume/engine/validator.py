@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 
 from anklume.engine.models import (
     MACHINE_TYPES,
@@ -61,6 +63,7 @@ def validate(infra: Infrastructure) -> ValidationResult:
     result = ValidationResult()
 
     _check_schema_version(infra, result)
+    _check_requires_anklume(infra, result)
     _check_domain_names(infra, result)
     _check_trust_levels(infra, result)
     _check_machine_names(infra, result)
@@ -88,6 +91,46 @@ def _check_schema_version(infra: Infrastructure, result: ValidationResult) -> No
             "anklume.yml",
             f"schema_version {v} est obsolète (version actuelle : {SCHEMA_VERSION}).",
             "Lancer 'anklume migrate' pour mettre à jour le format.",
+        )
+
+
+def _check_requires_anklume(infra: Infrastructure, result: ValidationResult) -> None:
+    """Vérifie que la version anklume installée satisfait requires_anklume."""
+    req = infra.config.requires_anklume
+    if req is None:
+        return
+
+    try:
+        current = pkg_version("anklume")
+    except PackageNotFoundError:
+        current = "0.0.0"
+
+    # Comparaison simplifiée basée sur packaging-style tuple
+    def _version_tuple(v: str) -> tuple[int, ...]:
+        """Extrait les composantes numériques d'une version."""
+        parts = []
+        for p in v.split(".")[:3]:
+            digits = ""
+            for c in p:
+                if c.isdigit():
+                    digits += c
+                else:
+                    break
+            parts.append(int(digits) if digits else 0)
+        return tuple(parts)
+
+    try:
+        if _version_tuple(current) < _version_tuple(req):
+            result.add(
+                "anklume.yml",
+                f"requires_anklume >= {req} mais version installée = {current}.",
+                "Mettre à jour anklume : uv pip install --upgrade anklume",
+            )
+    except (ValueError, IndexError):
+        result.add(
+            "anklume.yml",
+            f"requires_anklume '{req}' : format de version invalide.",
+            "Utiliser le format semver (ex: 0.2.0).",
         )
 
 

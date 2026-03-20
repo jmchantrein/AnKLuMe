@@ -1,0 +1,31 @@
+# Changelog
+
+Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
+
+## [Non publié]
+
+### Sécurité
+- fix: passphrase ZFS masquée via openssl fd:3 (plus visible dans /proc)
+- fix: actions GitHub épinglées par SHA + permissions contents:read
+- feat: règles nftables DNAT pour routage transparent Tor
+- feat: validation noms dans IncusDriver (_validate_name)
+- feat: sanitizer enrichi (SSH keys, AWS creds, IPv6, JSON credentials)
+- fix: path traversal renforcé dans portal.py
+- fix: ports="all" respecte le champ protocol dans nftables
+
+### Ajouté
+- feat: `anklume rollback` — restaure les snapshots pre-apply de toutes les instances
+- feat: `anklume doctor --drift` — détecte les écarts YAML vs état Incus réel
+- feat: nftables déployé automatiquement en fin d'apply
+- feat: warning GPU shared mode et nesting privilégié
+- feat: CI matrice Python 3.11+3.12, cache uv, timeouts, dependabot
+- feat: workflow security.yml (ruff S + pip-audit hebdomadaire)
+- feat: mkdocstrings + référence API
+- feat: hook commit-bloquant (pytest doit passer avant git commit)
+- feat: CLAUDE.md trigger table + gotchas + règle de régression
+
+### Amélioré
+- refactor: Bash DRY — host/lib/common.sh + host/lib/nvidia.sh (~400 lignes dédupl.)
+- refactor: 16 rôles Ansible consolidés (meta, tags, handlers EN, nodejs partagé)
+- refactor: ruff étendu C4/SIM/PIE, pyright basic, pytest-cov
+- refactor: tests parametrize, edge cases YAML/nftables

@@ -979,6 +979,22 @@ def console_kill(
     run_console_kill(domain=domain)
 
 
+# --- anklume migrate ---
+
+
+@app.command("migrate")
+def migrate(
+    project: Annotated[
+        str,
+        typer.Option("--project", "-p", help="Répertoire du projet anklume"),
+    ] = ".",
+) -> None:
+    """Migrer le schema_version du projet vers la version courante."""
+    from anklume.cli._migrate import run_migrate
+
+    run_migrate(project_dir=project)
+
+
 # --- anklume doctor ---
 
 
