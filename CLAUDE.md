@@ -141,6 +141,48 @@ Quand l'utilisateur modifie un fichier entre deux sessions :
 Ne jamais ignorer une modification manuelle. Ne jamais revenir
 silencieusement à l'ancienne version.
 
+## Impact des modifications (si tu touches X → vérifie Y)
+
+IMPORTANT : avant de modifier un fichier, consulter cette table.
+
+| Fichier modifié | Tester | Aussi vérifier |
+|----------------|--------|----------------|
+| `engine/models.py` | **TOUS les tests** (24 dépendants) | parser, validator, reconciler, nftables, addressing |
+| `engine/incus_driver.py` | `test_incus_driver` | reconciler, destroy, snapshot, portal, ops |
+| `engine/reconciler.py` | `test_reconciler`, `test_e2e` | destroy (même patterns), nesting, gpu |
+| `engine/nftables.py` | `test_nftables` | tor (import croisé), addressing |
+| `engine/sanitizer.py` | `test_sanitizer` | llm_routing, llm_ops |
+| `engine/addressing.py` | `test_addressing` | nftables (IPs dans les règles) |
+| `engine/parser.py` | `test_parser` | validator (parsé → validé) |
+| `engine/validator.py` | `test_validator` | parser (validé après parsing) |
+| `engine/snapshot.py` | `test_snapshot` | reconciler (auto-snapshots dans apply) |
+| `engine/nesting.py` | `test_nesting_engine` | reconciler (prefixes + security config) |
+| `engine/gpu.py` | `test_gpu_engine` | reconciler (gpu profiles) |
+| `engine/destroy.py` | `test_destroy` | reconciler (protection flags) |
+| `provisioner/*.py` | `test_provisioner` | rôles Ansible (inventory/playbook generated) |
+| `cli/__init__.py` | `test_cli` | **toute la CLI** (routage des commandes) |
+
+## Pièges connus (gotchas)
+
+- **ConfigParser ≠ dict** : `config.get("Section", {})` plante sur un ConfigParser.
+  Utiliser `config["Section"] if "Section" in config else {}`.
+- **nftables séparé du pipeline apply** : `anklume apply` ne déploie PAS les règles
+  nftables. Il faut `anklume network deploy` en plus.
+- **`security.privileged=true` en nesting L2+** : inévitable pour LXC-in-LXC,
+  documenté dans ADR-019. Ne pas essayer de le supprimer.
+- **Incus image refs contiennent `/` et `:`** : le regex de validation dans
+  incus_driver accepte `images:debian/13` via `_SAFE_IMAGE_REF`, pas `_SAFE_NAME`.
+- **`uv tool install` interdit** : toujours utiliser le wrapper `uv run`.
+  Voir `feedback_uv_reinstall.md` dans la mémoire.
+- **Tests `@pytest.mark.real`** : nécessitent une VM KVM avec Incus.
+  Ne jamais les lancer en CI ou sur la machine hôte directe.
+
+## Règle de régression
+
+**OBLIGATOIRE** : tout bug découvert pendant le développement doit produire
+un test de régression AVANT le fix. Le test doit échouer sans le fix et
+passer avec. Ne jamais fixer un bug sans ajouter de test.
+
 ## Fichiers de contexte
 
 Toujours chargé : ce fichier (CLAUDE.md)

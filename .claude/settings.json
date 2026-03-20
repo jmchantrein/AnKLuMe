@@ -6,6 +6,7 @@
       "Grep",
       "Bash(ruff *)",
       "Bash(python -m pytest *)",
+      "Bash(uv run pytest *)",
       "Bash(yamllint *)",
       "Bash(shellcheck *)",
       "Bash(ansible-lint *)",
@@ -14,7 +15,10 @@
       "Bash(git log *)",
       "Bash(git add *)",
       "Bash(ls *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv sync *)",
+      "Bash(wc *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -29,7 +33,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ruff check --fix --quiet $CLAUDE_FILE_PATH 2>/dev/null || true"
+            "command": "ruff check --fix --quiet $CLAUDE_FILE_PATH 2>/dev/null; ruff format --quiet $CLAUDE_FILE_PATH 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'CMD=$(cat /dev/stdin | python3 -c \"import sys,json; print(json.load(sys.stdin).get(\\\"command\\\",\\\"\\\"))\" 2>/dev/null); case \"$CMD\" in *git\\ commit*) cd /home/jmc/AnKLuMe && python -m pytest tests/ -x -q --tb=line --ignore=tests/e2e --ignore=tests/test_e2e_real.py -m \"not real and not slow\" 2>&1 | tail -3; test ${PIPESTATUS[0]} -eq 0 || { echo \"BLOCKED: les tests doivent passer avant le commit\"; exit 2; } ;; esac'"
           }
         ]
       }
