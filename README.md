@@ -144,22 +144,40 @@ ses règles nftables, et sa couleur dans l'interface :
 
 ## Fonctionnalités
 
+### Cœur
+
+Le pipeline YAML → Incus + nftables + Ansible. Stable, testé,
+utilisé quotidiennement.
+
 | Fonctionnalité | Description |
 |---|---|
 | **Isolation par domaines** | Un projet Incus + sous-réseau + nftables par domaine |
 | **PSOT stateless** | Réconciliation sans state file — YAML + Incus = vérité |
-| **TUI interactif** | Éditeur visuel de domaines et politiques (`anklume tui`) |
-| **GPU passthrough** | Accès exclusif ou partagé au GPU (Ollama, STT, LLM) |
 | **Provisioning Ansible** | 15 rôles embarqués + rôles custom + Galaxy |
-| **Routage LLM** | Backend local/cloud, proxy de sanitisation automatique |
+| **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
+| **GPU passthrough** | Accès exclusif ou partagé au GPU |
 | **Snapshots** | Automatiques pré/post-apply, rollback destructif |
 | **Nesting Incus** | 2 niveaux en usage réel, 5 niveaux validés en benchmark |
-| **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
 | **Resource policy** | Allocation CPU/RAM proportionnelle par poids |
+| **Conteneurs jetables** | `anklume disp <image>` — usage unique |
+
+### Extensions
+
+Fonctionnalités construites sur le cœur. Elles illustrent le modèle
+d'extensibilité d'anklume et peuvent servir de référence pour
+développer vos propres extensions via le [système de plugins](#plugins).
+
+| Fonctionnalité | Description |
+|---|---|
+| **TUI interactif** | Éditeur visuel de domaines et politiques (`anklume tui`) |
+| **Routage LLM** | Backend local/cloud, proxy de sanitisation automatique |
 | **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
 | **Passerelle Tor** | VM routeur transparent Tor |
-| **Conteneurs jetables** | `anklume disp <image>` — usage unique |
 | **Workspace layout** | Placement déclaratif des fenêtres GUI (KDE) |
+
+> **Stabilité** : les fonctionnalités cœur sont utilisées quotidiennement
+> et couvertes par les tests. Les extensions sont fonctionnelles mais
+> peuvent évoluer plus rapidement.
 
 ## Commandes principales
 

@@ -115,6 +115,14 @@ def run_apply(
     # Afficher le résultat de la réconciliation
     _print_result(reconcile_result, dry_run=dry_run)
 
+    # Aperçu nftables en dry-run
+    if dry_run:
+        from anklume.engine.nftables import generate_ruleset
+
+        ruleset = generate_ruleset(infra)
+        typer.echo("\n[dry-run] Règles nftables :")
+        typer.echo(ruleset)
+
     if not reconcile_result.success:
         raise typer.Exit(1)
 

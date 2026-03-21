@@ -459,10 +459,11 @@ anklume apply all
   ├─ Interroge Incus via IncusDriver (état réel)
   ├─ Réconcilie : calcule le diff (désiré vs réel)
   ├─ Produit un plan d'actions ordonnées
-  ├─ [--dry-run] Affiche le plan et s'arrête
+  ├─ [--dry-run] Affiche le plan (Incus + nftables) et s'arrête
   ├─ Snapshots pré-apply (instances existantes à modifier)
   ├─ Exécute le plan (créations, mises à jour, démarrages)
   ├─ Snapshots post-apply (instances modifiées/créées)
+  ├─ Déploiement nftables (règles de cloisonnement réseau)
   ├─ [sauf --no-provision] Provisioning Ansible (roles)
   └─ Rapporte les succès et échecs par domaine
 ```

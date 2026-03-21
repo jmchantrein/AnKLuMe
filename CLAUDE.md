@@ -163,8 +163,9 @@ IMPORTANT : avant de modifier un fichier, consulter cette table.
 
 - **ConfigParser ≠ dict** : `config.get("Section", {})` plante sur un ConfigParser.
   Utiliser `config["Section"] if "Section" in config else {}`.
-- **nftables séparé du pipeline apply** : `anklume apply` ne déploie PAS les règles
-  nftables. Il faut `anklume network deploy` en plus.
+- **nftables intégré au pipeline apply** : `anklume apply` déploie
+  automatiquement les règles nftables après les snapshots post-apply.
+  `anklume network deploy` reste disponible pour un redéploiement manuel.
 - **`security.privileged=true` en nesting L2+** : inévitable pour LXC-in-LXC,
   documenté dans ADR-019. Ne pas essayer de le supprimer.
 - **Incus image refs contiennent `/` et `:`** : le regex de validation dans

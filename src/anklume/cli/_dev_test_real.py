@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 import typer
@@ -46,6 +47,16 @@ def run_dev_test_real(config: E2eRealConfig) -> None:
                 raise typer.Exit(1) from None
 
         os.chdir(original_dir)
+
+        # 2b. Retirer les règles nftables anklume — la VM sandbox a besoin
+        # d'internet pour le provisioning (apt, uv). Les tests @real dans
+        # la VM déploieront leurs propres règles nftables.
+        if shutil.which("nft"):
+            subprocess.run(
+                ["nft", "delete", "table", "inet", "anklume"],
+                capture_output=True,
+            )
+            typer.echo("Règles nftables anklume retirées (sandbox needs internet).")
 
         # 3. Attendre que la VM soit prête (cloud-init terminé)
         driver = IncusDriver()

@@ -103,18 +103,40 @@ anklume status
 
 ## Fonctionnalités
 
+### Cœur
+
+Le pipeline YAML → Incus + nftables + Ansible. Stable, testé,
+utilisé quotidiennement.
+
 | Fonctionnalité | Description |
 |---|---|
 | **Isolation par domaines** | Un projet Incus + sous-réseau + nftables par domaine |
 | **PSOT stateless** | Réconciliation sans state file — YAML + Incus = source de vérité |
-| **GPU passthrough** | Accès exclusif ou partagé au GPU (Ollama, STT, LLM) |
 | **Provisioning Ansible** | Rôles embarqués + rôles custom utilisateur |
+| **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
+| **GPU passthrough** | Accès exclusif ou partagé au GPU |
 | **Snapshots automatiques** | Pré/post-apply, rollback destructif |
 | **Nesting Incus** | 2 niveaux en usage réel, 5 niveaux validés en benchmark |
-| **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
-| **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
 | **Portails fichiers** | Transfert hôte ↔ conteneur sans compromettre l'isolation |
 | **Golden images** | Publier des instances comme images réutilisables |
+
+### Extensions
+
+Fonctionnalités construites sur le cœur. Elles illustrent le modèle
+d'extensibilité d'anklume et peuvent servir de référence pour
+développer vos propres extensions via le système de plugins.
+
+| Fonctionnalité | Description |
+|---|---|
+| **TUI interactif** | Éditeur visuel de domaines et politiques (`anklume tui`) |
+| **Routage LLM** | Backend local/cloud, proxy de sanitisation automatique |
+| **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
+| **Passerelle Tor** | VM routeur transparent Tor |
+| **Workspace layout** | Placement déclaratif des fenêtres GUI (KDE) |
+
+> **Stabilité** : les fonctionnalités cœur sont utilisées quotidiennement
+> et couvertes par les tests. Les extensions sont fonctionnelles mais
+> peuvent évoluer plus rapidement.
 
 ## Ce que anklume n'est PAS
 

@@ -1,5 +1,7 @@
 """Tests du parser anklume (YAML → modèles typés)."""
 
+import logging
+
 import pytest
 import yaml
 
@@ -403,3 +405,98 @@ class TestMalformedYaml:
         (tmp_path / "policies.yml").write_text("policies:\n  - from: 'unclosed\n    bad: :")
         with pytest.raises(yaml.YAMLError):
             parse_project(tmp_path)
+
+
+class TestUnknownKeyWarnings:
+    """Les clés YAML inconnues émettent un warning sans bloquer le parsing."""
+
+    def test_unknown_global_key(self, tmp_path, caplog):
+        _write_anklume_yml(tmp_path)
+        anklume_path = tmp_path / "anklume.yml"
+        raw = yaml.safe_load(anklume_path.read_text())
+        raw["bogus_key"] = "test"
+        anklume_path.write_text(yaml.dump(raw))
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.parser"):
+            infra = parse_project(tmp_path)
+
+        assert "bogus_key" in caplog.text
+        assert infra.config.schema_version == 1
+
+    def test_unknown_domain_key(self, tmp_path, caplog):
+        _write_anklume_yml(tmp_path)
+        _write_domain(
+            tmp_path,
+            "pro",
+            {
+                "description": "Test",
+                "turst_level": "untrusted",
+                "machines": {"dev": {"description": "Dev"}},
+            },
+        )
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.parser"):
+            infra = parse_project(tmp_path)
+
+        assert "turst_level" in caplog.text
+        assert infra.domains["pro"].trust_level == "semi-trusted"
+
+    def test_unknown_machine_key(self, tmp_path, caplog):
+        _write_anklume_yml(tmp_path)
+        _write_domain(
+            tmp_path,
+            "pro",
+            {
+                "description": "Test",
+                "machines": {
+                    "dev": {
+                        "description": "Dev",
+                        "tyep": "vm",
+                    }
+                },
+            },
+        )
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.parser"):
+            infra = parse_project(tmp_path)
+
+        assert "tyep" in caplog.text
+        assert infra.domains["pro"].machines["dev"].type == "lxc"
+
+    def test_unknown_policy_key(self, tmp_path, caplog):
+        _write_anklume_yml(tmp_path)
+        _write_policies(
+            tmp_path,
+            [
+                {
+                    "from": "pro",
+                    "to": "perso",
+                    "description": "Test",
+                    "ports": [80],
+                    "bidrectional": True,
+                }
+            ],
+        )
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.parser"):
+            infra = parse_project(tmp_path)
+
+        assert "bidrectional" in caplog.text
+        assert infra.policies[0].bidirectional is False
+
+    def test_no_warning_on_valid_keys(self, tmp_path, caplog):
+        _write_anklume_yml(tmp_path)
+        _write_domain(
+            tmp_path,
+            "pro",
+            {
+                "description": "Test",
+                "trust_level": "untrusted",
+                "machines": {"dev": {"description": "Dev", "type": "lxc"}},
+            },
+        )
+
+        with caplog.at_level(logging.WARNING, logger="anklume.engine.parser"):
+            parse_project(tmp_path)
+
+        assert caplog.text == ""

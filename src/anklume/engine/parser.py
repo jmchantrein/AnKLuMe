@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
@@ -20,6 +21,71 @@ from anklume.engine.models import (
     Profile,
     ResourcePolicyConfig,
 )
+
+log = logging.getLogger(__name__)
+
+# Clés connues par section — pour détecter les typos.
+# Synchroniser avec models.py si un champ est ajouté.
+_GLOBAL_KEYS = {
+    "schema_version",
+    "defaults",
+    "addressing",
+    "nesting",
+    "resource_policy",
+    "gpu_policy",
+    "ai_access_policy",
+    "network_passthrough",
+    "requires_anklume",
+}
+_DEFAULTS_KEYS = {"os_image", "trust_level"}
+_ADDRESSING_KEYS = {"base", "zone_step"}
+_NESTING_KEYS = {"prefix"}
+_RESOURCE_POLICY_KEYS = {
+    "host_reserve",
+    "mode",
+    "cpu_mode",
+    "memory_enforce",
+    "overcommit",
+}
+_HOST_RESERVE_KEYS = {"cpu", "memory"}
+_DOMAIN_KEYS = {
+    "description",
+    "trust_level",
+    "enabled",
+    "ephemeral",
+    "profiles",
+    "machines",
+}
+_MACHINE_KEYS = {
+    "description",
+    "type",
+    "ip",
+    "ephemeral",
+    "gpu",
+    "gui",
+    "profiles",
+    "roles",
+    "config",
+    "persistent",
+    "vars",
+    "weight",
+    "workspace",
+}
+_POLICY_KEYS = {
+    "from",
+    "to",
+    "description",
+    "ports",
+    "protocol",
+    "bidirectional",
+}
+
+
+def _warn_unknown_keys(raw: dict, known: set[str], location: str) -> None:
+    """Log un warning pour chaque clé inconnue dans raw."""
+    unknown = set(raw.keys()) - known
+    for key in sorted(unknown):
+        log.warning("Clé inconnue '%s' dans %s (ignorée)", key, location)
 
 
 class ParseError(Exception):
@@ -50,19 +116,24 @@ def _parse_global_config(path: Path) -> GlobalConfig:
     if not isinstance(raw, dict):
         raise ParseError(path, "le fichier doit contenir un mapping YAML (clé: valeur).")
 
+    _warn_unknown_keys(raw, _GLOBAL_KEYS, str(path))
+
     defaults_raw = raw.get("defaults", {})
+    _warn_unknown_keys(defaults_raw, _DEFAULTS_KEYS, f"{path} > defaults")
     defaults = Defaults(
         os_image=defaults_raw.get("os_image", "images:debian/13"),
         trust_level=defaults_raw.get("trust_level", "semi-trusted"),
     )
 
     addressing_raw = raw.get("addressing", {})
+    _warn_unknown_keys(addressing_raw, _ADDRESSING_KEYS, f"{path} > addressing")
     addressing = AddressingConfig(
         base=str(addressing_raw.get("base", "10.100")),
         zone_step=addressing_raw.get("zone_step", 10),
     )
 
     nesting_raw = raw.get("nesting", {})
+    _warn_unknown_keys(nesting_raw, _NESTING_KEYS, f"{path} > nesting")
     nesting = NestingConfig(
         prefix=nesting_raw.get("prefix", True),
     )
@@ -70,7 +141,9 @@ def _parse_global_config(path: Path) -> GlobalConfig:
     resource_policy = None
     rp_raw = raw.get("resource_policy")
     if rp_raw:
+        _warn_unknown_keys(rp_raw, _RESOURCE_POLICY_KEYS, f"{path} > resource_policy")
         host_reserve = rp_raw.get("host_reserve", {})
+        _warn_unknown_keys(host_reserve, _HOST_RESERVE_KEYS, f"{path} > host_reserve")
         resource_policy = ResourcePolicyConfig(
             host_reserve_cpu=str(host_reserve.get("cpu", "20%")),
             host_reserve_memory=str(host_reserve.get("memory", "20%")),
@@ -126,6 +199,8 @@ def _parse_domain(path: Path, defaults: Defaults) -> Domain:
     if not isinstance(raw, dict):
         raise ParseError(path, "le fichier domaine doit contenir un mapping YAML.")
 
+    _warn_unknown_keys(raw, _DOMAIN_KEYS, str(path))
+
     domain_name = path.stem
 
     if "description" not in raw:
@@ -148,6 +223,7 @@ def _parse_domain(path: Path, defaults: Defaults) -> Domain:
     domain_ephemeral = raw.get("ephemeral", False)
     for machine_name, machine_data in (raw.get("machines") or {}).items():
         machine_data = machine_data or {}
+        _warn_unknown_keys(machine_data, _MACHINE_KEYS, f"{path} > machines > {machine_name}")
 
         if "description" not in machine_data:
             raise ParseError(path, f"machine '{machine_name}': champ 'description' requis.")
@@ -202,6 +278,7 @@ def _parse_policies(path: Path) -> list[Policy]:
 
     policies = []
     for i, p in enumerate(policies_raw):
+        _warn_unknown_keys(p, _POLICY_KEYS, f"{path} > policies[{i}]")
         if "from" not in p or "to" not in p:
             raise ParseError(path, f"politique #{i + 1}: 'from' et 'to' requis.")
         if "description" not in p:
