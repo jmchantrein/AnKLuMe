@@ -161,11 +161,11 @@ utilisé quotidiennement.
 | **Resource policy** | Allocation CPU/RAM proportionnelle par poids |
 | **Conteneurs jetables** | `anklume disp <image>` — usage unique |
 
-### Extensions
+### Extensions intégrées
 
-Fonctionnalités construites sur le cœur. Elles illustrent le modèle
-d'extensibilité d'anklume et peuvent servir de référence pour
-développer vos propres extensions via le [système de plugins](#plugins).
+Fonctionnalités optionnelles construites sur le cœur. Elles ne sont
+pas requises pour l'isolation de base et peuvent évoluer indépendamment.
+Pour ajouter vos propres commandes, voir le [système de plugins](#plugins).
 
 | Fonctionnalité | Description |
 |---|---|

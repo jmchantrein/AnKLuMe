@@ -120,11 +120,11 @@ utilisé quotidiennement.
 | **Portails fichiers** | Transfert hôte ↔ conteneur sans compromettre l'isolation |
 | **Golden images** | Publier des instances comme images réutilisables |
 
-### Extensions
+### Extensions intégrées
 
-Fonctionnalités construites sur le cœur. Elles illustrent le modèle
-d'extensibilité d'anklume et peuvent servir de référence pour
-développer vos propres extensions via le système de plugins.
+Fonctionnalités optionnelles construites sur le cœur. Elles ne sont
+pas requises pour l'isolation de base et peuvent évoluer indépendamment.
+Pour ajouter vos propres commandes, voir le système de plugins.
 
 | Fonctionnalité | Description |
 |---|---|
