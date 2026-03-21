@@ -24,9 +24,7 @@ ai_app = typer.Typer(help="Gestion des services IA.")
 stt_app = typer.Typer(help="Push-to-talk STT.")
 llm_app = typer.Typer(help="Supervision LLM.")
 
-portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
 setup_app = typer.Typer(help="Configuration et import.")
-golden_app = typer.Typer(help="Golden images — images réutilisables.")
 tor_app = typer.Typer(help="Passerelle Tor.")
 resource_app = typer.Typer(help="Allocation des ressources.")
 workspace_app = typer.Typer(help="Workspace layout déclaratif (GUI tmuxp).")
@@ -41,9 +39,7 @@ app.add_typer(network_app, name="network")
 app.add_typer(ai_app, name="ai")
 app.add_typer(stt_app, name="stt")
 app.add_typer(llm_app, name="llm")
-app.add_typer(portal_app, name="portal")
 app.add_typer(setup_app, name="setup")
-app.add_typer(golden_app, name="golden")
 app.add_typer(tor_app, name="tor")
 app.add_typer(resource_app, name="resource")
 app.add_typer(workspace_app, name="workspace")
@@ -735,44 +731,6 @@ def stt_status() -> None:
     run_stt_status()
 
 
-# --- anklume portal <push|pull|list> ---
-
-
-@portal_app.command("push")
-def portal_push(
-    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
-    local_path: Annotated[str, typer.Argument(help="Chemin du fichier local")],
-    remote_path: Annotated[str, typer.Argument(help="Chemin distant")] = "/tmp/",  # noqa: S108
-) -> None:
-    """Envoyer un fichier vers une instance."""
-    from anklume.cli._portal import run_portal_push
-
-    run_portal_push(instance, local_path, remote_path)
-
-
-@portal_app.command("pull")
-def portal_pull(
-    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
-    remote_path: Annotated[str, typer.Argument(help="Chemin du fichier distant")],
-    local_path: Annotated[str, typer.Argument(help="Chemin local de destination")] = ".",
-) -> None:
-    """Récupérer un fichier depuis une instance."""
-    from anklume.cli._portal import run_portal_pull
-
-    run_portal_pull(instance, remote_path, local_path)
-
-
-@portal_app.command("list")
-def portal_list(
-    instance: Annotated[str, typer.Argument(help="Nom de l'instance")],
-    path: Annotated[str, typer.Argument(help="Chemin du répertoire distant")] = "/root/",
-) -> None:
-    """Lister les fichiers d'un répertoire distant."""
-    from anklume.cli._portal import run_portal_list
-
-    run_portal_list(instance, path)
-
-
 # --- anklume instance clipboard ---
 
 
@@ -871,41 +829,6 @@ def setup_gui(
         run_setup_gui_fix()
     else:
         run_setup_gui()
-
-
-# --- anklume golden <create|list|delete> ---
-
-
-@golden_app.command("create")
-def golden_create(
-    instance: Annotated[str, typer.Argument(help="Nom de l'instance à publier")],
-    alias: Annotated[
-        str | None,
-        typer.Option("--alias", "-a", help="Alias personnalisé (défaut: golden/<instance>)"),
-    ] = None,
-) -> None:
-    """Publier une instance comme golden image."""
-    from anklume.cli._golden import run_golden_create
-
-    run_golden_create(instance, alias=alias)
-
-
-@golden_app.command("list")
-def golden_list_cmd() -> None:
-    """Lister les golden images."""
-    from anklume.cli._golden import run_golden_list
-
-    run_golden_list()
-
-
-@golden_app.command("delete")
-def golden_delete(
-    alias: Annotated[str, typer.Argument(help="Alias de l'image à supprimer")],
-) -> None:
-    """Supprimer une golden image."""
-    from anklume.cli._golden import run_golden_delete
-
-    run_golden_delete(alias)
 
 
 # --- anklume tor <status> ---
@@ -1099,3 +1022,49 @@ def tui(
     from anklume.cli._tui import run_tui
 
     run_tui(project_dir=project)
+
+
+# --- Plugin discovery ---
+
+
+def _builtin_names() -> set[str]:
+    """Noms réservés dérivés des commandes enregistrées sur l'app."""
+    names: set[str] = set()
+    for g in app.registered_groups:
+        if g.name:
+            names.add(g.name)
+    for c in app.registered_commands:
+        if c.name:
+            names.add(c.name)
+        elif c.callback:
+            names.add(c.callback.__name__)
+    return names
+
+
+def _discover_plugins() -> None:
+    """Charge les plugins CLI externes via entry_points (groupe 'anklume.commands')."""
+    import logging
+    from importlib.metadata import entry_points
+
+    log = logging.getLogger(__name__)
+    builtin = _builtin_names()
+
+    try:
+        plugins = entry_points(group="anklume.commands")
+    except Exception:
+        log.debug("entry_points indisponible", exc_info=True)
+        return
+
+    for ep in plugins:
+        if ep.name in builtin:
+            log.warning("Plugin '%s' entre en conflit avec une commande intégrée", ep.name)
+            continue
+        try:
+            plugin_app = ep.load()
+            app.add_typer(plugin_app, name=ep.name)
+            log.debug("Plugin '%s' chargé", ep.name)
+        except Exception:
+            log.debug("Échec chargement plugin '%s'", ep.name, exc_info=True)
+
+
+_discover_plugins()

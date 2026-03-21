@@ -19,11 +19,18 @@ Les messages d'erreur expliquent quoi faire, pas juste ce qui a
    GPU passthrough dans un domaine dédié, cloisonné par nftables.
    Proxy de sanitisation pour les LLM cloud. Chaque agent/outil IA
    tourne dans un conteneur/VM jetable.
-2. **Enseignement sys/réseaux** — l'enseignant prépare une
+2. **LLM root sandboxé** — donner un accès root à un agent IA
+   (Claude Code, OpenHands, SWE-agent...) dans une instance isolée.
+   L'agent peut installer des paquets, modifier la config système,
+   lancer des tests E2E/BDD en situation réelle. Le nesting Incus
+   permet à un LLM dans une instance anklume d'utiliser anklume
+   lui-même pour créer des sous-instances. Un template
+   `CLAUDE.md` sandbox-aware est fourni dans `examples/`.
+3. **Enseignement sys/réseaux** — l'enseignant prépare une
    infrastructure et la distribue via git. Les étudiants déploient
    avec `anklume apply all` et manipulent une vraie infra.
    Idempotent, reproductible, jetable.
-3. **Compartimentalisation de poste** — séparer pro/perso/dev/sandbox/IA
+4. **Compartimentalisation de poste** — séparer pro/perso/dev/sandbox/IA
    sur une seule machine. Un domaine = un sous-réseau + un projet Incus.
    Drop-all par défaut entre domaines, politiques déclaratives.
 
@@ -378,28 +385,11 @@ policies:
 | `anklume network status` | État réseau (bridges, IPs, nftables) |
 | `anklume network passthrough <enable\|disable>` | Activer/désactiver le passthrough des bridges non-anklume |
 
-### Portails et transferts
-
-| Commande | Description |
-|----------|-------------|
-| `anklume portal push <inst> <local> [remote]` | Envoyer un fichier vers une instance |
-| `anklume portal pull <inst> <remote> [local]` | Récupérer un fichier depuis une instance |
-| `anklume portal list <inst> [path]` | Lister un répertoire distant |
-| `anklume disp [image] [cmd] [--list] [--cleanup]` | Lancer un conteneur jetable |
-
 ### Ressources
 
 | Commande | Description |
 |----------|-------------|
 | `anklume resource show [--project]` | Afficher l'allocation de ressources calculée |
-
-### Golden images
-
-| Commande | Description |
-|----------|-------------|
-| `anklume golden create <inst> [--alias]` | Publier une golden image |
-| `anklume golden list` | Lister les golden images |
-| `anklume golden delete <alias>` | Supprimer une golden image |
 
 ### IA et LLM
 
@@ -3345,623 +3335,16 @@ vers les variables d'environnement OpenClaw dans l'override systemd.
 
 ## 29. Portails et transferts
 
-Communication hôte ↔ conteneur sans compromettre l'isolation.
-Quatre fonctionnalités complémentaires : transfert de fichiers,
-partage de presse-papiers, conteneurs jetables, et import d'infra
-existante.
-
-### 29.1 File portals — transfert de fichiers
-
-Transfert de fichiers entre l'hôte et les conteneurs via la
-CLI `incus file push/pull`. Le portail respecte les frontières
-de projet Incus : chaque instance est identifiée par son nom
-complet (`domaine-machine`) et résolue vers son projet.
-
-#### Commandes CLI
-
-```
-anklume portal push <instance> <chemin_local> [chemin_distant]
-anklume portal pull <instance> <chemin_distant> [chemin_local]
-anklume portal list <instance> [chemin_distant]
-```
-
-**`push`** : envoie un fichier local vers l'instance.
-- `chemin_distant` : défaut `/tmp/` (le fichier garde son nom)
-- Vérifie que le fichier local existe
-- Vérifie que l'instance existe dans l'infra
-
-**`pull`** : récupère un fichier depuis l'instance.
-- `chemin_local` : défaut `.` (répertoire courant)
-- Vérifie que l'instance existe dans l'infra
-
-**`list`** : liste les fichiers d'un répertoire distant.
-- `chemin_distant` : défaut `/root/`
-- Affiche : nom, type, taille, permissions
-
-#### Sorties
-
-```
-# push
-Envoyé : rapport.pdf → pro-dev:/tmp/rapport.pdf (42 Ko)
-
-# pull
-Récupéré : pro-dev:/var/log/syslog → ./syslog (128 Ko)
-
-# list
-NOM                TYPE        TAILLE    PERMISSIONS
-rapport.pdf        fichier     42 Ko     -rw-r--r--
-backup/            répertoire  -         drwxr-xr-x
-```
-
-#### Driver Incus — méthodes fichier
-
-```python
-def file_push(
-    self,
-    instance: str,
-    project: str,
-    local_path: str,
-    remote_path: str,
-) -> None:
-    """Push un fichier via incus file push."""
-    self._run([
-        "file", "push", local_path,
-        f"{instance}{remote_path}",
-        "--project", project,
-    ])
-
-def file_pull(
-    self,
-    instance: str,
-    project: str,
-    remote_path: str,
-    local_path: str,
-) -> None:
-    """Pull un fichier via incus file pull."""
-    self._run([
-        "file", "pull",
-        f"{instance}{remote_path}",
-        local_path,
-        "--project", project,
-    ])
-```
-
-#### Module `engine/portal.py`
-
-```python
-@dataclass
-class PortalEntry:
-    """Entrée dans un répertoire distant."""
-    name: str
-    entry_type: str     # "file" | "directory" | "link"
-    size: int           # octets (-1 si inconnu)
-    permissions: str    # ex: "-rw-r--r--"
-
-@dataclass
-class TransferResult:
-    """Résultat d'un transfert fichier."""
-    instance: str
-    local_path: str
-    remote_path: str
-    size: int           # octets transférés
-
-def push_file(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-    local_path: str,
-    remote_path: str = "/tmp/",
-) -> TransferResult:
-    """Envoie un fichier vers une instance."""
-
-def pull_file(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-    remote_path: str,
-    local_path: str = ".",
-) -> TransferResult:
-    """Récupère un fichier depuis une instance."""
-
-def list_remote(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-    remote_path: str = "/root/",
-) -> list[PortalEntry]:
-    """Liste les entrées d'un répertoire distant."""
-```
-
-Chaque fonction résout d'abord l'instance vers son projet via
-`resolve_instance_project()`. Erreur si l'instance est inconnue.
-
-### 29.2 Clipboard sharing — presse-papiers hôte ↔ conteneur
-
-Pipe le contenu du presse-papiers hôte vers/depuis un conteneur.
-Utilise `wl-paste`/`wl-copy` côté hôte (Wayland KDE Plasma) et
-un fichier temporaire dans le conteneur.
-
-#### Commande CLI
-
-```
-anklume instance clipboard <instance> --push    # hôte → conteneur
-anklume instance clipboard <instance> --pull    # conteneur → hôte
-```
-
-**`--push`** (défaut) :
-1. Lit le presse-papiers hôte via `wl-paste`
-2. Écrit le contenu dans `/tmp/.anklume-clipboard` du conteneur
-   via `file_push`
-3. Affiche le nombre de caractères transférés
-
-**`--pull`** :
-1. Lit `/tmp/.anklume-clipboard` du conteneur via `instance_exec`
-2. Écrit sur le presse-papiers hôte via `wl-copy`
-3. Affiche le nombre de caractères transférés
-
-#### Module `engine/clipboard.py`
-
-```python
-CLIPBOARD_PATH = "/tmp/.anklume-clipboard"
-
-@dataclass
-class ClipboardResult:
-    """Résultat d'une opération presse-papiers."""
-    direction: str        # "push" | "pull"
-    instance: str
-    content_length: int   # caractères transférés
-
-def clipboard_push(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-) -> ClipboardResult:
-    """Copie le presse-papiers hôte vers le conteneur."""
-
-def clipboard_pull(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-) -> ClipboardResult:
-    """Copie le contenu du conteneur vers le presse-papiers hôte."""
-
-def read_host_clipboard() -> str:
-    """Lit le presse-papiers hôte via wl-paste."""
-
-def write_host_clipboard(text: str) -> None:
-    """Écrit sur le presse-papiers hôte via wl-copy."""
-```
-
-#### Modification du driver
-
-Ajout du paramètre `input` à `instance_exec` pour supporter
-le pipe de données vers stdin :
-
-```python
-def instance_exec(
-    self,
-    instance: str,
-    project: str,
-    command: list[str],
-    *,
-    input: str | None = None,
-) -> subprocess.CompletedProcess:
-    """Exécute une commande dans une instance.
-
-    Args:
-        input: données à envoyer sur stdin de la commande.
-    """
-```
-
-### 29.3 Disposable containers — conteneurs jetables
-
-Conteneurs éphémères pour des tâches ponctuelles. Lancement rapide,
-shell interactif, destruction automatique à la sortie.
-
-#### Commandes CLI
-
-```
-anklume disp <image>                # shell interactif
-anklume disp <image> -- <cmd>       # exécuter une commande
-anklume disp --list                 # lister les conteneurs jetables actifs
-anklume disp --cleanup              # détruire tous les conteneurs jetables
-```
-
-**Shell interactif** :
-1. Crée un conteneur `disp-XXXX` (suffixe hex aléatoire 4 chars)
-2. Démarre le conteneur
-3. Ouvre un shell via `incus exec` (process remplacé, stdin/stdout
-   directs vers le terminal)
-4. À la sortie du shell, détruit le conteneur
-
-**Exécution unique** :
-1. Crée et démarre le conteneur
-2. Exécute la commande via `instance_exec`
-3. Affiche stdout/stderr
-4. Détruit le conteneur
-
-**Listing** : affiche les conteneurs `disp-*` en cours.
-
-**Cleanup** : détruit tous les conteneurs `disp-*`.
-
-#### Module `engine/disposable.py`
-
-```python
-DISP_PREFIX = "disp-"
-DISP_PROJECT = "default"
-
-@dataclass
-class DispContainer:
-    """Conteneur jetable."""
-    name: str
-    image: str
-    project: str = DISP_PROJECT
-    status: str = "Running"
-
-def generate_disp_name() -> str:
-    """Génère un nom unique disp-XXXX (4 hex)."""
-
-def launch_disposable(
-    driver: IncusDriver,
-    image: str,
-    *,
-    project: str = DISP_PROJECT,
-) -> DispContainer:
-    """Crée et démarre un conteneur jetable."""
-
-def list_disposables(
-    driver: IncusDriver,
-    *,
-    project: str = DISP_PROJECT,
-) -> list[DispContainer]:
-    """Liste les conteneurs jetables actifs."""
-
-def destroy_disposable(
-    driver: IncusDriver,
-    name: str,
-    *,
-    project: str = DISP_PROJECT,
-) -> None:
-    """Arrête et détruit un conteneur jetable."""
-
-def cleanup_disposables(
-    driver: IncusDriver,
-    *,
-    project: str = DISP_PROJECT,
-) -> int:
-    """Détruit tous les conteneurs jetables. Retourne le nombre supprimé."""
-```
-
-#### Shell interactif
-
-Le shell interactif utilise `os.execvp` pour remplacer le processus
-Python par `incus exec`. Cela donne un vrai terminal interactif
-avec support des signaux, redimensionnement, etc.
-
-```python
-import os
-os.execvp("incus", [
-    "incus", "exec", name, "--project", project, "--", "bash",
-])
-```
-
-Le nettoyage du conteneur est assuré par un `atexit` handler
-ou un `try/finally` qui appelle `destroy_disposable` avant
-l'exec. Comme `execvp` remplace le process, le cleanup est
-fait dans un fork préalable.
-
-Alternative : utiliser `subprocess.run` sans `capture_output`
-(stdin/stdout/stderr hérités du terminal parent), puis détruire
-après la fin du process.
-
-### 29.4 Import infrastructure existante
-
-Scanne un Incus déjà configuré et génère les fichiers
-`domains/*.yml` correspondants. Permet d'adopter anklume sur
-une infrastructure existante.
-
-#### Commande CLI
-
-```
-anklume setup import [--dir <répertoire>]
-```
-
-**Flux** :
-1. Scanner les projets Incus (hors `default`)
-2. Pour chaque instance : lire `devices.eth0.network` pour le réseau
-3. Détecter GPU (`gpu-passthrough` profile) et GUI (`gui` profile)
-4. Mapper vers le format domaine anklume :
-   - Projet → domaine
-   - `devices.eth0.network` → réseau du domaine (subnet déduit du config CIDR)
-   - Instance → machine (nom déduit en retirant le préfixe projet)
-   - Profiles GPU/GUI → flags `gpu: true` / `gui: true`
-5. Générer les fichiers `domains/<projet>.yml`
-6. Afficher un récapitulatif + limitations
-
-**Limitations** (bootstrap approximatif, pas un roundtrip parfait) :
-
-| Information | Récupérable | Raison |
-|---|---|---|
-| Noms machines, type (lxc/vm) | Oui | Stocké dans Incus |
-| Réseau du domaine | Oui | `devices.eth0.network` sur les instances |
-| GPU | Oui | Profile `gpu-passthrough` |
-| GUI | Oui | Profile `gui` |
-| Rôles Ansible | **Non** | Aucune trace dans Incus après provisioning |
-| Descriptions originales | **Non** | Description Incus souvent vide |
-| Trust level | **Non** | Dépend de `anklume.yml` (addressing.base), défaut `semi-trusted` |
-| Variables (vars) | **Non** | Données Ansible, pas Incus |
-| Weight, workspace | **Non** | Métadonnées anklume pures |
-| IPs statiques | **Non** | DHCP dans le subnet |
-| Ephemeral | **Non** | Flag domaine, pas instance |
-
-L'import est conçu pour **adopter** une infrastructure existante, pas pour
-sauvegarder/restaurer une configuration anklume. La source de vérité
-reste les fichiers `domains/*.yml` (modèle PSOT).
-
-#### Module `engine/import_infra.py`
-
-```python
-@dataclass
-class ScannedInstance:
-    """Instance détectée dans Incus."""
-    name: str
-    status: str
-    instance_type: str    # "container" | "virtual-machine"
-    project: str
-    gpu: bool = False     # déduit du profile gpu-passthrough
-    gui: bool = False     # déduit du profile gui
-
-@dataclass
-class ScannedDomain:
-    """Domaine reconstitué depuis un projet Incus."""
-    project: str
-    network: str | None
-    subnet: str | None
-    instances: list[ScannedInstance]
-
-@dataclass
-class ImportResult:
-    """Résultat d'un import."""
-    domains: list[ScannedDomain]
-    files_written: list[str]
-
-def scan_incus(driver: IncusDriver) -> list[ScannedDomain]:
-    """Scanne les projets Incus et reconstruit les domaines."""
-
-def generate_domain_files(
-    domains: list[ScannedDomain],
-    output_dir: Path,
-) -> list[str]:
-    """Génère les fichiers domains/*.yml depuis le scan.
-
-    Returns:
-        Liste des chemins de fichiers écrits.
-    """
-
-def import_infrastructure(
-    driver: IncusDriver,
-    output_dir: Path,
-) -> ImportResult:
-    """Scan complet + génération de fichiers."""
-```
-
-### 29.5 Intégration CLI
-
-#### Nouveau groupe `portal`
-
-```python
-# cli/__init__.py
-portal_app = typer.Typer(help="Transfert de fichiers hôte ↔ conteneur.")
-app.add_typer(portal_app, name="portal")
-
-@portal_app.command("push")
-def portal_push(instance, local_path, remote_path="/tmp/")
-
-@portal_app.command("pull")
-def portal_pull(instance, remote_path, local_path=".")
-
-@portal_app.command("list")
-def portal_list(instance, path="/root/")
-```
-
-#### Extension `instance clipboard`
-
-```python
-@instance_app.command("clipboard")
-def instance_clipboard(instance, push=True, pull=False)
-```
-
-#### Commande `disp`
-
-```python
-@app.command("disp")
-def disp(image=None, cmd=None, list_all=False, cleanup=False)
-```
-
-#### Nouveau groupe `setup`
-
-```python
-setup_app = typer.Typer(help="Configuration et import.")
-app.add_typer(setup_app, name="setup")
-
-@setup_app.command("import")
-def setup_import(dir=".")
-```
-
-#### Fichiers CLI
-
-| Fichier | Fonctions |
-|---------|-----------|
-| `cli/_portal.py` | `run_portal_push`, `run_portal_pull`, `run_portal_list` |
-| `cli/_instance.py` | `run_instance_clipboard` (ajout) |
-| `cli/_disp.py` | `run_disp` |
-| `cli/_setup.py` | `run_setup_import` |
-
-### 29.6 Tests
-
-| Module | Tests | Couverture |
-|--------|-------|-----------|
-| `test_portal.py` | push, pull, list, instance inconnue, fichier absent | engine/portal.py |
-| `test_clipboard.py` | push, pull, wl-paste/wl-copy mock, erreurs | engine/clipboard.py |
-| `test_disposable.py` | launch, list, destroy, cleanup, nommage | engine/disposable.py |
-| `test_import_infra.py` | scan, generate, projets vides, noms machines | engine/import_infra.py |
-| `test_driver_file.py` | file_push, file_pull, instance_exec input | incus_driver.py |
-| `test_cli_phase17.py` | registration des commandes portal, disp, setup | cli/__init__.py |
-
-### 29.7 Mise à jour des commandes CLI (§6)
-
-```
-### Portails et transferts
-
-| Commande | Description |
-|----------|-------------|
-| `anklume portal push <inst> <local> [remote]` | Envoyer un fichier |
-| `anklume portal pull <inst> <remote> [local]` | Récupérer un fichier |
-| `anklume portal list <inst> [path]` | Lister fichiers distants |
-| `anklume instance clipboard <inst>` | Presse-papiers hôte ↔ conteneur |
-| `anklume disp <image>` | Conteneur jetable (shell interactif) |
-| `anklume disp --list` | Lister les conteneurs jetables |
-| `anklume setup import` | Importer une infra Incus existante |
-```
+*Section supprimée — voir branche `POC2` pour l'historique.*
 
 ## 30. Opérations avancées
 
-Quatre fonctionnalités opérationnelles : golden images (images
-réutilisables), passerelle Tor transparente, console tmux colorée
-par domaine, et diagnostic automatique (`doctor`).
+Trois fonctionnalités opérationnelles : passerelle Tor transparente,
+console tmux colorée par domaine, et diagnostic automatique (`doctor`).
 
 ### 30.1 Golden images — images réutilisables
 
-Créer des images de base à partir d'instances configurées.
-Publier une instance provisionnée en image Incus réutilisable,
-puis dériver de nouvelles instances depuis cette image.
-
-Cas d'usage : provisionner une instance `pro-dev` avec tous les
-outils, la publier comme golden image `golden/pro-dev`, puis
-l'utiliser comme base pour d'autres machines du même domaine.
-
-#### Commandes CLI
-
-```
-anklume golden create <instance> [--alias X]
-anklume golden list
-anklume golden delete <alias>
-```
-
-**`create`** : publie une instance comme image Incus.
-- L'instance est arrêtée avant publication (`incus publish`)
-- Alias par défaut : `golden/<full_name>` (ex: `golden/pro-dev`)
-- `--alias` : alias personnalisé
-- L'instance est redémarrée après publication
-- Erreur si l'instance est inconnue dans l'infra
-
-**`list`** : liste les golden images disponibles.
-- Filtre les images dont l'alias commence par `golden/`
-- Affiche : alias, fingerprint (8 premiers chars), taille, date
-
-**`delete`** : supprime une golden image par alias.
-- Erreur si l'alias est inconnu
-
-#### Sorties
-
-```
-# create
-Image golden/pro-dev créée (fingerprint: a1b2c3d4, 850 Mo)
-
-# list
-ALIAS                  FINGERPRINT  TAILLE    DATE
-golden/pro-dev         a1b2c3d4     850 Mo    2026-03-09
-golden/perso-browser   e5f6g7h8     420 Mo    2026-03-08
-
-# delete
-Image golden/pro-dev supprimée.
-```
-
-#### Driver Incus — méthodes image
-
-```python
-def image_publish(
-    self,
-    instance: str,
-    project: str,
-    *,
-    alias: str,
-) -> dict:
-    """Publie une instance comme image.
-
-    Utilise `incus publish <instance> --project <project> --alias <alias>`.
-    Retourne les métadonnées de l'image (fingerprint, size).
-    """
-
-def image_list(self, project: str = "default") -> list[IncusImage]:
-    """Liste les images Incus du projet."""
-
-def image_delete(self, fingerprint: str, project: str = "default") -> None:
-    """Supprime une image par fingerprint."""
-
-def image_alias_exists(self, alias: str, project: str = "default") -> bool:
-    """Vérifie si un alias d'image existe."""
-```
-
-#### Dataclass driver
-
-```python
-@dataclass
-class IncusImage:
-    """Image Incus."""
-    fingerprint: str
-    aliases: list[str] = field(default_factory=list)
-    size: int = 0          # octets
-    created_at: str = ""
-```
-
-#### Module `engine/golden.py`
-
-```python
-GOLDEN_PREFIX = "golden/"
-
-@dataclass
-class GoldenImage:
-    """Résultat de publication d'une golden image."""
-    alias: str
-    fingerprint: str
-    size: int           # octets
-    instance: str       # instance source
-
-def create_golden(
-    driver: IncusDriver,
-    infra: Infrastructure,
-    instance: str,
-    *,
-    alias: str | None = None,
-) -> GoldenImage:
-    """Publie une instance comme golden image.
-
-    1. Résout instance → projet
-    2. Arrête l'instance si running
-    3. Publie via incus publish
-    4. Redémarre l'instance
-    5. Retourne les métadonnées
-    """
-
-def list_golden(
-    driver: IncusDriver,
-    *,
-    project: str = "default",
-) -> list[GoldenImage]:
-    """Liste les golden images (alias golden/*)."""
-
-def delete_golden(
-    driver: IncusDriver,
-    alias: str,
-    *,
-    project: str = "default",
-) -> None:
-    """Supprime une golden image par alias."""
-```
-
-La résolution instance → projet utilise le même pattern que
-`portal.py` : itération sur les domaines activés de l'infra.
+*Section supprimée — voir branche `POC2` pour l'historique.*
 
 ### 30.2 Tor gateway — passerelle Tor transparente
 
@@ -4235,7 +3618,6 @@ anklume doctor
 ✗ Domaine pro             fichier domains/pro.yml absent
 ⚠ Réseau net-perso        bridge absent (lancer anklume apply)
 ✓ Snapshots               197 snapshots, 12 Go
-✓ Images golden           2 images, 1.2 Go
 
 Résultat : 7 ok, 1 warning, 1 erreur
 ```
@@ -4301,8 +3683,6 @@ def check_networks(
 ) -> list[CheckResult]:
     """Vérifie l'état des bridges réseau."""
 
-def check_golden(driver: IncusDriver) -> CheckResult:
-    """Vérifie les golden images."""
 ```
 
 #### Vérifications
@@ -4316,25 +3696,8 @@ def check_golden(driver: IncusDriver) -> CheckResult:
 | GPU | hardware | `nvidia-smi` retourne 0 | — |
 | Domaines valides | config | parser ne lève pas d'erreur | — |
 | Bridges réseau | infra | bridge existe dans Incus | `anklume apply` |
-| Golden images | infra | images listables | — |
 
 ### 30.5 Intégration CLI
-
-#### Nouveau groupe `golden`
-
-```python
-golden_app = typer.Typer(help="Golden images — images réutilisables.")
-app.add_typer(golden_app, name="golden")
-
-@golden_app.command("create")
-def golden_create(instance, alias=None)
-
-@golden_app.command("list")
-def golden_list_cmd()
-
-@golden_app.command("delete")
-def golden_delete(alias)
-```
 
 #### Nouveau groupe `tor`
 
@@ -4364,7 +3727,6 @@ def doctor(fix=False, json_output=False)
 
 | Fichier | Fonctions |
 |---------|-----------|
-| `cli/_golden.py` | `run_golden_create`, `run_golden_list`, `run_golden_delete` |
 | `cli/_tor.py` | `run_tor_status` |
 | `cli/_console.py` | `run_console` |
 | `cli/_doctor.py` | `run_doctor_cmd` |
@@ -4373,11 +3735,10 @@ def doctor(fix=False, json_output=False)
 
 | Module | Tests | Couverture |
 |--------|-------|-----------|
-| `test_golden.py` | create, list, delete, alias par défaut, instance inconnue, driver methods | engine/golden.py + driver |
 | `test_tor.py` | find gateways, validate config, rôle, templates, defaults | engine/tor.py + rôle |
 | `test_console.py` | build config, couleurs, filtrage running, session name | engine/console.py |
 | `test_doctor.py` | chaque check (ok, error), report counts, fix flag | engine/doctor.py |
-| `test_cli_phase18.py` | registration des commandes golden, tor, console, doctor | cli/__init__.py |
+| `test_cli_phase18.py` | registration des commandes tor, console, doctor | cli/__init__.py |
 
 ### 30.7 Mise à jour des commandes CLI (§6)
 
@@ -4386,9 +3747,6 @@ def doctor(fix=False, json_output=False)
 
 | Commande | Description |
 |----------|-------------|
-| `anklume golden create <inst> [--alias]` | Publier une instance comme golden image |
-| `anklume golden list` | Lister les golden images |
-| `anklume golden delete <alias>` | Supprimer une golden image |
 | `anklume tor status` | État des passerelles Tor |
 | `anklume console [domain]` | Console tmux colorée |
 | `anklume doctor` | Diagnostic automatique |
@@ -5172,3 +4530,55 @@ Les fichiers de domaines supprimés dans le TUI sont effacés du disque.
 | BUILTIN_ROLES triés | Ordre alphabétique |
 | CLI tui enregistrée | Commande et --project |
 | PolicyTable parse_ports | Numérique, "all", vide |
+
+## 38. Plugins CLI
+
+### 38.1 Mécanisme
+
+anklume supporte les plugins CLI via le mécanisme standard Python
+`importlib.metadata.entry_points`. Un package externe peut enregistrer
+une sous-commande en déclarant un entry point dans le groupe
+`anklume.commands`.
+
+### 38.2 Enregistrement (côté plugin)
+
+```toml
+# pyproject.toml du plugin
+[project.entry-points."anklume.commands"]
+myplugin = "mon_package.cli:app"
+```
+
+Le point d'entrée doit exposer un `typer.Typer` instance.
+
+### 38.3 Découverte (côté anklume)
+
+Au chargement du module `anklume.cli`, la fonction `_discover_plugins()`
+scanne les entry points du groupe `anklume.commands` et appelle
+`app.add_typer(plugin_app, name=ep.name)` pour chaque plugin trouvé.
+
+Comportement :
+- **Conflit de nom** : un plugin dont le nom est dans les commandes
+  enregistrées (dérivé de `_builtin_names()`) est ignoré (log warning).
+  Les commandes core ne sont pas overridables.
+- **Erreur de chargement** : un plugin qui lève une exception à
+  l'import est ignoré (log debug). La CLI continue normalement.
+- **Aucun plugin installé** : aucun effet, aucun coût mesurable.
+
+### 38.4 Noms réservés
+
+Les noms suivants sont réservés aux commandes intégrées et ne peuvent
+pas être utilisés par un plugin :
+
+`init`, `apply`, `dev`, `instance`, `domain`, `snapshot`, `network`,
+`ai`, `stt`, `llm`, `setup`, `tor`, `resource`, `workspace`, `console`,
+`status`, `rollback`, `destroy`, `disp`, `migrate`, `doctor`, `tui`.
+
+### 38.5 Tests
+
+| Cas | Attendu |
+|---|---|
+| Aucun plugin installé | CLI fonctionne normalement |
+| Plugin valide installé | Sous-commande disponible |
+| Plugin avec erreur import | Ignoré, CLI fonctionne |
+| Plugin nommé "apply" | Ignoré, warning loggué |
+| entry_points() lève exception | Ignoré, CLI fonctionne |

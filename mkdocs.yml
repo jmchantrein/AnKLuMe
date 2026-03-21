@@ -99,8 +99,6 @@ nav:
   - Opérations:
     - operations/index.md
     - Snapshots: operations/snapshots.md
-    - Portails et transferts: operations/portails.md
-    - Golden images: operations/golden-images.md
     - Passerelle Tor: operations/tor.md
     - Diagnostic: operations/doctor.md
   - Développement:

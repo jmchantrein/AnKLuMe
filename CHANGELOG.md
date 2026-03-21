@@ -5,6 +5,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Supprimé
+- refactor: golden images supprimées — wrapper trivial d'`incus publish`
+- refactor: portal push/pull supprimé — wrapper trivial d'`incus file`
+- refactor: live ISO supprimée — squelette abandonné, hors scope
 - refactor: télémétrie supprimée (YAGNI) — code mort jamais câblé
 - refactor: feature flags `experimental` supprimés — jamais utilisés
 - refactor: AuditEntry/audit_log supprimés du sanitizer — jamais appelés
@@ -22,10 +25,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 - feat: règles nftables DNAT pour routage transparent Tor
 - feat: validation noms dans IncusDriver (_validate_name)
 - feat: sanitizer enrichi (SSH keys, AWS creds, IPv6, JSON credentials)
-- fix: path traversal renforcé dans portal.py
 - fix: ports="all" respecte le champ protocol dans nftables
 
 ### Ajouté
+- feat: plugin discovery via entry_points (`anklume.commands`)
+- chore: licence changée de AGPL-3.0 vers MIT
 - feat: `anklume rollback` — restaure les snapshots pre-apply de toutes les instances
 - feat: `anklume doctor --drift` — détecte les écarts YAML vs état Incus réel
 - feat: nftables déployé automatiquement en fin d'apply

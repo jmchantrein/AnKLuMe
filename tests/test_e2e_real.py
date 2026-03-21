@@ -590,49 +590,6 @@ class TestRealNesting:
 # ===========================================================================
 
 
-@pytest.mark.real
-class TestRealPortal:
-    """Transfert de fichiers hôte ↔ conteneur."""
-
-    def test_push_pull_file(self, real_project, tmp_path, driver):
-        path, project_name = real_project
-        write_test_project(
-            path,
-            {
-                project_name: {
-                    "description": "Portal",
-                    "trust_level": "semi-trusted",
-                    "machines": {
-                        "box": {"description": "Box", "type": "lxc"},
-                    },
-                },
-            },
-        )
-        run_apply(dry_run=False, no_provision=True)
-
-        full_name = f"{project_name}-box"
-
-        # Créer un fichier local
-        local_file = tmp_path / "test-file.txt"
-        local_file.write_text("contenu de test")
-
-        # Push
-        driver.file_push(full_name, project_name, str(local_file), "/root/test-file.txt")
-
-        # Vérifier dans le conteneur
-        result = driver.instance_exec(
-            full_name,
-            project_name,
-            ["cat", "/root/test-file.txt"],
-        )
-        assert "contenu de test" in result.stdout
-
-        # Pull
-        pulled = tmp_path / "pulled.txt"
-        driver.file_pull(full_name, project_name, "/root/test-file.txt", str(pulled))
-        assert pulled.read_text().strip() == "contenu de test"
-
-
 # ===========================================================================
 # 9. Disposable — conteneurs jetables
 # ===========================================================================
@@ -661,58 +618,7 @@ class TestRealDisposable:
 
 
 # ===========================================================================
-# 10. Golden images — publish/list/delete
-# ===========================================================================
-
-
-@pytest.mark.real
-class TestRealGolden:
-    """Golden images — cycle complet."""
-
-    def test_create_list_delete(self, driver, tmp_path, monkeypatch):
-        proj = f"{E2E_PREFIX}-g"
-        cleanup_project(proj)
-        try:
-            monkeypatch.chdir(tmp_path)
-            write_test_project(
-                tmp_path,
-                {
-                    proj: {
-                        "description": "Golden",
-                        "trust_level": "semi-trusted",
-                        "machines": {
-                            "box": {"description": "Golden box", "type": "lxc"},
-                        },
-                    },
-                },
-            )
-            run_apply(dry_run=False, no_provision=True)
-
-            full_name = f"{proj}-box"
-            infra = parse_project(tmp_path)
-            assign_addresses(infra)
-
-            from anklume.engine.golden import create_golden, delete_golden, list_golden
-
-            # Publier
-            img = create_golden(driver, infra, full_name)
-            assert img.alias.startswith("golden/")
-
-            # Lister
-            images = list_golden(driver)
-            assert any(i.alias == img.alias for i in images)
-
-            # Supprimer
-            delete_golden(driver, img.alias)
-            images = list_golden(driver)
-            assert not any(i.alias == img.alias for i in images)
-
-        finally:
-            cleanup_project(proj)
-
-
-# ===========================================================================
-# 11. Import infrastructure
+# 10. Import infrastructure
 # ===========================================================================
 
 

@@ -27,9 +27,6 @@ src/anklume/        # Package Python
   engine/           # Moteur PSOT (domains/*.yml → Incus)
   provisioner/      # Interface Ansible pour le provisioning
   i18n/             # Traductions
-live/               # Live ISO — OS immuable avec persistance chiffrée (ZFS/BTRFS)
-  boot/             # Scripts de boot, systemd, grub
-platform/           # Plateforme web (FastAPI) (concern séparé) #REDONDANTS AVEC LABS ...
 tests/              # pytest + behave
 labs/               # Labs éducatifs
 docs/               # SPEC, ARCHITECTURE
@@ -74,7 +71,7 @@ anklume dev molecule      # Tests Molecule (rôles Ansible)
 ## Conventions de code
 
 ### Python
-- Typer pour la CLI, FastAPI pour le web, PyYAML pour le parsing
+- Typer pour la CLI, PyYAML pour le parsing
 - Type hints sur les fonctions publiques
 - `ruff` pour lint+format (zéro violation)
 
@@ -148,7 +145,7 @@ IMPORTANT : avant de modifier un fichier, consulter cette table.
 | Fichier modifié | Tester | Aussi vérifier |
 |----------------|--------|----------------|
 | `engine/models.py` | **TOUS les tests** (24 dépendants) | parser, validator, reconciler, nftables, addressing |
-| `engine/incus_driver.py` | `test_incus_driver` | reconciler, destroy, snapshot, portal, ops |
+| `engine/incus_driver.py` | `test_incus_driver` | reconciler, destroy, snapshot, ops |
 | `engine/reconciler.py` | `test_reconciler`, `test_e2e` | destroy (même patterns), nesting, gpu |
 | `engine/nftables.py` | `test_nftables` | tor (import croisé), addressing |
 | `engine/sanitizer.py` | `test_sanitizer` | llm_routing, llm_ops |

@@ -2,7 +2,7 @@ galaxy_info:
   author: Jean-Michel Chantrein
   description: "Outils de développement basiques (build-essential, git, python3)"
   min_ansible_version: "2.16"
-  license: AGPL-3.0-only
+  license: MIT
   platforms:
     - name: Debian
       versions:

@@ -114,6 +114,8 @@ dépôt. Le `.gitignore` sépare les concerns.
 
 ## ADR-018 : Live ISO = OS immuable avec persistance chiffrée
 
+> **Supprimee -- hors scope du projet.**
+
 La Live ISO est le mode de déploiement principal d'anklume :
 un OS immuable (squashfs en RAM) avec persistance des données
 sur volume chiffré (ZFS/BTRFS).

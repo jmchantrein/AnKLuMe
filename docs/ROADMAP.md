@@ -823,9 +823,23 @@ pour l'auto-évolution LLM du projet.
   couleur trust-level, générés par `anklume apply`. Minimaliste
   ou rien — pas d'usine à gaz.
 
+### Phase 27 — Simplification et pluginisation (2026-03-21)
+
+- [x] Golden images supprimées — wrapper trivial d'`incus publish`
+- [x] Portal push/pull supprimé — wrapper trivial d'`incus file`
+- [x] Live ISO supprimée — squelette abandonné, hors scope
+- [x] Licence AGPL-3.0 → MIT
+- [x] Plugin discovery via `entry_points(group="anklume.commands")`
+- [x] Protection des commandes builtin (set `_BUILTIN_NAMES`)
+- [x] Tests plugin discovery (7 tests, dont test réel avec package installé)
+- [x] README : encadré POC, section Plugins, nettoyage features supprimées
+- [x] SPEC, ARCHITECTURE, CHANGELOG, mkdocs mis à jour
+
 ### Écarté
 
 - ~~Live ISO~~ — hors scope (OS immuable séparé)
+- ~~Golden images~~ — wrapper trivial d'`incus publish`, supprimé phase 27
+- ~~Portal push/pull~~ — wrapper trivial d'`incus file`, supprimé phase 27
 - ~~`anklume llm switch`~~ — le routage §25 suffit, pas de bascule runtime
 - ~~Rôle `firewall_router`~~ — remplacé par nftables natif
 - ~~Rôles Ansible infra (`incus_*`)~~ — géré par le réconciliateur Python

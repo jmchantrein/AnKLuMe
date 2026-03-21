@@ -65,14 +65,6 @@ Makefile, pas d'API web.
 | `anklume llm bench` | Benchmark inférence (tokens/s, latence) |
 | `anklume llm sanitize <texte>` | Dry-run sanitisation |
 
-## Portails et transferts
-
-| Commande | Description |
-|---|---|
-| `anklume portal push <inst> <src> <dst>` | Envoyer un fichier vers un conteneur |
-| `anklume portal pull <inst> <src> <dst>` | Récupérer un fichier depuis un conteneur |
-| `anklume portal list <inst> [path]` | Lister les fichiers d'un conteneur |
-
 ## Conteneurs jetables
 
 | Commande | Description |
@@ -85,9 +77,6 @@ Makefile, pas d'API web.
 
 | Commande | Description |
 |---|---|
-| `anklume golden create <inst> [--alias X]` | Publier une instance comme image |
-| `anklume golden list` | Lister les golden images |
-| `anklume golden delete <alias>` | Supprimer une golden image |
 | `anklume console [domaine]` | Console tmux colorée par domaine |
 | `anklume doctor` | Diagnostic automatique |
 | `anklume doctor --fix` | Diagnostic + corrections automatiques |
@@ -141,9 +130,7 @@ graph TD
     CLI --> network
     CLI --> ai
     CLI --> llm
-    CLI --> portal
     CLI --> disp
-    CLI --> golden
     CLI --> console
     CLI --> doctor
     CLI --> stt

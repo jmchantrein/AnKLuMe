@@ -9,6 +9,9 @@ provisionnés par Ansible et prêts à l'emploi.
 [![CI](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml/badge.svg)](https://github.com/jmchantrein/AnKLuMe/actions/workflows/ci.yml)
 [![Documentation](https://github.com/jmchantrein/AnKLuMe/actions/workflows/docs.yml/badge.svg)](https://jmchantrein.github.io/AnKLuMe/)
 
+> **Statut : Proof of Concept** — Projet personnel publié en l'état.
+> Pas de garantie de support ni de maintenance. Contributions bienvenues.
+
 ## Pourquoi anklume ?
 
 ### Tester et utiliser l'IA sans compromettre ses données
@@ -31,6 +34,30 @@ par le proxy.
 outil IA tourne dans un conteneur/VM jetable. On teste, on évalue,
 on détruit. Pas d'accès aux données personnelles, pas de persistance
 non contrôlée.
+
+### Donner aux LLM un accès root sans risque
+
+Les agents IA (Claude Code, OpenHands, SWE-agent...) sont plus
+performants quand ils ont un accès root à un système réel. Mais
+root sur le poste hôte, c'est inacceptable.
+
+**Root sandboxé** — l'agent tourne root dans une instance anklume
+(conteneur ou VM), isolée par nftables. Il peut installer des
+paquets, modifier la config système, lancer des services, exécuter
+des tests E2E et BDD en situation réelle — sans aucun risque pour
+l'hôte.
+
+**Nesting** — un LLM root dans une instance anklume peut lui-même
+utiliser anklume pour créer des sous-instances (Incus-in-Incus).
+L'agent peut ainsi déployer, tester et détruire une infra complète
+de manière autonome.
+
+**Sandbox-aware prompting** — un fichier `CLAUDE.md` ou un system
+prompt dédié explique au LLM ce qu'il peut faire dans son sandbox.
+Les recherches montrent que la performance des agents augmente
+significativement (+24%) quand on leur dit explicitement qu'ils sont
+dans un environnement isolé et jetable (cf. LLM-in-Sandbox, arxiv
+2601.16206).
 
 ### Enseigner l'administration système et le réseau
 
@@ -130,8 +157,6 @@ ses règles nftables, et sa couleur dans l'interface :
 | **Réseau nftables** | Drop-all par défaut, politiques déclaratives |
 | **Resource policy** | Allocation CPU/RAM proportionnelle par poids |
 | **Push-to-talk STT** | Dictée vocale via Speaches (KDE Wayland) |
-| **Portails fichiers** | Transfert hôte ↔ conteneur isolé |
-| **Golden images** | Publier des instances comme images réutilisables |
 | **Passerelle Tor** | VM routeur transparent Tor |
 | **Conteneurs jetables** | `anklume disp <image>` — usage unique |
 | **Workspace layout** | Placement déclaratif des fenêtres GUI (KDE) |
@@ -167,8 +192,6 @@ anklume snapshot create                 # Snapshotter toutes les instances
 anklume snapshot restore <inst> <snap>  # Restaurer
 
 # Opérations
-anklume portal push <inst> <src> <dst>  # Envoyer un fichier
-anklume golden create <inst>            # Publier une image
 anklume resource show                   # Allocation CPU/mémoire
 anklume doctor                          # Diagnostic automatique
 anklume console                         # Console tmux colorée
@@ -195,12 +218,40 @@ anklume console                         # Console tmux colorée
 `ollama_server` · `openclaw_server` · `opencode_server` · `open_webui` ·
 `stt_server` · `tor_gateway`
 
+## Plugins
+
+anklume supporte les plugins CLI via le mécanisme standard Python
+[entry_points](https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/).
+
+Un plugin est un package Python qui expose un `typer.Typer` :
+
+```toml
+# pyproject.toml du plugin
+[project.entry-points."anklume.commands"]
+myplugin = "my_package.cli:app"
+```
+
+```python
+# my_package/cli.py
+import typer
+app = typer.Typer(help="Mon plugin anklume")
+
+@app.command()
+def hello():
+    typer.echo("Hello from plugin!")
+```
+
+```bash
+uv pip install ./my-plugin
+anklume myplugin hello  # Plugin disponible comme sous-commande
+```
+
 ## Développement
 
 ```bash
 uv sync --group dev
 anklume dev lint              # ruff check + format
-anklume dev test              # pytest (1330+ tests)
+anklume dev test              # pytest (1340+ tests)
 anklume dev molecule          # Tests Molecule (rôles Ansible)
 anklume dev test-real         # Tests E2E dans VM KVM
 ```
@@ -257,4 +308,4 @@ anklume s'appuie sur ces projets remarquables :
 
 ## Licence
 
-AGPL-3.0
+MIT

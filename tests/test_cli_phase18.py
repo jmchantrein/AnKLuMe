@@ -9,31 +9,6 @@ from anklume.cli import app
 runner = CliRunner()
 
 
-class TestGoldenCLI:
-    """Tests pour les commandes golden."""
-
-    def test_golden_group_registered(self):
-        """Le groupe 'golden' est enregistré."""
-        result = runner.invoke(app, ["golden", "--help"])
-        assert result.exit_code == 0
-        assert "golden" in result.output.lower() or "image" in result.output.lower()
-
-    def test_golden_create_registered(self):
-        """La commande 'golden create' est enregistrée."""
-        result = runner.invoke(app, ["golden", "create", "--help"])
-        assert result.exit_code == 0
-
-    def test_golden_list_registered(self):
-        """La commande 'golden list' est enregistrée."""
-        result = runner.invoke(app, ["golden", "list", "--help"])
-        assert result.exit_code == 0
-
-    def test_golden_delete_registered(self):
-        """La commande 'golden delete' est enregistrée."""
-        result = runner.invoke(app, ["golden", "delete", "--help"])
-        assert result.exit_code == 0
-
-
 class TestTorCLI:
     """Tests pour les commandes tor."""
 

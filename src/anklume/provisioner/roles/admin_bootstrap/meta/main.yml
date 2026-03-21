@@ -2,7 +2,7 @@ galaxy_info:
   author: Jean-Michel Chantrein
   description: "Première configuration machine (locale, fuseau horaire, paquets)"
   min_ansible_version: "2.16"
-  license: AGPL-3.0-only
+  license: MIT
   platforms:
     - name: Debian
       versions:

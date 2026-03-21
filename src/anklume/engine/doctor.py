@@ -12,7 +12,6 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Literal
 
-from anklume.engine.golden import GOLDEN_PREFIX
 from anklume.engine.incus_driver import IncusDriver
 from anklume.engine.models import Infrastructure
 from anklume.engine.ops import compute_network_status
@@ -166,34 +165,6 @@ def check_networks(
     return results
 
 
-def check_golden(driver: IncusDriver) -> CheckResult:
-    """Vérifie les golden images."""
-    try:
-        images = driver.image_list("default")
-        golden = [img for img in images if any(a.startswith(GOLDEN_PREFIX) for a in img.aliases)]
-        count = len(golden)
-        total_size = sum(img.size for img in golden)
-        size_mb = total_size // (1024 * 1024) if total_size else 0
-
-        if count > 0:
-            return CheckResult(
-                name="Images golden",
-                status="ok",
-                message=f"{count} image(s), {size_mb} Mo",
-            )
-        return CheckResult(
-            name="Images golden",
-            status="ok",
-            message="aucune image golden",
-        )
-    except Exception:
-        return CheckResult(
-            name="Images golden",
-            status="warning",
-            message="vérification impossible",
-        )
-
-
 @dataclass
 class DriftItem:
     """Un écart entre l'état désiré et l'état réel."""
@@ -250,10 +221,6 @@ def run_doctor(
 
         if driver is not None:
             checks.extend(check_networks(infra, driver))
-
-    # Checks golden (si driver disponible)
-    if driver is not None:
-        checks.append(check_golden(driver))
 
     # Drift detection (si demandé + infra + driver disponibles)
     if drift and infra is not None and driver is not None:

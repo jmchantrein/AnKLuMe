@@ -11,14 +11,13 @@ from anklume.engine.doctor import (
     check_ansible,
     check_domains,
     check_drift,
-    check_golden,
     check_gpu,
     check_incus,
     check_networks,
     check_nftables,
     run_doctor,
 )
-from anklume.engine.incus_driver import IncusImage, IncusProject
+from anklume.engine.incus_driver import IncusProject
 from anklume.engine.reconciler import Action, ReconcileResult
 from tests.conftest import make_domain, make_infra, make_machine, mock_driver
 
@@ -201,37 +200,13 @@ class TestCheckNetworks:
         assert results[0].fix_command is not None
 
 
-class TestCheckGolden:
-    """Tests pour check_golden."""
-
-    def test_golden_images_present(self):
-        """Golden images détectées → ok."""
-        driver = mock_driver()
-        driver.image_list.return_value = [
-            IncusImage(fingerprint="aaa", aliases=["golden/pro-dev"], size=100),
-        ]
-
-        result = check_golden(driver)
-
-        assert result.status == "ok"
-
-    def test_no_golden_images(self):
-        """Aucune golden image → ok (c'est optionnel)."""
-        driver = mock_driver()
-        driver.image_list.return_value = []
-
-        result = check_golden(driver)
-
-        assert result.status == "ok"
-
-
 class TestRunDoctor:
     """Tests pour run_doctor (orchestration)."""
 
     def test_run_returns_report(self):
         """run_doctor retourne un DoctorReport."""
         driver = mock_driver()
-        driver.image_list.return_value = []
+
         infra = make_infra(domains={})
 
         with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):
@@ -256,7 +231,7 @@ class TestRunDoctor:
     def test_run_with_drift_no_actions(self):
         """run_doctor avec drift=True et aucune action planifiée → ok."""
         driver = mock_driver()
-        driver.image_list.return_value = []
+
         infra = make_infra(domains={})
 
         with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):
@@ -272,7 +247,7 @@ class TestRunDoctor:
     def test_run_with_drift_has_actions(self):
         """run_doctor avec drift=True et des actions planifiées → warnings."""
         driver = mock_driver()
-        driver.image_list.return_value = []
+
         domain = make_domain(
             "pro",
             machines={"dev": make_machine("dev", "pro")},
@@ -313,7 +288,7 @@ class TestRunDoctor:
     def test_drift_not_run_without_flag(self):
         """run_doctor sans drift=True ne lance pas la détection de drift."""
         driver = mock_driver()
-        driver.image_list.return_value = []
+
         infra = make_infra(domains={})
 
         with patch("anklume.engine.doctor.shutil.which", return_value="/usr/bin/incus"):

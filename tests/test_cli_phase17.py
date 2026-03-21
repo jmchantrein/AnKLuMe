@@ -1,4 +1,4 @@
-"""Tests CLI Phase 17 — enregistrement des commandes portal, disp, setup, clipboard."""
+"""Tests CLI Phase 17 — enregistrement des commandes disp, setup, clipboard."""
 
 from __future__ import annotations
 
@@ -7,28 +7,6 @@ from typer.testing import CliRunner
 from anklume.cli import app
 
 runner = CliRunner()
-
-
-class TestPortalCommands:
-    """Vérifie que les commandes portal sont enregistrées."""
-
-    def test_portal_push_registered(self):
-        """La commande portal push existe."""
-        result = runner.invoke(app, ["portal", "push", "--help"])
-        assert result.exit_code == 0
-        assert "Envoyer" in result.output
-
-    def test_portal_pull_registered(self):
-        """La commande portal pull existe."""
-        result = runner.invoke(app, ["portal", "pull", "--help"])
-        assert result.exit_code == 0
-        assert "Récupérer" in result.output or "pull" in result.output.lower()
-
-    def test_portal_list_registered(self):
-        """La commande portal list existe."""
-        result = runner.invoke(app, ["portal", "list", "--help"])
-        assert result.exit_code == 0
-        assert "Lister" in result.output
 
 
 class TestDispCommand:
