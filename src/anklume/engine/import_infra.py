@@ -138,7 +138,7 @@ def _instance_to_machine_name(instance_name: str, project: str) -> str:
     """
     prefix = f"{project}-"
     if instance_name.startswith(prefix):
-        return instance_name[len(prefix):]
+        return instance_name[len(prefix) :]
     return instance_name
 
 

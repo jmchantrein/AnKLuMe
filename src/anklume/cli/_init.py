@@ -221,26 +221,29 @@ def _find_showcase_dir() -> Path | None:
     return None
 
 
-def run_init_showcase(directory: str) -> None:
+def run_init_showcase(directory: str | None = None) -> None:
     """Initialiser un projet depuis l'exemple showcase."""
     import shutil
+
+    from anklume.cli._common import resolve_project_dir
 
     showcase_dir = _find_showcase_dir()
     if showcase_dir is None:
         typer.echo("Répertoire examples/showcase/ introuvable.", err=True)
         raise typer.Exit(1)
 
-    project_dir = Path(directory).resolve()
-
-    if directory != ".":
-        if project_dir.exists() and any(project_dir.iterdir()):
-            typer.echo(f"Le répertoire {project_dir} n'est pas vide.")
-            raise typer.Exit(1)
-        project_dir.mkdir(parents=True, exist_ok=True)
+    project_dir = Path(directory).resolve() if directory else resolve_project_dir()
 
     if (project_dir / "anklume.yml").exists():
-        typer.echo(f"anklume.yml existe déjà dans {project_dir}")
-        raise typer.Exit(0)
+        typer.echo(f"Projet déjà initialisé dans {project_dir}", err=True)
+        typer.echo("Un seul projet par hôte. Détruisez d'abord : anklume destroy --force")
+        raise typer.Exit(1)
+
+    if project_dir.exists() and any(project_dir.iterdir()):
+        typer.echo(f"Le répertoire {project_dir} n'est pas vide.", err=True)
+        raise typer.Exit(1)
+
+    project_dir.mkdir(parents=True, exist_ok=True)
 
     # Copier tout le contenu du showcase
     for item in showcase_dir.iterdir():
@@ -259,23 +262,25 @@ def run_init_showcase(directory: str) -> None:
     typer.echo("Prochaine étape : adapter anklume.yml, puis : anklume apply all")
 
 
-def run_init(directory: str, *, lang: str = "fr") -> None:
+def run_init(directory: str | None = None, *, lang: str = "fr") -> None:
     """Créer un répertoire projet anklume."""
-    project_dir = Path(directory).resolve()
+    from anklume.cli._common import resolve_project_dir
 
-    if directory != ".":
-        if project_dir.exists() and any(project_dir.iterdir()):
-            typer.echo(f"Le répertoire {project_dir} n'est pas vide.")
-            raise typer.Exit(1)
-        project_dir.mkdir(parents=True, exist_ok=True)
+    project_dir = Path(directory).resolve() if directory else resolve_project_dir()
 
-    anklume_yml = project_dir / "anklume.yml"
-    if anklume_yml.exists():
-        typer.echo(f"anklume.yml existe déjà dans {project_dir}")
-        raise typer.Exit(0)
+    if (project_dir / "anklume.yml").exists():
+        typer.echo(f"Projet déjà initialisé dans {project_dir}", err=True)
+        typer.echo("Un seul projet par hôte. Détruisez d'abord : anklume destroy --force")
+        raise typer.Exit(1)
+
+    if project_dir.exists() and any(project_dir.iterdir()):
+        typer.echo(f"Le répertoire {project_dir} n'est pas vide.", err=True)
+        raise typer.Exit(1)
+
+    project_dir.mkdir(parents=True, exist_ok=True)
 
     content = _ANKLUME_YML.get(lang, _ANKLUME_YML["fr"])
-    anklume_yml.write_text(content)
+    (project_dir / "anklume.yml").write_text(content)
 
     # Créer domains/ avec un exemple
     domains_dir = project_dir / "domains"

@@ -12,6 +12,7 @@ from anklume.engine.doctor import (
     check_domains,
     check_drift,
     check_gpu,
+    check_idmap,
     check_incus,
     check_networks,
     check_nftables,
@@ -358,3 +359,62 @@ class TestCheckDrift:
             check_drift(infra, driver)
 
         mock_rec.assert_called_once_with(infra, driver, dry_run=True)
+
+
+class TestCheckIdmap:
+    """Tests pour check_idmap (subuid/subgid)."""
+
+    def test_both_files_ok(self, tmp_path):
+        """subuid et subgid contiennent un mapping root → ok."""
+        subuid = tmp_path / "subuid"
+        subgid = tmp_path / "subgid"
+        subuid.write_text("root:1000000:1000000000\n")
+        subgid.write_text("root:1000000:1000000000\n")
+
+        result = check_idmap(paths=(str(subuid), str(subgid)))
+        assert result.status == "ok"
+        assert "configuré" in result.message
+
+    def test_missing_file(self, tmp_path):
+        """Fichier inexistant → error."""
+        subuid = tmp_path / "subuid"  # n'existe pas
+        subgid = tmp_path / "subgid"
+        subgid.write_text("root:1000000:1000000000\n")
+
+        result = check_idmap(paths=(str(subuid), str(subgid)))
+        assert result.status == "error"
+        assert "absent" in result.message
+
+    def test_no_root_entry(self, tmp_path):
+        """Fichier sans entrée root → error."""
+        subuid = tmp_path / "subuid"
+        subgid = tmp_path / "subgid"
+        subuid.write_text("nobody:100000:65536\n")
+        subgid.write_text("root:1000000:1000000000\n")
+
+        result = check_idmap(paths=(str(subuid), str(subgid)))
+        assert result.status == "error"
+
+    def test_fix_creates_missing(self, tmp_path):
+        """--fix crée le mapping dans un fichier manquant."""
+        subuid = tmp_path / "subuid"  # n'existe pas
+        subgid = tmp_path / "subgid"
+        subgid.write_text("root:1000000:1000000000\n")
+
+        result = check_idmap(fix=True, paths=(str(subuid), str(subgid)))
+        assert result.status == "ok"
+        assert subuid.exists()
+        assert "root:1000000:1000000000" in subuid.read_text()
+
+    def test_fix_appends_to_existing(self, tmp_path):
+        """--fix ajoute le mapping à un fichier existant sans root."""
+        subuid = tmp_path / "subuid"
+        subgid = tmp_path / "subgid"
+        subuid.write_text("nobody:100000:65536\n")
+        subgid.write_text("root:1000000:1000000000\n")
+
+        result = check_idmap(fix=True, paths=(str(subuid), str(subgid)))
+        assert result.status == "ok"
+        content = subuid.read_text()
+        assert "nobody:100000:65536" in content
+        assert "root:1000000:1000000000" in content

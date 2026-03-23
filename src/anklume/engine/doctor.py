@@ -10,6 +10,7 @@ import logging
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from anklume.engine.incus_driver import IncusDriver
@@ -84,6 +85,71 @@ def check_ansible() -> CheckResult:
         "ansible-playbook",
         severity_if_missing="warning",
         missing_message="ansible-playbook introuvable (provisioning indisponible)",
+    )
+
+
+_IDMAP_PATHS = ("/etc/subuid", "/etc/subgid")
+
+
+def check_idmap(
+    *,
+    fix: bool = False,
+    paths: tuple[str, ...] = _IDMAP_PATHS,
+) -> CheckResult:
+    """Vérifie que /etc/subuid et /etc/subgid contiennent un mapping pour root.
+
+    Incus a besoin de ces fichiers pour exécuter des conteneurs unprivileged.
+    Avec --fix, ajoute la ligne manquante.
+    """
+    expected_line = "root:1000000:1000000000"
+    missing: list[str] = []
+
+    for path in paths:
+        try:
+            content = Path(path).read_text()
+            if not any(line.strip().startswith("root:") for line in content.splitlines()):
+                missing.append(path)
+        except FileNotFoundError:
+            missing.append(path)
+
+    if not missing:
+        return CheckResult(
+            name="idmap (subuid/subgid)",
+            status="ok",
+            message="mapping root configuré",
+        )
+
+    if fix:
+        errors: list[str] = []
+        for path in missing:
+            try:
+                p = Path(path)
+                existing = p.read_text() if p.exists() else ""
+                with p.open("a") as f:
+                    if existing and not existing.endswith("\n"):
+                        f.write("\n")
+                    f.write(expected_line + "\n")
+            except PermissionError:
+                errors.append(path)
+
+        if errors:
+            return CheckResult(
+                name="idmap (subuid/subgid)",
+                status="error",
+                message=f"permission refusée : {', '.join(errors)} (relancez avec sudo)",
+                fix_command="sudo anklume doctor --fix",
+            )
+        return CheckResult(
+            name="idmap (subuid/subgid)",
+            status="ok",
+            message=f"mapping root ajouté dans {', '.join(missing)}",
+        )
+
+    return CheckResult(
+        name="idmap (subuid/subgid)",
+        status="error",
+        message=f"mapping root absent dans {', '.join(missing)}",
+        fix_command="anklume doctor --fix",
     )
 
 
@@ -211,6 +277,7 @@ def run_doctor(
 
     # Checks système
     checks.append(check_incus())
+    checks.append(check_idmap(fix=fix))
     checks.append(check_nftables())
     checks.append(check_ansible())
     checks.append(check_gpu())

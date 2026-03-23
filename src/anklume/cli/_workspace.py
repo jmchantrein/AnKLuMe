@@ -356,7 +356,7 @@ def run_workspace_load(domain: str | None = None) -> None:
     """Restaure le workspace layout complet."""
     from anklume.cli._common import load_infra
 
-    infra = load_infra(Path.cwd())
+    infra = load_infra()
     layout = parse_workspace(infra)
 
     if domain:
@@ -417,7 +417,7 @@ def run_workspace_status() -> None:
     """Affiche le layout déclaré vs réel."""
     from anklume.cli._common import load_infra
 
-    infra = load_infra(Path.cwd())
+    infra = load_infra()
     layout = parse_workspace(infra)
 
     if not layout.entries:

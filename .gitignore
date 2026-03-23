@@ -13,6 +13,7 @@ src/anklume/_version.py
 
 # Fichiers utilisateur (créés par anklume init)
 # Ne pas commiter les projets d'infra dans le repo du framework
+anklume-infra/
 ansible_roles_custom/
 roles_custom/
 roles_vendor/

@@ -72,7 +72,9 @@ def main(
 
 @init_app.command("showcase")
 def init_showcase(
-    directory: Annotated[str, typer.Argument(help="Répertoire cible")] = ".",
+    directory: Annotated[
+        str | None, typer.Argument(help="Répertoire cible (défaut: ~/anklume-infra)")
+    ] = None,
 ) -> None:
     """Créer un projet showcase complet (tous les domaines)."""
     from anklume.cli._init import run_init_showcase
@@ -82,7 +84,9 @@ def init_showcase(
 
 @init_app.command("simple")
 def init_simple(
-    directory: Annotated[str, typer.Argument(help="Répertoire cible")] = ".",
+    directory: Annotated[
+        str | None, typer.Argument(help="Répertoire cible (défaut: ~/anklume-infra)")
+    ] = None,
     lang: Annotated[str, typer.Option("--lang", "-l", help="Langue (en/fr)")] = "fr",
 ) -> None:
     """Créer un projet minimal (un domaine exemple)."""

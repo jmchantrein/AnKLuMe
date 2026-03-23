@@ -104,7 +104,9 @@ def run_network_status() -> None:
 
 def run_network_passthrough(enable: bool) -> None:
     """Active ou désactive le passthrough des bridges non-anklume."""
-    config_path = Path.cwd() / "anklume.yml"
+    from anklume.cli._common import resolve_project_dir
+
+    config_path = resolve_project_dir() / "anklume.yml"
     if not config_path.exists():
         typer.echo("Erreur : anklume.yml introuvable.", err=True)
         raise typer.Exit(1)

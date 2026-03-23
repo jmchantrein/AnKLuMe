@@ -605,11 +605,7 @@ class TestTorTransparentRouting:
         gw = make_machine("tor-gw", "sandbox", roles=["tor_gateway"])
         gw.vars = {"tor_trans_port": 9999, "tor_dns_port": 5454}
         gw.type = "vm"
-        infra = make_infra(
-            domains={
-                "sandbox": make_domain("sandbox", machines={"tor-gw": gw})
-            }
-        )
+        infra = make_infra(domains={"sandbox": make_domain("sandbox", machines={"tor-gw": gw})})
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
         assert "dnat to" in ruleset
@@ -621,9 +617,7 @@ class TestTorTransparentRouting:
         gw = make_machine("tor-gw", "sandbox", roles=["tor_gateway"])
         gw.vars = {"tor_trans_port": 9040, "tor_dns_port": 5353}
         infra = make_infra(
-            domains={
-                "sandbox": make_domain("sandbox", machines={"tor-gw": gw}, enabled=False)
-            }
+            domains={"sandbox": make_domain("sandbox", machines={"tor-gw": gw}, enabled=False)}
         )
         assign_addresses(infra)
         ruleset = generate_ruleset(infra)
