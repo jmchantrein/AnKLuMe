@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import typer
 
-from anklume.cli._common import load_infra
+from anklume.cli._common import load_infra, resolve_project_dir
 from anklume.engine.incus_driver import IncusDriver
 from anklume.engine.nesting import detect_nesting_context
 from anklume.engine.reconciler import ReconcileResult, reconcile
@@ -20,7 +18,7 @@ def run_apply(
     no_provision: bool = False,
 ) -> None:
     """Pipeline apply : parse → validate → reconcile → snapshot → provision."""
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir()
     infra = load_infra(project_dir)
 
     # Filtrer un domaine spécifique si demandé

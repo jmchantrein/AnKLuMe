@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import typer
 
-from anklume.cli._common import load_infra
+from anklume.cli._common import load_infra, resolve_project_dir
 from anklume.engine.incus_driver import IncusDriver, IncusError
 from anklume.engine.nesting import detect_nesting_context
 from anklume.engine.ops import list_domains
@@ -40,7 +38,7 @@ def run_domain_list() -> None:
 
 def run_domain_check(name: str) -> None:
     """Valide un domaine isolément."""
-    project_dir = Path.cwd()
+    project_dir = resolve_project_dir()
     domain_file = project_dir / "domains" / f"{name}.yml"
 
     if not domain_file.exists():

@@ -84,7 +84,7 @@ def run_setup_gui_fix() -> None:
     from anklume.engine.incus_driver import IncusDriver, IncusError
     from anklume.engine.nesting import detect_nesting_context, prefix_name
 
-    infra = load_infra(Path.cwd())
+    infra = load_infra()
     driver = IncusDriver()
     ctx = detect_nesting_context()
     fixed = 0
@@ -577,7 +577,7 @@ def run_instance_gui(instance: str, app: str) -> None:
     from anklume.engine.incus_driver import IncusDriver, IncusError
     from anklume.engine.nesting import detect_nesting_context, prefix_name
 
-    infra = load_infra(Path.cwd())
+    infra = load_infra()
     ctx = detect_nesting_context()
 
     # Trouver la machine, son projet et son trust level
