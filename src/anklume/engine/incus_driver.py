@@ -309,9 +309,7 @@ class IncusDriver:
         """Retourne la config complète d'un profil (JSON via API)."""
         _validate_name(name)
         _validate_name(project)
-        result = self._run(
-            ["query", f"/1.0/profiles/{name}?project={project}"]
-        )
+        result = self._run(["query", f"/1.0/profiles/{name}?project={project}"])
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError as e:
@@ -344,13 +342,16 @@ class IncusDriver:
         pools = self.storage_pool_list()
         if not pools:
             raise IncusError(
-                ["incus", "storage", "list"], 1,
+                ["incus", "storage", "list"],
+                1,
                 "Aucun storage pool configuré. Lancez `incus admin init`.",
             )
 
         pool = pools[0]
         self.profile_device_add(
-            "default", "root", "disk",
+            "default",
+            "root",
+            "disk",
             {"path": "/", "pool": pool},
             project="default",
         )

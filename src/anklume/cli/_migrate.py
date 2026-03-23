@@ -39,7 +39,5 @@ def run_migrate(project_dir: str = ".") -> None:
         raise typer.Exit(1)
 
     # current < target : placeholder pour les futures migrations
-    console.print(
-        f"[yellow]Migration de schema_version {current} vers {target}[/yellow]"
-    )
+    console.print(f"[yellow]Migration de schema_version {current} vers {target}[/yellow]")
     console.print("[dim]Aucune migration automatique disponible pour le moment.[/dim]")

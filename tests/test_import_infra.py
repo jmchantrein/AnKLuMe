@@ -364,9 +364,7 @@ class TestImportInfrastructure:
         driver = mock_driver(
             projects=[IncusProject(name="pro"), IncusProject(name="default")],
             networks={"pro": [IncusNetwork(name="net-pro", config=net_cfg)]},
-            instances={
-                "pro": [_inst("pro-dev", "pro")]
-            },
+            instances={"pro": [_inst("pro-dev", "pro")]},
         )
 
         result = import_infrastructure(driver, tmp_path)

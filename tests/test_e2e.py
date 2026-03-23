@@ -350,19 +350,14 @@ class TestE2EImportRoundtrip:
         result = import_infrastructure(driver, import_dir)
 
         # 3. Trouver le domaine importé
-        imported = next(
-            (d for d in result.domains if d.project == project_name), None
-        )
+        imported = next((d for d in result.domains if d.project == project_name), None)
         assert imported is not None, (
             f"Domaine {project_name} absent de l'import. "
             f"Trouvés : {[d.project for d in result.domains]}"
         )
 
         # 4. Vérifier la structure
-        imported_names = {
-            inst.name.removeprefix(f"{project_name}-")
-            for inst in imported.instances
-        }
+        imported_names = {inst.name.removeprefix(f"{project_name}-") for inst in imported.instances}
         assert imported_names == {"web", "db"}
 
         # 5. Vérifier les types (tous LXC)

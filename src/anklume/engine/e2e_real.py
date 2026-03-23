@@ -330,10 +330,7 @@ def find_anklume_root() -> Path:
     if (candidate / "pyproject.toml").exists():
         return candidate
 
-    msg = (
-        "Racine anklume introuvable. "
-        "Lancez depuis le repo AnKLuMe ou définissez ANKLUME_ROOT."
-    )
+    msg = "Racine anklume introuvable. Lancez depuis le repo AnKLuMe ou définissez ANKLUME_ROOT."
     raise FileNotFoundError(msg)
 
 

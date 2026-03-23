@@ -30,7 +30,10 @@ from anklume.engine.resources import (
 
 
 def _machine(
-    name: str, weight: int = 1, config: dict | None = None, type: str = "lxc",
+    name: str,
+    weight: int = 1,
+    config: dict | None = None,
+    type: str = "lxc",
 ) -> Machine:
     return Machine(
         name=name,

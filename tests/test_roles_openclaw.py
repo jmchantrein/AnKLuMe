@@ -61,9 +61,7 @@ class TestOpenclawTasks:
         meta_path = BUILTIN_ROLES_DIR / "openclaw_server" / "meta" / "main.yml"
         meta = yaml.safe_load(meta_path.read_text())
         deps = meta.get("dependencies", [])
-        assert any(
-            d.get("role") == "nodejs" for d in deps
-        ), "nodejs dependency not found in meta"
+        assert any(d.get("role") == "nodejs" for d in deps), "nodejs dependency not found in meta"
 
     def test_installs_openclaw_npm(self):
         tasks = role_tasks("openclaw_server")

@@ -859,10 +859,7 @@ class TestRealShowcase:
             assert ds.network_exists, f"Réseau manquant : {ds.domain_name}"
 
         running_count = sum(
-            1
-            for ds in status.domains
-            for inst in ds.instances
-            if inst.state == "Running"
+            1 for ds in status.domains for inst in ds.instances if inst.state == "Running"
         )
         assert running_count == 4, f"{running_count}/4 instances running"
 
