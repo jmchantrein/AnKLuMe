@@ -24,7 +24,7 @@ dev = [
     "behave>=1.2",
     "ruff>=0.8",
     "pyright>=1.1",
-    "molecule>=24.0",
+    "molecule>=26.4.0",
     "ansible-core>=2.16",
     "mkdocstrings[python]>=0.25",
 ]
